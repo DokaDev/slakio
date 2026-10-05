@@ -64,6 +64,39 @@ fn case_2_thread_panel_snapshots() {
     }
 }
 
+/// Blank rows between the main pane's top border and its first drawn row.
+fn rows_above_the_history(d: &Demo, name: &str) -> usize {
+    let screen = d.screen();
+    let lines: Vec<&str> = screen.lines().collect();
+    let title = lines.iter().position(|l| l.contains(&format!("▌#{name} "))).expect("the pane title");
+    let col = lines[title].chars().position(|c| c == '▌').expect("the title mark") - 1;
+    lines[title + 1..].iter().take_while(|l| l.chars().skip(col).take(20).collect::<String>().trim().is_empty()).count()
+}
+
+#[test]
+fn gg_puts_the_oldest_message_on_the_first_row_and_a_short_history_sits_at_the_bottom() {
+    // A history longer than the screen: after `gg` the oldest message (under its date) is on
+    // the first row and newer ones fill the rest, cut at the bottom; no gap above it.
+    let mut d = Demo::new(80, 24);
+    d.open("deploys");
+    d.keys("g g");
+    assert_eq!(rows_above_the_history(&d, "deploys"), 0, "{}", d.screen());
+    assert!(d.screen().contains("── 2026-01-0"), "the date of the oldest message");
+    insta::assert_snapshot!("gg_long_history_80x24", mask_hangul(&d.screen()));
+    d.keys("j j j k k k");
+    assert_eq!(rows_above_the_history(&d, "deploys"), 0, "moving near the top keeps it there");
+    // A history that fits whole sits at the bottom, by the composer, before and after `gg`.
+    let mut d = Demo::new(120, 40);
+    d.open("feed-ticket-104");
+    let main = d.app.work.main.as_ref().unwrap();
+    assert!(main.complete && main.items.len() == 20, "a short channel: {}", main.items.len());
+    let gap = rows_above_the_history(&d, "feed-ticket-104");
+    assert!(gap > 0, "it fits with rows to spare");
+    d.keys("g g");
+    assert_eq!(rows_above_the_history(&d, "feed-ticket-104"), gap, "gg moves nothing");
+    insta::assert_snapshot!("gg_short_history_120x40", mask_hangul(&d.screen()));
+}
+
 #[test]
 fn enter_on_a_message_opens_its_thread_and_another_one_replaces_it() {
     let mut d = Demo::new(120, 40);

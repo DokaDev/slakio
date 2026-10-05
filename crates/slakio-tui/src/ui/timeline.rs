@@ -195,17 +195,32 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         i -= 1;
     }
     shown.reverse();
+    // The oldest is on screen with rows to spare and newer messages below the bottom one (after
+    // `gg`): those fill the rest, so the history starts on the first row with no gap above it.
+    // A history that fits whole stays at the bottom, as in any chat.
+    let from_top = total < h && bottom + 1 < n;
+    let mut i = bottom + 1;
+    while total < h && i < n {
+        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, i, w));
+        total += rows.len();
+        shown.push((i, rows));
+        i += 1;
+    }
     let range = pane.range();
     let style = if focused { t.cursor } else { t.cursor_inactive };
-    // Rows cut off at the top when the area is full; rows start at the bottom otherwise.
-    let mut skip = total.saturating_sub(h);
-    let mut y = area.y + h.saturating_sub(total) as u16;
+    // Rows cut off at the top when the area is full (at the bottom when filled from the top);
+    // rows start at the bottom otherwise.
+    let mut skip = if from_top { 0 } else { total.saturating_sub(h) };
+    let mut y = if from_top { area.y } else { area.y + h.saturating_sub(total) as u16 };
     for (i, rows) in shown {
         let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i));
         for line in rows {
             if skip > 0 {
                 skip -= 1;
                 continue;
+            }
+            if y >= area.bottom() {
+                break;
             }
             let row = Rect { y, height: 1, ..area };
             f.render_widget(Paragraph::new(line), row);
