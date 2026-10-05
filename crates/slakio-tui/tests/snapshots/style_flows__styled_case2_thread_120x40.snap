@@ -1,0 +1,84 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+╭──╮╭ Home ──────────────────╮╭ ▌#long-threads ────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────╮
+    [bdr 0..5] [mut 5..11] [bdr 11..32] [ws 32..33] [mut 33..47] [bdr 47..84] [acc 84..86] [ws 86..87] [ B 87..112] [acc 112..120]
+│●A││ ▾ Favorites            ││ ─────────────────── 2026-01-06 ─────────────────── ││   Latency today design draft     │
+    [bdr 0..1] [ws 1..2] [acc B 2..3] [bdr 3..5] [dim 6..7] [mut B 8..17] [bdr 29..31] [/cl 31..32] [dim/cl 32..82] [/cl 82..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+│●B││   # backend            ││ Minsu · 07:23                                      ││   metrics done build build       │
+    [bdr 0..1] [ws 1..2] [bdr 3..5] [mut 8..9] [bdr 29..31] [/cl 31..32] [/cl B 32..37] [dim/cl 37..45] [/cl 45..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+│──││   # incidents       3  ││   We waiting waiting now index a the a the release ││ Dan Cho · 03:14                  │
+    [bdr 0..5] [ B 8..9] [ B 10..19] [on/err B 25..28] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [ B 86..93] [dim 93..101] [acc 119..120]
+│H ││                        ││   ⤷ 1,200 replies · last 03:23                     ││   Starting deploy                │
+    [bdr 0..1] [acc B 1..2] [bdr 3..5] [bdr 29..31] [/cl 31..34] [acc/cl 34..62] [/cl 62..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+│D●││ ▾ Ops                  ││ Dan Cho · 07:30                                    ││ Chris Park · 03:15               │
+    [bdr 0..1] [ B 2..3] [bdr 3..5] [dim 6..7] [mut B 8..11] [bdr 29..31] [ B 32..39] [dim 39..47] [bdr 83..84] [acc 84..85] [ B 86..96] [dim 96..104] [acc 119..120]
+│A●││   # deploys            ││   Still index lunch index                          ││   Rolling back                   │
+    [bdr 0..1] [err B 2..3] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│F ││   # alerts             ││   ⤷ 6 replies · last 07:36                         ││ Alex Morgan · 03:16              │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [acc 34..58] [bdr 83..84] [acc 84..85] [ B 86..97] [dim 97..105] [acc 119..120]
+│L ││   # partner-shared ext ││ Owen Hwang · 07:37                                 ││   Suspect the DB pool            │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [dim 24..28] [bdr 29..31] [ B 32..42] [dim 42..50] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # hostile-strings    ││   Queue a after cache invoice on customer metrics  ││ Mia Jang · 03:17                 │
+    [bdr 0..1] [bdr 3..5] [ B 8..9] [ B 10..25] [bdr 29..31] [bdr 83..84] [acc 84..85] [ B 86..94] [dim 94..102] [acc 119..120]
+│  ││   # big-history        ││   on maybe sprint                                  ││   Staging fine invoice release   │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # long-threads       ││   ⤷ 12 replies · last 07:49                        ││   merge                          │
+    [bdr 0..1] [bdr 3..5] [/cl 5..8] [mut/cl 8..9] [/cl 9..29] [bdr 29..31] [acc 34..59] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││                        ││ Lily Jeon · 07:41                                  ││ ＊＊＊ · 03:18                   │
+    [bdr 0..1] [bdr 3..5] [bdr 29..31] [ B 32..41] [dim 41..49] [bdr 83..84] [acc 84..85] [ B 86..87] [ B 88..89] [ B 90..91] [dim 92..100] [acc 119..120]
+│  ││ ▾ Channels             ││   Confirmed                                        ││   Budget should timeout timeout  │
+    [bdr 0..1] [bdr 3..5] [dim 6..7] [mut B 8..16] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # announcements      ││ Lily Jeon · 07:54                                  ││   after tomorrow budget meeting  │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..41] [dim 41..49] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # design-review      ││   see https://docs.example.com/runbooks/latency    ││   someone production release     │
+    [bdr 0..1] [bdr 3..5] [dim 8..9] [dim 10..23] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-alert-134     ││ Owen Hwang · 08:00                                 ││ Tom Ko · 03:19                   │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..42] [dim 42..50] [bdr 83..84] [acc 84..85] [ B 86..92] [dim 92..100] [acc 119..120]
+│  ││   # feed-alert-8       ││   Migration branch index queue should              ││   Draft draft is is customer can │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-budget-162    ││ ＊＊＊ · 08:05                                     ││   retry dashboard                │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..33] [ B 34..35] [ B 36..37] [dim 38..46] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-budget-33     ││   Tracing on we pager please looks budget waiting  ││ Nina Seo · 03:20                 │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [ B 86..94] [dim 94..102] [acc 119..120]
+│  ││   # feed-build-50      ││   merge budget queue still branch metrics customer ││   After ticket customer timeout  │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-cache-119     ││   invoice                                          ││   queue again timeout check      │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-customer-161  ││ Tom Ko · 08:13                                     ││   sprint deploy review maybe is  │
+    [bdr 0..1] [bdr 3..5] [dim 8..9] [dim 10..27] [bdr 29..31] [ B 32..38] [dim 38..46] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-customer…  1  ││   ＊＊ ＊＊＊＊＊＊                                ││   build tracing latency          │
+    [bdr 0..1] [bdr 3..5] [dim 8..9] [dim 10..24] [on/err B 25..28] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-dashboard-22  ││ Kim · 08:21                                        ││ Max Baek · 03:21                 │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..35] [dim 35..43] [bdr 83..84] [acc 84..85] [ B 86..94] [dim 94..102] [acc 119..120]
+│  ││   # feed-dashboard-41  ││   Review lunch lunch design schema merge design    ││   Latency timeout should for     │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-design-34     ││   build the looks                                  ││   invoice on index roadmap a     │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-design-83     ││ Alex Morgan · 08:33                                ││   budget tracing is queue index  │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..43] [dim 43..51] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-draft-142     ││   Tracing timeout index merge now deploy queue     ││   ticket                         │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-draft-58      ││   done retry meeting can pager pager (edited)      ││ Ivy Moon · 03:22                 │
+    [bdr 0..1] [bdr 3..5] [ B 8..9] [ B 10..23] [bdr 29..31] [mut 69..77] [bdr 83..84] [acc 84..85] [ B 86..94] [dim 94..102] [acc 119..120]
+│  ││   # feed-draft-84      ││ Hyunwoo · 08:35                                    ││   Draft broken can looks staging │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [ B 32..39] [dim 39..47] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-index-199  2  ││   For cache timeout ticket migration pager         ││   done tracing now lunch meeting │
+    [bdr 0..1] [bdr 3..5] [ B 8..9] [ B 10..24] [on/err B 25..28] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-index-39      ││   rollback branch tracing after a done on tomorrow ││   invoice migration done         │
+    [bdr 0..1] [bdr 3..5] [dim 8..9] [dim 10..23] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-index-5    1  ││   broken schema                                    ││   customer please                │
+    [bdr 0..1] [bdr 3..5] [ B 8..9] [ B 10..22] [on/err B 25..28] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-invoice-16    ││   ⤷ 1 reply · last 08:36                           ││ Eve Bae · 03:23                  │
+    [bdr 0..1] [bdr 3..5] [ B 8..9] [ B 10..25] [bdr 29..31] [acc 34..56] [bdr 83..84] [acc 84..85] [ B 86..93] [dim 93..101] [acc 119..120]
+│  ││   # feed-invoice-168   ││   :+1: 3                                           ││   ＊＊＊＊＊                     │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [mut/surf2 34..40] [bdr 83..84] [acc 84..85] [acc 119..120]
+│  ││   # feed-latency-144   │├─ Message #long-threads ────────────────────────────┤├─ Reply ──────────────────────────┤
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..32] [mut 32..55] [bdr 55..84] [acc 84..86] [mut 86..93] [bdr 93..119] [acc 119..120]
+│  ││   # feed-meeting-82    ││ › Press i to write                                 ││ › Press i to reply               │
+    [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [dim 86..118] [acc 119..120]
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
+    [bdr 0..84] [acc 84..120]
+ NORMAL  ▌ #long-threads › ⤷ Thread        i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [dim/surf 10..11] [/surf 11..43] [/surf B 43..44] [mut/surf 44..50] [dim/surf 50..53] [/surf B 53..54] [mut/surf 54..63] [dim/surf 63..66] [/surf B 66..69] [mut/surf 69..74] [dim/surf 74..77] [/surf B 77..83] [mut/surf 83..89] [dim/surf 89..92] [/surf B 92..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

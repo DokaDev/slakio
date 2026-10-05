@@ -1,0 +1,84 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+╭───────────────────╮────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+    [bdr 0..21] [acc 21..30] [bdr 30..120]
+│▌A company     28  │        ││                                                                                        │
+    [bdr 0..1] [ws 1..2] [acc B 2..11] [on/err B 15..19] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│▌B side         9  │        ││                                                                                        │
+    [bdr 0..1] [ws 1..2] [on/err B 16..19] [bdr 20..21] [/sel 21..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│───────────────────│     3  ││                                                                                        │
+    [bdr 0..21] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│▎H  Home           │        ││                                                                                        │
+    [bdr 0..1] [acc B 1..9] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ D  DMs        16  │        ││                                                                                        │
+    [bdr 0..1] [acc/cl B 1..2] [/cl 2..15] [on/err B 15..19] [/cl 19..20] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ A  Activity   37  │        ││                                                                                        │
+    [bdr 0..1] [acc B 1..2] [on/err B 15..19] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ F  Files          │        ││                                                                                        │
+    [bdr 0..1] [acc B 1..2] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ L  Later          │red ext ││                                                                                        │
+    [bdr 0..1] [acc B 1..2] [bdr 20..21] [dim 24..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │ings    ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [ B 21..25] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │        ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │s       ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │        ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │        ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │ts      ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │ew      ││                         No conversation open                                           │
+    [bdr 0..1] [bdr 20..21] [dim 21..23] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
+│                   │134     ││                         Pick one in the list and press Enter.                          │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
+│                   │8       ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │-162    ││                         Enter    Open                                                  │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [warm B 56..61] [bdr 119..120]
+│                   │-33     ││                         Space h  Home                                                  │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+│                   │50      ││                         Space d  DMs                                                   │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+│                   │119     ││                         Ctrl+O   Back to the last one                                  │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│                   │er-161  ││                         ?        Keyboard help                                         │
+    [bdr 0..1] [bdr 20..21] [dim 21..27] [acc 29..30] [bdr 30..31] [warm B 56..57] [bdr 119..120]
+│                   │er…  1  ││                         Ctrl+Q   Quit                                                  │
+    [bdr 0..1] [bdr 20..21] [dim 21..24] [on/err B 25..28] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│                   │ard-22  ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │ard-41  ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │-34     ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │-83     ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │142     ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │58      ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [ B 21..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │84      ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │199  2  ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [ B 21..24] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │39      ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [dim 21..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │5    1  ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [ B 21..22] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │e-16    ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [ B 21..25] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │e-168   ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │y-144   ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                   │g-82    ││                                                                                        │
+    [bdr 0..1] [bdr 20..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+╰───────────────────╯────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+    [bdr 0..21] [acc 21..30] [bdr 30..120]
+ NORMAL  ▌A company › Home  Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 16 │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..28] [/surf B 28..33] [mut/surf 33..38] [dim/surf 38..41] [/surf B 41..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..53] [mut/surf 53..63] [dim/surf 63..66] [/surf B 66..67] [mut/surf 67..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

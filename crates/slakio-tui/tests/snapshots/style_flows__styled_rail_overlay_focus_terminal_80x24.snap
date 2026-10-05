@@ -1,0 +1,52 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+╭───────────────────╮────────╮╭────────────────────────────────────────────────╮
+    [acc 0..21] [bdr 21..80]
+│▌A company     28  │        ││                                                │
+    [acc 0..1] [ws 1..2] [acc/bdr B 2..11] [/bdr 11..15] [on/err B 15..19] [/bdr 19..20] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│▌B side         9  │        ││                                                │
+    [acc 0..1] [warm 1..2] [on/err B 16..19] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│───────────────────│     3  ││                                                │
+    [acc 0..1] [bdr 1..20] [acc 20..21] [on/err B 25..28] [bdr 29..31] [bdr 79..80]
+│▎H  Home           │        ││                                                │
+    [acc 0..1] [acc B 1..9] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│ D  DMs        16  │        ││                                                │
+    [acc 0..1] [acc B 1..2] [on/err B 15..19] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│ A  Activity   37  │        ││                                                │
+    [acc 0..1] [acc B 1..2] [on/err B 15..19] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│ F  Files          │        ││     No conversation open                       │
+    [acc 0..1] [acc B 1..2] [acc 20..21] [bdr 29..31] [ B 36..56] [bdr 79..80]
+│ L  Later          │red ext ││     Pick one in the list and press Enter.      │
+    [acc 0..1] [acc B 1..2] [acc 20..21] [bdr 24..28] [bdr 29..31] [mut 36..73] [bdr 79..80]
+│                   │ings    ││                                                │
+    [acc 0..1] [acc 20..21] [ B 21..25] [bdr 29..31] [bdr 79..80]
+│                   │        ││     Enter    Open                              │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [warm B 36..41] [bdr 79..80]
+│                   │s       ││     Space h  Home                              │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [warm B 36..43] [bdr 79..80]
+│                   │        ││     Space d  DMs                               │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [warm B 36..43] [bdr 79..80]
+│                   │        ││     Ctrl+O   Back to the last one              │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [warm B 36..42] [bdr 79..80]
+│                   │ts      ││     ?        Keyboard help                     │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [warm B 36..37] [bdr 79..80]
+│                   │ew      ││     Ctrl+Q   Quit                              │
+    [acc 0..1] [acc 20..21] [bdr 21..23] [bdr 29..31] [warm B 36..42] [bdr 79..80]
+│                   │134     ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│                   │8       ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│                   │-162    ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│                   │-33     ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│                   │50      ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+│                   │119     ││                                                │
+    [acc 0..1] [acc 20..21] [bdr 29..31] [bdr 79..80]
+╰───────────────────╯────────╯╰────────────────────────────────────────────────╯
+    [acc 0..21] [bdr 21..80]
+ NORMAL  ▌ Home  Enter show · j/k move · Esc back · ? help │  @37  DM 16 │ demo
+    [on/normal B 0..8] [ws 9..10] [bdr 10..11] [ B 17..22] [mut 22..27] [bdr 27..30] [ B 30..33] [mut 33..38] [bdr 38..41] [ B 41..44] [mut 44..49] [bdr 49..52] [ B 52..53] [mut 53..58] [bdr 58..61] [on/err B 61..66] [ B 67..72] [bdr 72..75] [warm 75..79]
