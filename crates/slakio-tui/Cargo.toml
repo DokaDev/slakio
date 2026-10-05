@@ -25,6 +25,8 @@ futures.workspace = true
 lexopt.workspace = true
 ratatui.workspace = true
 slakio-core.workspace = true
+# The invented world behind `--demo`.
+slakio-world.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "signal"] }
 
 [dev-dependencies]

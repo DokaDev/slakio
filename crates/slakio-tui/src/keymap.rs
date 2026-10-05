@@ -25,7 +25,8 @@ pub mod keys;
 pub use check::{Conflict, ConflictKind, check};
 pub use keys::{KeyChord, KeyError, parse_keys};
 
-use crate::action::{Action, CommandLineAction};
+use crate::action::{Action, CommandLineAction, ShellAction};
+use crate::app::shell::View;
 use slakio_core::i18n::Label;
 
 /// A key context: where the keyboard is.
@@ -108,9 +109,38 @@ const fn bind(ctx: Ctx, keys: &'static str, action: Action) -> Binding {
     Binding { ctx, keys, action }
 }
 
+const fn shell(ctx: Ctx, keys: &'static str, action: ShellAction) -> Binding {
+    bind(ctx, keys, Action::Shell(action))
+}
+
 /// The default bindings.
 pub const DEFAULTS: &[Binding] = &[
     bind(Ctx::Root, ":", Action::CommandLine(CommandLineAction::Open)),
+    // Between the regions. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
+    // `Backspace` as `^H`; `Space w h` works everywhere.
+    shell(Ctx::Shell, "ctrl+h", ShellAction::FocusLeft),
+    shell(Ctx::Shell, "ctrl+l", ShellAction::FocusRight),
+    shell(Ctx::Shell, "space w h", ShellAction::FocusLeft),
+    shell(Ctx::Shell, "space w l", ShellAction::FocusRight),
+    // The rail's entry points.
+    shell(Ctx::Shell, "space h", ShellAction::Show(View::Home)),
+    shell(Ctx::Shell, "space d", ShellAction::Show(View::Dms)),
+    shell(Ctx::Shell, "space a", ShellAction::Show(View::Activity)),
+    shell(Ctx::Shell, "space f", ShellAction::Show(View::Files)),
+    shell(Ctx::Shell, "space l", ShellAction::Show(View::Later)),
+    shell(Ctx::Shell, "space e", ShellAction::ToggleList),
+    shell(Ctx::Rail, "j", ShellAction::RailNext),
+    shell(Ctx::Rail, "down", ShellAction::RailNext),
+    shell(Ctx::Rail, "k", ShellAction::RailPrev),
+    shell(Ctx::Rail, "up", ShellAction::RailPrev),
+    shell(Ctx::Rail, "enter", ShellAction::RailSelect),
+    shell(Ctx::List, "j", ShellAction::ListNext),
+    shell(Ctx::List, "down", ShellAction::ListNext),
+    shell(Ctx::List, "k", ShellAction::ListPrev),
+    shell(Ctx::List, "up", ShellAction::ListPrev),
+    shell(Ctx::List, "g g", ShellAction::ListFirst),
+    shell(Ctx::List, "G", ShellAction::ListLast),
+    shell(Ctx::List, "enter", ShellAction::ListOpen),
     bind(Ctx::CommandLine, "enter", Action::CommandLine(CommandLineAction::Run)),
     bind(Ctx::CommandLine, "esc", Action::CommandLine(CommandLineAction::Cancel)),
 ];

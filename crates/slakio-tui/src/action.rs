@@ -6,6 +6,7 @@
 //! (`Action::CommandLine(CommandLineAction::Run)`), so dispatching one is routing, never a
 //! single match over every action of the app.
 
+use crate::app::shell::View;
 use slakio_core::i18n::Label;
 
 /// Something the user asked for, routed to the sub-state that owns it.
@@ -13,6 +14,7 @@ use slakio_core::i18n::Label;
 pub enum Action {
     App(AppAction),
     CommandLine(CommandLineAction),
+    Shell(ShellAction),
 }
 
 /// Actions of the app as a whole.
@@ -27,6 +29,27 @@ pub enum CommandLineAction {
     Open,
     Run,
     Cancel,
+}
+
+/// Actions of the shell: focus between the regions, the rail, the list panel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ShellAction {
+    FocusLeft,
+    FocusRight,
+    RailNext,
+    RailPrev,
+    /// Show the rail item under the cursor in the list panel.
+    RailSelect,
+    ListNext,
+    ListPrev,
+    ListFirst,
+    ListLast,
+    /// Open the conversation under the cursor, or fold its section.
+    ListOpen,
+    /// Show or hide the list panel.
+    ToggleList,
+    /// Show a view of the rail in the list panel.
+    Show(View),
 }
 
 /// One registered action.
@@ -65,6 +88,102 @@ pub const REGISTRY: &[ActionSpec] = &[
         id: "cmdline.cancel",
         label: Label::ActionCmdlineCancel,
         commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::FocusLeft),
+        id: "focus.left",
+        label: Label::ActionFocusLeft,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::FocusRight),
+        id: "focus.right",
+        label: Label::ActionFocusRight,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::RailNext),
+        id: "rail.next",
+        label: Label::ActionRailNext,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::RailPrev),
+        id: "rail.prev",
+        label: Label::ActionRailPrev,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::RailSelect),
+        id: "rail.select",
+        label: Label::ActionRailSelect,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ListNext),
+        id: "list.next",
+        label: Label::ActionListNext,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ListPrev),
+        id: "list.prev",
+        label: Label::ActionListPrev,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ListFirst),
+        id: "list.first",
+        label: Label::ActionListFirst,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ListLast),
+        id: "list.last",
+        label: Label::ActionListLast,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ListOpen),
+        id: "list.open",
+        label: Label::ActionListOpen,
+        commands: &[],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::ToggleList),
+        id: "list.toggle_panel",
+        label: Label::ActionListTogglePanel,
+        commands: &["list"],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::Show(View::Home)),
+        id: "view.home",
+        label: Label::ActionViewHome,
+        commands: &["home"],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::Show(View::Dms)),
+        id: "view.dms",
+        label: Label::ActionViewDms,
+        commands: &["dms"],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::Show(View::Activity)),
+        id: "view.activity",
+        label: Label::ActionViewActivity,
+        commands: &["activity"],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::Show(View::Files)),
+        id: "view.files",
+        label: Label::ActionViewFiles,
+        commands: &["files"],
+    },
+    ActionSpec {
+        action: Action::Shell(ShellAction::Show(View::Later)),
+        id: "view.later",
+        label: Label::ActionViewLater,
+        commands: &["later"],
     },
 ];
 

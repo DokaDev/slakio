@@ -310,6 +310,8 @@ const SAME_IN_KO: &[&str] = &[
     // Vim's mode names, which vim shows in English whatever the language.
     "mode.normal",
     "mode.command",
+    // "DM" is what Korean Slack users say too.
+    "status.dms",
 ];
 
 #[test]

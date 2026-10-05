@@ -42,10 +42,12 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 ## The UI: state, actions, effects
 
 `App` (`crates/slakio-tui/src/app.rs`) is a thin router. Each part of the state is a sub-state
-that owns its data and its update: today the command line (`app/cmdline.rs`) and the status
-line's notices (`app/status.rs`); the shell (rail, list panel), the layout (tabs and panes), the
-panes, the read model of the workspaces, the input mode and the overlays join as they are
-built. Rules:
+that owns its data and its update: the command line (`app/cmdline.rs`), the status line's
+notices (`app/status.rs`), the shell — focus between rail, list panel and work area, the rail
+and list cursors, folded sections, what the work area has open (`app/shell.rs`) — and the read
+model of the workspaces (`app/model.rs`); the layout (tabs and panes), the panes, the input
+mode and the overlays join as they are built. The geometry of the screen (`screen.rs`) is one
+pure function that drawing and the mouse both use. Rules:
 
 - An `Action` is namespaced by its owner (`Action::CommandLine(CommandLineAction::Run)`), so
   dispatching one is routing, not one match over every action of the app.
@@ -54,6 +56,11 @@ built. Rules:
 - State does no I/O. The binary owns the terminal and a single `tokio::select!` loop over
   input, signals and the app's next deadline; it redraws only after something changed and
   sleeps when nothing happens (the idle wakeups are a performance budget).
+- The UI talks to a backend only through the protocol of `slakio_core::backend`: the app
+  queues commands, the binary's loop delivers them and hands the events back, and an event for
+  an older request (an older generation) is dropped. `slakio --demo` uses `DemoBackend`
+  (`crates/slakio-tui/src/demo.rs`) over `slakio-world`; `main.rs` is the one place that names
+  a concrete backend.
 - Channels from background tasks are bounded wherever a stream can be large (websocket events,
   history pages, downloads); events carry their target and a generation, and stale ones are
   dropped.
@@ -76,6 +83,18 @@ built. Rules:
 - **Failures as data.** Core never words a failure: a `Fault` has a kind the UI turns into a
   catalog message and a raw detail that only goes to `<state>/errors.log`. The status line never
   shows OS or parser text.
+
+## Keys
+
+`crates/slakio-tui/src/keymap.rs` holds the context tree and the default bindings; every
+binding names an action of the registry. Keys resolve from the focused context outwards; a text
+input has no parent, so `Ctrl+W` can close a pane in Normal mode and delete a word while
+typing. Sequences (`g g`, `Space w h`) wait for their next key. The checker
+(`keymap/check.rs`) runs on the defaults in the tests and rejects duplicates, shadowed parent
+keys, prefixes, character keys in text inputs, keys a terminal cannot tell apart without the
+kitty keyboard protocol (`Ctrl+I`/`Tab`, `Ctrl+M`/`Enter`, `Ctrl+[`/`Esc`, `Ctrl+H`/`Backspace`)
+bound to different actions, and actions reachable only by such keys or `Alt` keys.
+`docs/keybindings.md` is generated from the table.
 
 ## UI strings (i18n)
 

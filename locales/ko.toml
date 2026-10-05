@@ -13,10 +13,46 @@
 "config.unknown_key" = "설정 파일에 알 수 없는 항목 {key} 이(가) 있어 기본값을 사용합니다"
 "config.bad_value" = "{key} = {value} 은(는) 올바르지 않습니다 ({allowed} 중 하나). 기본값을 사용합니다"
 
+"welcome.demo_hint" = "만들어 낸 데이터로 화면을 써 보려면 slakio --demo 를 실행하세요."
+
+"rail.home" = "홈"
+"rail.dms" = "DM"
+"rail.activity" = "활동"
+"rail.files" = "파일"
+"rail.later" = "나중에"
+
+"list.loading" = "불러오는 중…"
+"list.later_version" = "다음 버전에서 제공됩니다."
+"list.empty" = "비어 있습니다."
+
+"pane.empty" = "목록에서 대화를 고르고 Enter를 누르세요."
+"pane.no_history" = "이 빌드에서는 아직 메시지를 보여 주지 않습니다."
+
+"status.demo" = "데모"
+"status.dms" = "DM"
+
+"screen.too_small" = "터미널이 {width}×{height}입니다. slakio에는 최소 {min_width}×{min_height}가 필요합니다."
+
 "action.quit" = "종료"
 "action.cmdline.open" = "명령줄 열기"
 "action.cmdline.run" = "입력한 명령 실행"
 "action.cmdline.cancel" = "명령줄 닫기"
+"action.focus.left" = "왼쪽으로 포커스 이동"
+"action.focus.right" = "오른쪽으로 포커스 이동"
+"action.rail.next" = "레일 다음 항목"
+"action.rail.prev" = "레일 이전 항목"
+"action.rail.select" = "레일 항목 보기"
+"action.list.next" = "다음 줄"
+"action.list.prev" = "이전 줄"
+"action.list.first" = "첫 줄"
+"action.list.last" = "마지막 줄"
+"action.list.open" = "대화 열기 또는 섹션 접기"
+"action.list.toggle_panel" = "목록 패널 보이기/숨기기"
+"action.view.home" = "홈 보기"
+"action.view.dms" = "DM 보기"
+"action.view.activity" = "활동 보기"
+"action.view.files" = "파일 보기"
+"action.view.later" = "나중에 보기"
 
 "ctx.root" = "어디서나"
 "ctx.shell" = "메인 화면"

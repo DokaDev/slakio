@@ -1,35 +1,59 @@
-//! Drawing a frame of [`App`]: the work area (empty for now) and the status line.
+//! Drawing a frame of [`App`]. Without a backend: the welcome text and the status line. With
+//! one: the shell — rail, list panel, work area — over the status line (see [`crate::screen`]
+//! for the geometry), or, on a terminal too small for it, only how much room it needs.
 //!
-//! ```text
-//!                         slakio
-//!   Early development: nothing connects to Slack yet.
-//!          Type :qa and press Enter to quit.
+//! * [`rail`], [`list`], [`work`] — the three regions; [`statusline`] — the bottom line.
 //!
-//!  NORMAL  <notice>
-//! ```
+//! Names drawn here are the backend's data (workspace, channel and people names). The demo
+//! world holds only printable names; remote text goes through the sanitiser before any of it
+//! is drawn.
 
-use crate::app::status::Level;
-use crate::app::{App, Mode};
+mod list;
+mod rail;
+mod statusline;
+mod work;
+
+use crate::app::App;
+use crate::app::shell::{Region, View};
+use crate::screen;
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Constraint, Layout, Position, Rect};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
-use slakio_core::i18n::{Label, Localized};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::style::Style;
+use ratatui::symbols::border;
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Paragraph, Wrap};
+use slakio_core::i18n::{Label, Localized, Msg};
 use std::time::Instant;
 
 /// Draw the whole screen at `now` (notices that ran out are not drawn).
 pub fn draw(f: &mut Frame, app: &App, now: Instant) {
-    let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(f.area());
-    draw_body(f, app, body);
-    draw_status(f, app, status, now);
+    let area = f.area();
+    if app.backend.is_none() {
+        let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+        draw_welcome(f, app, body);
+        statusline::draw(f, app, status, now);
+        return;
+    }
+    if screen::too_small(area) {
+        draw_too_small(f, app, area);
+        return;
+    }
+    let a = app.areas();
+    if let Some(l) = a.list {
+        list::draw(f, app, l);
+    }
+    work::draw(f, app, a.work);
+    rail::draw(f, app, a.rail);
+    statusline::draw(f, app, a.status, now);
 }
 
-fn draw_body(f: &mut Frame, app: &App, area: Rect) {
+fn draw_welcome(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let lines = vec![
         Line::styled(Localized::verbatim("slakio").to_string(), t.title),
         Line::styled(app.i18n.label(Label::WelcomeStatus).to_string(), t.muted),
         Line::styled(app.i18n.label(Label::WelcomeQuitHint).to_string(), t.muted),
+        Line::styled(app.i18n.label(Label::WelcomeDemoHint).to_string(), t.muted),
     ];
     let height = lines.len() as u16;
     let top = area.y + area.height.saturating_sub(height) / 2;
@@ -37,35 +61,57 @@ fn draw_body(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(lines).alignment(Alignment::Center).style(t.text), area);
 }
 
-fn draw_status(f: &mut Frame, app: &App, area: Rect, now: Instant) {
-    let t = &app.theme;
-    let (label, style) = match app.mode() {
-        Mode::Normal => (Label::ModeNormal, t.mode_normal),
-        Mode::Command => (Label::ModeCommand, t.mode_command),
+fn draw_too_small(f: &mut Frame, app: &App, area: Rect) {
+    let msg = Msg::ScreenTooSmall {
+        width: area.width.to_string(),
+        height: area.height.to_string(),
+        min_width: screen::MIN_WIDTH.to_string(),
+        min_height: screen::MIN_HEIGHT.to_string(),
     };
-    let badge = format!(" {} ", app.i18n.label(label));
-    let badge_width = width(&badge);
-    let mut spans = vec![Span::styled(badge, style), Span::raw(" ")];
-    let mut cursor = None;
-    if app.mode() == Mode::Command {
-        let text = format!(":{}", app.cmdline.text());
-        let x = area.x + (badge_width + 1 + width(&text)) as u16;
-        cursor = Some(Position { x: x.min(area.right().saturating_sub(1)), y: area.y });
-        spans.push(Span::styled(text, t.text));
-    } else if let Some(n) = app.status.notice(now) {
-        let style = match n.level {
-            Level::Warning => t.warning,
-            Level::Info => t.text,
-        };
-        spans.push(Span::styled(app.i18n.msg(&n.msg).to_string(), style));
-    }
-    f.render_widget(Paragraph::new(Line::from(spans)).style(t.status), area);
-    if let Some(p) = cursor {
-        f.set_cursor_position(p);
+    let text = app.i18n.msg(&msg).to_string();
+    f.render_widget(Paragraph::new(text).wrap(Wrap { trim: true }).style(app.theme.muted), area);
+}
+
+/// A region's frame: rounded, its border marking the focus.
+fn frame<'a>(app: &App, region: Region, title: Line<'a>) -> Block<'a> {
+    let t = &app.theme;
+    let style = if app.shell.focus == region { t.border_focus } else { t.border };
+    Block::bordered().border_set(border::ROUNDED).border_style(style).title(title)
+}
+
+/// The name of a view (rail labels, list title, breadcrumb).
+fn view_label(view: View) -> Label {
+    match view {
+        View::Home => Label::RailHome,
+        View::Dms => Label::RailDms,
+        View::Activity => Label::RailActivity,
+        View::Files => Label::RailFiles,
+        View::Later => Label::RailLater,
     }
 }
 
-/// Display width of text in terminal cells.
-fn width(s: &str) -> usize {
-    Span::raw(s).width()
+/// The rail's letter, or its Nerd Font icon, for a view.
+fn view_glyph(view: View, icons: bool) -> &'static str {
+    match (view, icons) {
+        (View::Home, false) => "H",
+        (View::Dms, false) => "D",
+        (View::Activity, false) => "A",
+        (View::Files, false) => "F",
+        (View::Later, false) => "L",
+        (View::Home, true) => "\u{F02DC}",
+        (View::Dms, true) => "\u{F0361}",
+        (View::Activity, true) => "\u{F009A}",
+        (View::Files, true) => "\u{F0219}",
+        (View::Later, true) => "\u{F00C0}",
+    }
+}
+
+/// The first letter of a workspace's name, upper case: its rail letter.
+fn workspace_letter(name: &str) -> String {
+    name.chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_default()
+}
+
+/// Paint `style` over a whole row (the cursor).
+fn highlight(f: &mut Frame, row: Rect, style: Style) {
+    f.buffer_mut().set_style(row, style);
 }

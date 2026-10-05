@@ -9,23 +9,26 @@ use futures::StreamExt;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::EventStream;
+use slakio_core::backend::Backend;
 use slakio_core::config::{self, ConfigError};
 use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
 use slakio_core::paths::Paths;
 use slakio_core::secret::{STORE_ENV, StoreKind};
-use slakio_tui::app::App;
+use slakio_tui::app::{App, Settings};
+use slakio_tui::demo::DemoBackend;
 use slakio_tui::terminal::{Cursor, cursor_shape};
 use slakio_tui::theme::Theme;
 use slakio_tui::ui;
+use slakio_world::World;
 use std::io::{self, Stdout};
 use std::process::ExitCode;
 use std::time::Instant;
 
 fn main() -> ExitCode {
     let mut stats = stats::Stats::from_env();
-    let cli_config = match parse_args(std::env::args_os().skip(1)) {
-        Ok(Cli::Run { config }) => config,
+    let (cli_config, demo) = match parse_args(std::env::args_os().skip(1)) {
+        Ok(Cli::Run { config, demo }) => (config, demo),
         Ok(Cli::Help) => {
             print!("{HELP}");
             return ExitCode::SUCCESS;
@@ -50,6 +53,12 @@ fn main() -> ExitCode {
     let (cfg, cfg_err) = config::load(config_path.as_deref());
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let mut app = App::new(lang, Theme::from_env(|k| std::env::var(k).ok()));
+    app.settings = Settings { icons: cfg.icons, rail_push: cfg.rail_expand == "push" };
+    // The one place that names a concrete backend.
+    let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
+    if let Some(b) = &backend {
+        app.connect(b.capabilities());
+    }
     if let Some(e) = cfg_err {
         ErrorLog::new(paths.errors_log()).record("config", &e.fault());
         app.warn(config_message(&e), Instant::now());
@@ -72,7 +81,7 @@ fn main() -> ExitCode {
         // Restores the terminal however this block ends (also a setup that fails part way).
         let _restore = term::guard();
         let mut terminal = term::setup_terminal()?;
-        run(&mut terminal, app, &mut stats).await
+        run(&mut terminal, app, backend, &mut stats).await
     });
     if let Some(s) = stats.as_mut() {
         s.write();
@@ -103,8 +112,11 @@ fn config_message(e: &ConfigError) -> Msg {
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     mut app: App,
+    mut backend: Option<Box<dyn Backend>>,
     stats: &mut Option<stats::Stats>,
 ) -> io::Result<()> {
+    let size = terminal.size()?;
+    app.resize(size.width, size.height);
     let mut events = EventStream::new();
     let mut signals = Signals::new()?;
     let mut cursor = Cursor::default();
@@ -113,6 +125,15 @@ async fn run(
     // restores the terminal (tests/signals.rs).
     let panic_after_frame = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_PANIC").is_some_and(|v| v == "1");
     while !app.quit {
+        // The backend's turn: deliver what the app asked for, take what is ready.
+        if let Some(b) = backend.as_mut() {
+            for (generation, command) in app.take_commands() {
+                b.send(generation, command);
+            }
+            while let Some(envelope) = b.poll() {
+                redraw |= app.on_backend(envelope);
+            }
+        }
         if redraw {
             cursor.apply(&mut io::stdout(), cursor_shape(&app))?;
             terminal.draw(|f| ui::draw(f, &app, Instant::now()))?;

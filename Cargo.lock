@@ -1387,6 +1387,7 @@ dependencies = [
  "lexopt",
  "ratatui",
  "slakio-core",
+ "slakio-world",
  "tokio",
 ]
 

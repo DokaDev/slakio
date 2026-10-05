@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/shell_flows.rs
+expression: s
+---
+╭──╮╭ Home ──────────────╮╭────────────────────────────────────────────────────╮
+│▌A││▾ Favorites         ││Choose a conversation in the list and press Enter.  │
+│▌B││ # backend          ││                                                    │
+│──││ # incidents      3 ││                                                    │
+│H ││▾ Ops               ││                                                    │
+│D●││ # deploys          ││                                                    │
+│A●││ # alerts           ││                                                    │
+│F ││ # partner-shared   ││                                                    │
+│L ││ # hostile-string ● ││                                                    │
+│  ││ # big-history      ││                                                    │
+│  ││ # long-threads     ││                                                    │
+│  ││▾ Channels          ││                                                    │
+│  ││ # announcements    ││                                                    │
+│  ││ # design-review    ││                                                    │
+│  ││ # feed-alert-134   ││                                                    │
+│  ││ # feed-alert-8     ││                                                    │
+│  ││ # feed-budget-162  ││                                                    │
+│  ││ # feed-budget-33   ││                                                    │
+│  ││ # feed-build-50    ││                                                    │
+│  ││ # feed-cache-119   ││                                                    │
+│  ││ # feed-customer-1  ││                                                    │
+│  ││ # feed-customer- 1 ││                                                    │
+╰──╯╰────────────────────╯╰────────────────────────────────────────────────────╯
+ NORMAL  ▌A company  Home                                      @37  DM 16  demo

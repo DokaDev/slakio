@@ -19,11 +19,53 @@
 "config.unknown_key" = "Unknown setting {key} in the config file; using the defaults"
 "config.bad_value" = "{key} = {value} is not valid (expected {allowed}); using the defaults"
 
+# The empty work area without a backend.
+"welcome.demo_hint" = "To try the interface with invented data, run slakio --demo."
+
+# The rail.
+"rail.home" = "Home"
+"rail.dms" = "DMs"
+"rail.activity" = "Activity"
+"rail.files" = "Files"
+"rail.later" = "Later"
+
+# The list panel.
+"list.loading" = "Loading…"
+"list.later_version" = "Available in a later version."
+"list.empty" = "Nothing here."
+
+# The work area.
+"pane.empty" = "Choose a conversation in the list and press Enter."
+"pane.no_history" = "Messages are not shown in this build yet."
+
+# The status line: the demo backend, and the unread DM total.
+"status.demo" = "demo"
+"status.dms" = "DM"
+
+# A terminal smaller than the screen needs.
+"screen.too_small" = "The terminal is {width}×{height}; slakio needs at least {min_width}×{min_height}."
+
 # Actions (key help and docs/keybindings.md).
 "action.quit" = "Quit"
 "action.cmdline.open" = "Open the command line"
 "action.cmdline.run" = "Run the typed command"
 "action.cmdline.cancel" = "Close the command line"
+"action.focus.left" = "Move the focus left"
+"action.focus.right" = "Move the focus right"
+"action.rail.next" = "Next rail item"
+"action.rail.prev" = "Previous rail item"
+"action.rail.select" = "Show the rail item"
+"action.list.next" = "Next row"
+"action.list.prev" = "Previous row"
+"action.list.first" = "First row"
+"action.list.last" = "Last row"
+"action.list.open" = "Open the conversation, or fold the section"
+"action.list.toggle_panel" = "Show or hide the list panel"
+"action.view.home" = "Show Home"
+"action.view.dms" = "Show DMs"
+"action.view.activity" = "Show Activity"
+"action.view.files" = "Show Files"
+"action.view.later" = "Show Later"
 
 # Key contexts (key help and docs/keybindings.md).
 "ctx.root" = "Everywhere"
