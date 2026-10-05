@@ -1,0 +1,37 @@
+name: Fuzz
+
+# cargo-fuzz needs a nightly toolchain, so it is not a merge gate: it runs on a schedule (and by
+# hand) against main. A crash fails the run and uploads the input; the fix lands with a stable
+# regression test made from it.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  SLAKIO_SECRET_STORE: memory
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sanitize:
+    name: fuzz the sanitiser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo +nightly install --locked cargo-fuzz --version 0.13.2
+      # Ten minutes of the sanitiser on arbitrary bytes.
+      - run: cargo +nightly fuzz run sanitize -- -max_total_time=600
+        working-directory: fuzz
+      - uses: actions/upload-artifact@v7
+        if: ${{ failure() }}
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts

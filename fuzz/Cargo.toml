@@ -1,0 +1,27 @@
+# cargo-fuzz targets (nightly toolchain): `cargo +nightly fuzz run sanitize`. Not a member of
+# the main workspace, so the stable build, the lock file and the license checks never see
+# libfuzzer. CI runs them on a schedule (.github/workflows/fuzz.yml); an input a run finds
+# becomes a stable regression test next to the code it breaks.
+[package]
+name = "slakio-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+slakio-core = { path = "../crates/slakio-core" }
+
+[[bin]]
+name = "sanitize"
+path = "fuzz_targets/sanitize.rs"
+test = false
+doc = false
+bench = false
+
+# Its own workspace: never part of the main one.
+[workspace]
