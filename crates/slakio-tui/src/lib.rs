@@ -10,15 +10,20 @@
 //! * [`theme`] — color and style tokens.
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
+//! * [`input`] — Hangul typed where a key command was meant.
+//! * [`text`] — display widths and wrapping; [`time`] — message dates and times.
 //!
 //! UI-independent logic lives in `slakio-core`.
 
 pub mod action;
 pub mod app;
 pub mod demo;
+pub mod input;
 pub mod keymap;
 pub mod kitty;
 pub mod screen;
 pub mod terminal;
+pub mod text;
 pub mod theme;
+pub mod time;
 pub mod ui;

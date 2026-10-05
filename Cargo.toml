@@ -44,6 +44,10 @@ tokio = "1"
 toml = "1.1.6"
 # The config file and the one-time notices file: read and written keeping comments and order.
 toml_edit = "0.25"
+# Grapheme clusters and their display widths, the same functions Ratatui's buffer uses, so
+# wrapped message text and the composer's cursor line up with what is drawn.
+unicode-segmentation = "1"
+unicode-width = "0.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

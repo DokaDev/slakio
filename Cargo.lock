@@ -1452,6 +1452,8 @@ dependencies = [
  "slakio-core",
  "slakio-world",
  "tokio",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]

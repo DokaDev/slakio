@@ -28,6 +28,8 @@ slakio-core.workspace = true
 # The invented world behind `--demo`.
 slakio-world.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "signal"] }
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
