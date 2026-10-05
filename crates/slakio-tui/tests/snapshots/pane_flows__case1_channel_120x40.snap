@@ -1,5 +1,5 @@
 ---
-source: crates/slakio-tui/tests/shell_flows.rs
+source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ────────────────╮╭ ▌#backend ───────────────────────────────────────────────────────────────────────────────╮

@@ -4,11 +4,13 @@
 //!
 //! ```text
 //! root
-//! └─ shell            (the non-text regions: leader `Space`, focus keys)
+//! └─ shell            (the non-text regions: leader `Space`, focus keys, back/forward)
 //!    ├─ rail
 //!    ├─ list
 //!    └─ pane.normal   (the work area in Normal mode)
-//! cmdline  [text]     (the `:` command line)
+//!       └─ pane.visual   (a VISUAL range of messages)
+//! cmdline          [text]  (the `:` command line)
+//! composer.insert  [text]  (a pane's composer in Insert mode)
 //! ```
 //!
 //! * [`keys`] — key chords and their notation (`ctrl+e`, `esc`, `space w h`).
@@ -25,7 +27,7 @@ pub mod keys;
 pub use check::{Conflict, ConflictKind, check};
 pub use keys::{KeyChord, KeyError, parse_keys};
 
-use crate::action::{Action, CommandLineAction, ShellAction};
+use crate::action::{Action, CommandLineAction, ComposerAction, PaneAction, ShellAction};
 use crate::app::shell::View;
 use slakio_core::i18n::Label;
 
@@ -42,13 +44,26 @@ pub enum Ctx {
     List,
     /// The work area in Normal mode.
     PaneNormal,
+    /// A VISUAL range of messages.
+    PaneVisual,
     /// The `:` command line (text input).
     CommandLine,
+    /// A pane's composer in Insert mode (text input).
+    ComposerInsert,
 }
 
 impl Ctx {
     /// Every context, in the order the docs list them.
-    pub const ALL: &'static [Ctx] = &[Ctx::Root, Ctx::Shell, Ctx::Rail, Ctx::List, Ctx::PaneNormal, Ctx::CommandLine];
+    pub const ALL: &'static [Ctx] = &[
+        Ctx::Root,
+        Ctx::Shell,
+        Ctx::Rail,
+        Ctx::List,
+        Ctx::PaneNormal,
+        Ctx::PaneVisual,
+        Ctx::CommandLine,
+        Ctx::ComposerInsert,
+    ];
 
     /// The id config files and the docs use.
     pub fn id(self) -> &'static str {
@@ -58,7 +73,9 @@ impl Ctx {
             Ctx::Rail => "rail",
             Ctx::List => "list",
             Ctx::PaneNormal => "pane.normal",
+            Ctx::PaneVisual => "pane.visual",
             Ctx::CommandLine => "cmdline",
+            Ctx::ComposerInsert => "composer.insert",
         }
     }
 
@@ -69,7 +86,9 @@ impl Ctx {
             Ctx::Rail => Label::CtxRail,
             Ctx::List => Label::CtxList,
             Ctx::PaneNormal => Label::CtxPaneNormal,
+            Ctx::PaneVisual => Label::CtxPaneVisual,
             Ctx::CommandLine => Label::CtxCmdline,
+            Ctx::ComposerInsert => Label::CtxComposerInsert,
         }
     }
 
@@ -77,9 +96,10 @@ impl Ctx {
     /// is typed.
     pub fn parent(self) -> Option<Ctx> {
         match self {
-            Ctx::Root | Ctx::CommandLine => None,
+            Ctx::Root | Ctx::CommandLine | Ctx::ComposerInsert => None,
             Ctx::Shell => Some(Ctx::Root),
             Ctx::Rail | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
+            Ctx::PaneVisual => Some(Ctx::PaneNormal),
         }
     }
 
@@ -90,7 +110,7 @@ impl Ctx {
 
     /// Characters typed here are text, not commands.
     pub fn is_text_input(self) -> bool {
-        matches!(self, Ctx::CommandLine)
+        matches!(self, Ctx::CommandLine | Ctx::ComposerInsert)
     }
 }
 
@@ -113,6 +133,14 @@ const fn shell(ctx: Ctx, keys: &'static str, action: ShellAction) -> Binding {
     bind(ctx, keys, Action::Shell(action))
 }
 
+const fn pane(ctx: Ctx, keys: &'static str, action: PaneAction) -> Binding {
+    bind(ctx, keys, Action::Pane(action))
+}
+
+const fn composer(keys: &'static str, action: ComposerAction) -> Binding {
+    bind(Ctx::ComposerInsert, keys, Action::Composer(action))
+}
+
 /// The default bindings.
 pub const DEFAULTS: &[Binding] = &[
     bind(Ctx::Root, ":", Action::CommandLine(CommandLineAction::Open)),
@@ -129,6 +157,13 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space f", ShellAction::Show(View::Files)),
     shell(Ctx::Shell, "space l", ShellAction::Show(View::Later)),
     shell(Ctx::Shell, "space e", ShellAction::ToggleList),
+    // Back and forward through what the work area showed. `Ctrl+I` is `Tab` without the kitty
+    // keyboard protocol, so `Tab` does the same; `Alt` needs Option-as-Alt on macOS.
+    pane(Ctx::Shell, "ctrl+o", PaneAction::Back),
+    pane(Ctx::Shell, "alt+left", PaneAction::Back),
+    pane(Ctx::Shell, "ctrl+i", PaneAction::Forward),
+    pane(Ctx::Shell, "tab", PaneAction::Forward),
+    pane(Ctx::Shell, "alt+right", PaneAction::Forward),
     shell(Ctx::Rail, "j", ShellAction::RailNext),
     shell(Ctx::Rail, "down", ShellAction::RailNext),
     shell(Ctx::Rail, "k", ShellAction::RailPrev),
@@ -141,6 +176,27 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::List, "g g", ShellAction::ListFirst),
     shell(Ctx::List, "G", ShellAction::ListLast),
     shell(Ctx::List, "enter", ShellAction::ListOpen),
+    pane(Ctx::PaneNormal, "j", PaneAction::Next),
+    pane(Ctx::PaneNormal, "down", PaneAction::Next),
+    pane(Ctx::PaneNormal, "k", PaneAction::Prev),
+    pane(Ctx::PaneNormal, "up", PaneAction::Prev),
+    pane(Ctx::PaneNormal, "g g", PaneAction::First),
+    pane(Ctx::PaneNormal, "G", PaneAction::Last),
+    pane(Ctx::PaneNormal, "enter", PaneAction::OpenThread),
+    pane(Ctx::PaneNormal, "V", PaneAction::Visual),
+    pane(Ctx::PaneNormal, "y", PaneAction::Copy),
+    pane(Ctx::PaneNormal, "i", PaneAction::Insert),
+    pane(Ctx::PaneNormal, "ctrl+w", PaneAction::Close),
+    pane(Ctx::PaneVisual, "esc", PaneAction::Escape),
+    // `Shift+Enter` needs the kitty keyboard protocol (else it arrives as `Enter`); `Ctrl+J`
+    // and `Alt+Enter` work everywhere.
+    composer("enter", ComposerAction::Send),
+    composer("shift+enter", ComposerAction::Newline),
+    composer("alt+enter", ComposerAction::Newline),
+    composer("ctrl+j", ComposerAction::Newline),
+    composer("esc", ComposerAction::Leave),
+    composer("ctrl+w", ComposerAction::DeleteWord),
+    composer("ctrl+u", ComposerAction::DeleteLine),
     bind(Ctx::CommandLine, "enter", Action::CommandLine(CommandLineAction::Run)),
     bind(Ctx::CommandLine, "esc", Action::CommandLine(CommandLineAction::Cancel)),
 ];

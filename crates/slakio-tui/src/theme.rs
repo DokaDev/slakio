@@ -26,6 +26,8 @@ pub struct Theme {
     /// well, so the mode never depends on the color.
     pub mode_normal: Style,
     pub mode_command: Style,
+    pub mode_insert: Style,
+    pub mode_visual: Style,
     /// A transient notice that warns (an unknown command, a config file that cannot be used).
     pub warning: Style,
     /// The border of the region that has the focus, and of the others.
@@ -46,6 +48,16 @@ pub struct Theme {
     pub current: Style,
     /// The backend's state in the status line (`demo`).
     pub connection: Style,
+    /// A message's sender, and the user as sender.
+    pub author: Style,
+    pub own_author: Style,
+    /// A message's time and the date separators.
+    pub timestamp: Style,
+    /// A reaction pill, and one the user is among.
+    pub reaction: Style,
+    pub reaction_mine: Style,
+    /// The "N replies" row of a message with a thread.
+    pub thread_link: Style,
     /// Workspace colours, by [`WorkspaceColor`] slot. They belong to the workspace, so they
     /// stay the same in every theme that has colours; a letter names the workspace too.
     pub workspaces: [Style; 4],
@@ -62,6 +74,8 @@ impl Theme {
             status: Style::new(),
             mode_normal: badge(Color::Blue),
             mode_command: badge(Color::Yellow),
+            mode_insert: badge(Color::Green),
+            mode_visual: badge(Color::Magenta),
             warning: Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             border_focus: Style::new().fg(Color::Blue),
             border: Style::new().fg(Color::DarkGray),
@@ -73,6 +87,12 @@ impl Theme {
             muted_conversation: Style::new().fg(Color::DarkGray),
             current: Style::new().add_modifier(Modifier::BOLD),
             connection: Style::new().fg(Color::Yellow),
+            author: Style::new().add_modifier(Modifier::BOLD),
+            own_author: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            timestamp: Style::new().fg(Color::DarkGray),
+            reaction: Style::new().fg(Color::DarkGray),
+            reaction_mine: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            thread_link: Style::new().fg(Color::Blue),
             workspaces: [
                 Style::new().fg(Color::Green),
                 Style::new().fg(Color::Magenta),
@@ -93,6 +113,8 @@ impl Theme {
             status: Style::new(),
             mode_normal: badge,
             mode_command: badge,
+            mode_insert: badge,
+            mode_visual: badge,
             warning: bold,
             border_focus: bold,
             border: Style::new(),
@@ -104,6 +126,12 @@ impl Theme {
             muted_conversation: Style::new().add_modifier(Modifier::DIM),
             current: bold,
             connection: Style::new(),
+            author: bold,
+            own_author: bold.add_modifier(Modifier::UNDERLINED),
+            timestamp: Style::new(),
+            reaction: Style::new(),
+            reaction_mine: bold,
+            thread_link: Style::new().add_modifier(Modifier::UNDERLINED),
             workspaces: [Style::new(); 4],
         }
     }

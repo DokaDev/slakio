@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/pane_flows.rs
+expression: mask_hangul(&s)
+---
+╭──╮╭ Home ──────────────╮╭ ▌#backend ─────────────────────────────────────────╮
+│▌A││▾ Favorites         ││Lily Jeon    Dashboard schema budget draft     06:19│
+│▌B││ # backend          ││             please is now waiting fine a           │
+│──││ # incidents      3 ││             lunch production someone cache         │
+│H ││▾ Ops               ││             release done                           │
+│D●││ # deploys          ││Kate Nam     Check a customer should maybe     06:26│
+│A●││ # alerts           ││Mia Jang     Budget metrics merge design       06:35│
+│F ││ # partner-shared   ││             rollback alert alert should draft      │
+│L ││ # hostile-string ● ││             after alert on staging tomorrow        │
+│  ││ # big-history      ││Tom Ko       On waiting migration someone      06:41│
+│  ││ # long-threads     ││             index can staging should               │
+│  ││▾ Channels          ││Kate Nam     Production roadmap customer build 06:51│
+│  ││ # announcements    ││             alert now latency fine review          │
+│  ││ # design-review    ││             latency roadmap broken should for      │
+│  ││ # feed-alert-134   ││Chris Park   Confirmed                         06:59│
+│  ││ # feed-alert-8     ││Kate Nam     Ticket review pager pager         07:05│
+│  ││ # feed-budget-162  ││             production on build alert the on       │
+│  ││ # feed-budget-33   ││             draft                                  │
+│  ││ # feed-build-50    ││Alex Morgan  Meeting moved to 3pm              07:14│
+│  ││ # feed-cache-119   ││╭ Message #backend ────────────────────────────────╮│
+│  ││ # feed-customer-1  │││Press i to write                                  ││
+│  ││ # feed-customer- 1 ││╰──────────────────────────────────────────────────╯│
+╰──╯╰────────────────────╯╰────────────────────────────────────────────────────╯
+ NORMAL  ▌A company  #backend                                  @37  DM 16  demo

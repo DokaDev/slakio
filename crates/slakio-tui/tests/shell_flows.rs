@@ -2,98 +2,19 @@
 //! demo backend is pumped by hand, the way the binary's loop does it. Screens are insta
 //! snapshots (English only); under CI insta never rewrites them.
 
-use ratatui::Terminal;
-use ratatui::backend::TestBackend;
-use ratatui::crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+#[path = "support/demo.rs"]
+mod demo;
+
+use demo::{Demo, assert_harmless, mask_hangul};
+use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use slakio_core::backend::{Backend, Envelope, Event as BackendEvent, Generation};
 use slakio_core::i18n::Lang;
 use slakio_tui::app::shell::{Region, View};
 use slakio_tui::app::{App, Settings};
 use slakio_tui::demo::DemoBackend;
-use slakio_tui::keymap::parse_keys;
 use slakio_tui::theme::Theme;
-use slakio_tui::ui;
 use slakio_world::World;
 use std::time::Instant;
-
-struct Demo {
-    app: App,
-    backend: DemoBackend,
-    now: Instant,
-}
-
-impl Demo {
-    fn new(w: u16, h: u16) -> Self {
-        Self::with(w, h, Lang::En, Settings::default())
-    }
-
-    fn with(w: u16, h: u16, lang: Lang, settings: Settings) -> Self {
-        let mut app = App::new(lang, Theme::terminal());
-        app.settings = settings;
-        app.resize(w, h);
-        let backend = DemoBackend::new(World::demo());
-        app.connect(backend.capabilities());
-        let mut d = Self { app, backend, now: Instant::now() };
-        d.pump();
-        d
-    }
-
-    /// One turn of the binary's loop for the backend.
-    fn pump(&mut self) {
-        for (g, c) in self.app.take_commands() {
-            self.backend.send(g, c);
-        }
-        while let Some(e) = self.backend.poll() {
-            self.app.on_backend(e);
-        }
-    }
-
-    /// Press keys written in config notation (`space w h`, `G`, `ctrl+l`).
-    fn keys(&mut self, notation: &str) {
-        for k in parse_keys(notation).unwrap() {
-            self.app.handle_event(Event::Key(k.to_event()), self.now);
-        }
-        self.pump();
-    }
-
-    fn command(&mut self, cmd: &str) {
-        self.keys(":");
-        for c in cmd.chars() {
-            self.keys(&c.to_string());
-        }
-        self.keys("enter");
-    }
-
-    fn mouse(&mut self, kind: MouseEventKind, column: u16, row: u16) -> bool {
-        let ev = MouseEvent { kind, column, row, modifiers: KeyModifiers::NONE };
-        self.app.handle_event(Event::Mouse(ev), self.now)
-    }
-
-    fn screen(&self) -> String {
-        let (w, h) = (self.app.size.width, self.app.size.height);
-        let mut t = Terminal::new(TestBackend::new(w, h)).unwrap();
-        t.draw(|f| ui::draw(f, &self.app, self.now)).unwrap();
-        let buf = t.backend().buffer();
-        (0..h)
-            .map(|y| {
-                // A wide character fills two cells; the second one is not text of its own.
-                let mut line = String::new();
-                let mut x = 0;
-                while x < w {
-                    let sym = buf[(x, y)].symbol();
-                    line.push_str(sym);
-                    x += (ratatui::text::Span::raw(sym).width() as u16).max(1);
-                }
-                line.trim_end().to_string()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    fn status_line(&self) -> String {
-        self.screen().lines().last().unwrap().to_string()
-    }
-}
 
 #[test]
 fn the_demo_opens_on_home_of_the_first_workspace_at_three_sizes() {
@@ -102,7 +23,7 @@ fn the_demo_opens_on_home_of_the_first_workspace_at_three_sizes() {
         let s = d.screen();
         assert!(s.contains("Favorites") && s.contains("# backend") && s.contains("A company"), "{s}");
         assert!(d.status_line().contains("demo"), "the status line says the data is invented");
-        insta::assert_snapshot!(format!("demo_home_{w}x{h}"), s);
+        insta::assert_snapshot!(format!("demo_home_{w}x{h}"), mask_hangul(&s));
     }
 }
 
@@ -142,10 +63,10 @@ fn the_focused_rail_expands_over_the_list_or_pushes_it_aside() {
     assert_eq!(d.app.shell.focus, Region::Rail);
     let s = d.screen();
     assert!(s.contains("A company") && s.contains("Home") && s.contains("Activity"), "{s}");
-    insta::assert_snapshot!("demo_rail_overlay_120x40", s);
+    insta::assert_snapshot!("demo_rail_overlay_120x40", mask_hangul(&s));
     let mut push = Demo::with(120, 40, Lang::En, Settings { rail_push: true, ..Settings::default() });
     push.keys("space w h");
-    insta::assert_snapshot!("demo_rail_push_120x40", push.screen());
+    insta::assert_snapshot!("demo_rail_push_120x40", push.snap());
 }
 
 #[test]
@@ -159,7 +80,7 @@ fn the_rail_switches_workspace_and_view() {
     let s = d.screen();
     assert!(s.contains(" DMs ") && s.contains("@ "), "{s}");
     assert!(!s.contains("# general"), "DMs lists no channels");
-    insta::assert_snapshot!("demo_dms_120x40", s);
+    insta::assert_snapshot!("demo_dms_120x40", mask_hangul(&s));
 }
 
 #[test]
@@ -183,9 +104,10 @@ fn enter_opens_a_conversation_in_the_work_area_and_the_breadcrumb() {
     assert!(s.contains("Choose a conversation in the list and press Enter."), "{s}");
     d.keys("j enter");
     let s = d.screen();
-    assert!(s.contains("▌#backend") && s.contains("Messages are not shown in this build yet."), "{s}");
+    assert!(s.contains("▌#backend") && s.contains("Message #backend") && s.contains("Press i to write"), "{s}");
+    assert_eq!(d.app.shell.focus, Region::Work, "the opened conversation has the keyboard");
     assert!(d.status_line().contains("#backend"), "{}", d.status_line());
-    insta::assert_snapshot!("demo_open_120x40", s);
+    insta::assert_snapshot!("demo_open_120x40", mask_hangul(&s));
 }
 
 #[test]
@@ -247,7 +169,7 @@ fn hovering_the_rail_expands_it_and_clicks_select_and_open() {
     // A list row opens it: row 2 is the first channel under the first section.
     let list = d.app.areas().list.unwrap();
     d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 2);
-    let open = d.app.shell.open.clone().expect("opened");
+    let open = d.app.work.main.as_ref().expect("opened").target.clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);
     assert_eq!(d.app.shell.focus, Region::Work);
@@ -300,22 +222,6 @@ fn the_overlay_rail_hides_the_list_panel_it_covers() {
         assert!(gap.trim().is_empty(), "row {y}: {gap:?} shows through\n{s}");
     }
     // The screen itself: the snapshot `demo_rail_overlay_120x40`.
-}
-
-/// A character that must never reach a cell: controls, bidi, zero-width.
-fn harmful(c: char) -> bool {
-    c.is_control()
-        || ('\u{200B}'..='\u{200F}').contains(&c)
-        || ('\u{202A}'..='\u{202E}').contains(&c)
-        || ('\u{2066}'..='\u{2069}').contains(&c)
-        || c == '\u{FEFF}'
-}
-
-/// The screen holds no character a terminal would act on.
-fn assert_harmless(screen: &str) {
-    for (y, line) in screen.lines().enumerate() {
-        assert!(!line.chars().any(harmful), "row {y}: {line:?}");
-    }
 }
 
 #[test]

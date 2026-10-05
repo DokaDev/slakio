@@ -1,6 +1,7 @@
 //! The shell: which region has the focus (rail, list panel, work area), the rail's cursor, the
-//! view the list panel shows, the list's cursor and scroll, folded sections, and what the work
-//! area has open. It owns its update ([`Shell::update`]); the rows come from the read model.
+//! view the list panel shows, the list's cursor and scroll, and folded sections. It owns its
+//! update ([`Shell::update`]), which hands back a conversation to open (the work area opens
+//! it); the rows come from the read model.
 //!
 //! ```text
 //! rail          list panel          work area
@@ -72,8 +73,6 @@ pub struct Shell {
     pub list_hidden: bool,
     /// The mouse is over the rail.
     pub hover_rail: bool,
-    /// What the work area shows.
-    pub open: Option<Target>,
 }
 
 impl Default for Shell {
@@ -88,7 +87,6 @@ impl Default for Shell {
             collapsed: HashSet::new(),
             list_hidden: false,
             hover_rail: false,
-            open: None,
         }
     }
 }
@@ -104,7 +102,9 @@ impl Shell {
     }
 
     /// Apply `action`. `list_height` is the number of rows the list panel shows (for scrolling).
-    pub fn update(&mut self, action: ShellAction, model: &Model, list_height: usize) {
+    /// The conversation to open, when the action opens one.
+    pub fn update(&mut self, action: ShellAction, model: &Model, list_height: usize) -> Option<Target> {
+        let mut open = None;
         let items = rail_items(model.workspaces().len());
         let rows = self.rows(model).len();
         match action {
@@ -121,7 +121,7 @@ impl Shell {
             ShellAction::ListPrev => self.list_cursor = self.list_cursor.saturating_sub(1),
             ShellAction::ListFirst => self.list_cursor = 0,
             ShellAction::ListLast => self.list_cursor = rows.saturating_sub(1),
-            ShellAction::ListOpen => self.open_row(model),
+            ShellAction::ListOpen => open = self.open_row(model),
             ShellAction::ToggleList => {
                 self.list_hidden = !self.list_hidden;
                 if self.list_hidden && self.focus == Region::List {
@@ -131,6 +131,7 @@ impl Shell {
             ShellAction::Show(view) => self.select(RailItem::View(view), &items),
         }
         self.scroll(list_height);
+        open
     }
 
     /// Show `item` (one of `items`, the rail) in the list panel and move the focus there.
@@ -149,20 +150,21 @@ impl Shell {
         self.focus = Region::List;
     }
 
-    /// Open the conversation under the cursor, or fold or unfold its section.
-    pub fn open_row(&mut self, model: &Model) {
+    /// The conversation under the cursor (to open), or fold or unfold its section.
+    pub fn open_row(&mut self, model: &Model) -> Option<Target> {
         match self.rows(model).get(self.list_cursor) {
             Some(Row::Section(i)) => {
                 let id = model.section(*i).id.clone();
                 if !self.collapsed.remove(&id) {
                     self.collapsed.insert(id);
                 }
+                None
             }
             Some(Row::Conversation(i)) => {
                 let c = model.conversation(*i);
-                self.open = Some(Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() });
+                Some(Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() })
             }
-            None => {}
+            None => None,
         }
     }
 
@@ -182,9 +184,6 @@ impl Shell {
         self.workspace = self.workspace.min(n.saturating_sub(1));
         self.rail_cursor = self.rail_cursor.min(rail_items(n).len() - 1);
         self.list_cursor = self.list_cursor.min(self.rows(model).len().saturating_sub(1));
-        if self.open.as_ref().is_some_and(|t| model.target(t).is_none()) {
-            self.open = None;
-        }
         self.scroll(list_height);
     }
 

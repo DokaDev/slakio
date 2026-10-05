@@ -230,3 +230,14 @@ fn the_terminal_is_restored_after_a_panic_while_handed_over_or_after() {
     assert!(screen.text().ends_with(&restore_sequence()));
     assert_eq!(RAW_OFFS.with(Cell::get), raw + 2);
 }
+
+#[test]
+fn osc52_puts_base64_text_on_the_clipboard() {
+    assert_eq!(base64(b""), "");
+    assert_eq!(base64(b"f"), "Zg==");
+    assert_eq!(base64(b"fo"), "Zm8=");
+    assert_eq!(base64(b"foo"), "Zm9v");
+    assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+    assert_eq!(base64("\u{D55C}".as_bytes()), "7ZWc");
+    assert_eq!(osc52("hi"), "\x1b]52;c;aGk=\x07");
+}

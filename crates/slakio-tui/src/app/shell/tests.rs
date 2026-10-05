@@ -84,10 +84,9 @@ fn enter_folds_a_section_and_opens_a_conversation() {
     s.update(ShellAction::ListOpen, &m, 10);
     assert_eq!(s.rows(&m).len(), before, "and unfolded");
     s.update(ShellAction::ListNext, &m, 10);
-    s.update(ShellAction::ListOpen, &m, 10);
-    let open = s.open.clone().expect("a conversation is open");
+    let open = s.update(ShellAction::ListOpen, &m, 10).expect("a conversation to open");
     assert_eq!(m.target(&open).unwrap().name, "backend");
-    assert_eq!(s.focus, Region::List, "the focus stays in the list");
+    assert_eq!(s.focus, Region::List, "the app moves the focus, not the shell");
 }
 
 #[test]
@@ -95,8 +94,7 @@ fn clamping_after_a_smaller_model_keeps_cursors_valid() {
     let m = model();
     let mut s = Shell::default();
     s.update(ShellAction::ListLast, &m, 10);
-    s.update(ShellAction::ListOpen, &m, 10);
     s.workspace = 1;
     s.clamp(&Model::default(), 10);
-    assert_eq!((s.workspace, s.list_cursor, s.open.clone()), (0, 0, None));
+    assert_eq!((s.workspace, s.list_cursor), (0, 0));
 }

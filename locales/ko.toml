@@ -2,6 +2,8 @@
 
 "mode.normal" = "NORMAL"
 "mode.command" = "COMMAND"
+"mode.insert" = "INSERT"
+"mode.visual" = "VISUAL"
 
 "welcome.status" = "개발 초기 단계: 아직 Slack에 연결되지 않습니다."
 "welcome.quit_hint" = "종료하려면 :qa 를 입력하고 Enter를 누르세요."
@@ -26,10 +28,23 @@
 "list.empty" = "비어 있습니다."
 
 "pane.empty" = "목록에서 대화를 고르고 Enter를 누르세요."
-"pane.no_history" = "이 빌드에서는 아직 메시지를 보여 주지 않습니다."
+"pane.loading" = "메시지를 불러오는 중…"
+"pane.no_messages" = "아직 메시지가 없습니다."
+"pane.thread" = "스레드"
+
+"message.edited" = "(수정됨)"
+"message.more" = "… 이 메시지의 나머지는 표시하지 않습니다"
+"message.replies" = "답글 {count}개 · 마지막 {time}"
+
+"composer.message" = "{name}에 메시지 보내기"
+"composer.reply" = "답글"
+"composer.hint" = "i를 눌러 입력"
 
 "status.demo" = "데모"
 "status.dms" = "DM"
+"status.copied" = "메시지 {count}개를 복사했습니다"
+"status.no_history" = "그 방향으로는 더 없습니다"
+"status.demo_echo" = "데모: 여기에만 보이고 어디로도 보내지 않습니다"
 
 "screen.too_small" = "터미널이 {width}×{height}입니다. slakio에는 최소 {min_width}×{min_height}가 필요합니다."
 
@@ -53,10 +68,29 @@
 "action.view.activity" = "활동 보기"
 "action.view.files" = "파일 보기"
 "action.view.later" = "나중에 보기"
+"action.pane.next" = "다음 메시지 (VISUAL 범위 넓히기)"
+"action.pane.prev" = "이전 메시지 (VISUAL 범위 넓히기)"
+"action.pane.first" = "가장 오래된 메시지"
+"action.pane.last" = "가장 최근 메시지"
+"action.pane.open_thread" = "스레드 패널에서 스레드 열기"
+"action.pane.visual" = "메시지 범위 고르기 (VISUAL)"
+"action.pane.copy" = "고른 메시지 복사"
+"action.pane.escape" = "VISUAL 끝내기"
+"action.pane.insert" = "입력창에 쓰기"
+"action.pane.close" = "패널 닫기"
+"action.history.back" = "이전 대화로 돌아가기"
+"action.history.forward" = "다시 앞으로"
+"action.composer.send" = "보내기"
+"action.composer.newline" = "줄 바꾸기"
+"action.composer.leave" = "입력 멈추기 (Normal 모드)"
+"action.composer.delete_word" = "커서 앞 단어 지우기"
+"action.composer.delete_line" = "줄 처음까지 지우기"
 
 "ctx.root" = "어디서나"
 "ctx.shell" = "메인 화면"
 "ctx.rail" = "레일"
 "ctx.list" = "목록 패널"
 "ctx.pane_normal" = "작업 영역 (Normal 모드)"
+"ctx.pane_visual" = "메시지 범위 (VISUAL)"
+"ctx.composer_insert" = "입력창 (Insert 모드)"
 "ctx.cmdline" = "명령줄"

@@ -15,13 +15,14 @@ use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
 use slakio_core::paths::Paths;
 use slakio_core::secret::{STORE_ENV, StoreKind};
-use slakio_tui::app::{App, Settings};
+use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
-use slakio_tui::terminal::{Cursor, cursor_shape};
+use slakio_tui::exchange::exchange;
+use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
 use slakio_tui::theme::Theme;
 use slakio_tui::ui;
 use slakio_world::World;
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 
@@ -127,11 +128,15 @@ async fn run(
     while !app.quit {
         // The backend's turn: deliver what the app asked for, take what is ready.
         if let Some(b) = backend.as_mut() {
-            for (generation, command) in app.take_commands() {
-                b.send(generation, command);
-            }
-            while let Some(envelope) = b.poll() {
-                redraw |= app.on_backend(envelope);
+            redraw |= exchange(&mut app, b.as_mut());
+        }
+        for effect in app.take_effects() {
+            match effect {
+                Effect::Copy(text) => {
+                    let mut out = io::stdout();
+                    out.write_all(osc52(&text).as_bytes())?;
+                    out.flush()?;
+                }
             }
         }
         if redraw {

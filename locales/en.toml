@@ -5,6 +5,8 @@
 # Mode badge at the left of the status line.
 "mode.normal" = "NORMAL"
 "mode.command" = "COMMAND"
+"mode.insert" = "INSERT"
+"mode.visual" = "VISUAL"
 
 # The empty work area of step zero.
 "welcome.status" = "Early development: nothing connects to Slack yet."
@@ -36,11 +38,26 @@
 
 # The work area.
 "pane.empty" = "Choose a conversation in the list and press Enter."
-"pane.no_history" = "Messages are not shown in this build yet."
+"pane.loading" = "Loading messages…"
+"pane.no_messages" = "No messages yet."
+"pane.thread" = "Thread"
+
+# A message in a pane.
+"message.edited" = "(edited)"
+"message.more" = "… the rest of this message is not shown"
+"message.replies" = { one = "{count} reply · last {time}", other = "{count} replies · last {time}" }
+
+# A pane's composer.
+"composer.message" = "Message {name}"
+"composer.reply" = "Reply"
+"composer.hint" = "Press i to write"
 
 # The status line: the demo backend, and the unread DM total.
 "status.demo" = "demo"
 "status.dms" = "DM"
+"status.copied" = { one = "Copied {count} message", other = "Copied {count} messages" }
+"status.no_history" = "Nothing more in that direction"
+"status.demo_echo" = "Demo: shown here only, not sent anywhere"
 
 # A terminal smaller than the screen needs.
 "screen.too_small" = "The terminal is {width}×{height}; slakio needs at least {min_width}×{min_height}."
@@ -66,6 +83,23 @@
 "action.view.activity" = "Show Activity"
 "action.view.files" = "Show Files"
 "action.view.later" = "Show Later"
+"action.pane.next" = "Next message (extends a VISUAL range)"
+"action.pane.prev" = "Previous message (extends a VISUAL range)"
+"action.pane.first" = "Oldest message"
+"action.pane.last" = "Newest message"
+"action.pane.open_thread" = "Open the thread in the thread panel"
+"action.pane.visual" = "Select a range of messages (VISUAL)"
+"action.pane.copy" = "Copy the selected messages"
+"action.pane.escape" = "Leave VISUAL"
+"action.pane.insert" = "Write in the composer"
+"action.pane.close" = "Close the pane"
+"action.history.back" = "Back to the conversation before"
+"action.history.forward" = "Forward again"
+"action.composer.send" = "Send"
+"action.composer.newline" = "New line"
+"action.composer.leave" = "Stop writing (Normal mode)"
+"action.composer.delete_word" = "Delete the word before the cursor"
+"action.composer.delete_line" = "Delete to the start of the line"
 
 # Key contexts (key help and docs/keybindings.md).
 "ctx.root" = "Everywhere"
@@ -73,4 +107,6 @@
 "ctx.rail" = "Rail"
 "ctx.list" = "List panel"
 "ctx.pane_normal" = "Work area (Normal mode)"
+"ctx.pane_visual" = "A range of messages (VISUAL)"
+"ctx.composer_insert" = "Composer (Insert mode)"
 "ctx.cmdline" = "Command line"

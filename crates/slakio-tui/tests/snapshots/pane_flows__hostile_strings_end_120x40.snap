@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/pane_flows.rs
+expression: mask_hangul(&d.screen())
+---
+╭──╮╭ Home ────────────────╮╭ ▌#hostile-strings ───────────────────────────────────────────────────────────────────────╮
+│▌A││▾ Favorites           ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│▌B││ # backend            ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│──││ # incidents        3 ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│H ││▾ Ops                 ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│D●││ # deploys            ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│A●││ # alerts             ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│F ││ # partner-shared ⇄   ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│L ││ # hostile-strings  ● ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # big-history        ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # long-threads       ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││▾ Channels            ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # announcements      ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # design-review      ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-alert-134     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-alert-8       ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-budget-162    ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-budget-33     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-build-50      ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-cache-119     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-customer-161  ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-customer-16 1 ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-dashboard-22  ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-dashboard-41  ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-design-34     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-design-83     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-draft-142     ││              xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx      │
+│  ││ # feed-draft-58    ● ││              … the rest of this message is not shown                                     │
+│  ││ # feed-draft-84      ││Ethan Song    ok ���( � end                                                          21:18│
+│  ││ # feed-index-199   2 ││Mia Jang      ����                                                                   21:58│
+│  ││ # feed-index-39      ││Eve Bae       one                                                                    22:05│
+│  ││ # feed-index-5     1 ││              two                                                                         │
+│  ││ # feed-invoice-16  ● ││              three                                                                       │
+│  ││ # feed-invoice-168   ││              :pray: 1  :tada: 1  :white_check_mark: 5                                    │
+│  ││ # feed-latency-144   ││Zoe Lim       ＊＊👩‍💻👍🏽🇰🇷                                                             22:46│
+│  ││ # feed-meeting-82    ││╭ Message #hostile-strings ──────────────────────────────────────────────────────────────╮│
+│  ││ # feed-merge-192     │││Press i to write                                                                        ││
+│  ││ # feed-merge-54      ││╰────────────────────────────────────────────────────────────────────────────────────────╯│
+╰──╯╰──────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company  #hostile-strings                                                                  @37  DM 16  demo

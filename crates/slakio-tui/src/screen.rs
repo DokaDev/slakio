@@ -45,6 +45,20 @@ pub fn areas(size: Rect, rail_expanded: bool, push: bool, list_hidden: bool) -> 
     Areas { rail, list: (!list_hidden).then_some(list), work, status }
 }
 
+/// The most lines a composer shows before it scrolls.
+pub const COMPOSER_MAX_LINES: u16 = 5;
+
+/// The work area split into the main pane and, when open, the thread panel on its right (two
+/// fifths of the width, at least 30 cells while the main pane keeps 20).
+pub fn work_split(work: Rect, thread: bool) -> (Rect, Option<Rect>) {
+    if !thread {
+        return (work, None);
+    }
+    let w = (work.width * 2 / 5).max(30).min(work.width.saturating_sub(20));
+    let [main, side] = Layout::horizontal([Constraint::Min(0), Constraint::Length(w)]).areas(work);
+    (main, Some(side))
+}
+
 /// Inside a bordered area.
 pub fn inner(r: Rect) -> Rect {
     r.inner(Margin { horizontal: 1, vertical: 1 })

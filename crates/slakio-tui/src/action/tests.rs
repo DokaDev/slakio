@@ -23,6 +23,14 @@ fn every_action_is_registered() {
     .into_iter()
     .chain(View::ALL.iter().map(|v| Show(*v)))
     .map(Action::Shell);
+    let pane = {
+        use PaneAction::*;
+        [Next, Prev, First, Last, OpenThread, Visual, Copy, Escape, Insert, Close, Back, Forward].map(Action::Pane)
+    };
+    let composer = {
+        use ComposerAction::*;
+        [Send, Newline, Leave, DeleteWord, DeleteLine].map(Action::Composer)
+    };
     let all = [
         Action::App(AppAction::Quit),
         Action::CommandLine(CommandLineAction::Open),
@@ -30,7 +38,9 @@ fn every_action_is_registered() {
         Action::CommandLine(CommandLineAction::Cancel),
     ]
     .into_iter()
-    .chain(shell);
+    .chain(shell)
+    .chain(pane)
+    .chain(composer);
     let mut n = 0;
     for a in all {
         assert_eq!(spec(a).action, a);

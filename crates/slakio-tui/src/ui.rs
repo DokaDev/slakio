@@ -2,7 +2,8 @@
 //! one: the shell — rail, list panel, work area — over the status line (see [`crate::screen`]
 //! for the geometry), or, on a terminal too small for it, only how much room it needs.
 //!
-//! * [`rail`], [`list`], [`work`] — the three regions; [`statusline`] — the bottom line.
+//! * [`rail`], [`list`], [`work`] — the three regions; [`timeline`] — a pane's messages;
+//!   [`statusline`] — the bottom line.
 //!
 //! Names and messages drawn here are remote text ([`slakio_core::sanitize::Remote`]): it can
 //! only be drawn through the sanitiser (`line()`, `block()`), never as it came. A test keeps
@@ -11,6 +12,7 @@
 mod list;
 mod rail;
 mod statusline;
+pub mod timeline;
 mod work;
 
 use crate::app::App;

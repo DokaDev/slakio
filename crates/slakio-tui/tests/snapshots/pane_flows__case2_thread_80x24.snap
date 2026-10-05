@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/pane_flows.rs
+expression: mask_hangul(&s)
+---
+╭──╮╭ Home ──────────────╮╭ ▌#long-threads ──────╮╭ ▌⤷ Thread · #long-threads ─╮
+│▌A││▾ Favorites         ││───── 2026-01-06 ─────││       maybe is build       │
+│▌B││ # backend          ││Min… We waiting  07:23││       tracing latency      │
+│──││ # incidents      3 ││     waiting now      ││Max B… Latency timeout 03:21│
+│H ││▾ Ops               ││     index a the      ││       should for           │
+│D●││ # deploys          ││     a the            ││       invoice on           │
+│A●││ # alerts           ││     release          ││       index roadmap a      │
+│F ││ # partner-shared   ││     ⤷ 1,200 replies ·││       budget tracing       │
+│L ││ # hostile-string ● ││Dan… Still index 07:30││       is queue index       │
+│  ││ # big-history      ││     lunch index      ││       ticket               │
+│  ││ # long-threads     ││     ⤷ 6 replies · las││Ivy M… Draft broken    03:22│
+│  ││▾ Channels          ││Owe… Queue a     07:37││       can looks            │
+│  ││ # announcements    ││     after cache      ││       staging done         │
+│  ││ # design-review    ││     invoice on       ││       tracing now          │
+│  ││ # feed-alert-134   ││     customer         ││       lunch meeting        │
+│  ││ # feed-alert-8     ││     metrics on       ││       invoice              │
+│  ││ # feed-budget-162  ││     maybe            ││       migration done       │
+│  ││ # feed-budget-33   ││     sprint           ││       customer please      │
+│  ││ # feed-build-50    ││     ⤷ 12 replies · la││Eve B… ＊＊＊＊＊      03:23│
+│  ││ # feed-cache-119   ││╭ Message #long-threa╮││╭ Reply ───────────────────╮│
+│  ││ # feed-customer-1  │││Press i to write    ││││Press i to write          ││
+│  ││ # feed-customer- 1 ││╰────────────────────╯││╰──────────────────────────╯│
+╰──╯╰────────────────────╯╰──────────────────────╯╰────────────────────────────╯
+ NORMAL  ▌A company  #long-threads › ⤷ Thread                  @37  DM 16  demo

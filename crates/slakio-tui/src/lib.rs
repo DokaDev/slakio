@@ -6,7 +6,8 @@
 //! * [`keymap`] — key contexts, default bindings, key notation, `docs/keybindings.md`.
 //! * [`screen`] — the geometry of the main screen, shared by drawing and the mouse.
 //! * [`ui`] — drawing a frame.
-//! * [`demo`] — the demo backend over the invented world (`slakio --demo`).
+//! * [`demo`] — the demo backend over the invented world (`slakio --demo`); [`exchange`] —
+//!   requests and answers between the app and a backend.
 //! * [`theme`] — color and style tokens.
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
@@ -18,6 +19,7 @@
 pub mod action;
 pub mod app;
 pub mod demo;
+pub mod exchange;
 pub mod input;
 pub mod keymap;
 pub mod kitty;

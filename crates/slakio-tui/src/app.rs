@@ -1,19 +1,25 @@
 //! The application state. `App` is a thin router: each part of the state lives in a sub-state
 //! that owns its data and its update ([`cmdline::CommandLine`], [`status::Status`],
-//! [`shell::Shell`], [`model::Model`]); `App` turns input into [`Action`]s through the key map
-//! and routes each action to its owner.
+//! [`shell::Shell`], [`work::Work`] with its [`pane::Pane`]s and their [`composer::Composer`]s,
+//! [`model::Model`]); `App` turns input into [`Action`]s through the key map and routes each
+//! action to its owner.
 //!
 //! State does no I/O. Requests to the backend are queued ([`App::take_commands`]) and its
-//! answers handed in ([`App::on_backend`]) by the binary's loop, which also reads [`App::quit`]
-//! and [`App::deadline`]. Without a backend (`slakio` without `--demo`, for now) the work area
-//! only says how to quit and how to try the demo.
+//! answers handed in ([`App::on_backend`]); what only the terminal can do (put text on the
+//! clipboard) is queued as an [`Effect`] ([`App::take_effects`]). The binary's loop delivers
+//! both and also reads [`App::quit`] and [`App::deadline`]. Without a backend (`slakio` without
+//! `--demo`, for now) the work area only says how to quit and how to try the demo.
 
 pub mod cmdline;
+pub mod composer;
 pub mod model;
+pub mod pane;
 pub mod shell;
 pub mod status;
+pub mod work;
 
-use crate::action::{self, Action, AppAction, CommandLineAction, ShellAction};
+use crate::action::{self, Action, AppAction, CommandLineAction, ComposerAction, PaneAction, ShellAction};
+use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
 use crate::theme::Theme;
@@ -22,15 +28,28 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, Mous
 use ratatui::layout::{Position, Rect};
 use shell::{Region, Shell, rail_items};
 use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEvent, Generation};
-use slakio_core::i18n::{I18n, Lang, Msg};
+use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
 use std::time::Instant;
+use work::{Side, Work};
 
 /// The input mode, shown by the badge at the left of the status line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Normal,
+    /// Writing in a composer.
+    Insert,
+    /// Selecting a range of messages.
+    Visual,
     Command,
+}
+
+/// Something only the terminal can do, done by the binary's loop.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Effect {
+    /// Put text on the system clipboard (OSC 52; the terminal does it, no clipboard library
+    /// is touched).
+    Copy(String),
 }
 
 /// Display settings from the config file.
@@ -52,12 +71,14 @@ pub struct App {
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
     pub shell: Shell,
+    pub work: Work,
     pub model: Model,
     /// What the connected backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     /// The generation of the last boot request; older answers are dropped.
     boot: Generation,
     commands: Vec<(Generation, Command)>,
+    effects: Vec<Effect>,
     /// The terminal's size, for the mouse and scrolling.
     pub size: Rect,
     /// Set once the user asked to quit; the binary's loop ends.
@@ -75,10 +96,12 @@ impl App {
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),
             shell: Shell::default(),
+            work: Work::default(),
             model: Model::default(),
             backend: None,
             boot: Generation::default(),
             commands: Vec::new(),
+            effects: Vec::new(),
             size: Rect::default(),
             quit: false,
         }
@@ -93,7 +116,14 @@ impl App {
 
     /// The requests for the backend queued since the last call.
     pub fn take_commands(&mut self) -> Vec<(Generation, Command)> {
-        std::mem::take(&mut self.commands)
+        let mut out = std::mem::take(&mut self.commands);
+        out.extend(self.work.take_requests());
+        out
+    }
+
+    /// The effects queued since the last call.
+    pub fn take_effects(&mut self) -> Vec<Effect> {
+        std::mem::take(&mut self.effects)
     }
 
     /// An event of the backend. `true` when the screen changed; an answer to an older request
@@ -103,11 +133,11 @@ impl App {
             BackendEvent::Booted(snapshot) if envelope.generation == self.boot => {
                 self.model = Model::new(*snapshot);
                 self.shell.clamp(&self.model, self.list_height());
+                self.work.clamp(&self.model);
                 true
             }
             BackendEvent::Booted(_) => false,
-            // Nothing asks for history yet.
-            BackendEvent::History(_) => false,
+            BackendEvent::History(page) => self.work.on_page(envelope.generation, &page, &self.model),
         }
     }
 
@@ -117,7 +147,12 @@ impl App {
     }
 
     pub fn mode(&self) -> Mode {
-        if self.cmdline.is_open() { Mode::Command } else { Mode::Normal }
+        match self.key_context() {
+            Ctx::CommandLine => Mode::Command,
+            Ctx::ComposerInsert => Mode::Insert,
+            Ctx::PaneVisual => Mode::Visual,
+            _ => Mode::Normal,
+        }
     }
 
     /// Where the keyboard is.
@@ -131,6 +166,8 @@ impl App {
         match self.shell.focus {
             Region::Rail => Ctx::Rail,
             Region::List => Ctx::List,
+            Region::Work if self.work.insert && self.work.focused().is_some() => Ctx::ComposerInsert,
+            Region::Work if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
             Region::Work => Ctx::PaneNormal,
         }
     }
@@ -157,20 +194,32 @@ impl App {
             // asks for; a press is what counts.
             Event::Key(k) if k.kind == KeyEventKind::Press => {
                 let key = KeyChord::from_event(&k);
-                let ctx = self.key_context();
-                match self.keymap.feed(&mut self.keys, ctx, key) {
-                    Resolved::Action(a) => self.dispatch(a, now),
-                    Resolved::Pending => {}
-                    Resolved::Unbound(seq) => {
-                        if let [key] = seq[..] {
-                            self.type_key(ctx, key);
+                // Outside text input, Hangul typed with a Korean input source means the QWERTY
+                // keys at the same places (`j` arrives as the jamo on that key); a syllable is
+                // several keys, each resolved where the previous one left off.
+                let mapped = match key.code {
+                    KeyCode::Char(c) if key.mods.is_empty() && !self.key_context().is_text_input() => hangul::keys(c),
+                    _ => None,
+                };
+                match mapped {
+                    Some(keys) => {
+                        for k in keys {
+                            self.feed(KeyChord::char(k), now);
                         }
                     }
+                    None => self.feed(key, now),
                 }
                 true
             }
             Event::Paste(text) => {
-                self.cmdline.insert(&text);
+                match self.key_context() {
+                    Ctx::ComposerInsert => {
+                        if let Some(p) = self.work.focused_mut() {
+                            p.composer.insert(&text);
+                        }
+                    }
+                    _ => self.cmdline.insert(&text),
+                }
                 true
             }
             Event::Resize(w, h) => {
@@ -182,8 +231,45 @@ impl App {
         }
     }
 
+    /// Resolve one key in the current context.
+    fn feed(&mut self, key: KeyChord, now: Instant) {
+        let ctx = self.key_context();
+        match self.keymap.feed(&mut self.keys, ctx, key) {
+            Resolved::Action(a) => self.dispatch(a, now),
+            Resolved::Pending => {}
+            Resolved::Unbound(seq) => {
+                if let [key] = seq[..] {
+                    self.type_key(ctx, key);
+                }
+            }
+        }
+    }
+
     /// A key no binding claims, for what has the focus.
     fn type_key(&mut self, ctx: Ctx, key: KeyChord) {
+        if ctx == Ctx::ComposerInsert {
+            if let Some(c) = self.work.focused_mut().map(|p| &mut p.composer) {
+                match key.code {
+                    KeyCode::Char(ch) if !key.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+                        c.insert(ch.encode_utf8(&mut [0; 4]));
+                    }
+                    KeyCode::Backspace => {
+                        c.backspace();
+                    }
+                    KeyCode::Delete => {
+                        c.delete();
+                    }
+                    KeyCode::Left => c.left(),
+                    KeyCode::Right => c.right(),
+                    KeyCode::Up => c.vertical(-1),
+                    KeyCode::Down => c.vertical(1),
+                    KeyCode::Home => c.home(),
+                    KeyCode::End => c.end(),
+                    _ => {}
+                }
+            }
+            return;
+        }
         if ctx != Ctx::CommandLine {
             return;
         }
@@ -225,11 +311,19 @@ impl App {
                         if row < self.shell.rows(&self.model).len() {
                             self.shell.focus = Region::List;
                             self.shell.list_cursor = row;
-                            self.shell.open_row(&self.model);
+                            if let Some(t) = self.shell.open_row(&self.model) {
+                                self.open(t);
+                            }
                         }
                     }
                 } else if a.work.contains(at) {
                     self.shell.focus = Region::Work;
+                    let (_, thread) = screen::work_split(a.work, self.work.thread.is_some());
+                    let side = if thread.is_some_and(|t| t.contains(at)) { Side::Thread } else { Side::Main };
+                    if side != self.work.side {
+                        self.work.side = side;
+                        self.work.insert = false;
+                    }
                 }
                 true
             }
@@ -243,13 +337,116 @@ impl App {
             Action::App(AppAction::Quit) => self.quit = true,
             Action::CommandLine(a) => self.command_line(a, now),
             Action::Shell(a) => self.shell(a),
+            Action::Pane(a) => self.pane(a, now),
+            Action::Composer(a) => self.composer(a, now),
         }
     }
 
     fn shell(&mut self, a: ShellAction) {
-        if self.backend.is_some() {
-            let height = self.list_height();
-            self.shell.update(a, &self.model, height);
+        if self.backend.is_none() {
+            return;
+        }
+        // Between the two panes of the work area first, then out of it.
+        let step = match a {
+            ShellAction::FocusLeft => -1,
+            ShellAction::FocusRight => 1,
+            _ => 0,
+        };
+        if step != 0 && self.shell.focus == Region::Work && self.work.focus_side(step) {
+            return;
+        }
+        let height = self.list_height();
+        if let Some(target) = self.shell.update(a, &self.model, height) {
+            self.open(target);
+        }
+    }
+
+    /// Open a conversation in the main pane and give it the keyboard, as GUI Slack does: the
+    /// next `j`/`k` moves through its messages.
+    fn open(&mut self, target: slakio_core::model::Target) {
+        self.work.open(target);
+        self.shell.focus = Region::Work;
+    }
+
+    fn pane(&mut self, a: PaneAction, now: Instant) {
+        if self.backend.is_none() {
+            return;
+        }
+        match a {
+            PaneAction::Back | PaneAction::Forward => {
+                let moved = if a == PaneAction::Back { self.work.back() } else { self.work.forward() };
+                if moved {
+                    self.shell.focus = Region::Work;
+                } else {
+                    self.status.show(Msg::Label(Label::StatusNoHistory), Level::Info, now);
+                }
+            }
+            PaneAction::Next => self.work.with_pane(|p| p.step(1)),
+            PaneAction::Prev => self.work.with_pane(|p| p.step(-1)),
+            PaneAction::First => self.work.with_pane(|p| p.select_oldest()),
+            PaneAction::Last => self.work.with_pane(|p| p.select_newest()),
+            PaneAction::OpenThread => {
+                if self.work.focused().is_some_and(|p| p.selected.is_none()) {
+                    self.work.with_pane(|p| p.select_newest());
+                }
+                self.work.open_thread();
+            }
+            PaneAction::Visual => self.work.with_pane(|p| {
+                if p.visual.take().is_none() {
+                    if p.selected.is_none() {
+                        p.select_newest();
+                    }
+                    p.visual = p.selected;
+                }
+            }),
+            PaneAction::Escape => self.work.with_pane(|p| p.visual = None),
+            PaneAction::Copy => self.copy(now),
+            PaneAction::Insert => {
+                if self.work.focused().is_some() {
+                    self.work.insert = true;
+                }
+            }
+            PaneAction::Close => self.work.close(),
+        }
+    }
+
+    /// Copy the selected messages (the VISUAL range, or the selected one) as text: one
+    /// message alone as its text, a range as `time  author: text` lines. Sanitised text only.
+    fn copy(&mut self, now: Instant) {
+        let Some(p) = self.work.focused_mut() else { return };
+        let Some((a, b)) = p.range() else { return };
+        let one = a == b && p.visual.is_none();
+        let items = &p.items[a..=b];
+        let text = if one {
+            items[0].text.to_string()
+        } else {
+            items
+                .iter()
+                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts), m.author, m.text))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        p.visual = None;
+        let count = items.len() as u64;
+        self.effects.push(Effect::Copy(text));
+        self.status.show(Msg::StatusCopied { count }, Level::Info, now);
+    }
+
+    fn composer(&mut self, a: ComposerAction, now: Instant) {
+        match a {
+            ComposerAction::Send => {
+                if self.work.send(&self.model) && self.backend.is_some_and(|c| c.demo) {
+                    self.status.show(Msg::Label(Label::StatusDemoEcho), Level::Info, now);
+                }
+            }
+            ComposerAction::Newline => self.work.with_pane(|p| p.composer.newline()),
+            ComposerAction::Leave => self.work.insert = false,
+            ComposerAction::DeleteWord => self.work.with_pane(|p| {
+                p.composer.delete_word_back();
+            }),
+            ComposerAction::DeleteLine => self.work.with_pane(|p| {
+                p.composer.delete_line_back();
+            }),
         }
     }
 

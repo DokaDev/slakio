@@ -9,6 +9,7 @@ use super::work::breadcrumb;
 use super::{view_glyph, view_label};
 use crate::app::shell::View;
 use crate::app::status::Level;
+use crate::app::work::Side;
 use crate::app::{App, Mode};
 use crate::keymap::keys;
 use ratatui::Frame;
@@ -22,6 +23,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let t = &app.theme;
     let (label, style) = match app.mode() {
         Mode::Normal => (Label::ModeNormal, t.mode_normal),
+        Mode::Insert => (Label::ModeInsert, t.mode_insert),
+        Mode::Visual => (Label::ModeVisual, t.mode_visual),
         Mode::Command => (Label::ModeCommand, t.mode_command),
     };
     let badge = format!(" {} ", app.i18n.label(label));
@@ -42,7 +45,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             spans.push(Span::styled("▌", t.workspace(ws.color)));
             spans.push(Span::styled(format!("{}  ", ws.name.line()), t.text));
         }
-        let place = match app.shell.open.as_ref().and_then(|o| app.model.target(o)) {
+        let main = app.work.main.as_ref().and_then(|p| app.model.target(&p.target));
+        let place = match main {
+            Some(c) if app.work.side == Side::Thread && app.work.thread.is_some() => {
+                format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))
+            }
             Some(c) => breadcrumb(c),
             None => app.i18n.label(view_label(app.shell.view)).to_string(),
         };
