@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/app_flows.rs
+expression: "screen(&app, 80, 24, now)"
+---
+
+
+
+
+
+
+
+
+
+
+                                     slakio
+                Early development: nothing connects to Slack yet.
+                        Type :qa and press Enter to quit.
+
+
+
+
+
+
+
+
+
+
+ NORMAL
