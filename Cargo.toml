@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/slakio-core", "crates/slakio-tui", "crates/slakio-bench"]
+members = ["crates/slakio-core", "crates/slakio-world", "crates/slakio-tui", "crates/slakio-bench"]
 
 [workspace.package]
 version = "0.0.0"
@@ -21,6 +21,7 @@ publish = false
 # tui -> core <- adapters; adapters never depend on each other or on tui; bench -> all.
 slakio-core = { path = "crates/slakio-core" }
 slakio-tui = { path = "crates/slakio-tui" }
+slakio-world = { path = "crates/slakio-world" }
 
 # Terminal input and output for Ratatui; `event-stream` for the async event loop.
 crossterm = { version = "0.29", features = ["event-stream"] }

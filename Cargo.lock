@@ -1391,6 +1391,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "slakio-world"
+version = "0.0.0"
+dependencies = [
+ "slakio-core",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

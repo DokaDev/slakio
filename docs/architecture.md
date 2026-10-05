@@ -9,11 +9,11 @@ unless it says so.
 | Crate | What | Depends on |
 |---|---|---|
 | `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
+| `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
 | `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core` |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
 
-Planned crates join with the step that needs them: `slakio-world` (a deterministic fake
-world for the demo mode and the tests), `slakio-slack` (the Slack adapter), `slakio-auth`
+Planned crates join with the step that needs them: `slakio-slack` (the Slack adapter), `slakio-auth`
 (sign-in), `slakio-store` (the local cache), `slakio-fake` (a fake Slack server, tests only)
 and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
 
