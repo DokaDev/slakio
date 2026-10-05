@@ -3,9 +3,13 @@
 //!
 //! ```toml
 //! language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
-//! icons = false            # Nerd Font icons in the rail and status line (else letters)
+//! theme = "auto"           # "auto", "terminal", "dark", "tokyo-night" (-night / -day)
+//! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
 //! rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 //! ```
+//!
+//! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
+//! terminal's own colors.
 //!
 //! `rail_expand` is temporary: both ways exist until one is chosen, then the setting goes.
 //!
@@ -22,8 +26,10 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     /// The UI language setting: `auto`, `en` or `ko` ([`crate::i18n::detect_lang`]).
     pub language: String,
-    /// Nerd Font icons instead of letters.
-    pub icons: bool,
+    /// The color theme: `auto` or a built-in ([`THEMES`]).
+    pub theme: String,
+    /// Nerd Font icons instead of letters: `on`, `off`, or `ask` (asked once, the answer saved).
+    pub icons: String,
     /// How the rail expands: `overlay` or `push` ([`RAIL_EXPAND`]).
     pub rail_expand: String,
     /// The file the settings came from (or would be written to), when known.
@@ -32,12 +38,24 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { language: "auto".to_string(), icons: false, rail_expand: "overlay".to_string(), path: None }
+        Self {
+            language: "auto".to_string(),
+            theme: "auto".to_string(),
+            icons: "ask".to_string(),
+            rail_expand: "overlay".to_string(),
+            path: None,
+        }
     }
 }
 
 /// The values `language` takes.
 pub const LANGUAGES: &[&str] = &["auto", "en", "ko"];
+
+/// The values `theme` takes (the UI's built-in themes).
+pub const THEMES: &[&str] = &["auto", "terminal", "dark", "tokyo-night", "tokyo-night-night", "tokyo-night-day"];
+
+/// The values `icons` takes (`true` and `false` are `on` and `off`).
+pub const ICONS: &[&str] = &["on", "off", "ask"];
 
 /// The values `rail_expand` takes.
 pub const RAIL_EXPAND: &[&str] = &["overlay", "push"];
@@ -96,7 +114,14 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
         match key {
             "language" => cfg.language = one_of(item, LANGUAGES).ok_or_else(|| bad(LANGUAGES.join(", ")))?,
             "rail_expand" => cfg.rail_expand = one_of(item, RAIL_EXPAND).ok_or_else(|| bad(RAIL_EXPAND.join(", ")))?,
-            "icons" => cfg.icons = item.as_bool().ok_or_else(|| bad("true, false".to_string()))?,
+            "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
+            "icons" => {
+                cfg.icons = match item.as_bool() {
+                    Some(true) => "on".to_string(),
+                    Some(false) => "off".to_string(),
+                    None => one_of(item, ICONS).ok_or_else(|| bad(ICONS.join(", ")))?,
+                }
+            }
             other => return Err(ConfigError::UnknownKey(other.to_string())),
         }
     }
@@ -106,6 +131,23 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
 /// The string value of `item` when it is one of `allowed` (case ignored), lowercased.
 fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
     item.as_str().map(str::to_ascii_lowercase).filter(|v| allowed.contains(&v.as_str()))
+}
+
+/// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
+/// order of what is there; a missing file is created. Used for the one answer the app saves
+/// itself (`icons` after asking). A file that cannot be read or parsed is left alone.
+pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(Fault::io_at(&e, path)),
+    };
+    let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| Fault::toml_edit(&text, &e))?;
+    doc[key] = toml_edit::value(value);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| Fault::io_at(&e, dir))?;
+    }
+    crate::fsutil::atomic_write(path, doc.to_string().as_bytes()).map_err(|e| Fault::io_at(&e, path))
 }
 
 #[cfg(test)]

@@ -54,7 +54,7 @@ fn main() -> ExitCode {
     let (cfg, cfg_err) = config::load(config_path.as_deref());
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let mut app = App::new(lang, Theme::from_env(|k| std::env::var(k).ok()));
-    app.settings = Settings { icons: cfg.icons, rail_push: cfg.rail_expand == "push" };
+    app.settings = Settings { icons: cfg.icons == "on", rail_push: cfg.rail_expand == "push" };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {
