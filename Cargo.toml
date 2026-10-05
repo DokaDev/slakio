@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/slakio-core", "crates/slakio-world", "crates/slakio-tui", "crates/slakio-bench"]
+# cargo-fuzz targets need nightly; they build on their own (fuzz/Cargo.toml).
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.0.0"
@@ -27,6 +29,8 @@ slakio-world = { path = "crates/slakio-world" }
 crossterm = { version = "0.29", features = ["event-stream"] }
 # `StreamExt` over crossterm's event stream, and `select_all` over the signal streams.
 futures = "0.3"
+# Property tests of the sanitiser and the pure models, on the stable toolchain.
+proptest = { version = "1", default-features = false, features = ["std"] }
 # Snapshot tests of rendered screens (English only, never rewritten under CI).
 insta = "1.48.0"
 # The command line (`--help`, `--version`, `--config`): a small parser with no dependencies,
