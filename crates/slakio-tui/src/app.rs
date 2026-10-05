@@ -8,7 +8,7 @@ pub mod cmdline;
 pub mod status;
 
 use crate::action::{self, Action, AppAction, CommandLineAction};
-use crate::keymap::{Ctx, KeyChord, Keymap};
+use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::theme::Theme;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use slakio_core::i18n::{I18n, Lang, Msg};
@@ -24,6 +24,8 @@ pub enum Mode {
 
 pub struct App {
     pub keymap: Keymap,
+    /// Keys of an unfinished sequence (`Space w …`).
+    pub keys: KeyState,
     pub i18n: I18n,
     pub theme: Theme,
     pub cmdline: cmdline::CommandLine,
@@ -36,6 +38,7 @@ impl App {
     pub fn new(lang: Lang, theme: Theme) -> Self {
         Self {
             keymap: Keymap::default(),
+            keys: KeyState::default(),
             i18n: I18n::new(lang),
             theme,
             cmdline: cmdline::CommandLine::default(),
@@ -66,9 +69,14 @@ impl App {
             Event::Key(k) if k.kind == KeyEventKind::Press => {
                 let key = KeyChord::from_event(&k);
                 let ctx = self.key_context();
-                match self.keymap.resolve(ctx, key) {
-                    Some(a) => self.dispatch(a, now),
-                    None => self.type_key(ctx, key),
+                match self.keymap.feed(&mut self.keys, ctx, key) {
+                    Resolved::Action(a) => self.dispatch(a, now),
+                    Resolved::Pending => {}
+                    Resolved::Unbound(seq) => {
+                        if let [key] = seq[..] {
+                            self.type_key(ctx, key);
+                        }
+                    }
                 }
                 true
             }

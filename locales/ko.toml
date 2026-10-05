@@ -19,4 +19,8 @@
 "action.cmdline.cancel" = "명령줄 닫기"
 
 "ctx.root" = "어디서나"
+"ctx.shell" = "메인 화면"
+"ctx.rail" = "레일"
+"ctx.list" = "목록 패널"
+"ctx.pane_normal" = "작업 영역 (Normal 모드)"
 "ctx.cmdline" = "명령줄"

@@ -1,7 +1,7 @@
 //! `docs/keybindings.md`, generated from the default bindings, the action registry and the
 //! English catalog. `tests/keybindings_doc.rs` fails when the committed file is out of date.
 
-use super::{Ctx, Keymap, keys};
+use super::{Ctx, Keymap, check, keys};
 use crate::action::REGISTRY;
 use slakio_core::i18n::Lang;
 
@@ -19,6 +19,9 @@ pub fn render() -> String {
          (marked **[text]**) has no parent: every key it does not bind is typed.\n",
     );
     for &ctx in Ctx::ALL {
+        if km.bindings(ctx).next().is_none() {
+            continue;
+        }
         let text = if ctx.is_text_input() { " **[text]**" } else { "" };
         s.push_str(&format!("\n## {} (`{}`){text}\n\n", ctx.label().text(Lang::En), ctx.id()));
         s.push_str("| Keys | Action | Id |\n|---|---|---|\n");
@@ -33,6 +36,27 @@ pub fn render() -> String {
     for spec in REGISTRY.iter().filter(|s| !s.commands.is_empty()) {
         let also = spec.commands[1..].iter().map(|c| format!("`:{c}`")).collect::<Vec<_>>().join(" ");
         s.push_str(&format!("| `:{}` | {also} | {} |\n", spec.commands[0], spec.label.text(Lang::En)));
+    }
+    let fragile: Vec<_> = km.all().iter().filter(|b| b.keys.iter().any(|k| check::fragile(*k))).collect();
+    if !fragile.is_empty() {
+        s.push_str(
+            "\n## Keys that need the kitty keyboard protocol or Option as Alt\n\n\
+             Without the kitty keyboard protocol a terminal sends `Ctrl+I` as `Tab`, `Ctrl+M` as `Enter`, \
+             `Ctrl+[` as `Esc`, and on some terminals `Backspace` as `Ctrl+H`; on macOS, `Alt` keys need \
+             \"Option as Alt\" (Ghostty: `macos-option-as-alt = true`). Each of these keys has another key that \
+             works everywhere.\n\n| Keys | Action | Also |\n|---|---|---|\n",
+        );
+        for b in fragile {
+            let spec = crate::action::spec(b.action);
+            let also = km
+                .keys_for(b.action, b.ctx)
+                .into_iter()
+                .filter(|k| !k.iter().any(|c| check::fragile(*c)))
+                .map(|k| format!("`{}`", keys::label(&k)))
+                .collect::<Vec<_>>()
+                .join(" ");
+            s.push_str(&format!("| `{}` | {} | {also} |\n", keys::label(&b.keys), spec.label.text(Lang::En)));
+        }
     }
     s
 }

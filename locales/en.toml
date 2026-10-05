@@ -27,4 +27,8 @@
 
 # Key contexts (key help and docs/keybindings.md).
 "ctx.root" = "Everywhere"
+"ctx.shell" = "Main screen"
+"ctx.rail" = "Rail"
+"ctx.list" = "List panel"
+"ctx.pane_normal" = "Work area (Normal mode)"
 "ctx.cmdline" = "Command line"
