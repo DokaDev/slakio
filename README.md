@@ -11,9 +11,10 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 **Pre-alpha, early development. slakio does not connect to Slack yet.**
 
 What exists today is the project's foundation and the first part of the interface, on
-invented data only (`slakio --demo`): the rail, the list panel of channels and DMs, the work
-area and the status line. There is no sign-in, no real workspace and no message history yet,
-and there is no release to install. Nothing here is ready for daily use.
+invented data only (`slakio --demo`): the rail, the list panel of channels and DMs, the
+conversation pane with a thread panel and a composer, and the status line. There is no sign-in
+and no real workspace yet; nothing is ever sent anywhere, and there is no release to install.
+Nothing here is ready for daily use.
 
 The plan, in order: a user interface on fake data first, then read-only Slack connectivity,
 then sending messages, drafts, the Activity view and search, reactions and emoji, files and
@@ -30,8 +31,22 @@ images, and settings. This README only lists what works; it will grow with each 
   - the rail (workspaces, Home, DMs; Activity, Files and Later say they come in a later
     version) expands when focused or hovered;
   - the list panel shows sections (fold with `Enter`), channels and DMs with unread dots and
-    mention counts; `Enter` or a click opens a conversation's frame in the work area (its
-    messages are not shown yet);
+    mention counts; `Enter` or a click opens the conversation in the work area;
+  - the conversation shows its messages (date separators, edited marker, reaction pills,
+    "N replies" rows), loading older ones as you go up; `j` / `k` select messages, `g g` /
+    `G` jump to the oldest / newest, `Enter` opens the thread in a panel on the right (another
+    thread replaces it), `Ctrl+W` closes the panel, then the conversation; `Ctrl+O` / `Tab`
+    go back and forward between conversations;
+  - `V` selects a range of messages and `y` copies it (or the selected message) to the
+    clipboard through the terminal (OSC 52);
+  - `i` writes in the pane's composer (multiline: `Ctrl+J` or `Alt+Enter` for a new line,
+    `Shift+Enter` with the kitty keyboard protocol; `Ctrl+W` deletes a word; Korean input
+    works); `Enter` shows the message in the demo only, it is not sent anywhere; `Esc` goes
+    back to Normal mode;
+  - with a Korean input source, Normal-mode keys still work (`j` typed as its jamo moves);
+  - every name and message from the (invented) remote side is shown through a sanitiser that
+    removes terminal escape sequences, control and bidi characters; the demo has a channel of
+    hostile strings and a few hostile names to show it;
   - `Ctrl+h` / `Ctrl+l` (or `Space w h` / `Space w l`) move between the rail, the list and the
     work area; `Space h` / `Space d` show Home / DMs; `Space e` hides the list panel;
   - every key is listed in [docs/keybindings.md](docs/keybindings.md).

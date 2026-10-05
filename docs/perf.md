@@ -18,6 +18,11 @@ and credentials in memory. The binary writes its counters to the file named by
 | startup | size of the release binary; time from process start to the first frame | binary size (MiB) |
 | idle | event loop wakeups and frames per second while nothing happens | wakeups/s, frames/s |
 
+One count is held by a test instead (`crates/slakio-tui/tests/pane_flows.rs`): a frame lays out
+at most twice the message rows it shows, on the 10,000-message channel and the 1,200-reply
+thread, after moving, `g g` and `G` (the drawing code counts the rows it lays out). Messages are
+sanitised once, when their page arrives, never per frame.
+
 ## Why it does not flake
 
 CI holds **counts** only: bytes, wakeups, frames. Those do not depend on how fast or busy the

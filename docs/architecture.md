@@ -8,7 +8,7 @@ unless it says so.
 
 | Crate | What | Depends on |
 |---|---|---|
-| `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
+| `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), the terminal-escape sanitiser, paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
 | `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
 | `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core` |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
@@ -44,9 +44,11 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 `App` (`crates/slakio-tui/src/app.rs`) is a thin router. Each part of the state is a sub-state
 that owns its data and its update: the command line (`app/cmdline.rs`), the status line's
 notices (`app/status.rs`), the shell — focus between rail, list panel and work area, the rail
-and list cursors, folded sections, what the work area has open (`app/shell.rs`) — and the read
-model of the workspaces (`app/model.rs`); the layout (tabs and panes), the panes, the input
-mode and the overlays join as they are built. The geometry of the screen (`screen.rs`) is one
+and list cursors, folded sections (`app/shell.rs`) —, the work area — the main pane, the auto
+thread panel, which of them has the keyboard, Insert mode, back/forward history
+(`app/work.rs`) — with its panes (`app/pane.rs`: loaded messages, selection, VISUAL range) and
+their composers (`app/composer.rs`), and the read model of the workspaces (`app/model.rs`); the
+layout (tabs and splits) and the overlays join as they are built. The geometry of the screen (`screen.rs`) is one
 pure function that drawing and the mouse both use. Rules:
 
 - An `Action` is namespaced by its owner (`Action::CommandLine(CommandLineAction::Run)`), so
@@ -57,13 +59,29 @@ pure function that drawing and the mouse both use. Rules:
   input, signals and the app's next deadline; it redraws only after something changed and
   sleeps when nothing happens (the idle wakeups are a performance budget).
 - The UI talks to a backend only through the protocol of `slakio_core::backend`: the app
-  queues commands, the binary's loop delivers them and hands the events back, and an event for
-  an older request (an older generation) is dropped. `slakio --demo` uses `DemoBackend`
+  queues commands, the binary's loop delivers them and hands the events back
+  (`exchange.rs`, until neither side has more: an answer may ask for the next page), and an
+  event for an older request (an older generation) or for a target no pane shows is dropped.
+  Messages come in pages (`Command::History`), newest first, older ones as the selection nears
+  the top.
+- What only the terminal can do is an `Effect` the loop carries out: copying is OSC 52, so no
+  clipboard library or helper process is involved. `slakio --demo` uses `DemoBackend`
   (`crates/slakio-tui/src/demo.rs`) over `slakio-world`; `main.rs` is the one place that names
   a concrete backend.
 - Channels from background tasks are bounded wherever a stream can be large (websocket events,
   history pages, downloads); events carry their target and a generation, and stale ones are
   dropped.
+
+## Remote text
+
+Everything a remote party chose — names of workspaces, people, sections, conversations and
+reactions, message texts, later topics, statuses, file names and link texts — is
+`slakio_core::sanitize::Remote`. It has no `Display`, `Deref` or `AsRef<str>`, so it reaches a
+widget only through `line()` / `block()`, the sanitiser, which removes escape sequences
+(7-bit and 8-bit), control, bidi and invisible characters, private-use code points, mark
+floods and overlong text. `Remote::unsanitized` (comparisons and lookups) and `Safe::trusted`
+are kept out of the drawing code by a test. Message texts are sanitised once, when their page
+arrives; the composer sanitises what is typed or pasted into it.
 
 ## Robustness
 
