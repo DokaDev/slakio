@@ -54,7 +54,11 @@ fn main() -> ExitCode {
     let (cfg, cfg_err) = config::load(config_path.as_deref());
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let env = |k: &str| std::env::var(k).ok();
-    let mut app = App::new(lang, Theme::from_env(&cfg.theme, env, Background::Unknown));
+    // The background matters only to a theme with a light and a dark variant, and to the
+    // muted text of the terminal's colors; never asked without colors.
+    let background =
+        if env("NO_COLOR").is_some_and(|v| !v.is_empty()) { Background::Unknown } else { term::background() };
+    let mut app = App::new(lang, Theme::from_env(&cfg.theme, env, background));
     app.settings = Settings { icons: cfg.icons == "on", rail_push: cfg.rail_expand == "push" };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);

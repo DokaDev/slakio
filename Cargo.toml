@@ -39,6 +39,9 @@ lexopt = "0.3"
 ratatui = "0.30"
 # The bench crate's JSONL output and the binary's stats file.
 serde_json = "1.0.151"
+# The terminal's background (OSC 11, light or dark) for the themes with a light and a dark
+# variant; asked once at startup, before the event stream reads stdin.
+terminal-colorsaurus = "1.0.3"
 tokio = "1"
 # Reading the locale catalogs in build.rs and the budgets of the bench crate.
 toml = "1.1.6"

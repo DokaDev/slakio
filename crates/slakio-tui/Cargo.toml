@@ -27,6 +27,7 @@ ratatui.workspace = true
 slakio-core.workspace = true
 # The invented world behind `--demo`.
 slakio-world.workspace = true
+terminal-colorsaurus.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "signal"] }
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
