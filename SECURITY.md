@@ -21,6 +21,14 @@ welcome:
   terminal instead of being shown as text;
 - downloads written outside the folder the user chose, or opened without being asked.
 
+## Copying remote text
+
+What slakio copies (a message, or a VISUAL range) is the sanitised message text the screen draws
+from, in full: no escape sequences or invisible characters, but still text someone else wrote.
+It can hold a command, and the line breaks that run it. Be careful pasting copied text into a
+shell; a terminal with bracketed paste, and a shell that honours it, keeps a paste from running
+on its own. Copied text that does something on paste the screen did not show is in scope.
+
 ## Supported versions
 
 slakio is pre-alpha and has no release yet. Once it has, only the latest release is
