@@ -1,6 +1,6 @@
 [package]
 name = "slakio-core"
-description = "UI-free and network-free core of slakio: paths, files, config, secrets, faults, i18n"
+description = "UI-free and network-free core of slakio: domain model, backend protocol, paths, files, config, secrets, faults, i18n"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

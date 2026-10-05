@@ -8,7 +8,7 @@ unless it says so.
 
 | Crate | What | Depends on |
 |---|---|---|
-| `slakio-core` | UI-free and network-free core: paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
+| `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
 | `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core` |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
 
