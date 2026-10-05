@@ -138,6 +138,57 @@ fn long_text_is_cut_with_an_ellipsis() {
     assert_eq!(line(&exact), exact);
 }
 
+/// Texts made to be slow: every introducer unterminated, sequences that almost end, floods.
+fn adversarial(n: usize) -> Vec<String> {
+    vec![
+        "\x1b]x".repeat(n),
+        "\x1b]".repeat(n),
+        "\x1bP".repeat(n),
+        "\x1b_\x1b".repeat(n),
+        "\u{9d}x".repeat(n),
+        "\u{90}\u{98}\u{9e}\u{9f}".repeat(n),
+        "\x1b[".repeat(n),
+        format!("\x1b[{}", "1;".repeat(n)),
+        "\x1b ".repeat(n),
+        format!("\x1b({}", " ".repeat(n)),
+        "\x1b".repeat(n),
+        "\u{9b}".repeat(n),
+        format!("{}{}", "\x1b]0;t\x07".repeat(n / 4), "\x1b]x".repeat(n)),
+        "\u{200B}".repeat(n),
+        format!("e{}", "\u{0301}".repeat(n)),
+    ]
+}
+
+#[test]
+fn the_work_is_linear_in_the_input_however_hostile() {
+    // The characters looked at, not the time taken: deterministic on every machine.
+    for s in adversarial(40_000) {
+        for block in [false, true] {
+            let max_bytes = if block { BLOCK_MAX_INPUT_BYTES } else { LINE_MAX_INPUT_BYTES };
+            let read = s.len().min(max_bytes);
+            let steps = sanitize_steps(&s, block);
+            assert!(steps <= 4 * read + 16, "{steps} steps for {read} bytes ({:?}…)", &s[..8.min(s.len())]);
+        }
+    }
+    // Twice the input, about twice the work.
+    for (small, big) in adversarial(10_000).iter().zip(adversarial(20_000).iter()) {
+        let (a, b) = (sanitize_steps(small, true), sanitize_steps(big, true));
+        assert!(b <= 2 * a + 16, "{a} then {b} steps ({:?}…)", &small[..4.min(small.len())]);
+    }
+}
+
+#[test]
+fn only_the_first_bytes_of_a_huge_input_are_read() {
+    let huge = format!("{}tail", "\u{200B}".repeat(BLOCK_MAX_INPUT_BYTES));
+    assert_eq!(block(&huge), "…", "nothing visible within the bytes read, and the cut is marked");
+    let name = format!("ok{}", "\u{200B}".repeat(LINE_MAX_INPUT_BYTES));
+    assert_eq!(line(&name), "ok…");
+    assert_eq!(line(&line(&name)), "ok…", "stable once cut");
+    // A cut in the middle of a character stays on a boundary.
+    let multi = "\u{D55C}".repeat(LINE_MAX_INPUT_BYTES);
+    assert_eq!(line(&multi).chars().count(), LINE_MAX_CHARS);
+}
+
 #[test]
 fn remote_text_is_reached_only_through_the_sanitiser() {
     let r = Remote::new("a\x1b[2Jb\nc");
@@ -197,8 +248,28 @@ proptest! {
 
 }
 
+/// Text built from repeated pieces that open sequences and seldom close them: the inputs that
+/// would make a rescanning sanitiser quadratic.
+fn timing_text() -> impl Strategy<Value = String> {
+    let piece = prop::sample::select(vec![
+        "\x1b]", "\x1bP", "\x1b_", "\x1b^", "\x1bX", "\u{9d}", "\u{90}", "\x1b[", "\u{9b}", "\x1b", "\x1b(", "1;", " ",
+        "x", "\x07", "\x1b\\", "\u{9c}", "\u{200B}", "\u{0301}",
+    ]);
+    (prop::collection::vec(piece, 1..8), 100..3000usize).prop_map(|(pieces, n)| pieces.concat().repeat(n))
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
+
+    #[test]
+    fn hostile_repetitions_stay_linear(s in timing_text()) {
+        for block in [false, true] {
+            let max_bytes = if block { BLOCK_MAX_INPUT_BYTES } else { LINE_MAX_INPUT_BYTES };
+            let steps = sanitize_steps(&s, block);
+            prop_assert!(steps <= 4 * s.len().min(max_bytes) + 16, "{} steps for {} bytes", steps, s.len());
+        }
+        check(&block(&s), true);
+    }
 
     #[test]
     fn long_lines_respect_the_caps(s in prop::collection::vec(hostile_char(), 200..2000)) {

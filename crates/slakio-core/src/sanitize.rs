@@ -25,7 +25,9 @@
 //!   `U+FFFD`, so remote text cannot pass for the UI's own icons;
 //! * at most [`MAX_MARKS`] combining marks follow a character;
 //! * a line keeps at most [`LINE_MAX_CHARS`] characters and a block [`BLOCK_MAX_CHARS`]; what is
-//!   cut ends with `…`.
+//!   cut ends with `…`. Only the first [`LINE_MAX_INPUT_BYTES`] or [`BLOCK_MAX_INPUT_BYTES`] of
+//!   the input are read at all, and the work is linear in them: a hostile text cannot make the
+//!   sanitiser slow.
 //!
 //! Sanitising twice gives what sanitising once gave.
 //!
@@ -55,6 +57,11 @@ use std::fmt;
 pub const LINE_MAX_CHARS: usize = 256;
 /// The most characters a block (a message body) keeps: Slack's own limit for a message.
 pub const BLOCK_MAX_CHARS: usize = 40_000;
+/// The most bytes of a line's input that are read; the rest is cut (sixteen bytes for each
+/// character kept: room for escape sequences and invisible characters around real text).
+pub const LINE_MAX_INPUT_BYTES: usize = LINE_MAX_CHARS * 16;
+/// The most bytes of a block's input that are read; the rest is cut.
+pub const BLOCK_MAX_INPUT_BYTES: usize = BLOCK_MAX_CHARS * 16;
 /// The most combining marks kept after one character.
 pub const MAX_MARKS: usize = 2;
 /// What a tab becomes in a block.
@@ -225,56 +232,107 @@ fn char_at(s: &str, i: usize) -> Option<char> {
     s.get(i..).and_then(|r| r.chars().next())
 }
 
-/// The end (byte index) of the escape sequence whose introducer ends at `i`: `csi` for a
-/// control sequence, else a string (OSC, DCS, SOS, PM, APC) ended by ST (`ESC \`, U+009C) or
-/// BEL. `None` when it never ends properly: then only the introducer is dropped.
-fn sequence_end(s: &str, mut i: usize, csi: bool) -> Option<usize> {
-    if csi {
-        // Parameters and intermediates, then one final byte.
-        while let Some(c) = char_at(s, i) {
-            match c {
-                '\x20'..='\x3f' => i += 1,
-                '\x40'..='\x7e' => return Some(i + 1),
-                _ => return None,
-            }
-        }
-        return None;
-    }
-    while let Some(c) = char_at(s, i) {
-        match c {
-            '\x07' => return Some(i + 1),
-            '\u{9c}' => return Some(i + c.len_utf8()),
-            '\x1b' if char_at(s, i + 1) == Some('\\') => return Some(i + 2),
-            _ => i += c.len_utf8(),
-        }
-    }
-    None
+/// The input being sanitised and what scanning it has learnt.
+struct Scan<'a> {
+    s: &'a str,
+    /// No string sequence terminator (ST or BEL) at or after this byte: once a scan for one has
+    /// run to the end of the text, a later introducer is not scanned again (which would make a
+    /// text of unterminated introducers quadratic).
+    no_terminator_from: usize,
+    /// Characters looked at, for the tests that hold the work linear.
+    steps: usize,
 }
 
-/// Where the escape sequence starting with `ESC` at byte `i` ends.
-fn escape_end(s: &str, i: usize) -> usize {
-    let lone = i + 1;
-    match char_at(s, lone) {
-        Some('[') => sequence_end(s, lone + 1, true).unwrap_or(lone + 1),
-        Some(']' | 'P' | 'X' | '^' | '_') => sequence_end(s, lone + 1, false).unwrap_or(lone + 1),
-        // `ESC` intermediates final (`ESC ( B`).
-        Some('\x20'..='\x2f') => {
-            let mut j = lone;
-            while let Some('\x20'..='\x2f') = char_at(s, j) {
-                j += 1;
+impl Scan<'_> {
+    /// The character at byte `i`, if any.
+    fn at(&mut self, i: usize) -> Option<char> {
+        self.steps += 1;
+        char_at(self.s, i)
+    }
+
+    /// The end (byte index) of the escape sequence whose introducer ends at `i`: `csi` for a
+    /// control sequence, else a string (OSC, DCS, SOS, PM, APC) ended by ST (`ESC \`, U+009C)
+    /// or BEL. `None` when it never ends properly: then only the introducer is dropped.
+    fn sequence_end(&mut self, mut i: usize, csi: bool) -> Option<usize> {
+        if csi {
+            // Parameters and intermediates, then one final byte.
+            while let Some(c) = self.at(i) {
+                match c {
+                    '\x20'..='\x3f' => i += 1,
+                    '\x40'..='\x7e' => return Some(i + 1),
+                    _ => return None,
+                }
             }
-            match char_at(s, j) {
-                Some('\x30'..='\x7e') => j + 1,
-                _ => lone,
+            return None;
+        }
+        if i >= self.no_terminator_from {
+            return None;
+        }
+        let start = i;
+        while let Some(c) = self.at(i) {
+            match c {
+                '\x07' => return Some(i + 1),
+                '\u{9c}' => return Some(i + c.len_utf8()),
+                '\x1b' if char_at(self.s, i + 1) == Some('\\') => return Some(i + 2),
+                _ => i += c.len_utf8(),
             }
         }
-        // `ESC c` (reset), `ESC 7`, `ESC =`, …
-        Some('\x30'..='\x7e') => lone + 1,
-        _ => lone,
+        self.no_terminator_from = start;
+        None
     }
+
+    /// Where the escape sequence starting with `ESC` at byte `i` ends.
+    fn escape_end(&mut self, i: usize) -> usize {
+        let lone = i + 1;
+        match self.at(lone) {
+            Some('[') => self.sequence_end(lone + 1, true).unwrap_or(lone + 1),
+            Some(']' | 'P' | 'X' | '^' | '_') => self.sequence_end(lone + 1, false).unwrap_or(lone + 1),
+            // `ESC` intermediates final (`ESC ( B`).
+            Some('\x20'..='\x2f') => {
+                let mut j = lone;
+                while let Some('\x20'..='\x2f') = self.at(j) {
+                    j += 1;
+                }
+                match self.at(j) {
+                    Some('\x30'..='\x7e') => j + 1,
+                    _ => lone,
+                }
+            }
+            // `ESC c` (reset), `ESC 7`, `ESC =`, …
+            Some('\x30'..='\x7e') => lone + 1,
+            _ => lone,
+        }
+    }
+}
+
+/// `s` cut to at most `max_bytes` (on a character boundary), and whether it was cut.
+fn read_at_most(s: &str, max_bytes: usize) -> (&str, bool) {
+    if s.len() <= max_bytes {
+        return (s, false);
+    }
+    let mut end = max_bytes;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    (&s[..end], true)
 }
 
 fn sanitize(s: &str, block: bool, max: usize) -> String {
+    sanitize_counted(s, block, max).0
+}
+
+/// The characters [`sanitize_block`] (`block`) or [`sanitize_line`] looks at for `text`: at most
+/// a few per byte of input, whatever the input. For the fuzz target, which holds it linear.
+#[doc(hidden)]
+pub fn sanitize_steps(text: &str, block: bool) -> usize {
+    sanitize_counted(text, block, if block { BLOCK_MAX_CHARS } else { LINE_MAX_CHARS }).1
+}
+
+/// The sanitised text and the characters looked at to make it.
+fn sanitize_counted(s: &str, block: bool, max: usize) -> (String, usize) {
+    let max_bytes = if block { BLOCK_MAX_INPUT_BYTES } else { LINE_MAX_INPUT_BYTES };
+    let (s, truncated) = read_at_most(s, max_bytes);
+    let mut scan = Scan { s, no_terminator_from: usize::MAX, steps: 0 };
     let mut out = String::with_capacity(s.len().min(max * 4));
     // Characters in `out`; one more than `max` tells that the text has to be cut.
     let mut kept = 0usize;
@@ -282,21 +340,21 @@ fn sanitize(s: &str, block: bool, max: usize) -> String {
     let mut last: Option<char> = None;
     let mut i = 0;
     while kept <= max {
-        let Some(c) = char_at(s, i) else { break };
+        let Some(c) = scan.at(i) else { break };
         let next = i + c.len_utf8();
         let start = i;
         i = next;
         let replacement: Option<&str> = match c {
             '\x1b' => {
-                i = escape_end(s, start);
+                i = scan.escape_end(start);
                 continue;
             }
             '\u{9b}' => {
-                i = sequence_end(s, next, true).unwrap_or(next);
+                i = scan.sequence_end(next, true).unwrap_or(next);
                 continue;
             }
             '\u{90}' | '\u{98}' | '\u{9d}' | '\u{9e}' | '\u{9f}' => {
-                i = sequence_end(s, next, false).unwrap_or(next);
+                i = scan.sequence_end(next, false).unwrap_or(next);
                 continue;
             }
             '\r' | '\n' | '\u{85}' | '\u{2028}' | '\u{2029}' => {
@@ -340,7 +398,7 @@ fn sanitize(s: &str, block: bool, max: usize) -> String {
             }
         }
     }
-    if kept > max {
+    if kept > max || truncated {
         let mut cut: String = out.chars().take(max - 1).collect();
         while cut.ends_with('\u{200D}') {
             cut.pop();
@@ -348,7 +406,7 @@ fn sanitize(s: &str, block: bool, max: usize) -> String {
         cut.push(CUT);
         out = cut;
     }
-    out
+    (out, scan.steps)
 }
 
 #[cfg(test)]
