@@ -12,7 +12,7 @@ fn home_lists_each_section_then_its_conversations_and_folds_collapsed_ones() {
     assert!(matches!(rows[0], Row::Section(_)));
     let headers: Vec<&str> = rows
         .iter()
-        .filter_map(|r| if let Row::Section(i) = r { Some(m.section(*i).name.as_str()) } else { None })
+        .filter_map(|r| if let Row::Section(i) = r { Some(m.section(*i).name.unsanitized()) } else { None })
         .collect();
     assert_eq!(headers, ["Favorites", "Ops", "Channels", "Direct messages"]);
     let Row::Section(fav) = rows[0] else { unreachable!() };

@@ -2,9 +2,13 @@
 //! sections, conversations and messages. Plain data with no behaviour beyond small queries, so
 //! the demo world, the Slack adapter and the tests all build the same values.
 //!
+//! Every text a remote party chose — names, message bodies, reaction names — is [`Remote`]:
+//! it reaches the screen only through the sanitiser.
+//!
 //! Ids are Slack's string ids (`T…`, `U…`, `C…`, `D…`), kept as opaque strings: a saved layout
 //! names its targets by them, so it restores with whichever backend produced them.
 
+use crate::sanitize::Remote;
 use std::fmt;
 
 macro_rules! string_id {
@@ -57,7 +61,7 @@ pub struct WorkspaceColor(pub u8);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Workspace {
     pub id: WorkspaceId,
-    pub name: String,
+    pub name: Remote,
     pub color: WorkspaceColor,
 }
 
@@ -67,7 +71,7 @@ pub enum Org {
     /// The workspace's own organization.
     Own,
     /// Another organization (a Slack Connect peer); its name.
-    External(String),
+    External(Remote),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,9 +80,9 @@ pub struct User {
     /// The workspace that lists this person.
     pub workspace: WorkspaceId,
     /// The handle (`minsu.kim`).
-    pub name: String,
+    pub name: Remote,
     /// The name people see (`Minsu Kim`).
-    pub display_name: String,
+    pub display_name: Remote,
     pub org: Org,
     pub bot: bool,
 }
@@ -101,7 +105,7 @@ pub enum SectionKind {
 pub struct Section {
     pub id: SectionId,
     pub workspace: WorkspaceId,
-    pub name: String,
+    pub name: Remote,
     pub kind: SectionKind,
 }
 
@@ -118,7 +122,7 @@ pub struct Conversation {
     pub workspace: WorkspaceId,
     pub kind: ConversationKind,
     /// The channel name without `#`; for a DM, the peer's display name.
-    pub name: String,
+    pub name: Remote,
     /// The sidebar section it is listed in.
     pub section: SectionId,
     /// Shared with another organization (Slack Connect).
@@ -157,7 +161,7 @@ impl fmt::Display for Ts {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Reaction {
     /// The emoji name without colons (`+1`, `eyes`).
-    pub name: String,
+    pub name: Remote,
     pub count: u32,
     /// The user is among those who reacted.
     pub mine: bool,
@@ -174,9 +178,8 @@ pub struct ThreadSummary {
 pub struct Message {
     pub ts: Ts,
     pub user: UserId,
-    /// The text as the sender wrote it. Remote text: it reaches the screen only through the
-    /// sanitiser.
-    pub text: String,
+    /// The text as the sender wrote it.
+    pub text: Remote,
     pub thread: Option<ThreadSummary>,
     pub reactions: Vec<Reaction>,
     pub edited: bool,

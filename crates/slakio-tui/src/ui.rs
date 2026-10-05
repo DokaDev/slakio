@@ -4,9 +4,9 @@
 //!
 //! * [`rail`], [`list`], [`work`] — the three regions; [`statusline`] — the bottom line.
 //!
-//! Names drawn here are the backend's data (workspace, channel and people names). The demo
-//! world holds only printable names; remote text goes through the sanitiser before any of it
-//! is drawn.
+//! Names and messages drawn here are remote text ([`slakio_core::sanitize::Remote`]): it can
+//! only be drawn through the sanitiser (`line()`, `block()`), never as it came. A test keeps
+//! `Remote::unsanitized` out of this module.
 
 mod list;
 mod rail;
@@ -23,6 +23,7 @@ use ratatui::symbols::border;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use slakio_core::i18n::{Label, Localized, Msg};
+use slakio_core::sanitize::Safe;
 use std::time::Instant;
 
 /// Draw the whole screen at `now` (notices that ran out are not drawn).
@@ -112,8 +113,8 @@ fn view_glyph(view: View, icons: bool) -> &'static str {
 }
 
 /// The first letter of a workspace's name, upper case: its rail letter.
-fn workspace_letter(name: &str) -> String {
-    name.chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_default()
+fn workspace_letter(name: &Safe) -> String {
+    name.as_str().chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_default()
 }
 
 /// Paint `style` over a whole row (the cursor).

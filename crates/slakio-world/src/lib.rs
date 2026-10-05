@@ -8,8 +8,9 @@
 //! the same world. Messages are not stored: message `i` of a conversation is generated from
 //! `(seed, conversation, i)` on demand, so a huge channel costs nothing until it is read.
 //!
-//! Everything is invented. Names hold only printable text; hostile strings appear only as
-//! message text, which reaches the screen only through the sanitiser.
+//! Everything is invented. Hostile strings appear as message text, and also where a remote party
+//! names things: a person's display name (and so a DM's name), a section's name, a reaction's
+//! name. All of it is [`slakio_core::sanitize::Remote`] text, drawn only through the sanitiser.
 
 mod hostile;
 mod rng;
@@ -23,6 +24,7 @@ use slakio_core::model::{
     Conversation, ConversationId, ConversationKind, Message, Org, Reaction, Section, SectionId, SectionKind,
     ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
 };
+use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
 
 /// The seed of the demo.
@@ -115,6 +117,13 @@ const PEOPLE: &[(&str, &str)] = &[
 ];
 
 const PARTNER_ORG: &str = "Partner Inc";
+/// A person of `A company` whose names try to take over the terminal; they post in the hostile
+/// channel and have a DM.
+const HOSTILE_USER: (&str, &str) = ("mallory\x1b[8m", "\x1b[31mMallory\x1b[0m \u{202E}live\u{202C}\x1b]0;owned\x07");
+/// The name of a section of `B side`, with a sequence that would clear the screen.
+const HOSTILE_SECTION: &str = "Side\x1b[2J\x1b[H projects";
+/// A reaction name on the first message of the hostile channel.
+const HOSTILE_REACTION: &str = "blink\x1b[5m\u{200B}";
 const PARTNERS: &[(&str, &str)] = &[("p.lin", "Pat Lin"), ("q.ford", "Quinn Ford"), ("r.diaz", "Rae Diaz")];
 const BOTS: &[(&str, &str)] = &[("grafana", "Grafana"), ("deploybot", "Deploy Bot")];
 const REACTIONS: &[&str] = &["+1", "eyes", "tada", "white_check_mark", "pray", "fire"];
@@ -159,7 +168,8 @@ const SPECS: &[Spec] = &[
         channels: 60,
         dms: 5,
         sections: &[
-            ("Channels", SectionKind::Channels, &["general", "random", "side-project", "ideas"]),
+            (HOSTILE_SECTION, SectionKind::Custom, &["side-project"]),
+            ("Channels", SectionKind::Channels, &["general", "random", "ideas"]),
             ("Direct messages", SectionKind::DirectMessages, &[]),
         ],
     },
@@ -214,8 +224,8 @@ impl World {
         let ts = Ts(slot * 1_000_000 + r.below(plan.step * 1_000_000));
         let user = r.pick(&plan.posters).clone();
         let text = match plan.history {
-            History::Hostile => hostile::all().swap_remove(index).text,
-            _ => text::message(&mut r),
+            History::Hostile => hostile::all().swap_remove(index).text.into(),
+            _ => text::message(&mut r).into(),
         };
         let replies = match plan.history {
             History::LongThread if index == 0 => LONG_THREAD_REPLIES,
@@ -230,11 +240,14 @@ impl World {
         let mut reactions: Vec<Reaction> = Vec::new();
         if r.chance(15) {
             for _ in 0..1 + r.below(3) {
-                let name = r.pick(REACTIONS).to_string();
+                let name = Remote::from(*r.pick(REACTIONS));
                 if !reactions.iter().any(|x| x.name == name) {
                     reactions.push(Reaction { name, count: 1 + r.below(5) as u32, mine: r.chance(30) });
                 }
             }
+        }
+        if plan.history == History::Hostile && index == 0 {
+            reactions.push(Reaction { name: HOSTILE_REACTION.into(), count: 2, mine: false });
         }
         Some(Message { ts, user, text, thread, reactions, edited: r.chance(5) })
     }
@@ -249,21 +262,28 @@ impl World {
         let mut r = Rng::keyed(self.seed, &format!("{conversation}/{parent}"), u64::from(index));
         let ts = Ts(root.ts.0 + (u64::from(index) + 1) * REPLY_STEP_SECS * 1_000_000);
         let user = r.pick(&plan.posters).clone();
-        Some(Message { ts, user, text: text::message(&mut r), thread: None, reactions: Vec::new(), edited: false })
+        Some(Message {
+            ts,
+            user,
+            text: text::message(&mut r).into(),
+            thread: None,
+            reactions: Vec::new(),
+            edited: false,
+        })
     }
 
     fn add_workspace(&mut self, n: usize, spec: &Spec) {
         let ws = WorkspaceId::new(spec.id);
         self.snapshot.workspaces.push(Workspace {
             id: ws.clone(),
-            name: spec.name.to_string(),
+            name: spec.name.into(),
             color: WorkspaceColor(n as u8),
         });
         let user = |id: String, name: &str, display: &str, org: Org, bot: bool| User {
             id: UserId::new(id),
             workspace: ws.clone(),
-            name: name.to_string(),
-            display_name: display.to_string(),
+            name: name.into(),
+            display_name: display.into(),
             org,
             bot,
         };
@@ -290,6 +310,8 @@ impl World {
         } else {
             vec![]
         };
+        let hostile: Option<User> =
+            spec.partners.then(|| user(format!("UDEMO{tag}666"), HOSTILE_USER.0, HOSTILE_USER.1, Org::Own, false));
         let own: Vec<UserId> = people.iter().map(|u| u.id.clone()).collect();
         let with_bots: Vec<UserId> = own.iter().chain(bots.iter().map(|b| &b.id)).cloned().collect();
         let shared: Vec<UserId> = own.iter().take(4).chain(partners.iter().map(|p| &p.id)).cloned().collect();
@@ -307,7 +329,7 @@ impl World {
             self.snapshot.sections.push(Section {
                 id: section.clone(),
                 workspace: ws.clone(),
-                name: name.to_string(),
+                name: (*name).into(),
                 kind: *kind,
             });
             let mut names: Vec<String> = channels.iter().map(|c| c.to_string()).collect();
@@ -318,13 +340,14 @@ impl World {
             for name in names {
                 let posters = match name.as_str() {
                     names::SHARED => shared.clone(),
+                    names::HOSTILE => own.iter().chain(hostile.iter().map(|h| &h.id)).cloned().collect(),
                     "alerts" | "incidents" | "deploys" => with_bots.clone(),
                     _ => own.clone(),
                 };
                 let private = name != names::SHARED && r.chance(10);
                 let kind = ConversationKind::Channel { private };
                 let id = ConversationId::new(format!("CDEMO{tag}{:04}", self.snapshot.conversations.len()));
-                self.add_conversation(&ws, id, kind, name, &section, posters);
+                self.add_conversation(&ws, id, kind, name.into(), &section, posters);
             }
             if *kind == SectionKind::DirectMessages {
                 for (i, peer) in people.iter().take(spec.dms).enumerate() {
@@ -333,18 +356,25 @@ impl World {
                     let posters = vec![me.id.clone(), peer.id.clone()];
                     self.add_conversation(&ws, id, kind, peer.display_name.clone(), &section, posters);
                 }
+                if let Some(h) = &hostile {
+                    let id = ConversationId::new(format!("DDEMO{tag}0666"));
+                    let kind = ConversationKind::Dm { user: h.id.clone() };
+                    let posters = vec![me.id.clone(), h.id.clone()];
+                    self.add_conversation(&ws, id, kind, h.display_name.clone(), &section, posters);
+                }
                 let group: Vec<&User> = people.iter().skip(1).take(3).collect();
-                let name = group.iter().map(|u| u.display_name.as_str()).collect::<Vec<_>>().join(", ");
+                let name: String = group.iter().map(|u| u.display_name.unsanitized()).collect::<Vec<_>>().join(", ");
                 let users: Vec<UserId> = group.iter().map(|u| u.id.clone()).collect();
                 let posters = std::iter::once(me.id.clone()).chain(users.iter().cloned()).collect();
                 let id = ConversationId::new(format!("GDEMO{tag}0001"));
-                self.add_conversation(&ws, id, ConversationKind::GroupDm { users }, name, &section, posters);
+                self.add_conversation(&ws, id, ConversationKind::GroupDm { users }, name.into(), &section, posters);
             }
         }
         self.snapshot.users.push(me);
         self.snapshot.users.extend(people);
         self.snapshot.users.extend(bots);
         self.snapshot.users.extend(partners);
+        self.snapshot.users.extend(hostile);
     }
 
     fn add_conversation(
@@ -352,12 +382,12 @@ impl World {
         ws: &WorkspaceId,
         id: ConversationId,
         kind: ConversationKind,
-        name: String,
+        name: Remote,
         section: &SectionId,
         posters: Vec<UserId>,
     ) {
         let mut r = Rng::keyed(self.seed, id.as_str(), u64::MAX);
-        let (history, count) = match name.as_str() {
+        let (history, count) = match name.unsanitized() {
             names::BIG_HISTORY => (History::Normal, BIG_HISTORY_MESSAGES),
             names::LONG_THREADS => (History::LongThread, 40),
             names::HOSTILE => (History::Hostile, hostile::all().len()),

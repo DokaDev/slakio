@@ -26,14 +26,14 @@ fn the_same_seed_gives_the_same_world() {
 fn two_workspaces_with_sections_about_300_channels_and_dms() {
     let w = world();
     let s = w.snapshot();
-    let names: Vec<_> = s.workspaces.iter().map(|w| w.name.as_str()).collect();
+    let names: Vec<_> = s.workspaces.iter().map(|w| w.name.unsanitized()).collect();
     assert_eq!(names, ["A company", "B side"]);
     assert_ne!(s.workspaces[0].color, s.workspaces[1].color);
     let channels = s.conversations.iter().filter(|c| !c.is_dm()).count();
     assert!((280..=320).contains(&channels), "{channels} channels");
     for ws in &s.workspaces {
         let dms = s.conversations.iter().filter(|c| c.workspace == ws.id && c.is_dm()).count();
-        assert!(dms >= 5, "{}: {dms} DMs", ws.name);
+        assert!(dms >= 5, "{:?}: {dms} DMs", ws.name);
         assert!(w.me(&ws.id).is_some());
     }
     assert!(s.conversations.iter().any(|c| matches!(c.kind, ConversationKind::GroupDm { .. })));
@@ -50,8 +50,8 @@ fn ids_are_unique_and_every_reference_resolves() {
     for c in &s.conversations {
         assert!(ids.insert(c.id.as_str()), "{} twice", c.id);
         let section = s.sections.iter().find(|x| x.id == c.section).expect("section exists");
-        assert_eq!(section.workspace, c.workspace, "{}", c.name);
-        assert!(c.mentions <= c.unread, "{}", c.name);
+        assert_eq!(section.workspace, c.workspace, "{:?}", c.name);
+        assert!(c.mentions <= c.unread, "{:?}", c.name);
         if let ConversationKind::Dm { user } = &c.kind {
             assert!(s.users.iter().any(|u| &u.id == user));
         }
@@ -61,7 +61,7 @@ fn ids_are_unique_and_every_reference_resolves() {
     for c in &s.conversations {
         for i in 0..w.message_count(&c.id).min(30) {
             let m = w.message(&c.id, i).unwrap();
-            assert!(users.contains(m.user.as_str()), "{}: poster {}", c.name, m.user);
+            assert!(users.contains(m.user.as_str()), "{:?}: poster {}", c.name, m.user);
         }
     }
 }
@@ -117,7 +117,8 @@ fn the_long_thread_has_1200_replies_in_time_order() {
 fn the_hostile_channel_carries_every_hostile_string() {
     let w = world();
     let c = conv(&w, names::HOSTILE);
-    let texts: Vec<String> = (0..w.message_count(&c.id)).map(|i| w.message(&c.id, i).unwrap().text).collect();
+    let texts: Vec<String> =
+        (0..w.message_count(&c.id)).map(|i| w.message(&c.id, i).unwrap().text.unsanitized().to_string()).collect();
     let corpus: Vec<String> = hostile_strings().into_iter().map(|h| h.text).collect();
     assert_eq!(texts, corpus);
     assert!(c.unread > 0, "it shows up as unread, so it gets opened");
@@ -131,38 +132,65 @@ fn message_text_includes_korean_emoji_sequences_and_threads_with_reactions() {
     let big = &conv(&w, names::BIG_HISTORY).id;
     let more: Vec<Message> = (0..2000).map(|i| w.message(big, i).unwrap()).collect();
     let any = |p: &dyn Fn(&Message) -> bool| all.iter().chain(&more).any(p);
-    assert!(any(&|m| m.text.chars().any(|ch| ('\u{AC00}'..='\u{D7A3}').contains(&ch))), "Korean");
-    assert!(any(&|m| m.text.contains('\u{200D}')), "emoji ZWJ sequences");
+    assert!(any(&|m| m.text.unsanitized().chars().any(|ch| ('\u{AC00}'..='\u{D7A3}').contains(&ch))), "Korean");
+    assert!(any(&|m| m.text.unsanitized().contains('\u{200D}')), "emoji ZWJ sequences");
     assert!(any(&|m| m.thread.is_some()), "threads");
     assert!(any(&|m| !m.reactions.is_empty()), "reaction pills");
     assert!(any(&|m| m.edited), "edited messages");
 }
 
-/// Until the sanitiser exists, the shell draws names as they are, so the world's names must be
-/// harmless: no control, format, bidi or zero-width characters. Hostile text lives only in
-/// message bodies.
+/// Remote parties name things too: hostile names exist, and each one is drawn as harmless text
+/// (no control, bidi or zero-width character) that is not empty.
 #[test]
-fn names_hold_only_printable_text() {
+fn hostile_names_exist_and_sanitise_to_printable_text() {
     let w = world();
     let s = w.snapshot();
-    let bad = |t: &str| {
-        t.is_empty()
-            || t.chars().any(|c| {
-                c.is_control()
-                    || ('\u{200B}'..='\u{200F}').contains(&c)
-                    || ('\u{202A}'..='\u{202E}').contains(&c)
-                    || ('\u{2066}'..='\u{2069}').contains(&c)
-                    || c == '\u{FEFF}'
-            })
+    let bad = |c: char| {
+        c.is_control()
+            || ('\u{200B}'..='\u{200F}').contains(&c)
+            || ('\u{202A}'..='\u{202E}').contains(&c)
+            || ('\u{2066}'..='\u{2069}').contains(&c)
+            || c == '\u{FEFF}'
     };
-    let names = s
+    let names: Vec<&Remote> = s
         .workspaces
         .iter()
-        .map(|x| x.name.as_str())
-        .chain(s.users.iter().flat_map(|u| [u.name.as_str(), u.display_name.as_str()]))
-        .chain(s.sections.iter().map(|x| x.name.as_str()))
-        .chain(s.conversations.iter().map(|x| x.name.as_str()));
+        .map(|x| &x.name)
+        .chain(s.users.iter().flat_map(|u| [&u.name, &u.display_name]))
+        .chain(s.sections.iter().map(|x| &x.name))
+        .chain(s.conversations.iter().map(|x| &x.name))
+        .collect();
+    let hostile = names.iter().filter(|n| n.unsanitized().chars().any(bad)).count();
+    assert!(hostile >= 4, "a user's two names, their DM and a section: {hostile}");
     for n in names {
-        assert!(!bad(n), "{n:?}");
+        let safe = n.line();
+        assert!(!safe.is_empty() && !safe.as_str().chars().any(bad), "{n:?} -> {safe:?}");
+    }
+    let c = conv(&w, names::HOSTILE);
+    let first = w.message(&c.id, 0).unwrap();
+    assert!(first.reactions.iter().any(|r| r.name.unsanitized().contains('\x1b')), "a hostile reaction name");
+    let posters: HashSet<_> = (0..w.message_count(&c.id)).map(|i| w.message(&c.id, i).unwrap().user).collect();
+    let mallory = s.users.iter().find(|u| u.name.unsanitized().starts_with("mallory")).unwrap();
+    assert!(posters.contains(&mallory.id), "the hostile user posts there");
+    assert!(s.conversations.iter().any(|c| c.kind == ConversationKind::Dm { user: mallory.id.clone() }));
+}
+
+/// Every hostile string, sanitised, keeps no escape, control (but line breaks), bidi or
+/// zero-width character.
+#[test]
+fn every_hostile_string_sanitises_to_harmless_text() {
+    for h in hostile_strings() {
+        let block = Remote::new(h.text.clone()).block();
+        let line = Remote::new(h.text).line();
+        for (out, breaks) in [(block.as_str(), true), (line.as_str(), false)] {
+            assert!(
+                !out.chars().any(|c| (c.is_control() && !(breaks && c == '\n'))
+                    || ('\u{202A}'..='\u{202E}').contains(&c)
+                    || ('\u{2066}'..='\u{2069}').contains(&c)
+                    || c == '\u{200B}'),
+                "{}: {out:?}",
+                h.what
+            );
+        }
     }
 }

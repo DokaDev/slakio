@@ -40,7 +40,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     if app.backend.is_some() {
         if let Some(ws) = app.model.workspaces().get(app.shell.workspace) {
             spans.push(Span::styled("▌", t.workspace(ws.color)));
-            spans.push(Span::styled(format!("{}  ", ws.name), t.text));
+            spans.push(Span::styled(format!("{}  ", ws.name.line()), t.text));
         }
         let place = match app.shell.open.as_ref().and_then(|o| app.model.target(o)) {
             Some(c) => breadcrumb(c),

@@ -301,3 +301,52 @@ fn the_overlay_rail_hides_the_list_panel_it_covers() {
     }
     // The screen itself: the snapshot `demo_rail_overlay_120x40`.
 }
+
+/// A character that must never reach a cell: controls, bidi, zero-width.
+fn harmful(c: char) -> bool {
+    c.is_control()
+        || ('\u{200B}'..='\u{200F}').contains(&c)
+        || ('\u{202A}'..='\u{202E}').contains(&c)
+        || ('\u{2066}'..='\u{2069}').contains(&c)
+        || c == '\u{FEFF}'
+}
+
+/// The screen holds no character a terminal would act on.
+fn assert_harmless(screen: &str) {
+    for (y, line) in screen.lines().enumerate() {
+        assert!(!line.chars().any(harmful), "row {y}: {line:?}");
+    }
+}
+
+#[test]
+fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
+    let mut d = Demo::new(120, 40);
+    d.keys("space d");
+    let rows = d.app.shell.rows(&d.app.model);
+    let at = rows
+        .iter()
+        .position(|r| match r {
+            slakio_tui::app::model::Row::Conversation(i) => {
+                d.app.model.conversation(*i).name.unsanitized().contains("Mallory")
+            }
+            _ => false,
+        })
+        .expect("the DM with the hostile user");
+    for _ in 0..at {
+        d.keys("j");
+    }
+    d.keys("enter");
+    let s = d.screen();
+    assert_harmless(&s);
+    assert!(s.contains("@ Mallory live"), "the list row: {s}");
+    assert!(s.contains("▌@Mallory live"), "the pane title: {s}");
+    assert!(d.status_line().contains("@Mallory live"), "{}", d.status_line());
+    assert!(!s.contains("owned"), "the title sequence is gone, its text too: {s}");
+    // A hostile section name of the other workspace.
+    // Home puts the rail cursor on Home; one up is workspace B.
+    d.keys("space h ctrl+h k enter");
+    assert_eq!(d.app.shell.workspace, 1);
+    let s = d.screen();
+    assert_harmless(&s);
+    assert!(s.contains("▾ Side projects"), "{s}");
+}

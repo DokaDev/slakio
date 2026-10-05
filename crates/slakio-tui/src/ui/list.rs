@@ -61,7 +61,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
         Row::Section(i) => {
             let s = app.model.section(i);
             let fold = if app.shell.collapsed.contains(&s.id) { "▸" } else { "▾" };
-            f.render_widget(Paragraph::new(format!("{fold} {}", s.name)).style(t.section), area);
+            f.render_widget(Paragraph::new(format!("{fold} {}", s.name.line())).style(t.section), area);
         }
         Row::Conversation(i) => {
             let c = app.model.conversation(i);
@@ -89,8 +89,10 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
             };
             let badge_w = Span::raw(badge.as_str()).width() as u16;
             let name_w = area.width.saturating_sub(badge_w + 2);
-            let mut spans =
-                vec![Span::styled(format!(" {prefix} "), name_style), Span::styled(c.name.as_str(), name_style)];
+            let mut spans = vec![
+                Span::styled(format!(" {prefix} "), name_style),
+                Span::styled(c.name.line().into_string(), name_style),
+            ];
             if c.external {
                 spans.push(Span::styled(" ⇄", t.muted));
             }

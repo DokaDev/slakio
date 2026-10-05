@@ -30,5 +30,6 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
 
 /// How a conversation is named in titles and the status line: `#backend`, `@Minsu`.
 pub(super) fn breadcrumb(c: &slakio_core::model::Conversation) -> String {
-    if c.is_dm() { format!("@{}", c.name) } else { format!("#{}", c.name) }
+    let name = c.name.line();
+    if c.is_dm() { format!("@{name}") } else { format!("#{name}") }
 }

@@ -48,7 +48,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
                 let ws = &workspaces[w];
                 let style = if w == app.shell.workspace { t.current } else { t.text };
                 // Collapsed, the name's first letter; expanded, the name.
-                let name = if expanded { ws.name.clone() } else { workspace_letter(&ws.name) };
+                let name = ws.name.line();
+                let name = if expanded { name.into_string() } else { workspace_letter(&name) };
                 let spans = vec![Span::styled("▌", t.workspace(ws.color)), Span::styled(name, style)];
                 // Collapsed, the letter takes the whole row.
                 let dot = if expanded && app.model.workspace_unread(w) { "●" } else { "" };
