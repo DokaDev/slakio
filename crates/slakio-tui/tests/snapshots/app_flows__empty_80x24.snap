@@ -10,19 +10,19 @@ expression: "screen(&app, 80, 24, now)"
 
 
 
+               slakio
+               Early development: nothing connects to Slack yet.
 
-                                     slakio
-                Early development: nothing connects to Slack yet.
-                        Type :qa and press Enter to quit.
-           To try the interface with invented data, run slakio --demo.
+               Ctrl+Q  Quit
+               ?       Keyboard help
 
-
-
-
+               Run slakio --demo to try it with invented data.
 
 
 
 
 
 
- NORMAL
+
+
+ NORMAL                                       Ctrl+Q quit · ? help · : commands

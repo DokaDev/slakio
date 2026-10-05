@@ -1,76 +1,168 @@
 use super::*;
-use slakio_core::model::WorkspaceColor;
+use ratatui::buffer::Buffer;
 
-fn styles(t: &Theme) -> Vec<Style> {
+fn luminance(c: Color) -> f64 {
+    let Color::Rgb(r, g, b) = c else { panic!("{c:?} is not RGB") };
+    let lin = |v: u8| {
+        let v = f64::from(v) / 255.0;
+        if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+    };
+    0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+fn contrast(a: Color, b: Color) -> f64 {
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+fn colors(t: &Theme) -> Vec<Color> {
     let mut v = vec![
-        t.text,
-        t.muted,
-        t.title,
-        t.status,
-        t.mode_normal,
-        t.mode_command,
-        t.warning,
-        t.border_focus,
+        t.bg,
+        t.surface,
+        t.surface_alt,
         t.border,
-        t.cursor,
-        t.cursor_inactive,
-        t.section,
-        t.unread,
-        t.mention,
-        t.muted_conversation,
-        t.current,
-        t.connection,
+        t.accent,
+        t.accent_warm,
+        t.fg,
+        t.fg_muted,
+        t.fg_dim,
+        t.success,
+        t.warning,
+        t.error,
+        t.selection,
+        t.cursor_line,
+        t.range,
+        t.mode_normal,
         t.mode_insert,
         t.mode_visual,
-        t.author,
-        t.own_author,
-        t.timestamp,
-        t.reaction,
-        t.reaction_mine,
-        t.thread_link,
+        t.mode_command,
+        t.mode_fg,
     ];
     v.extend(t.workspaces);
     v
 }
 
 #[test]
-fn no_color_means_no_color_anywhere() {
-    for s in styles(&Theme::no_color()) {
-        assert_eq!((s.fg, s.bg), (None, None), "{s:?}");
-    }
-    let env = |v: &'static str| move |k: &str| (k == "NO_COLOR").then(|| v.to_string());
-    assert_eq!(Theme::from_env(env("1")), Theme::no_color());
-    assert_eq!(Theme::from_env(env("")), Theme::terminal(), "an empty NO_COLOR is unset");
-    assert_eq!(Theme::from_env(|_| None), Theme::terminal());
-}
-
-#[test]
-fn the_default_theme_uses_only_the_terminal_palette() {
-    for s in styles(&Theme::terminal()) {
-        for c in [s.fg, s.bg].into_iter().flatten() {
-            assert!(!matches!(c, Color::Rgb(..) | Color::Indexed(_)), "{c:?} is not one of the 16 ANSI colors");
+fn truecolor_themes_keep_text_readable() {
+    for t in [&DARK, &TOKYO_NIGHT_NIGHT, &TOKYO_NIGHT_DAY] {
+        let n = t.name;
+        assert!(contrast(t.fg, t.bg) >= 4.5, "{n}: body text {:.2}", contrast(t.fg, t.bg));
+        assert!(contrast(t.fg_muted, t.bg) >= 3.0, "{n}: muted text {:.2}", contrast(t.fg_muted, t.bg));
+        assert!(contrast(t.mode_fg, t.error) >= 4.5, "{n}: badge {:.2}", contrast(t.mode_fg, t.error));
+        assert!(contrast(t.fg, t.selection) >= 4.5, "{n}: text on the selection {:.2}", contrast(t.fg, t.selection));
+        assert!(contrast(t.fg, t.surface) >= 4.5, "{n}: status line {:.2}", contrast(t.fg, t.surface));
+        for m in [t.mode_normal, t.mode_insert, t.mode_visual, t.mode_command] {
+            assert!(contrast(t.mode_fg, m) >= 4.5, "{n}: mode badge {m:?} {:.2}", contrast(t.mode_fg, m));
         }
     }
 }
 
 #[test]
-fn mode_badges_are_apart_in_color_and_still_marked_without_it() {
-    // Each badge also carries its mode name (the status line draws it).
-    let t = Theme::terminal();
-    let bgs = [t.mode_normal.bg, t.mode_command.bg, t.mode_insert.bg, t.mode_visual.bg];
-    for (i, a) in bgs.iter().enumerate() {
-        assert!(!bgs[i + 1..].contains(a), "badge {i}");
+fn no_color_means_no_color_anywhere() {
+    let t = Theme::no_color();
+    for c in colors(&t) {
+        assert_eq!(c, Color::Reset);
     }
-    assert!(Theme::no_color().mode_normal.add_modifier.contains(Modifier::REVERSED));
+    for s in [t.text(), t.muted(), t.faint(), t.title(true), t.border(true), t.badge(), t.current(), t.key()] {
+        assert_eq!((s.fg.unwrap_or(Color::Reset), s.bg.unwrap_or(Color::Reset)), (Color::Reset, Color::Reset));
+    }
+    let env = |v: &'static str| move |k: &str| (k == "NO_COLOR").then(|| v.to_string());
+    assert_eq!(Theme::from_env("tokyo-night", env("1"), Background::Dark), Theme::no_color());
+    assert_eq!(Theme::from_env("auto", env(""), Background::Unknown), Theme::terminal(), "an empty NO_COLOR is unset");
+}
+
+#[test]
+fn the_terminal_theme_uses_only_the_terminal_palette() {
+    for t in [resolve("terminal", false, Background::Dark), resolve("terminal", false, Background::Light)] {
+        for c in colors(&t) {
+            assert!(!matches!(c, Color::Rgb(..) | Color::Indexed(_)), "{c:?} is not one of the 16 ANSI colors");
+        }
+    }
+    // Muted text is apart from the faint one on a dark background, and readable on a light one.
+    assert_eq!(resolve("terminal", false, Background::Dark).fg_muted, Color::Gray);
+    assert_eq!(resolve("terminal", false, Background::Light).fg_muted, Color::DarkGray);
+}
+
+#[test]
+fn auto_takes_tokyo_night_on_a_truecolor_terminal_and_its_variant_by_the_background() {
+    let env = |colorterm: &'static str| move |k: &str| (k == "COLORTERM").then(|| colorterm.to_string());
+    assert_eq!(Theme::from_env("auto", env("truecolor"), Background::Unknown).name, "tokyo-night-night");
+    assert_eq!(Theme::from_env("auto", env("24bit"), Background::Light).name, "tokyo-night-day");
+    assert_eq!(Theme::from_env("auto", env(""), Background::Dark).name, "terminal");
+    assert_eq!(Theme::from_env("auto", |_| None, Background::Dark).name, "terminal");
+    assert_eq!(Theme::from_env("dark", |_| None, Background::Light).name, "dark", "a theme named is a theme taken");
+    assert_eq!(Theme::from_env("tokyo-night-day", |_| None, Background::Dark).name, "tokyo-night-day");
+    for n in NAMES {
+        let _ = resolve(n, true, Background::Unknown);
+    }
+    assert_eq!(slakio_core::config::THEMES, NAMES, "the config file accepts exactly the theme names");
+}
+
+#[test]
+fn mode_badges_are_apart_in_color_and_still_marked_without_it() {
+    for t in [&TERMINAL, &DARK, &TOKYO_NIGHT_NIGHT, &TOKYO_NIGHT_DAY] {
+        let bgs = [t.mode_normal, t.mode_command, t.mode_insert, t.mode_visual];
+        for (i, a) in bgs.iter().enumerate() {
+            assert!(!bgs[i + 1..].contains(a), "{}: badge {i}", t.name);
+        }
+    }
+    assert!(Theme::no_color().mode(Color::Reset).add_modifier.contains(Modifier::REVERSED));
 }
 
 #[test]
 fn workspace_colours_differ_and_wrap_around() {
-    let t = Theme::terminal();
-    for (i, a) in t.workspaces.iter().enumerate() {
-        assert!(!t.workspaces[i + 1..].contains(a), "slot {i}");
+    for t in [&TERMINAL, &TOKYO_NIGHT_NIGHT] {
+        for (i, a) in t.workspaces.iter().enumerate() {
+            assert!(!t.workspaces[i + 1..].contains(a), "{}: slot {i}", t.name);
+        }
+        let n = t.workspaces.len() as u8;
+        assert_eq!(t.workspace(WorkspaceColor(n + 1)), t.workspace(WorkspaceColor(1)));
     }
-    assert_eq!(t.workspace(WorkspaceColor(5)), t.workspace(WorkspaceColor(1)));
-    // Without colour the cursor still shows.
-    assert!(Theme::no_color().cursor.add_modifier.contains(Modifier::REVERSED));
+}
+
+/// A row with gray text and a red badge, painted as each kind of selection.
+fn painted(t: &Theme, how: Selection) -> Buffer {
+    let mut buf = Buffer::empty(Rect::new(0, 0, 6, 1));
+    buf.set_string(1, 0, "ab", Style::new().fg(t.fg_dim));
+    buf.set_string(4, 0, "3", t.badge());
+    t.paint_selection(&mut buf, Rect::new(0, 0, 6, 1), how);
+    buf
+}
+
+#[test]
+fn a_selection_is_a_background_or_a_gutter_bar_never_an_underline() {
+    for t in [resolve("terminal", false, Background::Dark), TOKYO_NIGHT_NIGHT, Theme::no_color()] {
+        for how in [Selection::Focused, Selection::Unfocused, Selection::Visual] {
+            let buf = painted(&t, how);
+            for c in buf.content() {
+                assert!(!c.modifier.contains(Modifier::UNDERLINED), "{} {how:?}", t.name);
+                // Gray on a gray bar would vanish: the text takes the body color.
+                assert!(c.bg == Color::Reset || c.fg != c.bg, "{} {how:?}: {:?} on {:?}", t.name, c.fg, c.bg);
+            }
+            // The badge keeps its own background.
+            if t.kind != Kind::NoColor {
+                assert_eq!(buf[(4, 0)].bg, t.error, "{} {how:?}", t.name);
+            }
+        }
+    }
+    let tokyo = painted(&TOKYO_NIGHT_NIGHT, Selection::Focused);
+    assert!((0..6).filter(|&x| x != 4).all(|x| tokyo[(x, 0)].bg == TOKYO_NIGHT_NIGHT.selection), "the whole row");
+    let tokyo = painted(&TOKYO_NIGHT_NIGHT, Selection::Unfocused);
+    assert_eq!(tokyo[(1, 0)].bg, TOKYO_NIGHT_NIGHT.cursor_line);
+    let ansi = painted(&TERMINAL, Selection::Unfocused);
+    assert_eq!((ansi[(0, 0)].symbol(), ansi[(1, 0)].bg), (GUTTER, Color::Reset), "a bar, no background");
+    let plain = painted(&Theme::no_color(), Selection::Focused);
+    assert!(plain[(1, 0)].modifier.contains(Modifier::REVERSED));
+}
+
+#[test]
+fn dimming_blends_truecolor_and_marks_ansi() {
+    let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
+    buf.set_string(0, 0, "x", Style::new().fg(TOKYO_NIGHT_NIGHT.fg));
+    TOKYO_NIGHT_NIGHT.dim_area(&mut buf, Rect::new(0, 0, 2, 1));
+    assert_ne!(buf[(0, 0)].fg, TOKYO_NIGHT_NIGHT.fg);
+    assert_eq!(buf[(0, 0)].symbol(), "x");
+    let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
+    TERMINAL.dim_area(&mut buf, Rect::new(0, 0, 2, 1));
+    assert!(buf[(1, 0)].modifier.contains(Modifier::DIM));
 }

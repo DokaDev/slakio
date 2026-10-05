@@ -2,14 +2,18 @@
 //! scrolling in the app state, so a click lands on exactly the row that was drawn there.
 //!
 //! ```text
-//! ╭──╮╭ list ──────╮╭ work area ─────────────╮
-//! │▌A││            ││                        │
-//! ╰──╯╰────────────╯╰────────────────────────╯
+//! ╭──╮╭ list ──────╮╭ main pane ─────────╮╭ thread ──────╮
+//! │▌A││            ││                    ││              │
+//! │  ││            │├─ Message #backend ─┤├─ Reply ──────┤
+//! │  ││            ││ › Press i to write ││ ›            │
+//! ╰──╯╰────────────╯╰────────────────────╯╰──────────────╯
 //!  status line
 //! ```
 //!
 //! The focused (or hovered) rail widens to show labels, either over the list panel or pushing
-//! it aside.
+//! it aside. On a narrow screen an open thread panel takes the list panel's room (the list is
+//! left out of the layout only, and comes back when the thread closes or the list is focused);
+//! narrower still, the pane with the keyboard takes the whole work area.
 
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 
@@ -20,6 +24,10 @@ pub const RAIL_EXPANDED_WIDTH: u16 = 21;
 /// Below this the screen shows only how much room it needs.
 pub const MIN_WIDTH: u16 = 50;
 pub const MIN_HEIGHT: u16 = 10;
+/// A work area narrower than this gives the list panel's room to an open thread panel.
+pub const WORK_WIDE: u16 = 88;
+/// The main pane keeps this much beside the thread panel, or the focused one takes it all.
+pub const MAIN_MIN: u16 = 40;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Areas {
@@ -33,35 +41,93 @@ pub fn too_small(size: Rect) -> bool {
     size.width < MIN_WIDTH || size.height < MIN_HEIGHT
 }
 
-/// The areas for a screen of `size`. `push`: an expanded rail pushes the list aside instead of
-/// covering it.
-pub fn areas(size: Rect, rail_expanded: bool, push: bool, list_hidden: bool) -> Areas {
+/// What the layout depends on besides the size.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Shape {
+    pub rail_expanded: bool,
+    /// An expanded rail pushes the list aside instead of covering it.
+    pub push: bool,
+    /// The user hid the list panel.
+    pub list_hidden: bool,
+    /// The thread panel is open.
+    pub thread: bool,
+    /// The list panel has the focus (it is never left out then).
+    pub list_focused: bool,
+}
+
+/// The width of the list panel on a screen `width` wide: a fifth or so, 26 to 36 cells.
+pub fn list_width(width: u16) -> u16 {
+    (width * 22 / 100).clamp(26, 36)
+}
+
+/// The areas for a screen of `size`.
+pub fn areas(size: Rect, s: Shape) -> Areas {
     let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(size);
-    let rail_w = if rail_expanded && push { RAIL_EXPANDED_WIDTH } else { RAIL_WIDTH };
-    let list_w = if list_hidden { 0 } else { (body.width / 5).clamp(22, 32) };
+    let rail_w = if s.rail_expanded && s.push { RAIL_EXPANDED_WIDTH } else { RAIL_WIDTH };
+    let mut list_w = if s.list_hidden { 0 } else { list_width(body.width) };
+    let work_w = body.width.saturating_sub(rail_w + list_w);
+    let squeezed = s.thread && work_w < WORK_WIDE && !s.list_focused;
+    if squeezed {
+        list_w = 0;
+    }
     let [rail, list, work] =
         Layout::horizontal([Constraint::Length(rail_w), Constraint::Length(list_w), Constraint::Min(0)]).areas(body);
-    let rail = if rail_expanded && !push { Rect { width: RAIL_EXPANDED_WIDTH.min(body.width), ..rail } } else { rail };
-    Areas { rail, list: (!list_hidden).then_some(list), work, status }
+    let rail =
+        if s.rail_expanded && !s.push { Rect { width: RAIL_EXPANDED_WIDTH.min(body.width), ..rail } } else { rail };
+    Areas { rail, list: (list_w > 0).then_some(list), work, status }
 }
 
 /// The most lines a composer shows before it scrolls.
 pub const COMPOSER_MAX_LINES: u16 = 5;
 
 /// The work area split into the main pane and, when open, the thread panel on its right (two
-/// fifths of the width, at least 30 cells while the main pane keeps 20).
-pub fn work_split(work: Rect, thread: bool) -> (Rect, Option<Rect>) {
+/// fifths, 34 to 60 cells, while the main pane keeps [`MAIN_MIN`]). Where both do not fit, the
+/// pane with the keyboard (`thread_focused`) takes the whole area.
+pub fn work_split(work: Rect, thread: bool, thread_focused: bool) -> (Option<Rect>, Option<Rect>) {
     if !thread {
-        return (work, None);
+        return (Some(work), None);
     }
-    let w = (work.width * 2 / 5).max(30).min(work.width.saturating_sub(20));
+    let w = (work.width * 2 / 5).clamp(34, 60);
+    if work.width < w + MAIN_MIN {
+        return if thread_focused { (None, Some(work)) } else { (Some(work), None) };
+    }
     let [main, side] = Layout::horizontal([Constraint::Min(0), Constraint::Length(w)]).areas(work);
-    (main, Some(side))
+    (Some(main), Some(side))
 }
 
 /// Inside a bordered area.
 pub fn inner(r: Rect) -> Rect {
     r.inner(Margin { horizontal: 1, vertical: 1 })
+}
+
+/// The parts of a pane: its messages, the divider row of its composer (joined to the border) and
+/// the composer's lines (` › ` and the text).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PaneParts {
+    pub messages: Rect,
+    /// `None` when the pane is too low for a composer.
+    pub divider: Option<u16>,
+    pub input: Rect,
+}
+
+/// The width the composer's text wraps at in a pane `area`: inside the border, one cell of
+/// padding each side and the prompt.
+pub fn composer_width(area: Rect) -> usize {
+    usize::from(inner(area).width.saturating_sub(4)).max(2)
+}
+
+/// The parts of pane `area` whose composer shows `lines` lines (at most
+/// [`COMPOSER_MAX_LINES`]).
+pub fn pane_parts(area: Rect, lines: usize) -> PaneParts {
+    let inner = inner(area);
+    let lines = (lines as u16).clamp(1, COMPOSER_MAX_LINES);
+    if inner.height < lines + 3 {
+        return PaneParts { messages: inner, divider: None, input: Rect { height: 0, ..inner } };
+    }
+    let input = Rect { y: inner.bottom() - lines, height: lines, ..inner };
+    let divider = input.y - 1;
+    let messages = Rect { height: divider - inner.y, ..inner };
+    PaneParts { messages, divider: Some(divider), input }
 }
 
 /// The rail item (index into [`crate::app::shell::rail_items`]) on screen row `y`, given

@@ -74,3 +74,14 @@ fn the_same_ctrl_key_in_a_text_input_and_in_normal_mode_does_not_clash() {
     let table = [b(Ctx::PaneNormal, "ctrl+w", A), b(Ctx::CommandLine, "ctrl+w", B)];
     assert_eq!(kinds(&table, false), []);
 }
+
+/// A global key is looked up before every context: binding it anywhere else to something else,
+/// or starting a sequence with it, could never work.
+#[test]
+fn a_global_key_is_never_taken_by_a_context() {
+    use ConflictKind::Protected;
+    assert_eq!(kinds(&[b(Ctx::Global, "ctrl+q", A), b(Ctx::ComposerInsert, "ctrl+q", B)], false), [Protected]);
+    assert_eq!(kinds(&[b(Ctx::Global, "f1", A), b(Ctx::List, "f1 x", A)], false), [Protected]);
+    assert_eq!(kinds(&[b(Ctx::Global, "f1", A), b(Ctx::Help, "f1", A)], false), [], "the same action is no clash");
+    assert_eq!(kinds(&[b(Ctx::Global, "ctrl+q", A), b(Ctx::List, "q", B)], false), []);
+}

@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/ux_flows.rs
+expression: "demo::mask_hangul(&s)"
+---
+╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮╭ ▌⤷ Thread · #backend ────────────╮
+│●A││ ▾ Favorites            ││ ＊＊＊ · 05:48                                     ││ ────────── 2026-01-06 ────────── │
+│●B││▎  # backend            ││   see https://docs.example.com/runbooks/latency    ││ Alex Morgan · 07:14              │
+│──││   # incidents       3  ││ Park · 05:51                                       ││   Meeting moved to 3pm           │
+│H ││                        ││   Meeting for staging please someone someone on    ││ No replies yet · i reply         │
+│D●││ ▾ Ops                  ││   maybe timeout retry a we design can sprint       ││                                  │
+│A●││   # deploys            ││   production                                       ││                                  │
+│F ││   # alerts             ││ ＊＊＊ · 05:58                                     ││                                  │
+│L ││   # partner-shared ext ││   Rolling back                                     ││                                  │
+│  ││   # hostile-strings    ││ ＊＊＊ · 06:05                                     ││                                  │
+│  ││   # big-history        ││   Schema production after invoice cache is should  ││                                  │
+│  ││   # long-threads       ││ Kate Nam · 06:13                                   ││                                  │
+│  ││                        ││   Suspect the DB pool 🎉                           ││                                  │
+│  ││ ▾ Channels             ││ Lily Jeon · 06:19                                  ││                                  │
+│  ││   # announcements      ││   Dashboard schema budget draft please is now      ││                                  │
+│  ││   # design-review      ││   waiting fine a lunch production someone cache    ││                                  │
+│  ││   # feed-alert-134     ││   release done                                     ││                                  │
+│  ││   # feed-alert-8       ││ Kate Nam · 06:26                                   ││                                  │
+│  ││   # feed-budget-162    ││   Check a customer should maybe                    ││                                  │
+│  ││   # feed-budget-33     ││ Mia Jang · 06:35                                   ││                                  │
+│  ││   # feed-build-50      ││   Budget metrics merge design rollback alert alert ││                                  │
+│  ││   # feed-cache-119     ││   should draft after alert on staging tomorrow     ││                                  │
+│  ││   # feed-customer-161  ││ Tom Ko · 06:41                                     ││                                  │
+│  ││   # feed-customer…  1  ││   On waiting migration someone index can staging   ││                                  │
+│  ││   # feed-dashboard-22  ││   should                                           ││                                  │
+│  ││   # feed-dashboard-41  ││ Kate Nam · 06:51                                   ││                                  │
+│  ││   # feed-design-34     ││   Production roadmap customer build alert now      ││                                  │
+│  ││   # feed-design-83     ││   latency fine review latency roadmap broken       ││                                  │
+│  ││   # feed-draft-142     ││   should for                                       ││                                  │
+│  ││   # feed-draft-58      ││ Chris Park · 06:59                                 ││                                  │
+│  ││   # feed-draft-84      ││   Confirmed                                        ││                                  │
+│  ││   # feed-index-199  2  ││ Kate Nam · 07:05                                   ││                                  │
+│  ││   # feed-index-39      ││   Ticket review pager pager production on build    ││                                  │
+│  ││   # feed-index-5    1  ││   alert the on draft                               ││                                  │
+│  ││   # feed-invoice-16    ││▎Alex Morgan · 07:14                                ││                                  │
+│  ││   # feed-invoice-168   ││▎  Meeting moved to 3pm                             ││                                  │
+│  ││   # feed-latency-144   │├─ Message #backend ─────────────────────────────────┤├─ Reply ──────────────────────────┤
+│  ││   # feed-meeting-82    ││ › Press i to write                                 ││ › Press i to reply               │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
+ NORMAL  ▌A company › #backend › ⤷ Thread  i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo

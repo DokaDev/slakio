@@ -116,7 +116,8 @@ fn enter_on_a_message_opens_its_thread_and_another_one_replaces_it() {
     assert!(d.app.work.thread.is_none() && d.app.work.side == Side::Main);
     d.keys("ctrl+w");
     assert!(d.app.work.main.is_none());
-    assert!(d.screen().contains("Choose a conversation"));
+    assert_eq!(d.app.shell.focus, Region::List, "the list has the keyboard again");
+    assert!(d.screen().contains("No conversation open"));
 }
 
 #[test]
@@ -209,7 +210,7 @@ fn the_composer_is_multiline_and_a_paste_is_sanitised() {
     let c = &d.app.work.main.as_ref().unwrap().composer;
     assert_eq!(c.text(), "one\ntwo\nthree four");
     let s = d.screen();
-    assert!(s.contains("│one") && s.contains("│two") && s.contains("│three four"), "{s}");
+    assert!(s.contains("│ › one") && s.contains("│   two") && s.contains("│   three four"), "{s}");
     d.keys("enter");
     let last = d.app.work.main.as_ref().unwrap().items.last().unwrap().text.clone();
     assert_eq!(last.as_str(), "one\ntwo\nthree four");
@@ -276,16 +277,23 @@ fn back_and_forward_return_to_the_conversations_before() {
     let at = |d: &Demo| d.app.model.target(&d.app.work.main.as_ref().unwrap().target).unwrap().name.clone();
     d.keys("ctrl+o");
     assert_eq!(at(&d), "backend");
-    d.keys("tab");
+    d.keys("space ]");
     assert_eq!(at(&d), "incidents");
     d.keys("alt+left");
     assert_eq!(at(&d), "backend");
-    d.keys("ctrl+i");
+    d.keys("alt+right");
     assert_eq!(at(&d), "incidents");
-    d.keys("ctrl+i");
-    assert!(d.status_line().contains("Nothing more"), "{}", d.status_line());
+    d.keys("space ]");
+    assert!(d.status_line().contains("No later conversation"), "{}", d.status_line());
     d.command("back");
     assert_eq!(at(&d), "backend");
+    // `Tab` is the next panel; `Ctrl+I` goes forward only where the terminal tells it from `Tab`
+    // (the kitty keyboard protocol).
+    d.keys("ctrl+i");
+    assert_eq!(at(&d), "backend", "not bound without the protocol (it arrives as Tab)");
+    d.app.keymap = slakio_tui::keymap::Keymap::new(true);
+    d.keys("ctrl+i");
+    assert_eq!(at(&d), "incidents");
 }
 
 #[test]

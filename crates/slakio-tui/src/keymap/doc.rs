@@ -1,13 +1,15 @@
 //! `docs/keybindings.md`, generated from the default bindings, the action registry and the
 //! English catalog. `tests/keybindings_doc.rs` fails when the committed file is out of date.
 
-use super::{Ctx, Keymap, check, keys};
+use super::{Ctx, Keymap, check, keys, parse_keys};
 use crate::action::REGISTRY;
 use slakio_core::i18n::Lang;
 
 /// The whole document (LF line endings).
 pub fn render() -> String {
-    let km = Keymap::default();
+    // With the kitty keyboard protocol: every default binding (`Ctrl+I` is bound only then, and
+    // the last section says so).
+    let km = Keymap::new(true);
     let mut s = String::new();
     s.push_str("# slakio key bindings\n\n");
     s.push_str(
@@ -15,14 +17,21 @@ pub fn render() -> String {
          run `SLAKIO_BLESS=1 cargo test -p slakio-tui --test keybindings_doc` at the repository root. -->\n\n",
     );
     s.push_str(
-        "Keys resolve in the current context first, then in its parents. A text input context \
-         (marked **[text]**) has no parent: every key it does not bind is typed.\n",
+        "The keys of *Always* work everywhere, also while typing. Other keys resolve in the current \
+         context first, then in its parents. A text input context (marked **[text]**) has no parent: \
+         every key it does not bind is typed. A modal context (marked **[modal]**) has no parent \
+         either: only its own keys work there. `?`, `F1` or `Space ?` show these keys in the app; \
+         after `Space` (or another first key of a sequence) a popup lists what may follow.\n",
     );
     for &ctx in Ctx::ALL {
         if km.bindings(ctx).next().is_none() {
             continue;
         }
-        let text = if ctx.is_text_input() { " **[text]**" } else { "" };
+        let text = match (ctx.is_text_input(), ctx.is_modal()) {
+            (true, _) => " **[text]**",
+            (_, true) => " **[modal]**",
+            _ => "",
+        };
         s.push_str(&format!("\n## {} (`{}`){text}\n\n", ctx.label().text(Lang::En), ctx.id()));
         s.push_str("| Keys | Action | Id |\n|---|---|---|\n");
         for (k, action) in km.bindings(ctx) {
@@ -55,7 +64,14 @@ pub fn render() -> String {
                 .map(|k| format!("`{}`", keys::label(&k)))
                 .collect::<Vec<_>>()
                 .join(" ");
-            s.push_str(&format!("| `{}` | {} | {also} |\n", keys::label(&b.keys), spec.label.text(Lang::En)));
+            let only =
+                if crate::keymap::DEFAULTS.iter().any(|d| d.kitty && parse_keys(d.keys).ok().as_ref() == Some(&b.keys))
+                {
+                    " (bound only with the kitty keyboard protocol)"
+                } else {
+                    ""
+                };
+            s.push_str(&format!("| `{}`{only} | {} | {also} |\n", keys::label(&b.keys), spec.label.text(Lang::En)));
         }
     }
     s

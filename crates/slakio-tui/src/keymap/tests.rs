@@ -80,9 +80,10 @@ fn every_context_has_a_unique_id_and_text_inputs_have_no_parent() {
         assert!(!ids[i + 1..].contains(id), "{id}");
     }
     for c in Ctx::ALL {
-        if c.is_text_input() {
+        let alone = c.is_text_input() || c.is_modal() || *c == Ctx::Global;
+        if alone {
             assert_eq!(c.parent(), None, "{}", c.id());
         }
-        assert_eq!(c.chain().last(), Some(&if c.is_text_input() { *c } else { Ctx::Root }));
+        assert_eq!(c.chain().last(), Some(&if alone { *c } else { Ctx::Root }));
     }
 }

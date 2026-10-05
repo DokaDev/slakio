@@ -161,19 +161,32 @@ impl Work {
         self.fill();
     }
 
-    /// Close the focused pane (`Ctrl+W`): the thread panel, else the conversation.
-    pub fn close(&mut self) {
+    /// Close the focused pane (`Ctrl+W`): the thread panel (the main pane then selects the
+    /// thread's message), else the conversation, which is handed back.
+    pub fn close(&mut self) -> Option<Target> {
         self.insert = false;
         match self.side {
             Side::Thread => {
-                self.thread = None;
+                let closed = self.thread.take();
                 self.side = Side::Main;
+                if let (Some(t), Some(main)) = (closed, self.main.as_mut())
+                    && let Target::Thread { thread, .. } = t.target
+                    && let Some(i) = main.items.iter().position(|m| m.ts == thread)
+                {
+                    main.selected = Some(i);
+                }
+                None
             }
             Side::Main => {
-                self.main = None;
                 self.thread = None;
+                self.main.take().map(|p| p.target)
             }
         }
+    }
+
+    /// Any composer holds text that was not sent.
+    pub fn unsent(&self) -> bool {
+        [self.main.as_ref(), self.thread.as_ref()].into_iter().flatten().any(|p| !p.composer.text().trim().is_empty())
     }
 
     /// Move the keyboard to the pane on the left (`-1`) or right (`1`). `false` when there is

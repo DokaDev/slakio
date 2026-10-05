@@ -68,10 +68,17 @@ fn the_list_cursor_stays_in_range_and_on_screen() {
     assert_eq!(s.list_cursor, rows - 1);
     s.update(ShellAction::ListFirst, &m, 10);
     assert_eq!((s.list_cursor, s.list_top), (0, 0));
+    let list = s.rows(&m);
     for _ in 0..12 {
         s.update(ShellAction::ListNext, &m, 10);
+        assert!(list[s.list_cursor].is_selectable(), "never on the blank row between sections");
     }
-    assert_eq!((s.list_cursor, s.list_top), (12, 3));
+    // Twelve rows down, past the two blank rows on the way.
+    assert_eq!((s.list_cursor, s.list_top), (14, 5));
+    s.update(ShellAction::ListPageUp, &m, 10);
+    assert_eq!(s.list_cursor, 4);
+    s.update(ShellAction::ListHalfDown, &m, 10);
+    assert!(s.list_cursor > 4 && list[s.list_cursor].is_selectable());
 }
 
 #[test]
@@ -79,13 +86,17 @@ fn enter_folds_a_section_and_opens_a_conversation() {
     let m = model();
     let mut s = Shell::default();
     let before = s.rows(&m).len();
+    s.list_cursor = 0;
     s.update(ShellAction::ListOpen, &m, 10);
     assert_eq!(s.rows(&m).len(), before - 2, "Favorites folded");
     s.update(ShellAction::ListOpen, &m, 10);
     assert_eq!(s.rows(&m).len(), before, "and unfolded");
     s.update(ShellAction::ListNext, &m, 10);
     let open = s.update(ShellAction::ListOpen, &m, 10).expect("a conversation to open");
-    assert_eq!(m.target(&open).unwrap().name, "backend");
+    assert!(open.focus);
+    assert_eq!(m.target(&open.target).unwrap().name, "backend");
+    let peek = s.update(ShellAction::ListPeek, &m, 10).expect("a peek");
+    assert!(!peek.focus);
     assert_eq!(s.focus, Region::List, "the app moves the focus, not the shell");
 }
 

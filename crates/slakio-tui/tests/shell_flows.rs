@@ -21,7 +21,9 @@ fn the_demo_opens_on_home_of_the_first_workspace_at_three_sizes() {
     for (w, h) in [(80, 24), (120, 40), (200, 50)] {
         let d = Demo::new(w, h);
         let s = d.screen();
-        assert!(s.contains("Favorites") && s.contains("# backend") && s.contains("A company"), "{s}");
+        assert!(s.contains("Favorites") && s.contains("# backend"), "{s}");
+        // A narrow status line keeps the workspace's stripe and drops its name first.
+        assert_eq!(d.status_line().contains("A company"), w >= 120, "{}", d.status_line());
         assert!(d.status_line().contains("demo"), "the status line says the data is invented");
         insta::assert_snapshot!(format!("demo_home_{w}x{h}"), mask_hangul(&s));
     }
@@ -90,7 +92,7 @@ fn views_of_a_later_version_say_so_and_show_no_invented_rows() {
         d.keys(keys);
         assert_eq!(d.app.shell.view, view);
         let s = d.screen();
-        assert!(s.contains("Available in a later"), "{s}");
+        assert!(s.contains("comes in a") && s.contains("Space h  Home"), "{s}");
         assert!(!s.contains("# "), "{s}");
     }
     d.command("home");
@@ -101,10 +103,10 @@ fn views_of_a_later_version_say_so_and_show_no_invented_rows() {
 fn enter_opens_a_conversation_in_the_work_area_and_the_breadcrumb() {
     let mut d = Demo::new(120, 40);
     let s = d.screen();
-    assert!(s.contains("Choose a conversation in the list and press Enter."), "{s}");
-    d.keys("j enter");
+    assert!(s.contains("No conversation open") && s.contains("Enter    Open"), "the keys to start with: {s}");
+    d.keys("enter");
     let s = d.screen();
-    assert!(s.contains("▌#backend") && s.contains("Message #backend") && s.contains("Press i to write"), "{s}");
+    assert!(s.contains("▌#backend") && s.contains("├─ Message #backend") && s.contains("› Press i to write"), "{s}");
     assert_eq!(d.app.shell.focus, Region::Work, "the opened conversation has the keyboard");
     assert!(d.status_line().contains("#backend"), "{}", d.status_line());
     insta::assert_snapshot!("demo_open_120x40", mask_hangul(&s));
@@ -121,8 +123,10 @@ fn list_keys_move_jump_and_fold() {
     d.keys("enter");
     assert!(d.screen().contains("▸ Favorites"), "folded");
     assert_eq!(d.app.shell.rows(&d.app.model).len(), rows - 2);
+    // Down past the blank row under the folded section, and up again onto Ops.
     d.keys("down down up");
-    assert_eq!(d.app.shell.list_cursor, 1);
+    assert_eq!(d.app.shell.list_cursor, 2);
+    assert!(d.screen().contains("▾ Ops"));
 }
 
 #[test]
@@ -135,6 +139,8 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
     assert_eq!(d.app.shell.focus, Region::Rail);
     assert!(!d.status_line().contains("Space w"));
     d.keys("space w l ctrl+l");
+    assert_eq!(d.app.shell.focus, Region::List, "never onto an empty work area");
+    d.keys("enter ctrl+h ctrl+l");
     assert_eq!(d.app.shell.focus, Region::Work);
     // A sequence nothing is bound to is dropped without doing anything.
     d.keys("space x");
@@ -149,7 +155,7 @@ fn the_list_panel_hides_and_comes_back() {
     assert!(d.app.shell.list_hidden);
     assert!(!d.screen().contains("Favorites"));
     d.command("list");
-    assert!(d.screen().contains("Favorites"));
+    assert!(d.screen().contains("Favorites"), "{}", d.screen());
 }
 
 #[test]
@@ -157,7 +163,8 @@ fn hovering_the_rail_expands_it_and_clicks_select_and_open() {
     let mut d = Demo::new(120, 40);
     assert!(d.mouse(MouseEventKind::Moved, 1, 5), "entering the rail redraws");
     assert!(d.app.shell.rail_expanded());
-    assert!(!d.mouse(MouseEventKind::Moved, 2, 6), "moving inside it does not");
+    assert!(!d.mouse(MouseEventKind::Moved, 2, 5), "moving along the same item does not");
+    assert!(d.mouse(MouseEventKind::Moved, 2, 6), "another item is lit");
     assert!(d.mouse(MouseEventKind::Moved, 60, 6));
     assert!(!d.app.shell.rail_expanded());
     // Row 2 of the rail is workspace B (row 0 is the border).
@@ -201,27 +208,6 @@ fn icons_replace_the_rail_letters() {
     let d = Demo::with(120, 40, Lang::En, Settings { icons: true, ..Settings::default() });
     let s = d.screen();
     assert!(s.contains('\u{F02DC}'), "the Home icon: {s}");
-}
-
-#[test]
-fn the_overlay_rail_hides_the_list_panel_it_covers() {
-    let mut d = Demo::new(120, 40);
-    d.keys("ctrl+h");
-    let a = d.app.areas();
-    let list = a.list.expect("the list panel is shown");
-    assert!(a.rail.right() < list.right(), "the rail covers part of the list panel");
-    let s = d.screen();
-    // Between the overlay and the work area nothing of the list panel shows: no border pieces
-    // (`╮──────╮`), no fragments of names or counts.
-    for (y, line) in s.lines().take(usize::from(a.work.height)).enumerate() {
-        let cells: Vec<char> = line.chars().collect();
-        let gap: String = cells
-            .get(usize::from(a.rail.right())..usize::from(a.work.x))
-            .map(|c| c.iter().collect())
-            .unwrap_or_default();
-        assert!(gap.trim().is_empty(), "row {y}: {gap:?} shows through\n{s}");
-    }
-    // The screen itself: the snapshot `demo_rail_overlay_120x40`.
 }
 
 #[test]

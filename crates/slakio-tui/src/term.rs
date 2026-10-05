@@ -31,10 +31,11 @@ pub(crate) fn guard() -> Guard {
 /// Raw mode, alternate screen, mouse, bracketed paste, and — when the terminal answers the
 /// kitty keyboard protocol query — `DISAMBIGUATE_ESCAPE_CODES`. The query must run before the
 /// event stream starts reading stdin.
-pub(crate) fn setup_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
+/// `true` with the kitty protocol on (`Ctrl+I` is then told apart from `Tab`).
+pub(crate) fn setup_terminal() -> io::Result<(Terminal<CrosstermBackend<Stdout>>, bool)> {
     enable_raw_mode()?;
     STATE.raw_on();
     let enhanced = supports_keyboard_enhancement().unwrap_or(false);
     STATE.enter(&mut io::stdout(), enhanced)?;
-    Terminal::new(CrosstermBackend::new(io::stdout()))
+    Ok((Terminal::new(CrosstermBackend::new(io::stdout()))?, enhanced))
 }

@@ -86,3 +86,17 @@ fn the_view_wraps_by_cell_width_and_places_the_cursor() {
     assert_eq!(c.view(10), View { lines: vec!["ab".into(), String::new()], cursor: (1, 0) });
     assert_eq!(Composer::default().view(10), View { lines: vec![String::new()], cursor: (0, 0) });
 }
+
+#[test]
+fn ctrl_k_deletes_to_the_end_of_the_line() {
+    let mut c = Composer::default();
+    c.insert("one two\nthree");
+    c.vertical(-1);
+    c.home();
+    c.right();
+    c.right();
+    c.right();
+    assert!(c.delete_to_end());
+    assert_eq!(c.text(), "one\nthree");
+    assert!(!c.delete_to_end(), "nothing left on the line");
+}

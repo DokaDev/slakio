@@ -19,7 +19,7 @@ use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange::exchange;
 use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
-use slakio_tui::theme::Theme;
+use slakio_tui::theme::{Background, Theme};
 use slakio_tui::ui;
 use slakio_world::World;
 use std::io::{self, Stdout, Write};
@@ -53,12 +53,17 @@ fn main() -> ExitCode {
     let config_path = cli_config.or_else(|| paths.config_file());
     let (cfg, cfg_err) = config::load(config_path.as_deref());
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
-    let mut app = App::new(lang, Theme::from_env(|k| std::env::var(k).ok()));
+    let env = |k: &str| std::env::var(k).ok();
+    let mut app = App::new(lang, Theme::from_env(&cfg.theme, env, Background::Unknown));
     app.settings = Settings { icons: cfg.icons == "on", rail_push: cfg.rail_expand == "push" };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {
         app.connect(b.capabilities());
+        // Asked once, where the rail can preview the answer; the answer is saved.
+        if cfg.icons == "ask" && config_path.is_some() && cfg_err.is_none() {
+            app.ask_icons();
+        }
     }
     if let Some(e) = cfg_err {
         ErrorLog::new(paths.errors_log()).record("config", &e.fault());
@@ -81,8 +86,9 @@ fn main() -> ExitCode {
     let result = rt.block_on(async {
         // Restores the terminal however this block ends (also a setup that fails part way).
         let _restore = term::guard();
-        let mut terminal = term::setup_terminal()?;
-        run(&mut terminal, app, backend, &mut stats).await
+        let (mut terminal, enhanced) = term::setup_terminal()?;
+        app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
+        run(&mut terminal, app, backend, &mut stats, Saved { config: config_path, errors: paths.errors_log() }).await
     });
     if let Some(s) = stats.as_mut() {
         s.write();
@@ -110,11 +116,19 @@ fn config_message(e: &ConfigError) -> Msg {
 
 /// The event loop: draw when something changed, then sleep until the next input event, signal
 /// or deadline of the app. With nothing to do it never wakes up.
+/// Where the loop saves what the app asks it to: the config file, and the error log for a save
+/// that fails.
+struct Saved {
+    config: Option<std::path::PathBuf>,
+    errors: Option<std::path::PathBuf>,
+}
+
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     mut app: App,
     mut backend: Option<Box<dyn Backend>>,
     stats: &mut Option<stats::Stats>,
+    saved: Saved,
 ) -> io::Result<()> {
     let size = terminal.size()?;
     app.resize(size.width, size.height);
@@ -136,6 +150,17 @@ async fn run(
                     let mut out = io::stdout();
                     out.write_all(osc52(&text).as_bytes())?;
                     out.flush()?;
+                }
+                Effect::Save { key, value } => {
+                    let result = match &saved.config {
+                        Some(path) => config::set(path, key, &value),
+                        None => Err(slakio_core::fault::Fault::other("no config directory")),
+                    };
+                    if let Err(fault) = result {
+                        ErrorLog::new(saved.errors.clone()).record("config", &fault);
+                        app.warn(Msg::Label(Label::ConfigSaveFailed), Instant::now());
+                        redraw = true;
+                    }
                 }
             }
         }

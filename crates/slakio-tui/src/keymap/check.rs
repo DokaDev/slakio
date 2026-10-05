@@ -12,7 +12,10 @@
 //! 6. leave an action reachable only by fragile keys ([`ConflictKind::NoFallback`]): one of the
 //!    `Ctrl` keys above (they need the kitty protocol, or a terminal that sends a code of its
 //!    own) or an `Alt` key (macOS terminals send it only with "Option as Alt"). Every such
-//!    action also needs a binding that works everywhere, e.g. `Space w h` next to `Ctrl+H`.
+//!    action also needs a binding that works everywhere, e.g. `Space w h` next to `Ctrl+H`;
+//! 7. take a global key ([`Ctx::Global`]: quit, help, the quick switcher), which is looked up
+//!    before every context, for another action or as the start of a sequence
+//!    ([`ConflictKind::Protected`]): the binding could never be reached.
 
 use super::{Bound, Ctx, KeyChord, keys};
 use crate::action;
@@ -26,6 +29,7 @@ pub enum ConflictKind {
     TextKey,
     Indistinguishable,
     NoFallback,
+    Protected,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -68,6 +72,12 @@ pub fn legacy(k: KeyChord) -> KeyChord {
     KeyChord::new(code, KeyModifiers::NONE)
 }
 
+/// A key a terminal sends as itself only with the kitty keyboard protocol (`Ctrl+I` arrives as
+/// `Tab`, `Shift+Enter` as `Enter`): never the one a hint shows when another key does it.
+pub fn needs_protocol(k: KeyChord) -> bool {
+    legacy(k) != k || (k.code == KeyCode::Enter && k.mods.contains(KeyModifiers::SHIFT))
+}
+
 /// A key that some terminals cannot send as itself: see rule 6.
 pub fn fragile(k: KeyChord) -> bool {
     legacy(k) != k || k.mods.contains(KeyModifiers::ALT)
@@ -95,6 +105,13 @@ pub fn check(bindings: &[Bound], enhanced: bool) -> Vec<Conflict> {
             out.push(c);
         }
     };
+    for g in bindings.iter().filter(|b| b.ctx == Ctx::Global) {
+        for b in bindings.iter().filter(|b| b.ctx != Ctx::Global && b.keys[0] == g.keys[0]) {
+            if b.keys.len() > 1 || b.action != g.action {
+                push(Conflict { kind: ConflictKind::Protected, ctx: b.ctx, a: b.clone(), b: Some(g.clone()) });
+            }
+        }
+    }
     for &leaf in Ctx::ALL {
         let chain = leaf.chain();
         let depth = |c: Ctx| chain.iter().position(|x| *x == c);

@@ -176,6 +176,16 @@ impl Composer {
         true
     }
 
+    /// Delete from the cursor to the end of the line (`Ctrl+K`).
+    pub fn delete_to_end(&mut self) -> bool {
+        let end = self.line_end();
+        if end == self.cursor {
+            return false;
+        }
+        self.text.drain(self.cursor..end);
+        true
+    }
+
     /// The lines for a width of `w` cells (a line that fills `w` wraps, so the cursor always has
     /// a cell), and where the cursor is.
     pub fn view(&self, w: usize) -> View {

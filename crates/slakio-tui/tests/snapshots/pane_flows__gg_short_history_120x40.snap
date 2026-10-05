@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
-╭──╮╭ Home ────────────────╮╭ ▌#feed-ticket-104 ───────────────────────────────────────────────────────────────────────╮
-│▌A││ # design-review      ││                                                                                          │
-│▌B││ # feed-alert-134     ││                                                                                          │
-│──││ # feed-alert-8       ││─────────────────────────────────────── 2026-01-05 ───────────────────────────────────────│
-│H ││ # feed-budget-162    ││＊＊＊        Suspect the DB pool                                                    09:28│
-│D●││ # feed-budget-33     ││              :white_check_mark: 2                                                        │
-│A●││ # feed-build-50      ││Amy Ryu       Queue the merge today rollback                                         10:34│
-│F ││ # feed-cache-119     ││              ⤷ 6 replies · last 10:40                                                    │
-│L ││ # feed-customer-161  ││Lily Jeon     Index a tomorrow build invoice still alert metrics on customer budget  11:03│
-│  ││ # feed-customer-16 1 ││Noah Han      Looking into it                                                        12:05│
-│  ││ # feed-dashboard-22  ││Seoyeon       Lunch budget waiting branch migration check schema                     12:22│
-│  ││ # feed-dashboard-41  ││              :+1: 2  :fire: 5  :white_check_mark: 2                                      │
-│  ││ # feed-design-34     ││Chris Park    ＊＊ ＊＊＊?                                                           13:38│
-│  ││ # feed-design-83     ││Taylor Kim    Ticket done the now a still staging today build cache check invoice    14:24│
-│  ││ # feed-draft-142     ││              branch review now production                                                │
-│  ││ # feed-draft-58    ● ││              ⤷ 5 replies · last 14:29                                                    │
-│  ││ # feed-draft-84      ││＊＊＊        Today now queue dashboard invoice still customer can tomorrow invoice  14:54│
-│  ││ # feed-index-199   2 ││              broken merge after should done                                              │
-│  ││ # feed-index-39      ││Noah Han      Timeout production broken production maybe customer for timeout        15:37│
-│  ││ # feed-index-5     1 ││              invoice can check still                                                     │
-│  ││ # feed-invoice-16  ● ││Owen Hwang    Cache sprint design looks release migration roadmap pager rollback     16:30│
-│  ││ # feed-invoice-168   ││              fine                                                                        │
-│  ││ # feed-latency-144   ││Jordan Lee    Should is fine someone                                                 16:42│
-│  ││ # feed-meeting-82    ││Seoyeon       Deploy queue sprint                                                    17:21│
-│  ││ # feed-merge-192     ││Eve Bae       Timeout can retry                                                      18:48│
-│  ││ # feed-merge-54      ││＊＊＊        Design lunch ticket now dashboard draft looks                          19:22│
-│  ││ # feed-metrics-125   ││Owen Hwang    Merge queue cache we                                                   20:02│
-│  ││ # feed-metrics-13    ││              :+1: 2  :white_check_mark: 4                                                │
-│  ││ # feed-metrics-18    ││Amy Ryu       Retry production branch again alert staging looks pager ticket         20:46│
-│  ││ # feed-production- ● ││              :eyes: 3                                                                    │
-│  ││ # feed-production-4  ││Kim           Is is latency rollback budget schema queue should again                21:29│
-│  ││ # feed-queue-224     ││Dana Yoon     Can index meeting now meeting tracing a pager should                   21:56│
-│  ││ # feed-retry-63      ││Hyunwoo       see https://docs.example.com/runbooks/latency (edited)                 22:58│
-│  ││ # feed-review-152    ││Zoe Lim       The waiting meeting sprint waiting for schema still rollback meeting   23:55│
-│  ││ # feed-sprint-90     ││              check release                                                               │
-│  ││ # feed-sprint-94     ││╭ Message #feed-ticket-104 ──────────────────────────────────────────────────────────────╮│
-│  ││ # feed-staging-91    │││Press i to write                                                                        ││
-│  ││ # feed-ticket-104  ● ││╰────────────────────────────────────────────────────────────────────────────────────────╯│
-╰──╯╰──────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company  #feed-ticket-104                                                                  @37  DM 16  demo
+╭──╮╭ Home ──────────────────╮╭ ▌#feed-ticket-104 ─────────────────────────────────────────────────────────────────────╮
+│●A││   # design-review      ││                                                                                        │
+│●B││   # feed-alert-134     ││                                                                                        │
+│──││   # feed-alert-8       ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
+│H ││   # feed-budget-162    ││ ＊＊＊        Suspect the DB pool                                                09:28 │
+│D●││   # feed-budget-33     ││               :white_check_mark: 2                                                     │
+│A●││   # feed-build-50      ││ Amy Ryu       Queue the merge today rollback                                     10:34 │
+│F ││   # feed-cache-119     ││               ⤷ 6 replies · last 10:40                                                 │
+│L ││   # feed-customer-161  ││ Lily Jeon     Index a tomorrow build invoice still alert metrics on customer     11:03 │
+│  ││   # feed-customer…  1  ││               budget                                                                   │
+│  ││   # feed-dashboard-22  ││ Noah Han      Looking into it                                                    12:05 │
+│  ││   # feed-dashboard-41  ││ Seoyeon       Lunch budget waiting branch migration check schema                 12:22 │
+│  ││   # feed-design-34     ││               :+1: 2  :fire: 5  :white_check_mark: 2                                   │
+│  ││   # feed-design-83     ││ Chris Park    ＊＊ ＊＊＊?                                                       13:38 │
+│  ││   # feed-draft-142     ││ Taylor Kim    Ticket done the now a still staging today build cache check        14:24 │
+│  ││   # feed-draft-58      ││               invoice branch review now production                                     │
+│  ││   # feed-draft-84      ││               ⤷ 5 replies · last 14:29                                                 │
+│  ││   # feed-index-199  2  ││ ＊＊＊        Today now queue dashboard invoice still customer can tomorrow      14:54 │
+│  ││   # feed-index-39      ││               invoice broken merge after should done                                   │
+│  ││   # feed-index-5    1  ││ Noah Han      Timeout production broken production maybe customer for timeout    15:37 │
+│  ││   # feed-invoice-16    ││               invoice can check still                                                  │
+│  ││   # feed-invoice-168   ││ Owen Hwang    Cache sprint design looks release migration roadmap pager rollback 16:30 │
+│  ││   # feed-latency-144   ││               fine                                                                     │
+│  ││   # feed-meeting-82    ││ Jordan Lee    Should is fine someone                                             16:42 │
+│  ││   # feed-merge-192     ││ Seoyeon       Deploy queue sprint                                                17:21 │
+│  ││   # feed-merge-54      ││ Eve Bae       Timeout can retry                                                  18:48 │
+│  ││   # feed-metrics-125   ││ ＊＊＊        Design lunch ticket now dashboard draft looks                      19:22 │
+│  ││   # feed-metrics-13    ││ Owen Hwang    Merge queue cache we                                               20:02 │
+│  ││   # feed-metrics-18    ││               :+1: 2  :white_check_mark: 4                                             │
+│  ││   # feed-production-1… ││ Amy Ryu       Retry production branch again alert staging looks pager ticket     20:46 │
+│  ││   # feed-production-44 ││               :eyes: 3                                                                 │
+│  ││   # feed-queue-224     ││ Kim           Is is latency rollback budget schema queue should again            21:29 │
+│  ││   # feed-retry-63      ││ Dana Yoon     Can index meeting now meeting tracing a pager should               21:56 │
+│  ││   # feed-review-152    ││ Hyunwoo       see https://docs.example.com/runbooks/latency (edited)             22:58 │
+│  ││   # feed-sprint-90     ││ Zoe Lim       The waiting meeting sprint waiting for schema still rollback       23:55 │
+│  ││   # feed-sprint-94     ││               meeting check release                                                    │
+│  ││   # feed-staging-91    │├─ Message #feed-ticket-104 ─────────────────────────────────────────────────────────────┤
+│  ││▎  # feed-ticket-104    ││ › Press i to write                                                                     │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌ #feed-ticket-104     Enter thread · y copy · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo

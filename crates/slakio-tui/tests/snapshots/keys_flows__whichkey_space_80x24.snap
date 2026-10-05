@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/keys_flows.rs
+expression: d.snap()
+---
+╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
+│●A││ ▾ Favorites            ││                                                │
+│●B││   # backend            ││                                                │
+│──││   # incidents       3  ││                                                │
+│H ││                        ││                                                │
+│D●││ ▾ Ops                  ││                                                │
+│A●││   # deploys            ││                                                │
+│F ││   # alerts             ││     No conversation open                       │
+│L ││   # partner-shared ext ││     Pick one in the list and press Enter.      │
+│  ││   # hostile-strings    ││                                                │
+│  ││   # big-history        ││     Enter    Open                              │
+│  ││   # long-threads       ││     Space h  Home                              │
+│  ││                        ││     Space d  DMs                               │
+│  ││ ▾ Channels             ││     Ctrl+O   Back to the last one              │
+╭ Space — Leader ──────────────────────────────────────────────────────────────╮
+│ h  Show Home                           [  Back to the conversation before    │
+│ d  Show DMs                            ]  Forward again                      │
+│ a  Show Activity                       ?  Keyboard help                      │
+│ f  Show Files                          /  Open the command line              │
+│ l  Show Later                          q  Quit                               │
+│ e  Show or hide the list panel         w  +Window                            │
+│ W  Switch workspace                                                          │
+╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
+ NORMAL  ▌ Home        Enter open · l peek · Tab next pane │  @37  DM 16 │ demo

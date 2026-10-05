@@ -13,7 +13,7 @@ use super::composer::Composer;
 use slakio_core::backend::{Generation, Page};
 use slakio_core::model::{Message, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Safe;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 /// Messages asked for at a time.
 pub const PAGE: u32 = 200;
@@ -62,6 +62,15 @@ impl Shown {
     }
 }
 
+/// A row of a pane as last drawn, for the mouse: the message on it, and whether it is the
+/// message's "N replies" link.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hit {
+    pub y: u16,
+    pub message: usize,
+    pub link: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct Pane {
     pub target: Target,
@@ -80,6 +89,8 @@ pub struct Pane {
     /// `gg` was pressed before the oldest message was loaded: keep loading, then select it.
     pub to_oldest: bool,
     pub composer: Composer,
+    /// The rows drawn last, by drawing (only it knows the rows' heights).
+    pub hits: RefCell<Vec<Hit>>,
 }
 
 impl Pane {
@@ -94,6 +105,7 @@ impl Pane {
             bottom: Cell::new(None),
             to_oldest: false,
             composer: Composer::default(),
+            hits: RefCell::new(Vec::new()),
         }
     }
 
@@ -156,6 +168,17 @@ impl Pane {
     pub fn select_newest(&mut self) {
         self.to_oldest = false;
         self.selected = self.items.len().checked_sub(1);
+    }
+
+    /// The message this thread pane is the thread of, when loaded (index into `items`).
+    pub fn root(&self) -> Option<usize> {
+        let Target::Thread { thread, .. } = &self.target else { return None };
+        self.items.iter().position(|m| m.ts == *thread)
+    }
+
+    /// Select the message on screen row `y` as last drawn; `Some(link)` when there is one.
+    pub fn hit(&self, y: u16) -> Option<Hit> {
+        self.hits.borrow().iter().find(|h| h.y == y).copied()
     }
 
     /// Select the oldest message, loading the rest of the history first.

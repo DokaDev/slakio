@@ -65,11 +65,17 @@ impl Demo {
         self.app.handle_event(Event::Mouse(ev), self.now)
     }
 
-    pub fn screen(&self) -> String {
+    /// The frame as drawn: every cell with its style.
+    pub fn buffer(&self) -> ratatui::buffer::Buffer {
         let (w, h) = (self.app.size.width, self.app.size.height);
         let mut t = Terminal::new(TestBackend::new(w, h)).unwrap();
         t.draw(|f| ui::draw(f, &self.app, self.now)).unwrap();
-        let buf = t.backend().buffer();
+        t.backend().buffer().clone()
+    }
+
+    pub fn screen(&self) -> String {
+        let (w, h) = (self.app.size.width, self.app.size.height);
+        let buf = &self.buffer();
         (0..h)
             .map(|y| {
                 // A wide character fills two cells; the second one is not text of its own.

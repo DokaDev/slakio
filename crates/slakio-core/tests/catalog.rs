@@ -314,6 +314,8 @@ const SAME_IN_KO: &[&str] = &[
     "mode.visual",
     // "DM" is what Korean Slack users say too.
     "status.dms",
+    // Only placeholders and a dash: the which-key popup's title (the keys, the group's name).
+    "guide.title",
 ];
 
 #[test]

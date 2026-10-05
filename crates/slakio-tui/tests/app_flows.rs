@@ -83,6 +83,7 @@ fn a_pasted_command_is_typed_without_its_line_break() {
 
 #[test]
 fn the_empty_frame_shows_the_status_line_and_how_to_quit() {
+    // How to quit and get help: keys, not a command to type.
     let now = Instant::now();
     let app = App::new(Lang::En, Theme::terminal());
     insta::assert_snapshot!("empty_80x24", screen(&app, 80, 24, now));
@@ -124,7 +125,7 @@ fn korean_ui_shows_the_translated_hint() {
     let ko = App::new(Lang::Ko, Theme::terminal());
     let en = App::new(Lang::En, Theme::terminal());
     let (k, e) = (screen(&ko, 80, 24, now), screen(&en, 80, 24, now));
-    assert!(!k.contains("Type :qa"), "{k}");
-    assert!(e.contains("Type :qa"), "{e}");
-    assert!(k.contains(":qa"), "{k}");
+    assert!(!k.contains("Keyboard help"), "{k}");
+    assert!(e.contains("Keyboard help") && e.contains("Ctrl+Q"), "{e}");
+    assert!(k.contains("Ctrl+Q"), "the keys stay keys: {k}");
 }

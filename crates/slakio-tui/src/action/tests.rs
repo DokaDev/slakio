@@ -15,32 +15,88 @@ fn ids_and_command_names_are_unique() {
 
 #[test]
 fn every_action_is_registered() {
-    use ShellAction::*;
-    let shell = [
-        FocusLeft, FocusRight, RailNext, RailPrev, RailSelect, ListNext, ListPrev, ListFirst, ListLast, ListOpen,
-        ToggleList,
-    ]
-    .into_iter()
-    .chain(View::ALL.iter().map(|v| Show(*v)))
-    .map(Action::Shell);
+    let shell = {
+        use ShellAction::*;
+        [
+            FocusLeft,
+            FocusRight,
+            FocusUp,
+            FocusDown,
+            FocusNext,
+            FocusPrev,
+            RailNext,
+            RailPrev,
+            RailFirst,
+            RailLast,
+            RailSelect,
+            RailLeave,
+            ListNext,
+            ListPrev,
+            ListFirst,
+            ListLast,
+            ListHalfDown,
+            ListHalfUp,
+            ListPageDown,
+            ListPageUp,
+            ListOpen,
+            ListPeek,
+            ListLeft,
+            ListSectionPrev,
+            ListSectionNext,
+            ToggleList,
+        ]
+        .into_iter()
+        .chain(View::ALL.iter().map(|v| Show(*v)))
+        .map(Action::Shell)
+    };
     let pane = {
         use PaneAction::*;
-        [Next, Prev, First, Last, OpenThread, Visual, Copy, Escape, Insert, Close, Back, Forward].map(Action::Pane)
+        [
+            Next, Prev, First, Last, HalfDown, HalfUp, PageDown, PageUp, OpenThread, Visual, Copy, Escape, Insert,
+            Close, Left, Right, Back, Forward,
+        ]
+        .map(Action::Pane)
     };
     let composer = {
         use ComposerAction::*;
-        [Send, Newline, Leave, DeleteWord, DeleteLine].map(Action::Composer)
+        [Send, Newline, Leave, DeleteWord, DeleteLine, DeleteToEnd].map(Action::Composer)
     };
-    let all = [
-        Action::App(AppAction::Quit),
-        Action::CommandLine(CommandLineAction::Open),
-        Action::CommandLine(CommandLineAction::Run),
-        Action::CommandLine(CommandLineAction::Cancel),
-    ]
-    .into_iter()
-    .chain(shell)
-    .chain(pane)
-    .chain(composer);
+    let help = {
+        use HelpAction::*;
+        [
+            Open,
+            Close,
+            Next,
+            Prev,
+            PageDown,
+            PageUp,
+            First,
+            Last,
+            Run,
+            Expand,
+            Collapse,
+            Search,
+            SearchDone,
+            SearchCancel,
+        ]
+        .map(Action::Help)
+    };
+    let dialog = {
+        use DialogAction::*;
+        [Yes, No, Choose, Toggle].map(Action::Dialog)
+    };
+    let app = {
+        use AppAction::*;
+        [Quit, Interrupt, Palette, ChooseWorkspace].map(Action::App)
+    };
+    let all = app
+        .into_iter()
+        .chain([CommandLineAction::Open, CommandLineAction::Run, CommandLineAction::Cancel].map(Action::CommandLine))
+        .chain(shell)
+        .chain(pane)
+        .chain(composer)
+        .chain(help)
+        .chain(dialog);
     let mut n = 0;
     for a in all {
         assert_eq!(spec(a).action, a);

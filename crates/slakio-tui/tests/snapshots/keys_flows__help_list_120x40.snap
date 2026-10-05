@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/keys_flows.rs
+expression: s
+---
+╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│●A││ ▾ Fa╭ Keys — List panel ───────────────────────────────────────────────────────────────────────────────╮         │
+│●B││   # │ / Type / to search                                                                               │         │
+│──││   # │──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│H ││     │ ▾ List panel                                                                                     │         │
+│D●││ ▾ Op│   Next row                                                                              j / Down │         │
+│A●││   # │   Previous row                                                                            k / Up │         │
+│F ││   # │   First row                                                                           g g / Home │         │
+│L ││   # │   Last row                                                                               G / End │         │
+│  ││   # │   Half a page down                                                                        Ctrl+D │         │
+│  ││   # │   Half a page up                                                                          Ctrl+U │         │
+│  ││   # │   A page down                                                                           PageDown │         │
+│  ││     │   A page up                                                                               PageUp │         │
+│  ││ ▾ Ch│   Open the conversation, or fold the section                                               Enter │         │
+│  ││   # │   Open, staying in the list (or unfold)                                                l / Right │         │
+│  ││   # │   To the section header, fold it, then the rail                                         h / Left │         │
+│  ││   # │   Previous section                                                                             { │         │
+│  ││   # │   Next section                                                                                 } │         │
+│  ││   # │ ▾ Main screen                                                                                    │         │
+│  ││   # │   Next panel                                                                            Tab / F6 │         │
+│  ││   # │   Previous panel                                                            Shift+Tab / Shift+F6 │         │
+│  ││   # │   Move the focus left                                                         Ctrl+H / Space w h │         │
+│  ││   # │   Move the focus down                                                         Ctrl+J / Space w j │         │
+│  ││   # │   Move the focus up                                                           Ctrl+K / Space w k │         │
+│  ││   # │   Move the focus right                                                        Ctrl+L / Space w l │         │
+│  ││   # │   Close the pane                                                                       Space w c │         │
+│  ││   # │   Show Home                                                                              Space h │         │
+│  ││   # │   Show DMs                                                                               Space d │         │
+│  ││   # │   Show Activity                                                                          Space a │         │
+│  ││   # │   Show Files                                                                             Space f │         │
+│  ││   # │   Show Later                                                                             Space l │         │
+│  ││   # │   Show or hide the list panel                                                            Space e │         │
+│  ││   # │   Switch workspace                                                                       Space W │         │
+│  ││   # │   Back to the conversation before                                    Ctrl+O / Alt+Left / Space [ │         │
+│  ││   # │   Forward again                                                              Alt+Right / Space ] │         │
+│  ││   # │   Keyboard help                                                                          Space ? │         │
+│  ││   # │   Open the command line                                                                  Space / │         │
+│  ││   # ╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › Home                                                                            @37  DM 16 │ demo

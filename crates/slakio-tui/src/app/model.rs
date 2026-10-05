@@ -14,6 +14,15 @@ pub enum Row {
     Section(usize),
     /// A conversation (index into the conversations).
     Conversation(usize),
+    /// The blank row between two sections: never under the cursor.
+    Spacer,
+}
+
+impl Row {
+    /// The cursor can stop here.
+    pub fn is_selectable(self) -> bool {
+        self != Row::Spacer
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -74,6 +83,9 @@ impl Model {
             View::Home => {
                 let mut rows = vec![];
                 for (si, s) in self.snapshot.sections.iter().enumerate().filter(|(_, s)| s.workspace == w.id) {
+                    if !rows.is_empty() {
+                        rows.push(Row::Spacer);
+                    }
                     rows.push(Row::Section(si));
                     if !collapsed.contains(&s.id) {
                         rows.extend(
@@ -87,6 +99,20 @@ impl Model {
             // Not built yet: the list panel says so.
             View::Activity | View::Files | View::Later => vec![],
         }
+    }
+
+    /// Of the conversations of section `i`: how many have unread messages (not muted ones), and
+    /// the mentions they hold (what a folded header shows).
+    pub fn section_counts(&self, i: usize) -> (u32, u32) {
+        let s = &self.snapshot.sections[i];
+        let convs = self.snapshot.conversations.iter().filter(|c| c.workspace == s.workspace && c.section == s.id);
+        convs.fold((0, 0), |(u, m), c| (u + u32::from(c.unread > 0 && !c.muted), m + c.mentions))
+    }
+
+    /// Unread mentions in workspace `ws`.
+    pub fn workspace_mentions(&self, ws: usize) -> u32 {
+        let Some(w) = self.snapshot.workspaces.get(ws) else { return 0 };
+        self.snapshot.conversations.iter().filter(|c| c.workspace == w.id).map(|c| c.mentions).sum()
     }
 
     /// Workspace `ws` has an unread conversation that is not muted.
