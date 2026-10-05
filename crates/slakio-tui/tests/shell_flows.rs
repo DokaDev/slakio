@@ -280,3 +280,24 @@ fn icons_replace_the_rail_letters() {
     let s = d.screen();
     assert!(s.contains('\u{F02DC}'), "the Home icon: {s}");
 }
+
+#[test]
+fn the_overlay_rail_hides_the_list_panel_it_covers() {
+    let mut d = Demo::new(120, 40);
+    d.keys("ctrl+h");
+    let a = d.app.areas();
+    let list = a.list.expect("the list panel is shown");
+    assert!(a.rail.right() < list.right(), "the rail covers part of the list panel");
+    let s = d.screen();
+    // Between the overlay and the work area nothing of the list panel shows: no border pieces
+    // (`╮──────╮`), no fragments of names or counts.
+    for (y, line) in s.lines().take(usize::from(a.work.height)).enumerate() {
+        let cells: Vec<char> = line.chars().collect();
+        let gap: String = cells
+            .get(usize::from(a.rail.right())..usize::from(a.work.x))
+            .map(|c| c.iter().collect())
+            .unwrap_or_default();
+        assert!(gap.trim().is_empty(), "row {y}: {gap:?} shows through\n{s}");
+    }
+    // The screen itself: the snapshot `demo_rail_overlay_120x40`.
+}

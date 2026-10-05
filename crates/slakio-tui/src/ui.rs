@@ -21,7 +21,7 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::symbols::border;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use slakio_core::i18n::{Label, Localized, Msg};
 use std::time::Instant;
 
@@ -43,6 +43,11 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
         list::draw(f, app, l);
     }
     work::draw(f, app, a.work);
+    // The expanded rail over the list panel hides all of it: what would show beside the rail
+    // (a piece of the border, cut names) is cleared, not left half drawn.
+    if let Some(l) = a.list.filter(|l| l.intersects(a.rail)) {
+        f.render_widget(Clear, l);
+    }
     rail::draw(f, app, a.rail);
     statusline::draw(f, app, a.status, now);
 }
