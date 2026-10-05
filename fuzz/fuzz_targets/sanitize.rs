@@ -1,14 +1,11 @@
-//! The sanitiser on arbitrary input: never panics, leaves nothing a terminal would act on,
-//! sanitising twice changes nothing, and the work stays linear even when the input is repeated
-//! (the shape that makes a rescanning sanitiser quadratic).
+//! The sanitiser on arbitrary input: never panics, leaves nothing a terminal would act on, and
+//! sanitising twice changes nothing. Fast, so a run covers many inputs; the work on repeated
+//! input is the `sanitize_linear` target's.
 
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use slakio_core::sanitize::{
-    BLOCK_MAX_CHARS, BLOCK_MAX_INPUT_BYTES, LINE_MAX_CHARS, LINE_MAX_INPUT_BYTES, sanitize_block, sanitize_line,
-    sanitize_steps,
-};
+use slakio_core::sanitize::{BLOCK_MAX_CHARS, LINE_MAX_CHARS, sanitize_block, sanitize_line};
 
 /// A character that must never reach the screen (`\n` is allowed in a block).
 fn forbidden(c: char, block: bool) -> bool {
@@ -32,12 +29,4 @@ fuzz_target!(|data: &[u8]| {
     assert!(!block.as_str().chars().any(|c| forbidden(c, true)), "{block:?}");
     assert_eq!(sanitize_line(line.as_str()), line);
     assert_eq!(sanitize_block(block.as_str()), block);
-    // The same input repeated: the work stays a few steps per byte read.
-    if !text.is_empty() {
-        let repeated = text.repeat(BLOCK_MAX_INPUT_BYTES / text.len() / 4 + 1);
-        for (is_block, max_bytes) in [(false, LINE_MAX_INPUT_BYTES), (true, BLOCK_MAX_INPUT_BYTES)] {
-            let steps = sanitize_steps(&repeated, is_block);
-            assert!(steps <= 4 * repeated.len().min(max_bytes) + 16, "{steps} steps for {} bytes", repeated.len());
-        }
-    }
 });

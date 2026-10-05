@@ -27,8 +27,10 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal
       - run: cargo +nightly install --locked cargo-fuzz --version 0.13.2
-      # Ten minutes of the sanitiser on arbitrary bytes.
-      - run: cargo +nightly fuzz run sanitize -- -max_total_time=600
+      # The sanitiser's invariants on arbitrary bytes (fast), then its work on repeated input.
+      - run: cargo +nightly fuzz run sanitize -- -max_total_time=420
+        working-directory: fuzz
+      - run: cargo +nightly fuzz run sanitize_linear -- -max_total_time=180 -max_len=4096
         working-directory: fuzz
       - uses: actions/upload-artifact@v7
         if: ${{ failure() }}

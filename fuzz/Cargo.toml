@@ -1,4 +1,5 @@
-# cargo-fuzz targets (nightly toolchain): `cargo +nightly fuzz run sanitize`. Not a member of
+# cargo-fuzz targets (nightly toolchain): `cargo +nightly fuzz run sanitize` (the invariants, fast)
+# and `cargo +nightly fuzz run sanitize_linear` (linear work on repeated input). Not a member of
 # the main workspace, so the stable build, the lock file and the license checks never see
 # libfuzzer. CI runs them on a schedule (.github/workflows/fuzz.yml); an input a run finds
 # becomes a stable regression test next to the code it breaks.
@@ -19,6 +20,13 @@ slakio-core = { path = "../crates/slakio-core" }
 [[bin]]
 name = "sanitize"
 path = "fuzz_targets/sanitize.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sanitize_linear"
+path = "fuzz_targets/sanitize_linear.rs"
 test = false
 doc = false
 bench = false
