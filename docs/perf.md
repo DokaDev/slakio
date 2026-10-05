@@ -21,7 +21,9 @@ and credentials in memory. The binary writes its counters to the file named by
 One count is held by a test instead (`crates/slakio-tui/tests/pane_flows.rs`): a frame lays out
 at most twice the message rows it shows, on the 10,000-message channel and the 1,200-reply
 thread, after moving, `g g` and `G` (the drawing code counts the rows it lays out). Messages are
-sanitised once, when their page arrives, never per frame.
+sanitised once, when their page arrives, never per frame. The sanitiser itself reads at most a
+fixed number of bytes per name or message and does a few steps per byte, however hostile the
+text; its tests count the steps rather than time them (`crates/slakio-core/src/sanitize/tests.rs`).
 
 ## Why it does not flake
 
