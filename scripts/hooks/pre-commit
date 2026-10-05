@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Refuses a commit whose staged files contain what must never be committed:
+#   - Slack tokens and cookies (the `xox?-` prefixes);
+#   - e-mail addresses (other than GitHub's noreply addresses, SSH remotes and reserved example
+#     domains);
+#   - Slack file and CDN URLs;
+#   - Hangul outside locales/ko.toml;
+#   - any entry of the private denylist named by SLAKIO_PRIVATE_DENYLIST (a file outside the
+#     repository, one entry per line, matched without regard to case): company domains,
+#     workspace and team names, real people's names. When the variable is set but the file
+#     cannot be read, every commit is refused (fail closed).
+# The patterns are written so that this file does not match them itself.
+# Install: git config core.hooksPath scripts/hooks
+set -euo pipefail
+
+denylist=${SLAKIO_PRIVATE_DENYLIST:-}
+if [[ -n $denylist && ! -r $denylist ]]; then
+  echo "pre-commit: SLAKIO_PRIVATE_DENYLIST is set but $denylist cannot be read; refusing to commit" >&2
+  exit 1
+fi
+
+failed=0
+while IFS= read -r -d '' file; do
+  # Binary files (numstat shows `-`) have no lines to check.
+  if git diff --cached --numstat -- "$file" | grep -q '^-'; then
+    continue
+  fi
+  # The staged content, not the working tree's.
+  if ! git show ":$file" | DENYLIST="$denylist" FILE="$file" perl -CS -e '
+use strict;
+use warnings;
+my $file = $ENV{FILE};
+my @deny;
+if ($ENV{DENYLIST}) {
+    open(my $d, "<:encoding(UTF-8)", $ENV{DENYLIST}) or die "denylist: $!\n";
+    @deny = grep { length } map { s/^\s+|\s+$//gr } <$d>;
+}
+binmode STDIN, ":encoding(UTF-8)";
+my $failed = 0;
+while (my $line = <STDIN>) {
+    my @why;
+    push @why, "a Slack token or cookie" if $line =~ /xox[abcdeprs]-/;
+    while ($line =~ /([A-Za-z0-9._%+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g) {
+        my ($user, $domain) = ($1, $2);
+        # GitHub SSH remotes (git@github.com:owner/repo) are not addresses.
+        next if $user eq "git" && $domain eq "github.com";
+        push @why, "an e-mail address" unless $domain =~ /(^|\.)(users\.noreply\.github\.com|example\.(com|org|net)|invalid|test)$/i;
+    }
+    push @why, "a Slack file URL" if $line =~ m{files\.slack\.com|slack\.com/files|slack[-]edge}i;
+    push @why, "Hangul outside locales/ko.toml"
+        if $file ne "locales/ko.toml" && $line =~ /[\x{1100}-\x{11FF}\x{3130}-\x{318F}\x{A960}-\x{A97F}\x{AC00}-\x{D7FF}]/;
+    for my $entry (@deny) {
+        push @why, "an entry of the private denylist" if index(lc $line, lc $entry) >= 0;
+    }
+    for my $w (@why) {
+        print STDERR "pre-commit: $file:$.: $w\n";
+        $failed = 1;
+    }
+}
+exit $failed;
+'; then
+    failed=1
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if [[ $failed == 1 ]]; then
+  echo "pre-commit: commit refused (see above)" >&2
+  exit 1
+fi
