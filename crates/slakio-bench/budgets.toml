@@ -1,0 +1,17 @@
+# Performance budgets that CI holds slakio to (`slakio-bench budget`, docs/perf.md).
+#
+# CI holds counts only (bytes, wakeups, frames), never wall-clock times: those depend on the
+# machine and would make CI flaky. Times are measured and printed for the record.
+
+[startup]
+# The release binary (lto, one codegen unit, stripped). A developer machine (aarch64 macOS)
+# measures about 1 MiB with the empty frame of step zero; the budget leaves room for what comes
+# before the first release, and is lowered or raised only with a measurement and a reason.
+binary_mib_max = 8.0
+
+[idle]
+# The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
+# deadline, so it should not wake up at all.
+secs = 10
+wakeups_per_s_max = 0.2
+frames_per_s_max = 0.2

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/slakio-core", "crates/slakio-tui"]
+members = ["crates/slakio-core", "crates/slakio-tui", "crates/slakio-bench"]
 
 [workspace.package]
 version = "0.0.0"
