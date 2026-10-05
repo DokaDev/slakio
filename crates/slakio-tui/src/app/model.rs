@@ -4,8 +4,8 @@
 
 use super::shell::View;
 use slakio_core::backend::Snapshot;
-use slakio_core::model::{Conversation, Section, SectionId, Target, Workspace};
-use std::collections::HashSet;
+use slakio_core::model::{Conversation, Section, SectionId, Target, User, UserId, Workspace, WorkspaceId};
+use std::collections::{HashMap, HashSet};
 
 /// One row of the list panel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,13 +19,16 @@ pub enum Row {
 #[derive(Clone, Debug, Default)]
 pub struct Model {
     snapshot: Snapshot,
+    /// Index into the people, by id.
+    users: HashMap<UserId, usize>,
     /// Set once the backend answered.
     loaded: bool,
 }
 
 impl Model {
     pub fn new(snapshot: Snapshot) -> Self {
-        Self { snapshot, loaded: true }
+        let users = snapshot.users.iter().enumerate().map(|(i, u)| (u.id.clone(), i)).collect();
+        Self { snapshot, users, loaded: true }
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -44,13 +47,23 @@ impl Model {
         &self.snapshot.conversations[i]
     }
 
-    /// The conversation `target` names.
+    /// The conversation `target` names (a thread's conversation for a thread).
     pub fn target(&self, target: &Target) -> Option<&Conversation> {
-        match target {
-            Target::Conversation { workspace, conversation } => {
-                self.snapshot.conversations.iter().find(|c| &c.workspace == workspace && &c.id == conversation)
-            }
-        }
+        let (workspace, conversation) = (target.workspace(), target.conversation());
+        self.snapshot.conversations.iter().find(|c| &c.workspace == workspace && &c.id == conversation)
+    }
+
+    pub fn user(&self, id: &UserId) -> Option<&User> {
+        self.users.get(id).map(|&i| &self.snapshot.users[i])
+    }
+
+    pub fn workspace(&self, id: &WorkspaceId) -> Option<&Workspace> {
+        self.snapshot.workspaces.iter().find(|w| &w.id == id)
+    }
+
+    /// The user's own account in workspace `id`.
+    pub fn me(&self, id: &WorkspaceId) -> Option<&UserId> {
+        self.workspace(id).map(|w| &w.me)
     }
 
     /// The rows of `view` in workspace `ws`, sections in `collapsed` folded.

@@ -5,7 +5,7 @@
 //! The UI state never calls a backend: it queues commands, and the binary's loop delivers them
 //! and hands the events back. Only one wiring file of the UI names a concrete backend.
 
-use crate::model::{Conversation, Section, User, Workspace};
+use crate::model::{Conversation, Message, Section, Target, Ts, User, Workspace};
 
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
 /// drops events of an older one.
@@ -30,6 +30,19 @@ pub struct Capabilities {
 pub enum Command {
     /// Load the workspaces, people, sidebar sections and conversations.
     Boot,
+    /// Up to `limit` messages of `target` older than `before` (the newest when `None`). Answered
+    /// with [`Event::History`].
+    History { target: Target, before: Option<Ts>, limit: u32 },
+}
+
+/// A page of messages: the answer to [`Command::History`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Page {
+    pub target: Target,
+    /// Oldest first. A thread's first page (the oldest) starts with the thread's own message.
+    pub messages: Vec<Message>,
+    /// Nothing older exists: the start of the conversation or thread is in this page.
+    pub complete: bool,
 }
 
 /// Everything the UI lists right after start: the answer to [`Command::Boot`].
@@ -48,6 +61,7 @@ pub struct Snapshot {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
     Booted(Box<Snapshot>),
+    History(Box<Page>),
 }
 
 /// An event with the generation of the request it answers.

@@ -194,3 +194,52 @@ fn every_hostile_string_sanitises_to_harmless_text() {
         }
     }
 }
+
+#[test]
+fn history_pages_walk_back_to_the_first_message() {
+    let w = world();
+    let big = &conv(&w, names::BIG_HISTORY).id;
+    let (newest, done) = w.history(big, None, 200);
+    assert_eq!((newest.len(), done), (200, false));
+    assert_eq!(newest.last(), w.message(big, BIG_HISTORY_MESSAGES - 1).as_ref());
+    let mut before = Some(newest[0].ts);
+    let mut seen = newest.len();
+    while let Some(b) = before {
+        let (page, done) = w.history(big, Some(b), 200);
+        assert!(page.iter().all(|m| m.ts < b), "older than asked");
+        assert!(page.windows(2).all(|p| p[0].ts < p[1].ts), "oldest first");
+        seen += page.len();
+        before = if done { None } else { Some(page[0].ts) };
+    }
+    assert_eq!(seen, BIG_HISTORY_MESSAGES, "every message once");
+    let m = w.message(big, 1234).unwrap();
+    assert_eq!(w.index_of(big, m.ts), Some(1234));
+    assert_eq!(w.index_of(big, Ts(m.ts.0 + 1)), None);
+}
+
+#[test]
+fn a_thread_starts_with_its_message_and_pages_through_its_replies() {
+    let w = world();
+    let c = &conv(&w, names::LONG_THREADS).id;
+    let root = w.message(c, 0).unwrap();
+    let (last, done) = w.thread(c, root.ts, None, 100).unwrap();
+    assert_eq!((last.len(), done), (100, false));
+    assert_eq!(last.last(), w.reply(c, 0, LONG_THREAD_REPLIES - 1).as_ref());
+    let mut all = last;
+    while !done_paging(&w, c, root.ts, &mut all) {}
+    assert_eq!(all.len(), LONG_THREAD_REPLIES as usize + 1);
+    assert_eq!(all[0], root, "the thread's own message first");
+    assert!(all.windows(2).all(|p| p[0].ts < p[1].ts));
+    // A message without replies is a thread of one.
+    let plain = (0..w.message_count(c)).find_map(|i| w.message(c, i).filter(|m| m.thread.is_none())).unwrap();
+    assert_eq!(w.thread(c, plain.ts, None, 100), Some((vec![plain.clone()], true)));
+    assert_eq!(w.thread(c, Ts(1), None, 100), None, "no such message");
+}
+
+/// Prepend the page before `all[0]`; `true` once the first message is in.
+fn done_paging(w: &World, c: &ConversationId, thread: Ts, all: &mut Vec<Message>) -> bool {
+    let (mut page, done) = w.thread(c, thread, Some(all[0].ts), 100).unwrap();
+    page.append(all);
+    *all = page;
+    done
+}

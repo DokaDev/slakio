@@ -252,6 +252,86 @@ impl World {
         Some(Message { ts, user, text, thread, reactions, edited: r.chance(5) })
     }
 
+    /// The index of the message of `conversation` written at `ts`, if there is one.
+    pub fn index_of(&self, conversation: &ConversationId, ts: Ts) -> Option<usize> {
+        let n = self.message_count(conversation);
+        let (mut lo, mut hi) = (0, n);
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            match self.message(conversation, mid)?.ts.cmp(&ts) {
+                std::cmp::Ordering::Less => lo = mid + 1,
+                std::cmp::Ordering::Greater => hi = mid,
+                std::cmp::Ordering::Equal => return Some(mid),
+            }
+        }
+        None
+    }
+
+    /// Up to `limit` messages of `conversation` older than `before` (the newest when `None`),
+    /// oldest first, and whether the page reaches the first message.
+    pub fn history(&self, conversation: &ConversationId, before: Option<Ts>, limit: usize) -> (Vec<Message>, bool) {
+        let end = match before {
+            None => self.message_count(conversation),
+            Some(ts) => self.first_at_or_after(conversation, ts),
+        };
+        let start = end.saturating_sub(limit);
+        let messages = (start..end).filter_map(|i| self.message(conversation, i)).collect();
+        (messages, start == 0)
+    }
+
+    /// The thread under the message of `conversation` written at `thread`: up to `limit`
+    /// messages older than `before` (the newest when `None`), oldest first; the first page
+    /// starts with the thread's own message. `None` when there is no such message.
+    pub fn thread(
+        &self,
+        conversation: &ConversationId,
+        thread: Ts,
+        before: Option<Ts>,
+        limit: usize,
+    ) -> Option<(Vec<Message>, bool)> {
+        let parent = self.index_of(conversation, thread)?;
+        let root = self.message(conversation, parent)?;
+        let replies = root.thread.map_or(0, |t| t.replies) as usize;
+        // Position 0 is the thread's message, reply i is position i + 1.
+        let end = match before {
+            None => replies + 1,
+            Some(ts) => {
+                let (mut lo, mut hi) = (0, replies + 1);
+                while lo < hi {
+                    let mid = (lo + hi) / 2;
+                    match self.thread_at(conversation, parent, mid) {
+                        Some(m) if m.ts < ts => lo = mid + 1,
+                        _ => hi = mid,
+                    }
+                }
+                lo
+            }
+        };
+        let start = end.saturating_sub(limit);
+        let messages = (start..end).filter_map(|p| self.thread_at(conversation, parent, p)).collect();
+        Some((messages, start == 0))
+    }
+
+    fn thread_at(&self, conversation: &ConversationId, parent: usize, position: usize) -> Option<Message> {
+        match position {
+            0 => self.message(conversation, parent),
+            p => self.reply(conversation, parent, (p - 1) as u32),
+        }
+    }
+
+    /// The index of the first message of `conversation` written at or after `ts`.
+    fn first_at_or_after(&self, conversation: &ConversationId, ts: Ts) -> usize {
+        let (mut lo, mut hi) = (0, self.message_count(conversation));
+        while lo < hi {
+            let mid = (lo + hi) / 2;
+            match self.message(conversation, mid) {
+                Some(m) if m.ts < ts => lo = mid + 1,
+                _ => hi = mid,
+            }
+        }
+        lo
+    }
+
     /// Reply `index` of the thread under message `parent` of `conversation`, oldest first.
     pub fn reply(&self, conversation: &ConversationId, parent: usize, index: u32) -> Option<Message> {
         let plan = self.plans.get(conversation)?;
@@ -278,6 +358,7 @@ impl World {
             id: ws.clone(),
             name: spec.name.into(),
             color: WorkspaceColor(n as u8),
+            me: UserId::new(format!("UDEMO{}000", &spec.id[5..])),
         });
         let user = |id: String, name: &str, display: &str, org: Org, bot: bool| User {
             id: UserId::new(id),

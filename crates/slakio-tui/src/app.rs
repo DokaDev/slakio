@@ -106,6 +106,8 @@ impl App {
                 true
             }
             BackendEvent::Booted(_) => false,
+            // Nothing asks for history yet.
+            BackendEvent::History(_) => false,
         }
     }
 

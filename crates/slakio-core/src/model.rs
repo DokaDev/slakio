@@ -63,6 +63,8 @@ pub struct Workspace {
     pub id: WorkspaceId,
     pub name: Remote,
     pub color: WorkspaceColor,
+    /// The user's own account in it.
+    pub me: UserId,
 }
 
 /// Which organization a person belongs to, seen from the workspace that lists them.
@@ -188,7 +190,30 @@ pub struct Message {
 /// What a pane shows, named by ids only so a saved layout restores with any backend.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Target {
-    Conversation { workspace: WorkspaceId, conversation: ConversationId },
+    Conversation {
+        workspace: WorkspaceId,
+        conversation: ConversationId,
+    },
+    /// The thread under message `thread` of a conversation: that message, then its replies.
+    Thread {
+        workspace: WorkspaceId,
+        conversation: ConversationId,
+        thread: Ts,
+    },
+}
+
+impl Target {
+    pub fn workspace(&self) -> &WorkspaceId {
+        match self {
+            Target::Conversation { workspace, .. } | Target::Thread { workspace, .. } => workspace,
+        }
+    }
+
+    pub fn conversation(&self) -> &ConversationId {
+        match self {
+            Target::Conversation { conversation, .. } | Target::Thread { conversation, .. } => conversation,
+        }
+    }
 }
 
 #[cfg(test)]
