@@ -25,7 +25,7 @@ mod work;
 use crate::app::App;
 use crate::app::shell::{Region, View};
 use crate::screen;
-use crate::text::{clip, width};
+use crate::text::clip;
 use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -58,6 +58,7 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
     }
     statusline::draw(f, app, status, now);
     if app.which_key_visible(now) && app.help.is_none() && app.dialog.is_none() {
+        app.theme.dim_area(f.buffer_mut(), body);
         guide::draw(f, app, body);
     }
     if app.help.is_some() {
@@ -95,12 +96,13 @@ fn modal(f: &mut Frame, app: &App, rect: Rect, title: &str, footer: &str) -> Rec
     f.buffer_mut().set_style(rect, t.surface());
     let w = usize::from(rect.width);
     let title = clip(&format!(" {title} "), w.saturating_sub(4));
-    let footer = clip(&format!(" {footer} "), w.saturating_sub(4));
+    // Cut once, to what fits between the corners and a dash on each side.
+    let footer = if footer.is_empty() { String::new() } else { clip(&format!(" {footer} "), w.saturating_sub(4)) };
     let mut block = Block::bordered()
         .border_set(border::ROUNDED)
         .border_style(t.border(true))
         .title(Line::from(Span::styled(title, t.bold())));
-    if width(&footer) + 6 <= w {
+    if !footer.is_empty() {
         block = block.title_bottom(Line::from(Span::styled(footer, t.muted())).right_aligned());
     }
     f.render_widget(block, rect);

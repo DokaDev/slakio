@@ -25,4 +25,4 @@ expression: "screen(&app, 80, 24, now)"
 
 
 
- NORMAL                                       Ctrl+Q quit · ? help · : commands
+ NORMAL                                     │ Ctrl+Q quit · ? help · : commands

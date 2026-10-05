@@ -7,7 +7,7 @@
 //! collapsed   expanded
 //! ╭──╮        ╭───────────────────╮
 //! │▌A│        │▌A company      3  │   3 = a pill of mentions; ● = unread
-//! │●B│        │▌B side         ●  │   collapsed, ● in the stripe's place = unread
+//! │▌B│        │▌B side         ●  │   collapsed, an unread workspace's letter is bold
 //! │──│        │───────────────────│
 //! │H │        │▎H  Home           │   ▎ and the accent = what the list panel shows
 //! │D●│        │ D  DMs       16   │
@@ -65,10 +65,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
                         _ => (left, String::new(), style),
                     }
                 } else {
-                    // Collapsed there is no room for a dot: an unread workspace's stripe is one.
-                    let stripe = if unread || mentions > 0 { "●" } else { "▌" };
+                    // Collapsed: the stripe in the workspace's color; an unread workspace's
+                    // letter is bold, a read one muted (no dot: no room, and no mention red).
+                    let letter = match (w == app.shell.workspace, unread || mentions > 0) {
+                        (true, _) => t.current(),
+                        (false, true) => t.bold(),
+                        (false, false) => t.muted(),
+                    };
                     let left =
-                        vec![Span::styled(stripe, t.workspace(ws.color)), Span::styled(workspace_letter(&name), style)];
+                        vec![Span::styled("▌", t.workspace(ws.color)), Span::styled(workspace_letter(&name), letter)];
                     (left, String::new(), style)
                 }
             }

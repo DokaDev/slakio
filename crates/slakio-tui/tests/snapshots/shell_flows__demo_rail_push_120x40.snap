@@ -41,4 +41,4 @@ expression: push.snap()
 │                   ││   # feed-latency-144   ││                                                                       │
 │                   ││   # feed-meeting-82    ││                                                                       │
 ╰───────────────────╯╰────────────────────────╯╰───────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home                  Enter show · j/k move · Esc back · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home                │ Enter show · j/k move · Esc back · ? help · Space more │  @37  DM 16 │ demo

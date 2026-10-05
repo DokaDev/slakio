@@ -182,9 +182,9 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
 /// `── label ──` across `w` cells.
 fn rule(label: &str, w: usize, style: ratatui::style::Style) -> Line<'static> {
     let label = format!(" {label} ");
-    let side = w.saturating_sub(width(&label)) / 2;
-    let line = "─".repeat(side);
-    Line::styled(format!("{line}{label}{line}"), style)
+    let left = w.saturating_sub(width(&label)) / 2;
+    let right = w.saturating_sub(width(&label) + left);
+    Line::styled(format!("{}{label}{}", "─".repeat(left), "─".repeat(right)), style)
 }
 
 /// "No replies yet · i reply", with the key bound.

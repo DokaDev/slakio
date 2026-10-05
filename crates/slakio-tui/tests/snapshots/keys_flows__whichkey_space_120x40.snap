@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
 ╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│●A││ ▾ Favorites            ││                                                                                        │
-│●B││   # backend            ││                                                                                        │
+│▌A││ ▾ Favorites            ││                                                                                        │
+│▌B││   # backend            ││                                                                                        │
 │──││   # incidents       3  ││                                                                                        │
 │H ││                        ││                                                                                        │
 │D●││ ▾ Ops                  ││                                                                                        │
@@ -41,4 +41,4 @@ expression: s
 │ f  Show Files                          ]  Forward again                                                              │
 │ l  Show Later                          ?  Keyboard help                                                              │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
- NORMAL  ▌A company › Home  Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo

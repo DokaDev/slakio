@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│●A││ @ Kim                  ││                                                                                        │
-│●B││ @ Park                 ││                                                                                        │
+│▌A││ @ Kim                  ││                                                                                        │
+│▌B││ @ Park                 ││                                                                                        │
 │──││ @ Lee                  ││                                                                                        │
 │H ││ @ Minsu                ││                                                                                        │
 │D●││ @ Jiwon                ││                                                                                        │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││                        ││                                                                                        │
 │  ││                        ││                                                                                        │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › DMs       Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 1 │ demo
+ NORMAL  ▌B side › DMs     │ Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 1 │ demo

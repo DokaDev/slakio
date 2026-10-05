@@ -11,7 +11,7 @@
 use super::modal;
 use crate::app::App;
 use crate::app::dialog::Question;
-use crate::text::{clip, wrap};
+use crate::text::wrap;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Modifier;
@@ -39,6 +39,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     if d.question == Question::Icons {
         lines.push(Line::default());
         lines.push(Line::styled(PREVIEW, t.bold()).alignment(Alignment::Center));
+        lines.push(Line::default());
+        let later = app.i18n.label(Label::DialogIconsLater);
+        lines.extend(wrap(&later, inner_w, 3).0.into_iter().map(|l| Line::styled(l, t.muted())));
     }
     lines.push(Line::default());
     let button = |label: &str, focused: bool| {
@@ -51,7 +54,6 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let h = (lines.len() as u16 + 2).min(area.height);
     let rect = Rect::new(area.x + (area.width - w) / 2, area.y + area.height.saturating_sub(h) / 2, w, h);
     let footer = app.i18n.msg(&Msg::DialogKeys { no: no.clone(), yes: yes.clone() }).to_string();
-    let footer = clip(&footer, usize::from(w).saturating_sub(6));
     let inner = modal(f, app, rect, &app.i18n.label(title), &footer);
     let inner = Rect { x: inner.x + 1, width: inner.width.saturating_sub(2), ..inner };
     f.render_widget(Paragraph::new(lines), inner);

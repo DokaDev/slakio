@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ────────────────────────────╮╭ ▌#backend ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│●A││ ▾ Favorites                      ││ Ben Yu        Today retry design please branch still design index production maybe rollback we invoice                                                 02:54 │
-│●B││▎  # backend                      ││               :+1: 2  :tada: 4  :eyes: 2                                                                                                                     │
+│▌A││ ▾ Favorites                      ││ Ben Yu        Today retry design please branch still design index production maybe rollback we invoice                                                 02:54 │
+│▌B││▎  # backend                      ││               :+1: 2  :tada: 4  :eyes: 2                                                                                                                     │
 │──││   # incidents                 3  ││ Kate Nam      Confirmed                                                                                                                                02:55 │
 │H ││                                  ││ Dana Yoon     Tracing we branch is fine invoice today branch roadmap deploy customer alert deploy                                                      03:05 │
 │D●││ ▾ Ops                            ││ Lily Jeon     Meeting merge roadmap cache deploy for timeout latency (edited)                                                                          03:08 │
@@ -51,4 +51,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-retry-63                │├─ Message #backend ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ││   # feed-review-152              ││ › Press i to write                                                                                                                                           │
 ╰──╯╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #backend                                                                               i write · k messages · Esc list · Tab next pane · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend                                                                             │ i write · k messages · Esc list · Tab next pane · ? help · Space more │  @37  DM 16 │ demo

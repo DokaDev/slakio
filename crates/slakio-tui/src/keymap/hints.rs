@@ -15,6 +15,8 @@ pub enum Place {
     ListConversation,
     /// The list panel on a section header.
     ListSection,
+    /// The list panel with nothing to list (a view of a later version).
+    ListEmpty,
     Rail,
     /// The work area with nothing open.
     WorkEmpty,
@@ -70,6 +72,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
+        Place::ListEmpty => &[One(NEXT_PANE, Label::HintNextPane), One(HELP, Label::HintHelp), Leader(Label::HintMore)],
         Place::Rail => &[
             One(Action::Shell(ShellAction::RailSelect), Label::HintShow),
             Pair(Action::Shell(ShellAction::RailNext), Action::Shell(ShellAction::RailPrev), Label::HintMove),
@@ -158,6 +161,7 @@ mod tests {
             (Place::Welcome, Ctx::Root),
             (Place::ListConversation, Ctx::List),
             (Place::ListSection, Ctx::List),
+            (Place::ListEmpty, Ctx::List),
             (Place::Rail, Ctx::Rail),
             (Place::WorkEmpty, Ctx::PaneNormal),
             (Place::Pane, Ctx::PaneNormal),

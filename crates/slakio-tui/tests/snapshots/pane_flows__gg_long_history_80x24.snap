@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#deploys ─────────────────────────────────────╮
-│●A││ ▾ Favorites            ││ ───────────────── 2026-01-05 ───────────────── │
-│●B││   # backend            ││ Kate Nam · 10:21                               │
+│▌A││ ▾ Favorites            ││ ───────────────── 2026-01-05 ───────────────── │
+│▌B││   # backend            ││ Kate Nam · 10:21                               │
 │──││   # incidents       3  ││   Staging customer again cache maybe waiting   │
 │H ││                        ││   timeout draft after                          │
 │D●││ ▾ Ops                  ││   ⤷ 9 replies · last 10:30                     │
@@ -25,4 +25,4 @@ expression: mask_hangul(&d.screen())
 │  ││   # feed-build-50      │├─ Message #deploys ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌ #deploys       Enter thread · y copy · V select │  @37  DM 16 │ demo
+ NORMAL  ▌#deploys        │ Enter thread · y copy · ? help │  @37  DM 16 │ demo

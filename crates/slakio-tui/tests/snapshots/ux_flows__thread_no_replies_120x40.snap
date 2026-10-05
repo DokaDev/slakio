@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/ux_flows.rs
 expression: "demo::mask_hangul(&s)"
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮╭ ▌⤷ Thread · #backend ────────────╮
-│●A││ ▾ Favorites            ││ ＊＊＊ · 05:48                                     ││ ────────── 2026-01-06 ────────── │
-│●B││▎  # backend            ││   see https://docs.example.com/runbooks/latency    ││ Alex Morgan · 07:14              │
+│▌A││ ▾ Favorites            ││ ＊＊＊ · 05:48                                     ││ ────────── 2026-01-06 ────────── │
+│▌B││▎  # backend            ││   see https://docs.example.com/runbooks/latency    ││ Alex Morgan · 07:14              │
 │──││   # incidents       3  ││ Park · 05:51                                       ││   Meeting moved to 3pm           │
 │H ││                        ││   Meeting for staging please someone someone on    ││ No replies yet · i reply         │
 │D●││ ▾ Ops                  ││   maybe timeout retry a we design can sprint       ││                                  │
@@ -41,4 +41,4 @@ expression: "demo::mask_hangul(&s)"
 │  ││   # feed-latency-144   │├─ Message #backend ─────────────────────────────────┤├─ Reply ──────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                 ││ › Press i to reply               │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
- NORMAL  ▌A company › #backend › ⤷ Thread  i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌#backend › ⤷ Thread            │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo

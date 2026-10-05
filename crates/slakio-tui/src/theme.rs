@@ -302,9 +302,11 @@ impl Theme {
         Style::new().fg(self.workspaces[usize::from(c.0) % self.workspaces.len()])
     }
 
-    /// Paint `how` over the row `row` already drawn. Its first cell is the gutter: where the
-    /// theme has no background for `how`, a bar there marks the row. Text the background would
-    /// hide (gray on a gray bar) takes the body color; bold and the pill colors stay.
+    /// Paint `how` over the row `row` already drawn, whatever it is drawn on (the app's
+    /// background, a popup's surface). Its first cell is the gutter: where the theme has no
+    /// background for `how`, a bar there marks the row. Muted and faint text, and text the bar
+    /// would hide, take the body color so it stays readable on the bar; bold and the pills (a
+    /// background of the error color) stay.
     pub fn paint_selection(&self, buf: &mut Buffer, row: Rect, how: Selection) {
         let row = row.intersection(buf.area);
         if row.is_empty() {
@@ -326,12 +328,13 @@ impl Theme {
         if let Some(bg) = bg {
             for x in row.left()..row.right() {
                 let cell = &mut buf[(x, row.y)];
-                // A cell with a background of its own (a badge) keeps it.
-                if cell.bg == Color::Reset || cell.bg == self.bg {
-                    cell.bg = bg;
-                    if cell.fg == bg {
-                        cell.fg = self.fg;
-                    }
+                // A pill keeps its background.
+                if cell.bg == self.error && self.error != Color::Reset {
+                    continue;
+                }
+                cell.bg = bg;
+                if cell.fg == bg || cell.fg == self.fg_dim || cell.fg == self.fg_muted || cell.fg == self.border {
+                    cell.fg = self.fg;
                 }
             }
         }

@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/ux_flows.rs
 expression: d.snap()
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
-│●A││ ▾ Favorites            ││               ```                                                                      │
-│●B││▎  # backend            ││               ⤷ 8 replies · last 04:16                                                 │
+│▌A││ ▾ Favorites            ││               ```                                                                      │
+│▌B││▎  # backend            ││               ⤷ 8 replies · last 04:16                                                 │
 │──││   # incidents       3  ││ ＊＊＊        Ok, monitoring                                                     04:17 │
 │H ││                        ││ Ava Shin      On budget still the tracing design roadmap                         04:23 │
 │D●││ ▾ Ops                  ││ Mia Jang      Sprint fine timeout for merge for check rollback budget alert      04:31 │
@@ -41,4 +41,4 @@ expression: d.snap()
 │  ││   # feed-latency-144   │├─ Message #backend ─────────────────────────────────────────────────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                                                     │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌ #backend          i write · k messages · Esc list · Tab next pane · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌#backend         │ i write · k messages · Esc list · Tab next pane · ? help · Space more │  @37  DM 16 │ demo

@@ -41,7 +41,8 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::Rail => Place::Rail,
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_)) => Place::ListSection,
-            _ => Place::ListConversation,
+            Some(_) => Place::ListConversation,
+            None => Place::ListEmpty,
         },
         Ctx::ComposerInsert => Place::Insert,
         Ctx::PaneVisual => Place::Visual,
@@ -75,12 +76,14 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let sep = || Span::styled(" │ ", t.divider());
 
     // The hints, best first.
-    let mut hints: Vec<(String, String)> = place(app)
+    // The which-key popup lists the keys itself.
+    let resolved: Vec<(String, Label)> = place(app)
+        .filter(|_| !app.which_key_visible(now))
         .map(|(p, ctx)| hints::resolve(&app.keymap, p, ctx))
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(k, l)| (k, app.i18n.label(l).to_string()))
-        .collect();
+        .unwrap_or_default();
+    let all_hints: Vec<(String, String)> =
+        resolved.iter().map(|(k, l)| (k.clone(), app.i18n.label(*l).to_string())).collect();
+    let mut hints = all_hints.clone();
     let hint_spans = |hints: &[(String, String)]| -> Spans {
         let mut out = Vec::new();
         for (i, (k, l)) in hints.iter().enumerate() {
@@ -144,7 +147,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             out.push(Span::styled(n.clone(), t.text()));
         }
         if let Some(p) = place_text {
-            let lead = if ws_name.is_some() { " › " } else { " " };
+            let lead = match (ws_name.is_some(), stripe.is_some()) {
+                (true, _) => " › ",
+                // The stripe alone stands right before the place.
+                (false, true) => "",
+                (false, false) => " ",
+            };
             out.push(Span::styled(lead, t.faint()));
             out.push(Span::styled(p.clone(), t.text()));
         }
@@ -189,6 +197,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             }
             out.push(Span::styled(d.clone(), t.warm()));
         }
+        // Apart from the place (and a notice) on the left.
+        if !out.is_empty() {
+            out.insert(0, sep());
+        }
         out.push(Span::raw(" "));
         out
     };
@@ -201,8 +213,24 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     if need(&ws_name, &place_text, &hints, mentions, dms) > w {
         ws_name = None;
     }
-    while !hints.is_empty() && need(&ws_name, &place_text, &hints, mentions, dms) > w {
-        hints.pop();
+    // Hints by worth: help and the leader key go last; a hint that does not fit is skipped and
+    // a later, shorter one tried; the line keeps their order.
+    if need(&ws_name, &place_text, &hints, mentions, dms) > w {
+        let pinned = |l: Label| matches!(l, Label::HintHelp | Label::HintMore);
+        let order: Vec<usize> = (0..resolved.len())
+            .filter(|&i| pinned(resolved[i].1))
+            .chain((0..resolved.len()).filter(|&i| !pinned(resolved[i].1)))
+            .collect();
+        let mut chosen: Vec<usize> = Vec::new();
+        for i in order {
+            chosen.push(i);
+            chosen.sort_unstable();
+            let pick: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
+            if need(&ws_name, &place_text, &pick, mentions, dms) > w {
+                chosen.retain(|&j| j != i);
+            }
+        }
+        hints = chosen.iter().map(|&j| all_hints[j].clone()).collect();
     }
     if let Some(p) = place_text.as_mut() {
         let over = need(&ws_name, &Some(p.clone()), &hints, mentions, dms).saturating_sub(w);

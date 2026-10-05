@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│●A││ ▾ Favorites            ││                                                │
-│●B││   # backend            ││                                                │
+│▌A││ ▾ Favorites            ││                                                │
+│▌B││   # backend            ││                                                │
 │──││   # incidents       3  ││                                                │
 │H ││                        ││                                                │
 │D●││ ▾ Ops                  ││                                                │
@@ -25,4 +25,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-build-50      ││                                                │
 │  ││   # feed-cache-119     ││                                                │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌ Home        Enter open · l peek · Tab next pane │  @37  DM 16 │ demo
+ NORMAL  ▌Home          │ Enter open · ? help · Space more │  @37  DM 16 │ demo

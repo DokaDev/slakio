@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#long-threads ────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────╮
-│●A││ ▾ Favorites            ││▎─────────────────── 2026-01-06 ─────────────────── ││   Latency today design draft     │
-│●B││   # backend            ││▎Minsu · 07:23                                      ││   metrics done build build       │
+│▌A││ ▾ Favorites            ││▎─────────────────── 2026-01-06 ─────────────────── ││   Latency today design draft     │
+│▌B││   # backend            ││▎Minsu · 07:23                                      ││   metrics done build build       │
 │──││   # incidents       3  ││▎  We waiting waiting now index a the a the release ││ Dan Cho · 03:14                  │
 │H ││                        ││▎  ⤷ 1,200 replies · last 03:23                     ││   Starting deploy                │
 │D●││ ▾ Ops                  ││ Dan Cho · 07:30                                    ││ Chris Park · 03:15               │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-latency-144   │├─ Message #long-threads ────────────────────────────┤├─ Reply ──────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                 ││ › Press i to reply               │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
- NORMAL  ▌ #long-threads › ⤷ Thread        i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌#long-threads › ⤷ Thread       │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo

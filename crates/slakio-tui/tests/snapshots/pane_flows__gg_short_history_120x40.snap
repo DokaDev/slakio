@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#feed-ticket-104 ─────────────────────────────────────────────────────────────────────╮
-│●A││   # design-review      ││                                                                                        │
-│●B││   # feed-alert-134     ││                                                                                        │
+│▌A││   # design-review      ││                                                                                        │
+│▌B││   # feed-alert-134     ││                                                                                        │
 │──││   # feed-alert-8       ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
 │H ││   # feed-budget-162    ││ ＊＊＊        Suspect the DB pool                                                09:28 │
 │D●││   # feed-budget-33     ││               :white_check_mark: 2                                                     │
@@ -41,4 +41,4 @@ expression: mask_hangul(&d.screen())
 │  ││   # feed-staging-91    │├─ Message #feed-ticket-104 ─────────────────────────────────────────────────────────────┤
 │  ││▎  # feed-ticket-104    ││ › Press i to write                                                                     │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌ #feed-ticket-104     Enter thread · y copy · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌#feed-ticket-104    │ Enter thread · y copy · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo

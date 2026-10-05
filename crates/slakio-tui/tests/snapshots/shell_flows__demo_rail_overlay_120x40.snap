@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │                   │y-144   ││                                                                                        │
 │                   │g-82    ││                                                                                        │
 ╰───────────────────╯────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home                  Enter show · j/k move · Esc back · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home                │ Enter show · j/k move · Esc back · ? help · Space more │  @37  DM 16 │ demo

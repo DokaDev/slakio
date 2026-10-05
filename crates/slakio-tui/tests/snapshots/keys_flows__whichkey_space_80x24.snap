@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: d.snap()
 ---
 ╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│●A││ ▾ Favorites            ││                                                │
-│●B││   # backend            ││                                                │
+│▌A││ ▾ Favorites            ││                                                │
+│▌B││   # backend            ││                                                │
 │──││   # incidents       3  ││                                                │
 │H ││                        ││                                                │
 │D●││ ▾ Ops                  ││                                                │
@@ -25,4 +25,4 @@ expression: d.snap()
 │ e  Show or hide the list panel         w  +Window                            │
 │ W  Switch workspace                                                          │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
- NORMAL  ▌ Home        Enter open · l peek · Tab next pane │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home                                 │  @37  DM 16 │ demo

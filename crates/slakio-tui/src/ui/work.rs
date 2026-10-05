@@ -75,11 +75,13 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
     let w = usize::from(area.width);
     let label = clip(&format!(" {label} "), w.saturating_sub(5));
     let rule = "─".repeat(w.saturating_sub(3 + width(&label)));
+    // One color, the pane's border's, so the tees join it.
+    let style = t.border(focused);
     let line = Line::from(vec![
-        Span::styled("├─", t.border(focused)),
-        Span::styled(label, if insert { t.bold() } else { t.muted() }),
-        Span::styled(rule, t.border(insert)),
-        Span::styled("┤", t.border(focused)),
+        Span::styled("├─", style),
+        Span::styled(label, style),
+        Span::styled(rule, style),
+        Span::styled("┤", style),
     ]);
     f.render_widget(Paragraph::new(line), Rect { y: divider, height: 1, ..area });
     let input = parts.input;

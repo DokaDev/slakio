@@ -23,7 +23,7 @@ fn the_demo_opens_on_home_of_the_first_workspace_at_three_sizes() {
         let s = d.screen();
         assert!(s.contains("Favorites") && s.contains("# backend"), "{s}");
         // A narrow status line keeps the workspace's stripe and drops its name first.
-        assert_eq!(d.status_line().contains("A company"), w >= 120, "{}", d.status_line());
+        assert_eq!(d.status_line().contains("A company"), w >= 200, "{}", d.status_line());
         assert!(d.status_line().contains("demo"), "the status line says the data is invented");
         insta::assert_snapshot!(format!("demo_home_{w}x{h}"), mask_hangul(&s));
     }

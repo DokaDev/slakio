@@ -4,10 +4,10 @@ expression: screen_styled(&d)
 ---
 ╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..4] [acc 4..5] [ B 5..11] [acc 11..30] [bdr 30..120]
-│●A││ ▾ Favorites            ││                                                                                        │
+│▌A││ ▾ Favorites            ││                                                                                        │
     [bdr 0..1] [ws 1..2] [acc B 2..3] [bdr 3..4] [acc 4..5] [dim 6..7] [mut B 8..17] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│●B││   # backend            ││                                                                                        │
-    [bdr 0..1] [ws 1..2] [bdr 3..4] [acc 4..5] [/sel 5..8] [mut/sel 8..9] [/sel 9..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│▌B││   # backend            ││                                                                                        │
+    [bdr 0..1] [ws 1..2] [ B 2..3] [bdr 3..4] [acc 4..5] [/sel 5..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │──││   # incidents       3  ││                                                                                        │
     [bdr 0..4] [acc 4..5] [ B 8..9] [ B 10..19] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │H ││                        ││                                                                                        │
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [bdr 3..4] [acc 4..5] [mut 8..9] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
     [bdr 0..4] [acc 4..30] [bdr 30..120]
- NORMAL  ▌A company › Home  Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..28] [/surf B 28..33] [mut/surf 33..38] [dim/surf 38..41] [/surf B 41..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..53] [mut/surf 53..63] [dim/surf 63..66] [/surf B 66..67] [mut/surf 67..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌Home            │ Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 16 │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..25] [bdr/surf 25..28] [/surf B 28..33] [mut/surf 33..38] [dim/surf 38..41] [/surf B 41..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..53] [mut/surf 53..63] [dim/surf 63..66] [/surf B 66..67] [mut/surf 67..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

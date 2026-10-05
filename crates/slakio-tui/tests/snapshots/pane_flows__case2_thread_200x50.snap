@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ────────────────────────────╮╭ ▌#long-threads ──────────────────────────────────────────────────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────────────────────────────╮
-│●A││ ▾ Favorites                      ││▎────────────────────────────────────────── 2026-01-06 ────────────────────────────────────────── ││               release staging queue on broken            │
-│●B││   # backend                      ││▎Minsu         We waiting waiting now index a the a the release                             07:23 ││               lunch production index timeout draft       │
+│▌A││ ▾ Favorites                      ││▎────────────────────────────────────────── 2026-01-06 ────────────────────────────────────────── ││               release staging queue on broken            │
+│▌B││   # backend                      ││▎Minsu         We waiting waiting now index a the a the release                             07:23 ││               lunch production index timeout draft       │
 │──││   # incidents                 3  ││▎              ⤷ 1,200 replies · last 03:23                                                       ││               latency                                    │
 │H ││                                  ││ Dan Cho       Still index lunch index                                                      07:30 ││ Sam Rivera    Someone still tracing a after        03:03 │
 │D●││ ▾ Ops                            ││               ⤷ 6 replies · last 07:36                                                           ││               someone branch pager                       │
@@ -51,4 +51,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-retry-63                │├─ Message #long-threads ──────────────────────────────────────────────────────────────────────────┤├─ Reply ──────────────────────────────────────────────────┤
 │  ││   # feed-review-152              ││ › Press i to write                                                                               ││ › Press i to reply                                       │
 ╰──╯╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #long-threads › ⤷ Thread                                                                             i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #long-threads › ⤷ Thread                                                                           │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo

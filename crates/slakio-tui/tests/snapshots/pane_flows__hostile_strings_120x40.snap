@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────╮
-│●A││ ▾ Favorites            ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
-│●B││   # backend            ││ Park          beforeafter                                                        13:43 │
+│▌A││ ▾ Favorites            ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
+│▌B││   # backend            ││ Park          beforeafter                                                        13:43 │
 │──││   # incidents       3  ││               :blink: 2                                                                │
 │H ││                        ││ Park          abc                                                                14:04 │
 │D●││ ▾ Ops                  ││ Minsu         red blinking and truecolor                                         14:19 │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-latency-144   │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                                                     │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌ #hostile-strings     Enter thread · y copy · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌#hostile-strings    │ Enter thread · y copy · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo

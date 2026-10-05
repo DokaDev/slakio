@@ -3,8 +3,8 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────╮
-│●A││ ▾ Favorites            ││   Check a customer should maybe                │
-│●B││▎  # backend            ││ Mia Jang · 06:35                               │
+│▌A││ ▾ Favorites            ││   Check a customer should maybe                │
+│▌B││▎  # backend            ││ Mia Jang · 06:35                               │
 │──││   # incidents       3  ││   Budget metrics merge design rollback alert   │
 │H ││                        ││   alert should draft after alert on staging    │
 │D●││ ▾ Ops                  ││   tomorrow                                     │
@@ -25,4 +25,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌ #backend        i write · k messages · Esc list │  @37  DM 16 │ demo
+ NORMAL  ▌#backend         │ i write · ? help · Space more │  @37  DM 16 │ demo
