@@ -23,7 +23,10 @@
 //!   variation selector stays after a character);
 //! * private use code points (the icon fonts the UI itself draws with) and noncharacters become
 //!   `U+FFFD`, so remote text cannot pass for the UI's own icons;
-//! * at most [`MAX_MARKS`] combining marks follow a character;
+//! * soft hyphens, Hangul fillers and the object replacement character, which draw as nothing
+//!   or pass for blank names, are removed;
+//! * at most [`MAX_MARKS`] combining marks follow a character (Latin, Hebrew and Arabic marks
+//!   alike);
 //! * a line keeps at most [`LINE_MAX_CHARS`] characters and a block [`BLOCK_MAX_CHARS`]; what is
 //!   cut ends with `…`. Only the first [`LINE_MAX_INPUT_BYTES`] or [`BLOCK_MAX_INPUT_BYTES`] of
 //!   the input are read at all, and the work is linear in them: a hostile text cannot make the
@@ -177,12 +180,15 @@ fn is_control(c: char) -> bool {
 }
 
 /// Removed without a trace: bidi controls, zero-width and invisible formatting characters, tag
-/// characters, variation selector supplements. The zero-width joiner and the variation
-/// selectors are judged by their neighbours instead.
+/// characters, variation selector supplements, and the characters that draw as nothing or pass
+/// for a blank name (soft hyphen, Hangul fillers, object replacement). The zero-width joiner and
+/// the variation selectors are judged by their neighbours instead.
 fn is_invisible(c: char) -> bool {
     matches!(
         c,
-        '\u{061C}'                       // Arabic letter mark
+        '\u{00AD}'                       // soft hyphen
+        | '\u{061C}'                     // Arabic letter mark
+        | '\u{115F}' | '\u{1160}'        // Hangul choseong and jungseong fillers
         | '\u{180E}'                     // Mongolian vowel separator
         | '\u{200B}'                     // zero-width space
         | '\u{200C}'                     // zero-width non-joiner
@@ -190,9 +196,11 @@ fn is_invisible(c: char) -> bool {
         | '\u{202A}'..='\u{202E}'        // bidi embeddings and overrides
         | '\u{2060}'..='\u{2064}'        // word joiner, invisible operators
         | '\u{2066}'..='\u{2069}'        // bidi isolates
+        | '\u{3164}'                     // Hangul filler
         | '\u{206A}'..='\u{206F}'        // deprecated format characters
         | '\u{FEFF}'                     // byte order mark
-        | '\u{FFF9}'..='\u{FFFB}'        // interlinear annotation
+        | '\u{FFA0}'                     // halfwidth Hangul filler
+        | '\u{FFF9}'..='\u{FFFC}'        // interlinear annotation, object replacement
         | '\u{E0000}'..='\u{E007F}'      // tag characters
         | '\u{E0100}'..='\u{E01EF}' // variation selector supplement
     )
@@ -204,11 +212,28 @@ fn is_unsafe_glyph(c: char) -> bool {
         || (c as u32) & 0xFFFE == 0xFFFE
 }
 
-/// Combining marks (the blocks a "zalgo" flood uses).
+/// Combining marks (the blocks a "zalgo" flood uses, and Hebrew and Arabic points and
+/// cantillation marks, which stack the same way).
 fn is_mark(c: char) -> bool {
     matches!(
         c,
-        '\u{0300}'..='\u{036F}' | '\u{1AB0}'..='\u{1AFF}' | '\u{1DC0}'..='\u{1DFF}' | '\u{20D0}'..='\u{20FF}' | '\u{FE20}'..='\u{FE2F}'
+        '\u{0300}'..='\u{036F}'
+            | '\u{0591}'..='\u{05BD}'
+            | '\u{05BF}'
+            | '\u{05C1}'..='\u{05C2}'
+            | '\u{05C4}'..='\u{05C5}'
+            | '\u{05C7}'
+            | '\u{0610}'..='\u{061A}'
+            | '\u{064B}'..='\u{065F}'
+            | '\u{0670}'
+            | '\u{06D6}'..='\u{06DC}'
+            | '\u{06DF}'..='\u{06E4}'
+            | '\u{06E7}'..='\u{06E8}'
+            | '\u{06EA}'..='\u{06ED}'
+            | '\u{1AB0}'..='\u{1AFF}'
+            | '\u{1DC0}'..='\u{1DFF}'
+            | '\u{20D0}'..='\u{20FF}'
+            | '\u{FE20}'..='\u{FE2F}'
     )
 }
 

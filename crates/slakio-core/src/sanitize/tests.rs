@@ -138,6 +138,25 @@ fn long_text_is_cut_with_an_ellipsis() {
     assert_eq!(line(&exact), exact);
 }
 
+#[test]
+fn invisible_and_blank_looking_characters_go() {
+    // Soft hyphen, the Hangul fillers (a "blank" name), the object replacement character.
+    assert_eq!(line("in\u{AD}voice"), "invoice");
+    assert_eq!(line("\u{3164}\u{115F}\u{1160}\u{FFA0}"), "");
+    assert_eq!(line("a\u{3164}b\u{FFFC}c"), "abc");
+    assert_eq!(block("x\u{FFFC}\ny\u{AD}"), "x\ny");
+}
+
+#[test]
+fn hebrew_and_arabic_mark_floods_are_cut_to_two_marks() {
+    let hebrew = format!("\u{05D0}{}", "\u{05B8}\u{0591}".repeat(200));
+    assert_eq!(line(&hebrew), "\u{05D0}\u{05B8}\u{0591}");
+    let arabic = format!("\u{0628}{}", "\u{064E}\u{0651}\u{0670}\u{06E1}".repeat(100));
+    assert_eq!(line(&arabic), "\u{0628}\u{064E}\u{0651}");
+    // Ordinary pointed text keeps its marks.
+    assert_eq!(line("\u{0628}\u{064E}\u{0651}\u{0627}"), "\u{0628}\u{064E}\u{0651}\u{0627}");
+}
+
 /// Texts made to be slow: every introducer unterminated, sequences that almost end, floods.
 fn adversarial(n: usize) -> Vec<String> {
     vec![
@@ -207,6 +226,7 @@ fn hostile_char() -> impl Strategy<Value = char> {
             '\u{9b}', '\u{9c}', '\u{9d}', '\u{90}', '\u{9f}', '\r', '\n', '\t', '\0', '\x7f', '\u{85}',
             '\u{202E}', '\u{2066}', '\u{200B}', '\u{200D}', '\u{FEFF}', '\u{0301}', '\u{FE0F}', '\u{FE0E}',
             '\u{E0041}', '\u{E000}', '\u{FFFE}', '\u{2028}', '\u{1F469}', '\u{1F4BB}', '\u{2764}', '\u{D55C}', 'a', ' ',
+            '\u{AD}', '\u{3164}', '\u{115F}', '\u{FFFC}', '\u{05B8}', '\u{0591}', '\u{064E}', '\u{0651}',
         ]),
         1 => any::<char>(),
     ]
