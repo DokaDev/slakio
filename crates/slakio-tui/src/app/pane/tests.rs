@@ -73,6 +73,28 @@ fn gg_keeps_loading_until_the_oldest_message_is_selected() {
 }
 
 #[test]
+fn gg_selects_the_oldest_loaded_until_a_move_cancels_it() {
+    // Every way the selection changes keeps `to_oldest` true only on the oldest loaded message,
+    // which is why `wants` needs no case of its own for it.
+    let mut p = Pane::new(target());
+    let (pg, shown) = page(500, 600, false);
+    p.add_page(&pg, shown);
+    p.select_oldest();
+    for _ in 0..3 {
+        assert_eq!((p.to_oldest, p.selected), (true, Some(0)));
+        let first = p.items[0].ts.0;
+        let (pg, shown) = page(first - 100, first, false);
+        p.add_page(&pg, shown);
+    }
+    p.step(1);
+    assert!(!p.to_oldest && p.selected == Some(1));
+    p.select_oldest();
+    p.select_newest();
+    assert!(!p.to_oldest && p.selected == Some(p.items.len() - 1));
+    assert_eq!(p.wants(), None, "the newest selected, far from the top");
+}
+
+#[test]
 fn steps_stop_at_the_ends_and_the_range_is_ordered() {
     let mut p = Pane::new(target());
     p.step(1);

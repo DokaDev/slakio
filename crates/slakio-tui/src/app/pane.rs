@@ -5,7 +5,9 @@
 //!
 //! The view is anchored at the bottom: `bottom` is the message on the last row, or the newest
 //! while nothing is selected (so new messages stay in view). Drawing moves `bottom` to keep the
-//! selection on screen; it is a `Cell` because only drawing knows the rows' heights.
+//! selection on screen; it is a `Cell` because only drawing knows the rows' heights. At the top
+//! of a history longer than the screen (`gg`), the oldest message is on the first row and newer
+//! ones below `bottom` fill what is left; a history that fits whole sits at the bottom.
 
 use super::composer::Composer;
 use slakio_core::backend::{Generation, Page};
@@ -109,14 +111,15 @@ impl Pane {
     }
 
     /// The page to ask for next, if one is wanted: the newest first, then older ones when the
-    /// selection nears the top or `gg` waits for the oldest.
+    /// selection nears the top. `gg` waiting for the oldest needs no case of its own: it keeps
+    /// the oldest loaded message selected, which is near the top.
     pub fn wants(&self) -> Option<Option<Ts>> {
         if self.pending.is_some() || self.complete {
             return None;
         }
         let Some(first) = self.items.first() else { return Some(None) };
         let near_top = self.selected.is_some_and(|s| s < PREFETCH);
-        (near_top || self.to_oldest).then_some(Some(first.ts))
+        near_top.then_some(Some(first.ts))
     }
 
     /// A page arrived (already sanitised): put it before what is loaded.
