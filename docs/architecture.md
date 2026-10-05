@@ -47,9 +47,10 @@ notices (`app/status.rs`), the shell — focus between rail, list panel and work
 and list cursors, folded sections (`app/shell.rs`) —, the work area — the main pane, the auto
 thread panel, which of them has the keyboard, Insert mode, back/forward history
 (`app/work.rs`) — with its panes (`app/pane.rs`: loaded messages, selection, VISUAL range) and
-their composers (`app/composer.rs`), and the read model of the workspaces (`app/model.rs`); the
-layout (tabs and splits) and the overlays join as they are built. The geometry of the screen (`screen.rs`) is one
-pure function that drawing and the mouse both use. Rules:
+their composers (`app/composer.rs`), the read model of the workspaces (`app/model.rs`), the
+keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
+(tabs and splits) joins as it is built. The geometry of the screen (`screen.rs`) is one pure
+function that drawing and the mouse both use. Rules:
 
 - An `Action` is namespaced by its owner (`Action::CommandLine(CommandLineAction::Run)`), so
   dispatching one is routing, not one match over every action of the app.
@@ -64,8 +65,9 @@ pure function that drawing and the mouse both use. Rules:
   event for an older request (an older generation) or for a target no pane shows is dropped.
   Messages come in pages (`Command::History`), newest first, older ones as the selection nears
   the top.
-- What only the terminal can do is an `Effect` the loop carries out: copying is OSC 52, so no
-  clipboard library or helper process is involved. `slakio --demo` uses `DemoBackend`
+- What only the binary can do is an `Effect` the loop carries out: copying is OSC 52, so no
+  clipboard library or helper process is involved; saving an answer the app asked for (the
+  icons question) goes into the config file, keeping its comments. `slakio --demo` uses `DemoBackend`
   (`crates/slakio-tui/src/demo.rs`) over `slakio-world`; `main.rs` is the one place that names
   a concrete backend.
 - Channels from background tasks are bounded wherever a stream can be large (websocket events,
@@ -105,14 +107,28 @@ arrives; the composer sanitises what is typed or pasted into it.
 ## Keys
 
 `crates/slakio-tui/src/keymap.rs` holds the context tree and the default bindings; every
-binding names an action of the registry. Keys resolve from the focused context outwards; a text
-input has no parent, so `Ctrl+W` can close a pane in Normal mode and delete a word while
-typing. Sequences (`g g`, `Space w h`) wait for their next key. The checker
-(`keymap/check.rs`) runs on the defaults in the tests and rejects duplicates, shadowed parent
-keys, prefixes, character keys in text inputs, keys a terminal cannot tell apart without the
-kitty keyboard protocol (`Ctrl+I`/`Tab`, `Ctrl+M`/`Enter`, `Ctrl+[`/`Esc`, `Ctrl+H`/`Backspace`)
-bound to different actions, and actions reachable only by such keys or `Alt` keys.
-`docs/keybindings.md` is generated from the table.
+binding names an action of the registry. A few global keys (`Ctrl+Q`, `F1`, `Ctrl+P`) are looked
+up first, also while typing; then keys resolve from the focused context outwards; a text input
+or a modal context (the help, a question) has no parent, so `Ctrl+W` can close a pane in Normal
+mode and delete a word while typing. Sequences (`g g`, `Space w h`) wait for their next key;
+after a short wait the which-key popup lists what may follow (`keymap/guide.rs`), its delay one
+more deadline of the loop. The checker (`keymap/check.rs`) runs on the defaults in the tests and
+rejects duplicates, shadowed parent keys, prefixes, character keys in text inputs, keys a
+terminal cannot tell apart without the kitty keyboard protocol (`Ctrl+I`/`Tab`,
+`Ctrl+M`/`Enter`, `Ctrl+[`/`Esc`, `Ctrl+H`/`Backspace`) bound to different actions, actions
+reachable only by such keys or `Alt` keys, and a context taking a global key. `Ctrl+I` is bound
+only when the terminal has the protocol on. The hint line (`keymap/hints.rs`), the keyboard help,
+the empty states and `docs/keybindings.md` all show keys looked up in the key map, so a key is
+shown as bound.
+
+## The look
+
+`crates/slakio-tui/src/theme.rs` holds the color tokens and the styles made of them; widgets
+name roles, never colors. The built-ins are the terminal's own 16 colors, `dark` and
+`tokyo-night` (night or day by the terminal's background, asked once with OSC 11); `auto` takes
+`tokyo-night` on a terminal that says it shows 24-bit color. Two rules hold in every theme and are
+tested cell by cell (`tests/style_flows.rs`): the focus shows on a panel's border and title
+only, and a selection is a background (or a bar in the left gutter), never an underline.
 
 ## UI strings (i18n)
 

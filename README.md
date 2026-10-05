@@ -30,29 +30,50 @@ images, and settings. This README only lists what works; it will grow with each 
   anywhere:
   - the rail (workspaces, Home, DMs; Activity, Files and Later say they come in a later
     version) expands when focused or hovered;
-  - the list panel shows sections (fold with `Enter`), channels and DMs with unread dots and
-    mention counts; `Enter` or a click opens the conversation in the work area;
+  - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
+    with mention counts; `Enter` or a click opens the conversation in the work area and moves
+    there, `l` opens it and stays in the list;
   - the conversation shows its messages (date separators, edited marker, reaction pills,
     "N replies" rows), loading older ones as you go up; `j` / `k` select messages, `g g` /
-    `G` jump to the oldest / newest, `Enter` opens the thread in a panel on the right (another
-    thread replaces it), `Ctrl+W` closes the panel, then the conversation; `Ctrl+O` / `Tab`
-    go back and forward between conversations;
+    `G` jump to the oldest / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
+    wheel too), `Enter` opens the selected message's thread in a panel on the right (another
+    thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
+    the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between
+    conversations;
   - `V` selects a range of messages and `y` copies it (or the selected message) to the
     clipboard through the terminal (OSC 52);
   - `i` writes in the pane's composer (multiline: `Ctrl+J` or `Alt+Enter` for a new line,
     `Shift+Enter` with the kitty keyboard protocol; `Ctrl+W` deletes a word; Korean input
     works); `Enter` shows the message in the demo only, it is not sent anywhere; `Esc` goes
     back to Normal mode;
+  - `Esc` steps out one level at a time (VISUAL, the selection, the thread panel, the main
+    pane) and never closes anything;
   - with a Korean input source, Normal-mode keys still work (`j` typed as its jamo moves);
   - every name and message from the (invented) remote side is shown through a sanitiser that
     removes terminal escape sequences, control and bidi characters; the demo has a channel of
     hostile strings and a few hostile names to show it;
-  - `Ctrl+h` / `Ctrl+l` (or `Space w h` / `Space w l`) move between the rail, the list and the
-    work area; `Space h` / `Space d` show Home / DMs; `Space e` hides the list panel;
-  - every key is listed in [docs/keybindings.md](docs/keybindings.md).
-- `:qa` then `Enter` quits (`:q` too). `Esc` closes the command line.
+  - `Tab` / `Shift+Tab` go round the list, the main pane and the thread panel; `Ctrl+h` /
+    `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the rail included; `Space h` /
+    `Space d` show Home / DMs; `Space e` hides the list panel;
+  - the status line shows the keys worth knowing where you are, and every key is listed in
+    [docs/keybindings.md](docs/keybindings.md).
+- `Ctrl+Q` quits from anywhere (it asks first when a message you wrote was not sent); so do
+  `Space q` and `:q` / `:qa`.
+- Themes: the terminal's own colors, `dark`, and `tokyo-night` (its day variant on a light
+  background); `NO_COLOR=1` draws without colors.
+
+## Keys
+
+Five keys get you everywhere:
+
+| Key | What it does |
+|---|---|
+| `?` (or `F1`) | The keyboard help for where you are: every key, searchable, and `Enter` runs one |
+| `Space` | Wait a moment: a popup lists what may follow (`Space h` Home, `Space d` DMs, …) |
+| `Tab` | The next panel (`Shift+Tab` the previous one) |
+| `Esc` | One step out; never closes anything |
+| `Ctrl+Q` | Quit |
 - English and Korean interface text (`language = "auto" | "en" | "ko"` in the config file).
-- `NO_COLOR=1` draws without colors.
 
 ## Build from source
 
@@ -74,11 +95,15 @@ slakio on them yet.
 
 ```toml
 language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
-icons = false            # Nerd Font icons on the rail and the status line (else letters)
+theme = "auto"           # "auto", "terminal", "dark", "tokyo-night" (-night / -day)
+icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
 rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 ```
 
-`rail_expand` is temporary: both ways exist until one is chosen.
+`theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
+is `truecolor` or `24bit`), else the terminal's own colors. With `icons = "ask"`, `slakio
+--demo` asks once whether your font shows the icons (the rail previews the answer) and saves
+the answer in the config file. `rail_expand` is temporary: both ways exist until one is chosen.
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.
