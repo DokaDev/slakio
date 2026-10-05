@@ -1,0 +1,4 @@
+# `cargo audit` (CI job `audit`): the RustSec advisories of the dependencies. An advisory judged
+# not to apply is listed here and in deny.toml, each with the reason and when to revisit it.
+[advisories]
+ignore = []
