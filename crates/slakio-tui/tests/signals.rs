@@ -1,7 +1,10 @@
 //! The real binary in a pseudo terminal (`script`): ended by `:qa`, from outside with SIGTERM
 //! or SIGHUP, or by a panic, it restores the terminal every time (alternate screen left, mouse
-//! and bracketed paste off, the cursor shown with the user's shape). Unix only; skipped with a
-//! visible note when `script` is not there.
+//! and bracketed paste off, the cursor shown with the user's shape). Unix only.
+//!
+//! When `script` cannot start, each test prints a visible `SKIPPED` line with the reason and
+//! passes; with `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead, so a runner
+//! without a pseudo terminal can never turn these tests into silent passes.
 //!
 //! Every path out of a test (an assertion that fails, a timeout) kills and reaps what it
 //! started ([`Run`]): `script` puts the binary in raw mode on a pseudo terminal of its own, so
@@ -12,6 +15,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
+
+/// Set to `1`, a pseudo terminal that cannot start fails the test instead of skipping it.
+const REQUIRE_PTY: &str = "SLAKIO_REQUIRE_PTY";
 
 /// One run of the binary inside `script`, with its scratch directory. Dropped on every path
 /// (also a panic): the binary and `script` are each killed if they still run and waited for,
@@ -104,10 +110,20 @@ fn start(dir: &Path, env: &[(&str, &str)]) -> Option<Child> {
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    let required = std::env::var(REQUIRE_PTY).is_ok_and(|v| v == "1");
+    spawn_or_skip(&mut cmd, required)
+}
+
+/// Start `cmd`. When it cannot start: a failure when `required`, else `None` after a visible
+/// `SKIPPED` line on the terminal (written past the test harness's capture, so it shows even
+/// when the test passes).
+fn spawn_or_skip(cmd: &mut Command, required: bool) -> Option<Child> {
+    let program = cmd.get_program().to_string_lossy().into_owned();
     match cmd.spawn() {
         Ok(child) => Some(child),
+        Err(e) if required => panic!("`{program}` could not start ({e}), and {REQUIRE_PTY}=1 requires it"),
         Err(e) => {
-            let _ = writeln!(std::io::stderr(), "SKIPPED signals: `script` could not start: {e}");
+            let _ = writeln!(std::io::stderr(), "SKIPPED signals: `{program}` could not start: {e}");
             None
         }
     }
@@ -202,4 +218,17 @@ fn a_failed_run_leaves_no_process_behind() {
     assert!(!alive(app), "the binary still runs");
     assert!(!alive(script), "`script` still runs");
     assert!(!dir.exists(), "{}", dir.display());
+}
+
+/// A pseudo terminal that cannot start is skipped visibly, and fails when it is required.
+#[test]
+fn a_pseudo_terminal_that_cannot_start_fails_when_required() {
+    let missing = || {
+        let mut cmd = Command::new("slakio-test-no-such-program");
+        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        cmd
+    };
+    assert!(spawn_or_skip(&mut missing(), false).is_none(), "skipped when not required");
+    let required = std::panic::catch_unwind(|| spawn_or_skip(&mut missing(), true).map(|mut c| c.kill()));
+    assert!(required.is_err(), "a required pseudo terminal that cannot start must fail the test");
 }

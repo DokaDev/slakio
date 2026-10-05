@@ -62,6 +62,10 @@ jobs:
       # pseudo terminal. --no-fail-fast: a failing test target does not hide the failures of
       # the targets after it.
       - run: cargo test --workspace --locked --no-fail-fast
+        env:
+          # The pseudo-terminal tests (Linux and macOS; they do not build on Windows) fail
+          # instead of skipping when `script` cannot start.
+          SLAKIO_REQUIRE_PTY: "1"
 
   # No Hangul outside the values of locales/ko.toml, no old project name, no absolute home paths.
   repo-rules:
