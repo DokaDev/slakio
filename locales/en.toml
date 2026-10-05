@@ -1,0 +1,30 @@
+# The English message catalog: the source of every key (see docs/architecture.md, "UI strings
+# (i18n)"). A key is lowercase words joined by `.` or `_`; `{name}` is a placeholder. Every key
+# must be translated in ko.toml; the build fails otherwise.
+
+# Mode badge at the left of the status line.
+"mode.normal" = "NORMAL"
+"mode.command" = "COMMAND"
+
+# The empty work area of step zero.
+"welcome.status" = "Early development: nothing connects to Slack yet."
+"welcome.quit_hint" = "Type :qa and press Enter to quit."
+
+# The command line.
+"command.unknown" = "Not a command: {name}"
+
+# Config file problems (the app runs with the defaults; the raw detail goes to the error log).
+"config.read_failed" = "The config file could not be read; using the defaults"
+"config.syntax" = "The config file is not valid TOML; using the defaults"
+"config.unknown_key" = "Unknown setting {key} in the config file; using the defaults"
+"config.bad_value" = "{key} = {value} is not valid (expected {allowed}); using the defaults"
+
+# Actions (key help and docs/keybindings.md).
+"action.quit" = "Quit"
+"action.cmdline.open" = "Open the command line"
+"action.cmdline.run" = "Run the typed command"
+"action.cmdline.cancel" = "Close the command line"
+
+# Key contexts (key help and docs/keybindings.md).
+"ctx.root" = "Everywhere"
+"ctx.cmdline" = "Command line"

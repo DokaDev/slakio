@@ -1,0 +1,22 @@
+# The Korean message catalog. Keys and placeholders must match en.toml exactly.
+
+"mode.normal" = "NORMAL"
+"mode.command" = "COMMAND"
+
+"welcome.status" = "개발 초기 단계: 아직 Slack에 연결되지 않습니다."
+"welcome.quit_hint" = "종료하려면 :qa 를 입력하고 Enter를 누르세요."
+
+"command.unknown" = "없는 명령: {name}"
+
+"config.read_failed" = "설정 파일을 읽을 수 없어 기본값을 사용합니다"
+"config.syntax" = "설정 파일이 올바른 TOML이 아니어서 기본값을 사용합니다"
+"config.unknown_key" = "설정 파일에 알 수 없는 항목 {key} 이(가) 있어 기본값을 사용합니다"
+"config.bad_value" = "{key} = {value} 은(는) 올바르지 않습니다 ({allowed} 중 하나). 기본값을 사용합니다"
+
+"action.quit" = "종료"
+"action.cmdline.open" = "명령줄 열기"
+"action.cmdline.run" = "입력한 명령 실행"
+"action.cmdline.cancel" = "명령줄 닫기"
+
+"ctx.root" = "어디서나"
+"ctx.cmdline" = "명령줄"

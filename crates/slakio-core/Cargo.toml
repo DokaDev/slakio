@@ -1,0 +1,27 @@
+[package]
+name = "slakio-core"
+description = "UI-free and network-free core of slakio: paths, files, config, secrets, faults, i18n"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+# No UI crates (ratatui/crossterm), no network, no database here (docs/architecture.md).
+[dependencies]
+toml_edit.workspace = true
+
+# build.rs: checks the locale catalogs and generates the typed message API.
+[build-dependencies]
+toml.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
+
+[lints]
+workspace = true
