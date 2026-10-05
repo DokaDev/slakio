@@ -19,10 +19,32 @@ fn a_missing_file_or_no_config_directory_is_the_defaults() {
 }
 
 #[test]
-fn the_language_is_read() {
-    assert_eq!(parse("language = \"ko\"\n"), Ok("ko".to_string()));
-    assert_eq!(parse("# comment only\n"), Ok("auto".to_string()));
-    assert_eq!(parse("language = \"EN\""), Ok("en".to_string()));
+fn the_settings_are_read() {
+    let lang = |t: &str| parse(t).map(|c| c.language);
+    assert_eq!(lang("language = \"ko\"\n"), Ok("ko".to_string()));
+    assert_eq!(lang("# comment only\n"), Ok("auto".to_string()));
+    assert_eq!(lang("language = \"EN\""), Ok("en".to_string()));
+    let cfg = parse("icons = true\nrail_expand = \"push\"\n").unwrap();
+    assert!(cfg.icons);
+    assert_eq!(cfg.rail_expand, "push");
+    assert_eq!(parse("").unwrap(), Config::default());
+    assert_eq!((Config::default().icons, Config::default().rail_expand.as_str()), (false, "overlay"));
+}
+
+#[test]
+fn a_bad_value_names_the_allowed_ones() {
+    assert_eq!(
+        parse("rail_expand = \"side\""),
+        Err(ConfigError::Value {
+            key: "rail_expand".into(),
+            value: "\"side\"".into(),
+            allowed: "overlay, push".into()
+        })
+    );
+    assert_eq!(
+        parse("icons = \"yes\""),
+        Err(ConfigError::Value { key: "icons".into(), value: "\"yes\"".into(), allowed: "true, false".into() })
+    );
 }
 
 #[test]

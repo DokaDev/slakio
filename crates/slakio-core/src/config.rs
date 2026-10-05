@@ -2,8 +2,12 @@
 //! or the file given with `--config`.
 //!
 //! ```toml
-//! language = "auto"   # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
+//! language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
+//! icons = false            # Nerd Font icons in the rail and status line (else letters)
+//! rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 //! ```
+//!
+//! `rail_expand` is temporary: both ways exist until one is chosen, then the setting goes.
 //!
 //! A missing file is the defaults. A file that exists but cannot be used (unreadable, not valid
 //! TOML, an unknown key, a value out of range) is never treated as missing: the app runs with
@@ -18,18 +22,25 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     /// The UI language setting: `auto`, `en` or `ko` ([`crate::i18n::detect_lang`]).
     pub language: String,
+    /// Nerd Font icons instead of letters.
+    pub icons: bool,
+    /// How the rail expands: `overlay` or `push` ([`RAIL_EXPAND`]).
+    pub rail_expand: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { language: "auto".to_string(), path: None }
+        Self { language: "auto".to_string(), icons: false, rail_expand: "overlay".to_string(), path: None }
     }
 }
 
 /// The values `language` takes.
 pub const LANGUAGES: &[&str] = &["auto", "en", "ko"];
+
+/// The values `rail_expand` takes.
+pub const RAIL_EXPAND: &[&str] = &["overlay", "push"];
 
 /// Why the config file cannot be used.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,34 +78,34 @@ pub fn load(path: Option<&Path>) -> (Config, Option<ConfigError>) {
         }
     };
     match parse(&text) {
-        Ok(language) => (Config { language, ..defaults }, None),
+        Ok(cfg) => (Config { path: defaults.path.clone(), ..cfg }, None),
         Err(e) => (defaults, Some(e)),
     }
 }
 
 /// The settings of a config file's text.
-fn parse(text: &str) -> Result<String, ConfigError> {
+fn parse(text: &str) -> Result<Config, ConfigError> {
     let doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| ConfigError::Syntax(Fault::toml_edit(text, &e)))?;
-    let mut language = Config::default().language;
+    let mut cfg = Config::default();
     for (key, item) in doc.iter() {
+        let bad = |allowed: String| ConfigError::Value {
+            key: key.to_string(),
+            value: item.to_string().trim().to_string(),
+            allowed,
+        };
         match key {
-            "language" => {
-                let value = item.as_str().map(str::to_ascii_lowercase);
-                match value {
-                    Some(v) if LANGUAGES.contains(&v.as_str()) => language = v,
-                    _ => {
-                        return Err(ConfigError::Value {
-                            key: key.to_string(),
-                            value: item.to_string().trim().to_string(),
-                            allowed: LANGUAGES.join(", "),
-                        });
-                    }
-                }
-            }
+            "language" => cfg.language = one_of(item, LANGUAGES).ok_or_else(|| bad(LANGUAGES.join(", ")))?,
+            "rail_expand" => cfg.rail_expand = one_of(item, RAIL_EXPAND).ok_or_else(|| bad(RAIL_EXPAND.join(", ")))?,
+            "icons" => cfg.icons = item.as_bool().ok_or_else(|| bad("true, false".to_string()))?,
             other => return Err(ConfigError::UnknownKey(other.to_string())),
         }
     }
-    Ok(language)
+    Ok(cfg)
+}
+
+/// The string value of `item` when it is one of `allowed` (case ignored), lowercased.
+fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
+    item.as_str().map(str::to_ascii_lowercase).filter(|v| allowed.contains(&v.as_str()))
 }
 
 #[cfg(test)]
