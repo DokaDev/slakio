@@ -404,12 +404,12 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     assert!(hints(&d).contains("Enter send · Alt+Enter newline · Esc stop typing"), "{}", hints(&d));
     d.keys("esc :");
     assert!(hints(&d).contains("Enter run · Esc cancel"), "{}", hints(&d));
-    // Narrow: the workspace's name goes first, then hints from the end; the badge and `demo`
+    // Narrow: hints of least worth go first, the workspace's name stays; the badge and `demo`
     // stay.
     let mut d = Demo::new(80, 24);
     d.open("backend");
     let line = d.status_line();
-    assert!(line.starts_with(" NORMAL  ▌") && !line.contains("A company") && line.ends_with("demo"), "{line}");
+    assert!(line.starts_with(" NORMAL  ▌A comp") && line.ends_with("demo"), "{line}");
     assert!(line.contains("i write"), "{line}");
     let welcome = App::new(Lang::En, Theme::terminal());
     let mut t = ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 10)).unwrap();

@@ -25,4 +25,4 @@ expression: mask_hangul(&d.screen())
 │  ││   # feed-build-50      │├─ Message #deploys ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌#deploys        │ Enter thread · y copy · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #deploys     │ Enter thread · ? help │  @37  DM 16 │ demo

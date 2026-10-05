@@ -25,4 +25,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌#backend         │ i write · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend          │ i write · ? help │  @37  DM 16 │ demo

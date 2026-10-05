@@ -25,4 +25,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-build-50      ││                                                │
 │  ││   # feed-cache-119     ││                                                │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
- NORMAL  ▌Home          │ Enter open · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home  │ Enter open · l peek · ? help │  @37  DM 16 │ demo

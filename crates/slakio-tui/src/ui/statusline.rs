@@ -48,7 +48,8 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::PaneVisual => Place::Visual,
         _ => match app.work.focused() {
             None => Place::WorkEmpty,
-            Some(p) if p.selected.is_some() => Place::PaneSelected,
+            Some(p) if p.selected.is_some() && app.work.side == Side::Main => Place::PaneSelected,
+            Some(p) if app.work.side == Side::Thread && p.selected.is_some() => Place::ThreadSelected,
             Some(_) if app.work.side == Side::Thread => Place::Thread,
             Some(_) => Place::Pane,
         },
@@ -207,47 +208,127 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let need = |ws_name: &Option<String>, place_text: &Option<String>, hints: &[(String, String)], m: u32, d: u32| {
         // A notice is worth more than the hints: they make room for it.
         let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + width(m).min(48));
-        spans_width(&left(ws_name, place_text)) + msg_w + 1 + spans_width(&right(hints, m, d))
+        spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints, m, d))
     };
-    // Shorten in the order of the module docs until it fits.
-    if need(&ws_name, &place_text, &hints, mentions, dms) > w {
-        ws_name = None;
+    // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
+    // the next pane), the workspace's name (cut with `…`, eight cells kept), the other hints by
+    // worth, the middle of the place, the place's first key and help, the name, the DM count, the
+    // mentions. Then what is left is filled again: a dropped hint comes back where cutting
+    // the name makes room for it, and the name grows into the rest, so no run of blank cells is
+    // left between the two sides.
+    let over = |ws: &Option<String>, pl: &Option<String>, h: &[usize], m: u32, d: u32| {
+        let pick: Vec<(String, String)> = h.iter().map(|&j| all_hints[j].clone()).collect();
+        need(ws, pl, &pick, m, d).saturating_sub(w)
+    };
+    let full_name = ws_name.clone();
+    // The name cut by `by` cells, never under eight (or its own width).
+    let cut = |by: usize| -> Option<String> {
+        full_name.as_ref().map(|n| clip(n, width(n).saturating_sub(by).max(8.min(width(n)))))
+    };
+    let name_room = full_name.as_ref().map_or(0, |n| width(n).saturating_sub(8));
+    let low = |l: Label| matches!(l, Label::HintPeek | Label::HintCommands | Label::HintNextPane);
+    let low_order: Vec<usize> = [Label::HintPeek, Label::HintCommands, Label::HintNextPane]
+        .iter()
+        .filter_map(|l| resolved.iter().position(|(_, x)| x == l))
+        .collect();
+    // A hint's worth: help most, then the place's first key (what to press now), the leader key,
+    // the others, those of least worth.
+    let worth = |i: usize| match resolved[i].1 {
+        Label::HintHelp => 5,
+        _ if i == 0 => 4,
+        Label::HintMore => 3,
+        l if low(l) => 1,
+        _ => 2,
+    };
+    let rest_order: Vec<usize> = (2..=5)
+        .flat_map(|k| (0..resolved.len()).rev().filter(move |&i| worth(i) == k))
+        .filter(|&i| !low(resolved[i].1))
+        .collect();
+    let mut chosen: Vec<usize> = (0..resolved.len()).collect();
+    for &i in &low_order {
+        if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+            break;
+        }
+        chosen.retain(|&j| j != i);
     }
-    // Hints by worth: help and the leader key go last; a hint that does not fit is skipped and
-    // a later, shorter one tried; the line keeps their order.
-    if need(&ws_name, &place_text, &hints, mentions, dms) > w {
-        let pinned = |l: Label| matches!(l, Label::HintHelp | Label::HintMore);
-        let order: Vec<usize> = (0..resolved.len())
-            .filter(|&i| pinned(resolved[i].1))
-            .chain((0..resolved.len()).filter(|&i| !pinned(resolved[i].1)))
-            .collect();
-        let mut chosen: Vec<usize> = Vec::new();
-        for i in order {
-            chosen.push(i);
-            chosen.sort_unstable();
-            let pick: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
-            if need(&ws_name, &place_text, &pick, mentions, dms) > w {
-                chosen.retain(|&j| j != i);
+    let excess = over(&ws_name, &place_text, &chosen, mentions, dms);
+    if excess > 0 {
+        ws_name = cut(excess);
+    }
+    for &i in &rest_order {
+        if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+            break;
+        }
+        // The place gives up its middle before the first key and help go.
+        if worth(i) >= 4
+            && let Some(p) = place_text.as_mut()
+        {
+            let excess = over(&ws_name, &Some(p.clone()), &chosen, mentions, dms);
+            *p = clip_middle(p, width(p).saturating_sub(excess).max(10));
+            if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+                break;
             }
         }
-        hints = chosen.iter().map(|&j| all_hints[j].clone()).collect();
+        chosen.retain(|&j| j != i);
     }
     if let Some(p) = place_text.as_mut() {
-        let over = need(&ws_name, &Some(p.clone()), &hints, mentions, dms).saturating_sub(w);
-        if over > 0 {
-            *p = clip_middle(p, width(p).saturating_sub(over).max(4));
+        let excess = over(&ws_name, &Some(p.clone()), &chosen, mentions, dms);
+        if excess > 0 {
+            *p = clip_middle(p, width(p).saturating_sub(excess).max(4));
         }
     }
-    if need(&ws_name, &place_text, &hints, mentions, dms) > w {
+
+    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
+        ws_name = None;
+    }
+    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
         dms = 0;
     }
-    if need(&ws_name, &place_text, &hints, mentions, dms) > w {
+    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
         mentions = 0;
     }
+    // The name is cut for more hints only where it had to be cut anyway.
+    let cut_room = if ws_name == full_name { 0 } else { name_room };
+    if ws_name.is_some() {
+        // Of the sets of hints that fit (cutting the name for them, never under eight cells),
+        // the one that fills the line best, so a hint that fits where blanks would be is shown;
+        // help and the place's first key come first. Of equal fills, the one worth more.
+        let n = resolved.len();
+        let mut best: Option<(usize, usize)> = {
+            // What dropping gave, unless a set below fills more.
+            let pick: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
+            let fits = need(&ws_name, &place_text, &pick, mentions, dms) <= w;
+            fits.then(|| (need(&full_name, &place_text, &pick, mentions, dms).min(w + cut_room), 0))
+        };
+        for mask in 0..1usize << n {
+            let with: Vec<usize> = (0..n).filter(|&i| mask >> i & 1 == 1).collect();
+            // Help comes before any other hint, and the place's first key before the rest.
+            let needs = |k: usize| (0..n).any(|j| worth(j) == k && !with.contains(&j));
+            // A hint of least worth only comes with the others of its place.
+            let broken = (!with.is_empty() && needs(5))
+                || (with.iter().any(|&i| worth(i) < 4) && needs(4))
+                || (with.iter().any(|&i| worth(i) == 1) && needs(2));
+            if broken {
+                continue;
+            }
+            if over(&full_name, &place_text, &with, mentions, dms) > cut_room {
+                continue;
+            }
+            let pick: Vec<(String, String)> = with.iter().map(|&j| all_hints[j].clone()).collect();
+            let filled = need(&full_name, &place_text, &pick, mentions, dms).min(w + cut_room);
+            let value: usize = with.iter().map(|&i| 1 << worth(i)).sum();
+            if best.is_none_or(|(f, v)| filled > f || (filled == f && value > v)) {
+                best = Some((filled, value));
+                chosen = with;
+            }
+        }
+        ws_name = cut(over(&full_name, &place_text, &chosen, mentions, dms));
+    }
+    hints = chosen.iter().map(|&j| all_hints[j].clone()).collect();
     let mut line = left(&ws_name, &place_text);
     let right_spans = right(&hints, mentions, dms);
     if let Some((m, style)) = msg {
-        let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 4);
+        let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 3);
         if room > 0 {
             line.push(sep());
             line.push(Span::styled(clip(&m, room), style));

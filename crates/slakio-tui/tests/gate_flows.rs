@@ -150,7 +150,8 @@ fn a_short_status_line_keeps_the_place_tidy_and_apart_from_the_hints() {
     let mut d = Demo::new(80, 24);
     d.open("backend");
     let line = d.status_line();
-    assert!(line.contains("▌#backend") && line.contains("│ i write"), "{line}");
+    assert!(line.contains("▌A company › #backend") && line.contains("│ i write") && line.contains("? help"), "{line}");
+    assert!(!line.contains("#…"), "the place is cut only after the hints: {line}");
 }
 
 #[test]
@@ -159,4 +160,79 @@ fn a_view_of_a_later_version_hints_no_key_that_does_nothing_there() {
     d.keys("space a");
     let line = d.status_line();
     assert!(!line.contains("Enter open") && !line.contains("l peek") && line.contains("? help"), "{line}");
+}
+
+/// The blank cells between the status line's two sides, beyond the separator's own space.
+fn gap(line: &str) -> usize {
+    let body = line.trim_end();
+    let at = body.find(" │ ").expect("the right side starts with a separator");
+    body[..at].chars().rev().take_while(|c| *c == ' ').count()
+}
+
+#[test]
+fn the_status_line_shortens_hints_before_the_name_and_wastes_no_room() {
+    // At 120 columns the whole name stays: the hints of least worth make room for it.
+    let d = Demo::new(120, 40);
+    assert!(
+        d.status_line().contains("▌A company › Home") && d.status_line().contains("│ Enter open"),
+        "{}",
+        d.status_line()
+    );
+    for w in [120u16, 100, 80] {
+        let mut d = Demo::new(w, 30);
+        let home = d.status_line();
+        assert!(home.contains("▌A co"), "{w}: the name stays: {home}");
+        assert!(home.contains("Enter open") && home.contains("? help"), "{w}: {home}");
+        // Enter open is worth more than the peek.
+        assert!(!home.contains("l peek") || home.contains("Enter open"), "{home}");
+        d.open("backend");
+        let pane = d.status_line();
+        assert!(pane.contains("▌A co") && pane.contains("? help"), "{w}: {pane}");
+        let hints: &[&str] = &[
+            "Enter open",
+            "l peek",
+            "Tab next pane",
+            ": commands",
+            "i write",
+            "k messages",
+            "Esc list",
+            "? help",
+            "Space more",
+        ];
+        for line in [&home, &pane] {
+            // Blanks left over are fewer than any hint that was dropped needs (with its ` · `),
+            // and a cut name never sits beside blanks.
+            let narrowest = hints
+                .iter()
+                .filter(|h| {
+                    (line.as_str() == home.as_str())
+                        == ["Enter open", "l peek", "Tab next pane", ": commands", "? help", "Space more"].contains(h)
+                        || line.as_str() == pane.as_str() && !["Enter open", "l peek", ": commands"].contains(h)
+                })
+                .filter(|h| !line.contains(**h))
+                .map(|h| h.chars().count() + 3)
+                .min()
+                .unwrap_or(usize::MAX);
+            assert!(gap(line) < narrowest, "{w}: {line:?}");
+            assert!(gap(line) == 0 || !line.contains('…'), "{w}: {line:?}");
+        }
+    }
+}
+
+#[test]
+fn a_selected_reply_hints_how_to_reply_not_a_thread() {
+    let mut d = Demo::new(160, 40);
+    d.open("long-threads");
+    d.keys("g g enter");
+    d.keys("k");
+    let line = d.status_line();
+    assert!(line.contains("i reply · y copy") && !line.contains("Enter thread"), "{line}");
+}
+
+#[test]
+fn the_icons_question_says_enter_chooses() {
+    let mut d = Demo::new(80, 30);
+    d.app.ask_icons();
+    let s = d.screen();
+    assert!(s.contains("· Enter choose"), "the footer whole: {s}");
 }

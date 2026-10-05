@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [bdr 3..5] [mut 8..9] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [dim 86..118] [acc 119..120]
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
     [bdr 0..84] [acc 84..120]
- NORMAL  ▌#long-threads › ⤷ Thread       │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..40] [bdr/surf 40..43] [/surf B 43..44] [mut/surf 44..50] [dim/surf 50..53] [/surf B 53..54] [mut/surf 54..63] [dim/surf 63..66] [/surf B 66..69] [mut/surf 69..74] [dim/surf 74..77] [/surf B 77..83] [mut/surf 83..89] [dim/surf 89..92] [/surf B 92..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › #long-threads › ⤷ Thread      │ i reply · k messages · Ctrl+W close · ? help │  @37  DM 16 │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..51] [bdr/surf 51..54] [/surf B 54..55] [mut/surf 55..61] [dim/surf 61..64] [/surf B 64..65] [mut/surf 65..74] [dim/surf 74..77] [/surf B 77..83] [mut/surf 83..89] [dim/surf 89..92] [/surf B 92..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

@@ -59,7 +59,9 @@ fn case_2_thread_panel_snapshots() {
         d.keys("enter");
         let s = d.screen();
         assert!(s.contains("⤷ Thread · #long-threads") && s.contains(" Reply "), "{s}");
-        assert!(d.status_line().contains("#long-threads › ⤷ Thread"), "{}", d.status_line());
+        // A narrow status line cuts the place in its middle.
+        let place = if w >= 120 { "#long-threads › ⤷ Thread" } else { "⤷ Thread" };
+        assert!(d.status_line().contains(place), "{}", d.status_line());
         insta::assert_snapshot!(format!("case2_thread_{w}x{h}"), mask_hangul(&s));
     }
 }

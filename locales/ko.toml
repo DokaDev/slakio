@@ -200,5 +200,5 @@
 "dialog.icons_text" = "아래 표시가 네모나 물음표가 아닌 아이콘으로 보이나요? 고른 답을 레일에서 미리 보여 줍니다."
 "dialog.icons_no" = "아니오, 글자로"
 "dialog.icons_yes" = "예, 아이콘으로"
-"dialog.keys" = "y {yes} · n {no} · Enter 고른 답"
+"dialog.keys" = "y {yes} · n {no} · Enter 선택"
 "dialog.icons_later" = "나중에 설정 파일의 icons 로 바꿀 수 있습니다."

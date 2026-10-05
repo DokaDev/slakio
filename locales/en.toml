@@ -216,5 +216,5 @@
 "dialog.icons_text" = "Do the marks below look like icons, not boxes or question marks? The rail shows the answer with the focus."
 "dialog.icons_no" = "No, letters"
 "dialog.icons_yes" = "Yes, icons"
-"dialog.keys" = "y {yes} · n {no} · Enter the highlighted one"
+"dialog.keys" = "y {yes} · n {no} · Enter choose"
 "dialog.icons_later" = "You can change this later: icons in the config file."

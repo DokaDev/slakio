@@ -15,7 +15,7 @@ expression: s
 │  ││   # │ it.                                                      │ert now  │
 │  ││   # │                                                          │broken   │
 │  ││     │                    [ Stay ]   [ Quit ]                   │         │
-│  ││ ▾ Ch╰───────────── y Quit · n Stay · Enter the highlighted one ╯         │
+│  ││ ▾ Ch╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
 │  ││   # announcements      ││   Confirmed                                    │
 │  ││   # design-review      ││ Kate Nam · 07:05                               │
 │  ││   # feed-alert-134     ││   Ticket review pager pager production on      │

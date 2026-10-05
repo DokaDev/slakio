@@ -41,4 +41,4 @@ expression: "demo::mask_hangul(&s)"
 │  ││   # feed-latency-144   │├─ Message #backend ─────────────────────────────────┤├─ Reply ──────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                 ││ › Press i to reply               │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
- NORMAL  ▌#backend › ⤷ Thread            │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A compa… › #backend › ⤷ Thread │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
