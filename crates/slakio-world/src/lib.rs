@@ -1,7 +1,8 @@
 //! A seeded, deterministic fake Slack world: two workspaces (`A company`, `B side`), sidebar
 //! sections, about 300 channels, DMs and a group DM, a Slack Connect channel with people from
 //! another organization, bots, unread and mention counts, muted channels, a 10,000-message
-//! channel, a 1,200-reply thread, Korean and emoji text, and a channel of hostile strings.
+//! channel, a 1,200-reply thread, Korean and emoji text, and a channel of hostile strings. People
+//! are active, away or in do not disturb.
 //!
 //! The demo backend of the UI and the fake Slack server of the tests both build on it, so the
 //! demo, the screen snapshots and the network tests share one world. The same seed always gives
@@ -21,7 +22,7 @@ pub use hostile::{Hostile, all as hostile_strings};
 use rng::Rng;
 use slakio_core::backend::Snapshot;
 use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, Message, Org, Reaction, Section, SectionId, SectionKind,
+    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, Section, SectionId, SectionKind,
     ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
@@ -125,6 +126,16 @@ const HOSTILE_SECTION: &str = "Side\x1b[2J\x1b[H projects";
 /// A reaction name on the first message of the hostile channel.
 const HOSTILE_REACTION: &str = "blink\x1b[5m\u{200B}";
 const PARTNERS: &[(&str, &str)] = &[("p.lin", "Pat Lin"), ("q.ford", "Quinn Ford"), ("r.diaz", "Rae Diaz")];
+/// The presence of person `i` of a workspace: mostly active, some away, a few in do not disturb,
+/// in a fixed pattern so every run and every test sees the same.
+fn presence_of(i: usize) -> Presence {
+    match i % 6 {
+        2 | 5 => Presence::Away,
+        3 => Presence::Dnd,
+        _ => Presence::Active,
+    }
+}
+
 const BOTS: &[(&str, &str)] = &[("grafana", "Grafana"), ("deploybot", "Deploy Bot")];
 const REACTIONS: &[&str] = &["+1", "eyes", "tada", "white_check_mark", "pray", "fire"];
 const PREFIXES: &[&str] = &["team", "proj", "help", "ops", "feed"];
@@ -367,13 +378,15 @@ impl World {
             display_name: display.into(),
             org,
             bot,
+            presence: Presence::Active,
         };
         let tag = &spec.id[5..];
         let me = user(format!("UDEMO{tag}000"), "me", "Me", Org::Own, false);
         self.me.insert(ws.clone(), me.id.clone());
         let mut people = vec![];
         for (i, (name, display)) in PEOPLE.iter().take(spec.people).enumerate() {
-            people.push(user(format!("UDEMO{tag}{:03}", i + 1), name, display, Org::Own, false));
+            let presence = presence_of(i);
+            people.push(User { presence, ..user(format!("UDEMO{tag}{:03}", i + 1), name, display, Org::Own, false) });
         }
         let bots: Vec<User> = BOTS
             .iter()
@@ -384,15 +397,18 @@ impl World {
             PARTNERS
                 .iter()
                 .enumerate()
-                .map(|(i, (name, display))| {
-                    user(format!("UDEMOX{:03}", i + 1), name, display, Org::External(PARTNER_ORG.into()), false)
+                .map(|(i, (name, display))| User {
+                    presence: presence_of(i + 1),
+                    ..user(format!("UDEMOX{:03}", i + 1), name, display, Org::External(PARTNER_ORG.into()), false)
                 })
                 .collect()
         } else {
             vec![]
         };
-        let hostile: Option<User> =
-            spec.partners.then(|| user(format!("UDEMO{tag}666"), HOSTILE_USER.0, HOSTILE_USER.1, Org::Own, false));
+        let hostile: Option<User> = spec.partners.then(|| User {
+            presence: Presence::Dnd,
+            ..user(format!("UDEMO{tag}666"), HOSTILE_USER.0, HOSTILE_USER.1, Org::Own, false)
+        });
         let own: Vec<UserId> = people.iter().map(|u| u.id.clone()).collect();
         let with_bots: Vec<UserId> = own.iter().chain(bots.iter().map(|b| &b.id)).cloned().collect();
         let shared: Vec<UserId> = own.iter().take(4).chain(partners.iter().map(|p| &p.id)).cloned().collect();

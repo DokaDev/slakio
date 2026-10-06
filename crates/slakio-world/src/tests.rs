@@ -81,6 +81,24 @@ fn the_slack_connect_channel_has_people_of_another_organization() {
 }
 
 #[test]
+fn dm_peers_are_active_away_or_in_do_not_disturb() {
+    let w = world();
+    let snap = w.snapshot();
+    let peers: Vec<Presence> = snap
+        .conversations
+        .iter()
+        .filter_map(|c| match &c.kind {
+            ConversationKind::Dm { user } => snap.users.iter().find(|u| &u.id == user).map(|u| u.presence),
+            _ => None,
+        })
+        .collect();
+    for p in [Presence::Active, Presence::Away, Presence::Dnd] {
+        assert!(peers.contains(&p), "a DM peer is {p:?}: {peers:?}");
+    }
+    assert!(!peers.contains(&Presence::Unknown), "the demo knows everyone's presence");
+}
+
+#[test]
 fn the_big_channel_has_10k_messages_in_time_order() {
     let w = world();
     let big = &conv(&w, names::BIG_HISTORY).id;

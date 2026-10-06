@@ -76,6 +76,19 @@ pub enum Org {
     External(Remote),
 }
 
+/// Whether a person is around, as Slack says it. Do not disturb wins over the other two (Slack
+/// keeps it apart from presence; a person in it is shown as such whatever their presence).
+/// `Unknown` until a backend says: never shown as away.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Presence {
+    Active,
+    Away,
+    /// Do not disturb: notifications paused.
+    Dnd,
+    #[default]
+    Unknown,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct User {
     pub id: UserId,
@@ -87,6 +100,7 @@ pub struct User {
     pub display_name: Remote,
     pub org: Org,
     pub bot: bool,
+    pub presence: Presence,
 }
 
 /// What a sidebar section holds, which decides where new conversations land and how the
