@@ -358,6 +358,14 @@ impl Theme {
         Style::new().fg(self.mode_fg).bg(self.avatars[slot % self.avatars.len()]).add_modifier(Modifier::BOLD)
     }
 
+    /// The chip of a muted conversation: faint initials on the reactions' surface.
+    pub fn avatar_muted(&self) -> Style {
+        if self.plain() {
+            return self.faint();
+        }
+        self.faint().bg(self.surface_alt)
+    }
+
     /// The chip of a group DM (how many people are in it): body text on the reactions' surface.
     pub fn avatar_group(&self) -> Style {
         if self.plain() {

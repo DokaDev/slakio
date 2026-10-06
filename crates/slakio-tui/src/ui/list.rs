@@ -187,7 +187,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             let (mark_x, name_x) = match chip.flatten() {
                 Some(mut chip) => {
                     if c.muted {
-                        chip.style = t.faint();
+                        chip.style = t.avatar_muted();
                     }
                     put(f, area, x, avatar::WIDTH as u16, vec![chip]);
                     if let Some((mark, _)) = presence {

@@ -145,8 +145,10 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
             ConversationKind::Dm { user } => {
                 let u = d.app.model.user(user).unwrap();
                 let slot = avatar::slot(user) % theme.avatars.len();
-                if !c.muted {
-                    assert_eq!(buf[(x, y)].bg, theme.avatars[slot], "{}", c.name.line());
+                // A muted DM's chip is faint, on the reactions' surface.
+                let bg = if c.muted { theme.surface_alt } else { theme.avatars[slot] };
+                if k != d.app.shell.list_cursor || !c.muted {
+                    assert_eq!(buf[(x, y)].bg, bg, "{}", c.name.line());
                 }
                 let want = avatar::initials(u.display_name.line().as_str(), String::new);
                 assert_eq!(text(&buf, x, y, 2), want, "{}", c.name.line());
