@@ -57,6 +57,7 @@ const PREV_MSG: Action = Action::Pane(PaneAction::Prev);
 const NEXT_MSG: Action = Action::Pane(PaneAction::Next);
 
 /// The entries for `place`, best first (the line drops them from the end when it is short).
+#[expect(clippy::too_many_lines, reason = "a table of hints per place")]
 pub fn entries(place: Place) -> &'static [Hint] {
     match place {
         Place::Welcome => &[One(QUIT, Label::HintQuit), One(HELP, Label::HintHelp), One(COMMANDS, Label::HintCommands)],

@@ -434,6 +434,7 @@ pub fn lang_variant(code: &str) -> String {
 
 /// Generate the typed API (`Label`, `Msg`) for checked locales. `locales[0]` is the source;
 /// a key an optional locale lacks uses the source text.
+#[expect(clippy::too_many_lines, reason = "writes the whole generated file; to be split")]
 pub fn generate(locales: &[Locale]) -> String {
     let src = &locales[0];
     let text_of = |loc: &Locale, key: &str| loc.entries.get(key).unwrap_or(&src.entries[key]).clone();
@@ -457,7 +458,7 @@ pub fn generate(locales: &[Locale]) -> String {
         o.push_str(&doc(key, text));
         let _ = writeln!(o, "    {},", variant_name(key));
     }
-    o.push_str("}\n\nimpl Label {\n    /// Every label, in key order.\n    pub const ALL: &'static [Label] = &[\n");
+    o.push_str("}\n\n#[allow(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Label {\n    /// Every label, in key order.\n    pub const ALL: &'static [Label] = &[\n");
     for (key, _) in &labels {
         let _ = writeln!(o, "        Label::{},", variant_name(key));
     }
@@ -497,7 +498,7 @@ pub fn generate(locales: &[Locale]) -> String {
         let _ = writeln!(o, "    {} {{ {} }},", variant_name(key), fs.join(", "));
     }
     o.push_str("}\n\nimpl From<Label> for Msg {\n    fn from(l: Label) -> Self {\n        Msg::Label(l)\n    }\n}\n\n");
-    o.push_str("impl Msg {\n    /// The catalog key.\n    pub fn key(&self) -> &'static str {\n        match self {\n            Msg::Label(l) => l.key(),\n");
+    o.push_str("#[allow(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Msg {\n    /// The catalog key.\n    pub fn key(&self) -> &'static str {\n        match self {\n            Msg::Label(l) => l.key(),\n");
     for (key, _) in &msgs {
         let _ = writeln!(o, "            Msg::{} {{ .. }} => {},", variant_name(key), lit(key));
     }

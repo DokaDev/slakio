@@ -82,6 +82,10 @@ pub(super) fn badge(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(Line::from(spans)), Rect { width: w.min(area.width), ..area });
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the hint fitting is still inside the draw; it moves out into a pure function"
+)]
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let t = &app.theme;
     let w = usize::from(area.width);

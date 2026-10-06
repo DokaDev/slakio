@@ -25,6 +25,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 
+#[expect(clippy::too_many_lines, reason = "to be split")]
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let expanded = app.shell.rail_expanded();

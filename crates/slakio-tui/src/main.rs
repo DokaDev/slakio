@@ -26,6 +26,7 @@ use std::io::{self, Stdout, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 
+#[expect(clippy::too_many_lines, reason = "the binary's wiring; to be split")]
 fn main() -> ExitCode {
     let mut stats = stats::Stats::from_env();
     let (cli_config, demo) = match parse_args(std::env::args_os().skip(1)) {

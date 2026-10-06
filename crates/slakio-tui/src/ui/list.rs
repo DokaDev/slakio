@@ -108,6 +108,7 @@ fn right(f: &mut Frame, row: Rect, text: &str, style: Style) -> u16 {
 
 /// Draw `row` in `area`; where its presence mark is (the column), and whose, when it has one
 /// that is not faint.
+#[expect(clippy::too_many_lines, reason = "one arm per row kind; to be split")]
 fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Presence)> {
     let t = &app.theme;
     match row {

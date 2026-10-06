@@ -14,6 +14,7 @@ fn ids_and_command_names_are_unique() {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "lists every action")]
 fn every_action_is_registered() {
     let shell = {
         use ShellAction::*;

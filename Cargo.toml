@@ -58,6 +58,7 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 dbg_macro = "warn"
 todo = "warn"
+too_many_lines = "warn"
 
 # A single codegen unit with LTO drops the code no caller reaches, and stripping drops the
 # symbol table (panic messages keep their file and line); the binary size is a budget

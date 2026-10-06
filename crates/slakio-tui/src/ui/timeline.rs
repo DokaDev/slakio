@@ -83,6 +83,7 @@ fn grouped(pane: &Pane, i: usize) -> bool {
 }
 
 /// The rows of message `i` of `pane` for a width of `w` cells.
+#[expect(clippy::too_many_lines, reason = "header, text and footer rows of a message in one place; to be split")]
 fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
     let t = &app.theme;
     let m = &pane.items[i];
@@ -216,6 +217,7 @@ fn no_replies(app: &App) -> String {
 
 /// Draw `pane`'s messages into `area`; `focused`: the pane has the keyboard (the selection is
 /// drawn as the bar of the focused panel, else as the faint one).
+#[expect(clippy::too_many_lines, reason = "anchoring and painting in one pass; to be split")]
 pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: bool) {
     let t = &app.theme;
     pane.hits.borrow_mut().clear();

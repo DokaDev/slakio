@@ -365,6 +365,7 @@ impl World {
         })
     }
 
+    #[expect(clippy::too_many_lines, reason = "builds a whole workspace; to be split")]
     fn add_workspace(&mut self, n: usize, spec: &Spec) {
         let ws = WorkspaceId::new(spec.id);
         self.snapshot.workspaces.push(Workspace {

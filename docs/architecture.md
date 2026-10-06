@@ -38,6 +38,10 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 - Unit tests in `foo/tests.rs` (`#[cfg(test)] mod tests;` in `foo.rs`); integration tests in
   the crate's `tests/`.
 - Every file opens with a comment that says what it is for and why it is shaped that way.
+- A source file has at most 600 lines and a function at most 80 (clippy's `too_many_lines`).
+  The few longer ones are listed — `.github/scripts/file-size-allowlist.txt` with their size,
+  `#[expect(clippy::too_many_lines)]` on the function — and may only shrink; the repository
+  rules and clippy fail on a new one.
 
 ## The UI: state, actions, effects
 

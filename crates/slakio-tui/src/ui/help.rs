@@ -25,6 +25,7 @@ use slakio_core::i18n::{Label, Msg};
 /// The widest the help box gets.
 const MAX_W: u16 = 100;
 
+#[expect(clippy::too_many_lines, reason = "to be split")]
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let Some(h) = app.help.as_ref() else { return };

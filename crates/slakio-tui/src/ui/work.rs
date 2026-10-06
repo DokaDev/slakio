@@ -82,9 +82,8 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, layout: &PaneLayout, side: S
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && app.work.insert;
     let view = pane.composer.view(screen::composer_width(area));
-    let parts = layout.parts;
-    timeline::draw(f, app, pane, parts.messages, focused);
-    let Some(divider) = parts.divider else { return };
+    timeline::draw(f, app, pane, layout.parts.messages, focused);
+    let Some(divider) = layout.parts.divider else { return };
     // The divider is joined to the pane's border: `├─ Message #backend ───┤`.
     let label = match side {
         Side::Main => app.i18n.msg(&Msg::ComposerMessage { name }).to_string(),
@@ -102,7 +101,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, layout: &PaneLayout, side: S
         Span::styled("┤", style),
     ]);
     f.render_widget(Paragraph::new(line), Rect { y: divider, height: 1, ..area });
-    let input = parts.input;
+    let input = layout.parts.input;
     let prompt = Rect { x: input.x + 1, width: 2.min(input.width), ..input };
     f.render_widget(Paragraph::new("›").style(if insert { t.accent() } else { t.faint() }), prompt);
     let text_area = Rect { x: input.x + 3, width: input.width.saturating_sub(4), ..input };

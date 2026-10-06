@@ -1,0 +1,4 @@
+# Clippy settings for the workspace (lints themselves are in Cargo.toml).
+# A function longer than this is split; the few that are not yet carry an `expect` that
+# says so, and a new one fails the build.
+too-many-lines-threshold = 80
