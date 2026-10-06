@@ -30,14 +30,15 @@ images, and settings. This README only lists what works; it will grow with each 
   anywhere:
   - the left column navigates, the right one is the work: the list panel's title is the
     workspace (its color band, its name, `▾`, then each other workspace that wants you by its
-    letter and mark, `· B @9`), its first row the view switcher — Home, DMs, Activity, Files
-    and Later (the last three say they come in a later version) as icons (or letters) with their
-    counts, the view shown spelled out — `@3` mentions, `●16` the DMs' unread messages, `●`
-    unread channels; red only where a mention is behind it, in the list, the tabs and the
+    letter and mark, `· B @9`), its first rows the view switcher as in GUI Slack's sidebar — a
+    row each for Home, DMs, Activity, Files and Later (the last three say they come in a later
+    version), an icon (icons on) and the name, the count at the right, the view shown with the
+    selection bar — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
     switcher alike (a DM's pill counts its unread messages, red when one mentions you); the
     status line repeats no count; `[` / `]` in the list show the view before or after;
     `Ctrl+R` or `Space r` (`:nav`) goes to the switcher from anywhere (and `Ctrl+R` back),
-    `h` / `l` and `Enter` pick a view, `Esc` leaves; the workspace (or `Space W`, or a click on
+    `j` / `k` move down it and on into the list (and back up), `Enter` picks a view, `Esc`
+    leaves; `Space v` (`:navrows`) folds it to one row, the view shown (`▸`), and unfolds it; the workspace (or `Space W`, or a click on
     it) opens a switcher of the workspaces with their counts; when the list panel makes room
     for a thread on a narrow screen, the status line names the workspace and the view;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
@@ -138,6 +139,7 @@ theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast",
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
 avatars = "initials"     # a person's initials on a colored chip, or "off"
 density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
+nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" (`Space v` switches)
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
