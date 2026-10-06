@@ -41,8 +41,9 @@ impl Timeline {
         self.items.binary_search_by_key(&ts, |m| m.ts).ok()
     }
 
-    /// The index of the message at `ts`, or, if it is not there (any more), of the next newer
-    /// one (the newest past the end); `None` while nothing is loaded.
+    /// The index of the message at `ts` (binary search), or, if it is not there (any more), of
+    /// the nearest newer one, else of the nearest older one (the newest); `None` while nothing
+    /// is loaded. A selection whose message is deleted moves there.
     pub fn index_near(&self, ts: Ts) -> Option<usize> {
         let last = self.items.len().checked_sub(1)?;
         Some(self.items.binary_search_by_key(&ts, |m| m.ts).unwrap_or_else(|i| i.min(last)))

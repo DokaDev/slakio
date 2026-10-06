@@ -133,3 +133,18 @@ fn the_selection_and_the_anchor_stay_on_their_messages_whatever_arrives() {
     tl.items.retain(|m| m.ts != Ts(110));
     assert_eq!(p.selected_index(&tl).map(|i| tl.items[i].ts), Some(Ts(111)));
 }
+
+#[test]
+fn a_deleted_selection_moves_to_the_nearest_newer_message_else_the_older_one() {
+    let mut p = Pane::new(target());
+    let mut tl = Timeline::default();
+    arrive(&mut p, &mut tl, 0, 5, true);
+    p.select_index(2, &tl);
+    tl.items.retain(|m| m.ts != Ts(2));
+    assert_eq!(p.selected_index(&tl).map(|i| tl.items[i].ts), Some(Ts(3)), "the next newer");
+    p.selected = Some(Ts(4));
+    tl.items.retain(|m| m.ts != Ts(4));
+    assert_eq!(p.selected_index(&tl).map(|i| tl.items[i].ts), Some(Ts(3)), "nothing newer: the older one");
+    tl.items.clear();
+    assert_eq!(p.selected_index(&tl), None, "nothing left");
+}
