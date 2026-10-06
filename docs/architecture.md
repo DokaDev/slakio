@@ -49,8 +49,8 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 that owns its data and its update: the command line (`app/cmdline.rs`), the status line's
 notices (`app/status.rs`), the shell — focus between rail, list panel and work area, the rail
 and list cursors, folded sections (`app/shell.rs`) —, the work area — the main pane, the auto
-thread panel, which of them has the keyboard, Insert mode, back/forward history
-(`app/work.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, anchor,
+thread panel, which of them has the keyboard, back/forward history
+(`app/work.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
 rows drawn), the messages of each target a pane shows, held once however many panes show it
 (`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
 `app/composer.rs`); every request to the backend gets its id from one allocator

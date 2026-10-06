@@ -65,8 +65,6 @@ pub struct Work {
     pub thread: Option<Pane>,
     /// Which pane has the keyboard when the work area has the focus.
     pub side: Side,
-    /// The focused pane's composer is being written in (Insert mode).
-    pub insert: bool,
     back: Vec<Target>,
     forward: Vec<Target>,
     /// The messages of the targets the panes show.
@@ -83,7 +81,6 @@ impl Default for Work {
             main: None,
             thread: None,
             side: Side::Main,
-            insert: false,
             back: Vec::new(),
             forward: Vec::new(),
             timelines: TimelineStore::default(),
@@ -127,6 +124,28 @@ impl Work {
             Side::Thread => self.thread.as_mut(),
             Side::Main => self.main.as_mut(),
         }
+    }
+
+    /// The focused pane is in Insert mode.
+    pub fn insert(&self) -> bool {
+        self.focused().is_some_and(|p| p.insert)
+    }
+
+    /// Insert mode on or off for the focused pane; no other pane is in it.
+    pub fn set_insert(&mut self, on: bool) {
+        for p in [self.main.as_mut(), self.thread.as_mut()].into_iter().flatten() {
+            p.insert = false;
+        }
+        if let Some(p) = self.focused_mut() {
+            p.insert = on;
+        }
+    }
+
+    /// Give the keyboard to the pane on `side`; Insert mode goes along.
+    pub fn turn(&mut self, side: Side) {
+        let insert = self.insert();
+        self.side = side;
+        self.set_insert(insert);
     }
 
     /// The messages pane `p` shows.
@@ -173,7 +192,7 @@ impl Work {
     pub fn open(&mut self, target: Target) {
         if let Some(current) = self.main.as_ref().map(|p| p.target.clone()) {
             if current == target {
-                self.side = Side::Main;
+                self.turn(Side::Main);
                 return;
             }
             self.back.push(current);
@@ -191,7 +210,6 @@ impl Work {
         self.prune();
         self.main = Some(Pane::new(target));
         self.side = Side::Main;
-        self.insert = false;
         self.fill();
     }
 
@@ -224,8 +242,8 @@ impl Work {
         let Some(main) = self.main.as_ref() else { return };
         let Some(m) = main.selected.and_then(|i| self.timeline(main).items.get(i)) else { return };
         let target = main.thread_target(m.ts);
-        self.side = Side::Thread;
         if self.thread.as_ref().is_some_and(|t| t.target == target) {
+            self.turn(Side::Thread);
             return;
         }
         self.show_beside(target);
@@ -233,9 +251,11 @@ impl Work {
 
     /// Show `target` in the thread panel, with the keyboard (what it showed is closed).
     pub fn show_beside(&mut self, target: Target) {
+        let insert = self.insert();
+        self.set_insert(false);
         self.thread = None;
         self.prune();
-        self.thread = Some(Pane::new(target));
+        self.thread = Some(Pane { insert, ..Pane::new(target) });
         self.side = Side::Thread;
         self.fill();
     }
@@ -243,7 +263,7 @@ impl Work {
     /// Close the focused pane (`Ctrl+W`): the thread panel (the main pane then selects the
     /// thread's message), else the conversation, which is handed back.
     pub fn close(&mut self) -> Option<Target> {
-        self.insert = false;
+        self.set_insert(false);
         let closed = match self.side {
             Side::Thread => {
                 let closed = self.thread.take();
@@ -278,7 +298,7 @@ impl Work {
             (Side::Thread, -1) => self.side = Side::Main,
             _ => return false,
         }
-        self.insert = false;
+        self.set_insert(false);
         true
     }
 
@@ -362,7 +382,6 @@ impl Work {
             self.main = None;
             self.thread = None;
             self.side = Side::Main;
-            self.insert = false;
             self.prune();
         }
         self.back.retain(|t| model.target(t).is_some());

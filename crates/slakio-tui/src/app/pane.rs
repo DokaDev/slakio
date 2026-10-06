@@ -1,5 +1,5 @@
-//! A pane: a view of one conversation or thread — the selection, a VISUAL range, where the
-//! view is anchored and the rows drawn last. The messages are not the pane's: they are the
+//! A pane: a view of one conversation or thread — the selection, a VISUAL range, Insert mode,
+//! where the view is anchored and the rows drawn last. The messages are not the pane's: they are the
 //! target's [`Timeline`], shared by every pane that shows it, and what is being written is the
 //! target's draft ([`super::drafts`]). A pane asks for older messages as its selection nears
 //! the top; drawing lays out only the rows on screen.
@@ -82,6 +82,8 @@ pub struct Pane {
     pub bottom: Cell<Option<usize>>,
     /// `gg` was pressed before the oldest message was loaded: keep loading, then select it.
     pub to_oldest: bool,
+    /// Its composer is being written in (Insert mode); only the pane with the keyboard is.
+    pub insert: bool,
     /// The rows drawn last, by drawing (only it knows the rows' heights).
     pub hits: RefCell<Vec<Hit>>,
 }
@@ -94,6 +96,7 @@ impl Pane {
             visual: None,
             bottom: Cell::new(None),
             to_oldest: false,
+            insert: false,
             hits: RefCell::new(Vec::new()),
         }
     }

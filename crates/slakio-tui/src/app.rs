@@ -257,7 +257,7 @@ impl App {
         match self.shell.focus {
             Region::Rail => Ctx::Rail,
             Region::List => Ctx::List,
-            Region::Work if self.work.insert && self.work.focused().is_some() => Ctx::ComposerInsert,
+            Region::Work if self.work.insert() => Ctx::ComposerInsert,
             Region::Work if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
             Region::Work => Ctx::PaneNormal,
         }
@@ -508,13 +508,13 @@ impl App {
         let side = Side::of(layout.slot);
         self.shell.focus = Region::Work;
         if side != self.work.side {
-            self.work.side = side;
-            self.work.insert = false;
+            self.work.set_insert(false);
+            self.work.turn(side);
         }
         let Some(pane) = self.work.focused() else { return };
         let parts = layout.parts;
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
-        self.work.insert = parts.input.contains(at);
+        self.work.set_insert(parts.input.contains(at));
         let Some(hit) = hit else { return };
         self.work.with_pane(|p, _| {
             p.selected = Some(hit.message);
@@ -640,17 +640,17 @@ impl App {
             Some(i) => stops[(i as isize + step).rem_euclid(n) as usize],
             None => stops[0],
         };
-        self.work.insert = false;
+        self.work.set_insert(false);
         match to {
             Stop::Rail => self.shell.focus = Region::Rail,
             Stop::List => self.shell.focus = Region::List,
             Stop::Main => {
                 self.shell.focus = Region::Work;
-                self.work.side = Side::Main;
+                self.work.turn(Side::Main);
             }
             Stop::Thread => {
                 self.shell.focus = Region::Work;
-                self.work.side = Side::Thread;
+                self.work.turn(Side::Thread);
             }
         }
     }
@@ -666,7 +666,7 @@ impl App {
 
     /// The list panel gets the keyboard, its cursor on the conversation `target` names.
     fn focus_list(&mut self, target: Option<slakio_core::model::Target>) {
-        self.work.insert = false;
+        self.work.set_insert(false);
         self.shell.list_hidden = false;
         self.shell.focus = Region::List;
         if let Some(t) = target {
@@ -701,7 +701,7 @@ impl App {
             PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl.items.len())),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
-                Some(p) if p.selected.is_none() || self.work.side == Side::Thread => self.work.insert = true,
+                Some(p) if p.selected.is_none() || self.work.side == Side::Thread => self.work.set_insert(true),
                 Some(_) => self.work.open_thread(),
                 None => {}
             },
@@ -717,7 +717,7 @@ impl App {
             PaneAction::Copy => self.copy(now),
             PaneAction::Insert => {
                 if self.work.focused().is_some() {
-                    self.work.insert = true;
+                    self.work.set_insert(true);
                 }
             }
             PaneAction::Left => {
@@ -759,7 +759,7 @@ impl App {
             return;
         }
         if self.work.side == Side::Thread {
-            self.work.side = Side::Main;
+            self.work.turn(Side::Main);
             return;
         }
         if !self.shell.list_hidden {
@@ -799,7 +799,7 @@ impl App {
                 }
             }
             ComposerAction::Newline => self.work.with_draft(Composer::newline),
-            ComposerAction::Leave => self.work.insert = false,
+            ComposerAction::Leave => self.work.set_insert(false),
             ComposerAction::DeleteWord => self.work.with_draft(|c| {
                 c.delete_word_back();
             }),

@@ -82,7 +82,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     }
     let title = Line::from(spans);
     f.render_widget(panel(app, focused, title), area);
-    let insert = focused && app.work.insert;
+    let insert = focused && pane.insert;
     timeline::draw(f, app, pane, layout.parts.messages, focused);
     let Some(divider) = layout.parts.divider else { return };
     // The divider is joined to the pane's border: `├─ Message #backend ───┤`.
