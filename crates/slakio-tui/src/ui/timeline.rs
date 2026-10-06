@@ -28,6 +28,7 @@ use super::{avatar_chip, highlight};
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::{Hit, Pane};
+use crate::app::timelines::Timeline;
 use crate::keymap::Ctx;
 use crate::text::{clip, width, wrap};
 use crate::theme::Selection;
@@ -70,11 +71,11 @@ pub fn reset_rows_laid_out() {
 type Laid = (Line<'static>, bool);
 
 /// Message `i` follows one of the same sender closely: its name is left out.
-fn grouped(pane: &Pane, i: usize) -> bool {
-    let Some(prev) = i.checked_sub(1).map(|p| &pane.items[p]) else { return false };
-    let m = &pane.items[i];
+fn grouped(pane: &Pane, tl: &Timeline, i: usize) -> bool {
+    let Some(prev) = i.checked_sub(1).map(|p| &tl.items[p]) else { return false };
+    let m = &tl.items[i];
     // A thread's own message and its first reply never group: the divider is between them.
-    let root = pane.root();
+    let root = pane.root(tl);
     prev.user == m.user
         && time::day(prev.ts) == time::day(m.ts)
         && m.ts.0.saturating_sub(prev.ts.0) <= GROUP_SECS * 1_000_000
@@ -84,16 +85,16 @@ fn grouped(pane: &Pane, i: usize) -> bool {
 
 /// The rows of message `i` of `pane` for a width of `w` cells.
 #[expect(clippy::too_many_lines, reason = "header, text and footer rows of a message in one place; to be split")]
-fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
+fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid> {
     let t = &app.theme;
-    let m = &pane.items[i];
+    let m = &tl.items[i];
     let mut out: Vec<Laid> = Vec::new();
-    let new_day = i == 0 || time::day(pane.items[i - 1].ts) != time::day(m.ts);
+    let new_day = i == 0 || time::day(tl.items[i - 1].ts) != time::day(m.ts);
     if new_day {
         out.push((rule(&time::date(m.ts), w, t.faint()), false));
     }
     let stacked = w < STACKED_BELOW;
-    let group = grouped(pane, i);
+    let group = grouped(pane, tl, i);
     let author_style = if m.own { t.own_author() } else { t.author() };
     // The sender's chip and a space before the name; the column grows by as much, so the text
     // starts at the same place on every row.
@@ -188,12 +189,12 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
         out.push((Line::from(spans), false));
     }
     // Below a thread's own message: how many replies follow, or that none do yet.
-    if pane.root() == Some(i) {
-        let replies = m.thread.map_or(pane.items.len().saturating_sub(1), |t| t.replies as usize);
+    if pane.root(tl) == Some(i) {
+        let replies = m.thread.map_or(tl.items.len().saturating_sub(1), |t| t.replies as usize);
         if replies > 0 {
             let label = app.i18n.msg(&Msg::ThreadReplies { count: replies as u64 }).to_string();
             out.push((rule(&label, w, t.faint()), false));
-        } else if pane.complete {
+        } else if tl.complete {
             out.push((Line::styled(no_replies(app), t.faint()), false));
         }
     }
@@ -219,6 +220,7 @@ fn no_replies(app: &App) -> String {
 /// drawn as the bar of the focused panel, else as the faint one).
 #[expect(clippy::too_many_lines, reason = "anchoring and painting in one pass; to be split")]
 pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: bool) {
+    let tl = app.work.timeline(pane);
     let t = &app.theme;
     pane.hits.borrow_mut().clear();
     if area.height == 0 || area.width < 3 {
@@ -226,8 +228,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     }
     // One cell of padding on each side; the left one is the selection's gutter.
     let text_area = |row: Rect| Rect { x: row.x + 1, width: row.width.saturating_sub(2), ..row };
-    if pane.items.is_empty() {
-        let text = if pane.complete {
+    if tl.items.is_empty() {
+        let text = if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
             app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string()
         } else {
@@ -237,10 +239,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         return;
     }
     let (h, w) = (usize::from(area.height), usize::from(area.width.saturating_sub(2)).max(1));
-    let n = pane.items.len();
+    let n = tl.items.len();
     let mut laid: HashMap<usize, Vec<Laid>> = HashMap::new();
-    let height =
-        |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| laid.entry(i).or_insert_with(|| rows(app, pane, i, w)).len();
+    let height = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| {
+        laid.entry(i).or_insert_with(|| rows(app, pane, tl, i, w)).len()
+    };
     // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
     let mut bottom = pane.bottom.get().unwrap_or(n - 1).min(n - 1);
     if let Some(sel) = pane.selected.map(|s| s.min(n - 1)) {
@@ -284,7 +287,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut total = 0;
     let mut i = bottom;
     loop {
-        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, i, w));
+        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, tl, i, w));
         total += rows.len();
         shown.push((i, rows));
         if total >= h || i == 0 {
@@ -300,7 +303,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let from_top = total < h && (bottom + 1 < n || pane.is_thread());
     let mut i = bottom + 1;
     while total < h && i < n {
-        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, i, w));
+        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, tl, i, w));
         total += rows.len();
         shown.push((i, rows));
         i += 1;

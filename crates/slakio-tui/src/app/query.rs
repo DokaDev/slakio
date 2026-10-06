@@ -8,11 +8,13 @@
 //! tests only and hidden from the docs.
 
 use super::App;
+use super::composer::Composer;
 use super::dialog::Question;
 use super::help;
 use super::model::Row;
 use super::pane::{Pane, Shown};
 use super::shell::{Region, View};
+use super::timelines::Timeline;
 use crate::keymap::Ctx;
 use crate::screen::Slot;
 use ratatui::layout::Rect;
@@ -50,6 +52,8 @@ pub enum Overlay {
 pub struct PaneRef<'a> {
     pane: &'a Pane,
     handle: PaneHandle,
+    timeline: &'a Timeline,
+    draft: &'a Composer,
 }
 
 impl<'a> PaneRef<'a> {
@@ -67,12 +71,12 @@ impl<'a> PaneRef<'a> {
 
     /// The loaded messages, oldest first.
     pub fn messages(self) -> &'a [Shown] {
-        &self.pane.items
+        &self.timeline.items
     }
 
     /// The oldest message is loaded.
     pub fn complete(self) -> bool {
-        self.pane.complete
+        self.timeline.complete
     }
 
     /// The selected message (index into [`Self::messages`]).
@@ -92,13 +96,15 @@ impl<'a> PaneRef<'a> {
 
     /// What its composer holds.
     pub fn composer_text(self) -> &'a str {
-        self.pane.composer.text()
+        self.draft.text()
     }
 }
 
 impl App {
     fn pane_ref(&self, slot: Slot) -> Option<PaneRef<'_>> {
-        self.work.pane(slot).map(|pane| PaneRef { pane, handle: PaneHandle(slot) })
+        let pane = self.work.pane(slot)?;
+        let (timeline, draft) = (self.work.timeline(pane), self.work.draft(pane));
+        Some(PaneRef { pane, handle: PaneHandle(slot), timeline, draft })
     }
 
     /// Where the keyboard is, under any popup.
@@ -222,11 +228,18 @@ impl App {
         if self.shell.focus != Region::Work {
             return;
         }
-        if let Some(p) = self.work.focused_mut()
-            && let Some(last) = p.items.len().checked_sub(1)
-        {
+        let Some(len) = self.work.focused().map(|p| self.work.timeline(p).items.len()) else { return };
+        if let (Some(p), Some(last)) = (self.work.focused_mut(), len.checked_sub(1)) {
             p.selected = Some(index.min(last));
         }
+    }
+
+    /// Test driver: show `target` in a second pane beside the conversation, with the keyboard
+    /// (the work area offers no such split yet; two panes on one target share its messages).
+    #[doc(hidden)]
+    pub fn open_beside(&mut self, target: Target) {
+        self.shell.focus = Region::Work;
+        self.work.show_beside(target);
     }
 
     /// Test driver: put the list panel's cursor on row `row` (the last one if past it).

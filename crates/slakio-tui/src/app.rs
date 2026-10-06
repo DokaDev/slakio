@@ -1,7 +1,7 @@
 //! The application state. `App` is a thin router: each part of the state lives in a sub-state
 //! that owns its data and its update ([`cmdline::CommandLine`] with its [`palette`],
 //! [`status::Status`],
-//! [`shell::Shell`], [`work::Work`] with its [`pane::Pane`]s and their [`composer::Composer`]s,
+//! [`shell::Shell`], [`work::Work`] with its [`pane::Pane`] views, [`timelines`] and [`drafts`],
 //! [`model::Model`], the keyboard [`help::Help`] and a [`dialog::Dialog`]); `App` turns input
 //! into [`Action`]s through the key map and routes each action to its owner.
 //!
@@ -29,14 +29,17 @@
 pub mod cmdline;
 pub mod composer;
 pub mod dialog;
+pub(crate) mod drafts;
 pub mod help;
 mod layout;
 pub mod model;
 pub mod palette;
 pub mod pane;
 pub mod query;
+pub(crate) mod requests;
 pub mod shell;
 pub mod status;
+pub(crate) mod timelines;
 pub(crate) mod work;
 
 use crate::action::{
@@ -46,6 +49,7 @@ use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
 use crate::theme::{self, Look, Theme};
+use composer::Composer;
 use dialog::{Dialog, Question};
 use help::Help;
 use model::Model;
@@ -137,7 +141,6 @@ pub struct App {
     pub backend: Option<Capabilities>,
     /// The generation of the last boot request; older answers are dropped.
     boot: Generation,
-    commands: Vec<(Generation, Command)>,
     effects: Vec<Effect>,
     /// The last click (for a double click): when, and where.
     last_click: Option<(Instant, Position)>,
@@ -167,7 +170,6 @@ impl App {
             dialog: None,
             backend: None,
             boot: Generation::default(),
-            commands: Vec::new(),
             effects: Vec::new(),
             last_click: None,
             size: Rect::default(),
@@ -178,8 +180,7 @@ impl App {
     /// Use a backend that can do `caps`: asks it for the workspaces.
     pub fn connect(&mut self, caps: Capabilities) {
         self.backend = Some(caps);
-        self.boot = self.boot.next();
-        self.commands.push((self.boot, Command::Boot));
+        self.boot = self.work.requests.ask(Command::Boot);
     }
 
     /// Ask once whether the terminal shows Nerd Font icons; the rail previews the answer that
@@ -191,9 +192,7 @@ impl App {
 
     /// The requests for the backend queued since the last call.
     pub fn take_commands(&mut self) -> Vec<(Generation, Command)> {
-        let mut out = std::mem::take(&mut self.commands);
-        out.extend(self.work.take_requests());
-        out
+        self.work.take_requests()
     }
 
     /// The effects queued since the last call.
@@ -318,8 +317,8 @@ impl App {
             Event::Paste(text) => {
                 match self.key_context() {
                     Ctx::ComposerInsert => {
-                        if let Some(p) = self.work.focused_mut() {
-                            p.composer.insert(&text);
+                        if let Some(c) = self.work.draft_mut() {
+                            c.insert(&text);
                         }
                     }
                     Ctx::HelpFilter => {
@@ -387,7 +386,7 @@ impl App {
         };
         match ctx {
             Ctx::ComposerInsert => {
-                let Some(c) = self.work.focused_mut().map(|p| &mut p.composer) else { return };
+                let Some(c) = self.work.draft_mut() else { return };
                 match (typed, key.code) {
                     (Some(ch), _) => c.insert(ch.encode_utf8(&mut [0; 4])),
                     (_, KeyCode::Backspace) => {
@@ -467,10 +466,7 @@ impl App {
                     return true;
                 }
                 let slot = self.frame().pane_at(at).map(|p| p.slot);
-                if let Some(p) = slot.and_then(|s| self.work.pane_mut(s)) {
-                    p.step(by);
-                }
-                self.work.with_pane(|_| {});
+                self.work.step_in(slot, by);
                 true
             }
             MouseEventKind::Down(MouseButton::Left) => {
@@ -518,7 +514,7 @@ impl App {
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
         self.work.insert = parts.input.contains(at);
         let Some(hit) = hit else { return };
-        self.work.with_pane(|p| {
+        self.work.with_pane(|p, _| {
             p.selected = Some(hit.message);
             p.visual = None;
         });
@@ -693,24 +689,24 @@ impl App {
                     self.info(Msg::Label(l), now);
                 }
             }
-            PaneAction::Next => self.work.with_pane(|p| p.step(1)),
-            PaneAction::Prev => self.work.with_pane(|p| p.step(-1)),
-            PaneAction::HalfDown => self.work.with_pane(|p| p.step((page / 2).max(1))),
-            PaneAction::HalfUp => self.work.with_pane(|p| p.step(-(page / 2).max(1))),
-            PaneAction::PageDown => self.work.with_pane(|p| p.step(page)),
-            PaneAction::PageUp => self.work.with_pane(|p| p.step(-page)),
-            PaneAction::First => self.work.with_pane(|p| p.select_oldest()),
-            PaneAction::Last => self.work.with_pane(|p| p.select_newest()),
+            PaneAction::Next => self.work.step(1),
+            PaneAction::Prev => self.work.step(-1),
+            PaneAction::HalfDown => self.work.step((page / 2).max(1)),
+            PaneAction::HalfUp => self.work.step(-(page / 2).max(1)),
+            PaneAction::PageDown => self.work.step(page),
+            PaneAction::PageUp => self.work.step(-page),
+            PaneAction::First => self.work.with_pane(|p, tl| p.select_oldest(tl)),
+            PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl.items.len())),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
                 Some(p) if p.selected.is_none() || self.work.side == Side::Thread => self.work.insert = true,
                 Some(_) => self.work.open_thread(),
                 None => {}
             },
-            PaneAction::Visual => self.work.with_pane(|p| {
+            PaneAction::Visual => self.work.with_pane(|p, tl| {
                 if p.visual.take().is_none() {
                     if p.selected.is_none() {
-                        p.select_newest();
+                        p.select_newest(tl.items.len());
                     }
                     p.visual = p.selected;
                 }
@@ -772,10 +768,10 @@ impl App {
     /// Copy the selected messages (the VISUAL range, or the selected one) as text: one
     /// message alone as its text, a range as `time  author: text` lines. Sanitised text only.
     fn copy(&mut self, now: Instant) {
-        let Some(p) = self.work.focused_mut() else { return };
+        let Some(p) = self.work.focused() else { return };
         let Some((a, b)) = p.range() else { return };
         let one = a == b && p.visual.is_none();
-        let items = &p.items[a..=b];
+        let items = &self.work.timeline(p).items[a..=b];
         let text = if one {
             items[0].text.to_string()
         } else {
@@ -785,8 +781,10 @@ impl App {
                 .collect::<Vec<_>>()
                 .join("\n")
         };
-        p.visual = None;
         let count = items.len() as u64;
+        if let Some(p) = self.work.focused_mut() {
+            p.visual = None;
+        }
         self.effects.push(Effect::Copy(text));
         self.info(Msg::StatusCopied { count }, now);
     }
@@ -798,16 +796,16 @@ impl App {
                     self.info(Msg::Label(Label::StatusDemoEcho), now);
                 }
             }
-            ComposerAction::Newline => self.work.with_pane(|p| p.composer.newline()),
+            ComposerAction::Newline => self.work.with_draft(Composer::newline),
             ComposerAction::Leave => self.work.insert = false,
-            ComposerAction::DeleteWord => self.work.with_pane(|p| {
-                p.composer.delete_word_back();
+            ComposerAction::DeleteWord => self.work.with_draft(|c| {
+                c.delete_word_back();
             }),
-            ComposerAction::DeleteLine => self.work.with_pane(|p| {
-                p.composer.delete_line_back();
+            ComposerAction::DeleteLine => self.work.with_draft(|c| {
+                c.delete_line_back();
             }),
-            ComposerAction::DeleteToEnd => self.work.with_pane(|p| {
-                p.composer.delete_to_end();
+            ComposerAction::DeleteToEnd => self.work.with_draft(|c| {
+                c.delete_to_end();
             }),
         }
     }

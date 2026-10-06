@@ -50,8 +50,11 @@ that owns its data and its update: the command line (`app/cmdline.rs`), the stat
 notices (`app/status.rs`), the shell — focus between rail, list panel and work area, the rail
 and list cursors, folded sections (`app/shell.rs`) —, the work area — the main pane, the auto
 thread panel, which of them has the keyboard, Insert mode, back/forward history
-(`app/work.rs`) — with its panes (`app/pane.rs`: loaded messages, selection, VISUAL range) and
-their composers (`app/composer.rs`), the read model of the workspaces (`app/model.rs`), the
+(`app/work.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, anchor,
+rows drawn), the messages of each target a pane shows, held once however many panes show it
+(`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
+`app/composer.rs`); every request to the backend gets its id from one allocator
+(`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the
 keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
 (tabs and splits) joins as it is built. The geometry of the screen (`screen.rs`) is pure:
 `screen::frame` lays out a frame once — the regions, each open pane, its messages and its

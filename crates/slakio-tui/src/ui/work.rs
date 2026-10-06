@@ -106,7 +106,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     let prompt = Rect { x: input.x + 1, width: 2.min(input.width), ..input };
     f.render_widget(Paragraph::new("›").style(if insert { t.accent() } else { t.faint() }), prompt);
     let text_area = Rect { x: input.x + 3, width: input.width.saturating_sub(4), ..input };
-    if pane.composer.is_empty() && !insert {
+    if app.work.draft(pane).is_empty() && !insert {
         let insert_key = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal);
         let hint = insert_key
             .map(|keys| match side {

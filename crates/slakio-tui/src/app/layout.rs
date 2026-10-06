@@ -36,7 +36,7 @@ impl App {
         let mut views = Vec::new();
         let layout = screen::frame(self.size, self.shape(), |slot, width| {
             let Some(pane) = self.work.pane(slot) else { return 1 };
-            let view = pane.composer.view(width);
+            let view = self.work.draft(pane).view(width);
             let lines = view.lines.len();
             views.push((slot, view));
             lines

@@ -13,22 +13,27 @@ fn conversation(m: &Model, name: &str) -> Target {
     Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() }
 }
 
+/// Answer the requests `asked` from the demo world.
+fn answer(w: &mut Work, m: &Model, backend: &mut crate::demo::DemoBackend, asked: Vec<(Generation, Command)>) {
+    use slakio_core::backend::Backend;
+    for (g, c) in asked {
+        backend.send(g, c);
+    }
+    while let Some(e) = backend.poll() {
+        if let Event::History(page) = e.event {
+            assert!(w.on_page(e.generation, &page, m));
+        }
+    }
+}
+
 /// Answer every request from the demo world, as the binary's loop does.
 fn pump(w: &mut Work, m: &Model, backend: &mut crate::demo::DemoBackend) {
-    use slakio_core::backend::Backend;
     loop {
         let asked = w.take_requests();
         if asked.is_empty() {
             return;
         }
-        for (g, c) in asked {
-            backend.send(g, c);
-        }
-        while let Some(e) = backend.poll() {
-            if let Event::History(page) = e.event {
-                assert!(w.on_page(e.generation, &page, m));
-            }
-        }
+        answer(w, m, backend, asked);
     }
 }
 
@@ -43,10 +48,10 @@ fn opening_loads_the_newest_page_and_reopening_focuses_instead() {
     assert_eq!(asked.len(), 1);
     w.open(backend);
     assert!(w.take_requests().is_empty(), "already open: no second load");
-    w.requests = asked;
+    answer(&mut w, &m, &mut b, asked);
     pump(&mut w, &m, &mut b);
-    let main = w.main.as_ref().unwrap();
-    assert!(!main.items.is_empty() && main.complete, "a short channel loads in one page");
+    let tl = w.timeline(w.main.as_ref().unwrap());
+    assert!(!tl.items.is_empty() && tl.complete, "a short channel loads in one page");
 }
 
 #[test]
@@ -70,15 +75,15 @@ fn enter_opens_the_thread_panel_and_another_thread_replaces_it() {
     let mut w = Work::default();
     w.open(conversation(&m, "long-threads"));
     pump(&mut w, &m, &mut b);
-    w.with_pane(|p| p.selected = Some(0));
+    w.with_pane(|p, _| p.selected = Some(0));
     w.open_thread();
     pump(&mut w, &m, &mut b);
     assert_eq!(w.side, Side::Thread);
     let thread = w.thread.as_ref().unwrap();
-    assert!(thread.is_thread() && thread.items.len() >= 200);
+    assert!(thread.is_thread() && w.timeline(thread).items.len() >= 200);
     let first = thread.target.clone();
     assert!(w.focus_side(-1));
-    w.with_pane(|p| p.selected = Some(1));
+    w.with_pane(|p, _| p.selected = Some(1));
     w.open_thread();
     assert_ne!(w.thread.as_ref().unwrap().target, first, "replaced");
     w.close();
@@ -115,13 +120,13 @@ fn send_echoes_the_composer_as_the_users_message_and_empties_it() {
     w.open(conversation(&m, "backend"));
     pump(&mut w, &m, &mut b);
     assert!(!w.send(&m), "nothing to send");
-    w.with_pane(|p| p.composer.insert("  hello\x1b[2J  "));
+    w.with_draft(|c| c.insert("  hello\x1b[2J  "));
     assert!(w.send(&m));
     let main = w.main.as_ref().unwrap();
-    let last = main.items.last().unwrap();
+    let last = w.timeline(main).items.last().unwrap();
     assert!(last.own && last.text.as_str() == "  hello  ");
     assert_eq!(last.author.as_str(), "Me");
-    assert!(main.composer.is_empty());
+    assert!(w.draft(main).is_empty());
 }
 
 #[test]
@@ -131,4 +136,56 @@ fn clamping_drops_a_conversation_that_is_gone() {
     w.open(Target::Conversation { workspace: WorkspaceId::new("TDEMOA"), conversation: ConversationId::new("CNOPE") });
     w.clamp(&m);
     assert!(w.main.is_none());
+}
+
+#[test]
+fn two_panes_on_one_target_share_its_messages_and_load_them_once() {
+    let m = model();
+    let mut b = crate::demo::DemoBackend::new(World::demo());
+    let mut w = Work::default();
+    let target = conversation(&m, "big-history");
+    w.open(target.clone());
+    pump(&mut w, &m, &mut b);
+    w.show_beside(target.clone());
+    assert!(w.take_requests().is_empty(), "the second pane loads nothing");
+    let n = w.timeline(w.main.as_ref().unwrap()).items.len();
+    assert_eq!(w.timeline(w.thread.as_ref().unwrap()).items.len(), n);
+    // Both panes select messages near the top; one older page comes, both keep their messages.
+    w.with_pane(|p, _| p.selected = Some(3));
+    w.main.as_mut().unwrap().selected = Some(5);
+    let asked = w.take_requests();
+    assert_eq!(asked.len(), 1, "one request for the target");
+    let (ts3, ts5) = {
+        let tl = w.timeline(w.main.as_ref().unwrap());
+        (tl.items[3].ts, tl.items[5].ts)
+    };
+    answer(&mut w, &m, &mut b, asked);
+    let tl = w.timeline(w.main.as_ref().unwrap());
+    let thread = w.thread.as_ref().unwrap();
+    assert_eq!(tl.items[thread.selected.unwrap()].ts, ts3);
+    assert_eq!(tl.items[w.main.as_ref().unwrap().selected.unwrap()].ts, ts5);
+    // One draft for the target: written in one pane, it is there in the other.
+    w.with_draft(|c| c.insert("hi"));
+    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "hi");
+    // Closing one pane keeps the messages for the other; closing both drops them.
+    w.close();
+    assert!(w.timelines.get(&target).is_some());
+    w.close();
+    assert!(w.timelines.get(&target).is_none() && w.drafts.get(&target).is_none());
+}
+
+#[test]
+fn a_page_for_a_closed_pane_is_dropped_and_reopening_loads_afresh() {
+    let m = model();
+    let mut w = Work::default();
+    let backend = conversation(&m, "backend");
+    w.open(backend.clone());
+    let (g, _) = w.take_requests().remove(0);
+    w.close();
+    let page = Page { target: backend.clone(), messages: Vec::new(), complete: true };
+    assert!(!w.on_page(g, &page, &m), "nobody waits for it");
+    w.open(backend);
+    let asked = w.take_requests();
+    assert_eq!(asked.len(), 1, "loaded again");
+    assert!(asked[0].0 > g, "one allocator: every request a new id");
 }

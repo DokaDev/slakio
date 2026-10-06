@@ -25,6 +25,9 @@ pub struct View {
 }
 
 impl Composer {
+    /// Nothing written.
+    pub const EMPTY: Self = Self { text: String::new(), cursor: 0 };
+
     pub fn text(&self) -> &str {
         &self.text
     }
