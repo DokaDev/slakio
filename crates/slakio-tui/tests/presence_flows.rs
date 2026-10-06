@@ -114,3 +114,22 @@ fn a_dm_title_says_whether_its_peer_is_around() {
     let title = d.screen().lines().next().unwrap().to_string();
     assert!(title.contains(&format!("@{name} ○ away")), "{title}");
 }
+
+#[test]
+fn the_selected_row_keeps_its_presence_color_in_the_16_color_theme() {
+    let theme = resolve("terminal", false, Background::Dark);
+    let mut d = dms(theme.clone(), Settings::default());
+    for p in [Presence::Active, Presence::Away, Presence::Dnd] {
+        let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == p && !muted(&d, n)).expect("a peer");
+        d.app.shell.list_cursor = index_of(&d, name);
+        let buf = d.buffer();
+        let cell = &buf[mark_at(&d, name)];
+        assert_eq!(cell.bg, theme.selection, "{name} is on the selection bar");
+        let want = match p {
+            Presence::Active => theme.success,
+            Presence::Dnd => theme.warning,
+            _ => theme.fg_muted,
+        };
+        assert_eq!(cell.fg, want, "{name} ({p:?}) keeps its color");
+    }
+}

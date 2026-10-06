@@ -262,6 +262,15 @@ impl Theme {
         }
     }
 
+    /// A presence mark on a selected row, painted over the bar after it ([`Self::paint_selection`]
+    /// lifts muted text). The 16-color theme keeps the mark's own color, unless it is the bar's
+    /// (a light terminal's muted gray): every color there reads on the dark gray bar. A truecolor
+    /// bar lifts the away mark like other muted text; the other marks keep their color anyway.
+    pub fn presence_selected(&self, p: Presence) -> Option<Color> {
+        let fg = self.presence(p).fg?;
+        (self.kind == Kind::Ansi && fg != self.selection).then_some(fg)
+    }
+
     pub fn accent(&self) -> Style {
         Style::new().fg(self.accent)
     }

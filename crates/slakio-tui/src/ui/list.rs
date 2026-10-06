@@ -31,7 +31,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::Label;
-use slakio_core::model::ConversationKind;
+use slakio_core::model::{ConversationKind, Presence};
 
 /// Nerd Font glyphs: `nf-md-lock` (a private channel) and `nf-md-link_variant` (a channel shared
 /// with another organization).
@@ -60,9 +60,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     for (k, &row) in rows.iter().enumerate().skip(app.shell.list_top).take(usize::from(inner.height)) {
         let y = inner.y + (k - app.shell.list_top) as u16;
         let area = Rect { y, height: 1, ..inner };
-        draw_row(f, app, row, area);
+        let mark = draw_row(f, app, row, area);
         if k == app.shell.list_cursor && row.is_selectable() {
             highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });
+            // A presence mark keeps its color on the bar where it reads there.
+            if let Some((x, fg)) = mark.and_then(|(x, p)| t.presence_selected(p).map(|fg| (x, fg))) {
+                f.buffer_mut()[(x, y)].set_fg(fg);
+            }
         }
     }
 }
@@ -92,10 +96,12 @@ fn right(f: &mut Frame, row: Rect, text: &str, style: Style) -> u16 {
     w
 }
 
-fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
+/// Draw `row` in `area`; where its presence mark is (the column), and whose, when it has one
+/// that is not faint.
+fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Presence)> {
     let t = &app.theme;
     match row {
-        Row::Spacer => {}
+        Row::Spacer => None,
         Row::Section(i) => {
             let s = app.model.section(i);
             let folded = app.shell.collapsed.contains(&s.id);
@@ -114,6 +120,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
             let room = area.width.saturating_sub(3 + used + 2);
             let name = clip(s.name.line().as_str(), usize::from(room));
             put(f, area, 3, room, vec![Span::styled(name, t.section())]);
+            None
         }
         Row::Conversation(i) => {
             let c = app.model.conversation(i);
@@ -174,6 +181,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
                 spans.push(Span::styled(tag, t.faint()));
             }
             put(f, area, x + 2, name_w + tag_w, spans);
+            presence.filter(|_| !c.muted).map(|(_, p)| (area.x + x, p))
         }
     }
 }
