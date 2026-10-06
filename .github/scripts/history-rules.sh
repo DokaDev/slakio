@@ -5,8 +5,8 @@
 #   2. a `refactor` commit changes no screen snapshot (no behavior changed, so no screen did);
 #   3. a commit that touches the file-size allowlist adds no entry and raises none against its
 #      parent (and the same holds over the whole range);
-#   4. a commit that changes a guard (the limit of file-size.sh, these scripts, clippy.toml,
-#      the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
+#   4. a commit that changes a guard (the limit of file-size.sh, these scripts and their tests,
+#      clippy.toml, the lint levels of Cargo.toml, the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
 #      (PR=true) also names each changed guard in its body (PR_BODY). Commits up to
 #      GUARD_TRAILER_SINCE, from before the rule, are exempt.
 # Without a usable BASE (a new branch, a force push, a shallow clone) the range falls back to
@@ -30,6 +30,10 @@ loosened() {
     local before after path lines was out=0
     before=$(git show "$1:$allowlist" 2>/dev/null | entries)
     after=$(git show "$2:$allowlist" 2>/dev/null | entries)
+    for path in $(awk '{ print $1 }' <<<"$after" | sort | uniq -d); do
+        echo "$allowlist ($3): $path is listed more than once"
+        out=1
+    done
     while read -r path lines; do
         [[ -z "$path" ]] && continue
         was=$(awk -v f="$path" '$1 == f { print $2 }' <<<"$before")
@@ -47,8 +51,10 @@ loosened() {
     return "$out"
 }
 since=${GUARD_TRAILER_SINCE:-1a64ad3b62676a55f11fe6daee95d5b86e77f068}
-guards=(.github/scripts/file-size.sh .github/scripts/history-rules.sh
+guards=(.github/scripts/file-size.sh .github/scripts/history-rules.sh .github/scripts/test-guards.sh
     .github/scripts/repo-rules.sh .github/scripts/dependency-direction.sh clippy.toml .github/workflows/ci.yml)
+# The workspace's lint levels (`[workspace.lints…]` of Cargo.toml) at commit $1, if any.
+lints() { git show "$1:Cargo.toml" 2>/dev/null | awk '/^\[/ { on = ($0 ~ /^\[workspace\.lints/) } on' || true; }
 usable() { [[ -n "$1" && ! "$1" =~ ^0+$ ]] && git cat-file -e "$1^{commit}" 2>/dev/null; }
 
 if ! usable "$base"; then
@@ -76,6 +82,9 @@ for commit in $(git rev-list --no-merges "$range"); do
         loosened "$parent" "$commit" "$short" || failed=1
     fi
     touched=$(git diff-tree --no-commit-id --root --name-only -r "$commit" -- "${guards[@]}")
+    if [[ -n "$parent" && "$(lints "$parent")" != "$(lints "$commit")" ]]; then
+        touched="${touched:+$touched$'\n'}Cargo.toml [workspace.lints]"
+    fi
     if [[ -n "$touched" ]] && ! git merge-base --is-ancestor "$commit" "$since" 2>/dev/null; then
         reason=$(git log -1 --format='%(trailers:key=Guard-change,valueonly)' "$commit" | tr -d '[:space:]')
         if [[ -z "$reason" ]]; then

@@ -14,7 +14,11 @@ failed=0
 # The lines `path size` of the allowlist, comments and blank lines left out.
 entries() { grep -v -e '^#' -e '^[[:space:]]*$' "$allowlist" || true; }
 
-# Every entry is a path and a whole number of lines, nothing else.
+# Every entry is a path and a whole number of lines, nothing else, one entry per path.
+for path in $(entries | awk '{ print $1 }' | sort | uniq -d); do
+    echo "$allowlist: $path is listed more than once"
+    failed=1
+done
 while read -r path lines rest; do
     if [[ ! "$lines" =~ ^[0-9]+$ || -n "$rest" ]]; then
         echo "$allowlist: \"$path $lines${rest:+ $rest}\": an entry is a path and a whole number of lines"

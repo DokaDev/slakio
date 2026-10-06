@@ -56,6 +56,16 @@ expect fail "a size that is not a whole number" in_repo "$d" bash .github/script
 d=$(repo size-word 700 big)
 expect fail "a size that is not a number" in_repo "$d" bash .github/scripts/file-size.sh
 
+d=$(repo size-twice 800 700)
+printf 'src/big.rs 900\n' >>"$d/.github/scripts/file-size-allowlist.txt"
+expect fail "a path listed twice" in_repo "$d" bash .github/scripts/file-size.sh
+
+d=$(repo twice 700 700)
+base=$(git -C "$d" rev-parse HEAD)
+printf 'src/big.rs 700\n' >>"$d/.github/scripts/file-size-allowlist.txt"
+commit "$d" -m "ci: list it again"
+expect fail "an allowlist that lists a path twice" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+
 d=$(repo raise 700 700)
 base=$(git -C "$d" rev-parse HEAD)
 sed -i.bak 's/ 700$/ 1200.0/' "$d/.github/scripts/file-size-allowlist.txt" && rm "$d/.github/scripts/file-size-allowlist.txt.bak"
@@ -71,6 +81,18 @@ git -C "$d" reset -q --hard "$base"
 echo "too-many-lines-threshold = 90" >"$d/clippy.toml"
 commit "$d" -m "ci: a looser threshold" -m "Guard-change: measured on the whole workspace"
 expect pass "a guard changed with a Guard-change trailer" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+
+d=$(repo lints 700 700)
+printf '[workspace]\n\n[workspace.lints.clippy]\ntodo = "warn"\n' >"$d/Cargo.toml"
+commit "$d" -m "build: lints"
+base=$(git -C "$d" rev-parse HEAD)
+printf '[workspace]\n\n[workspace.lints.clippy]\ntodo = "allow"\n' >"$d/Cargo.toml"
+commit "$d" -m "build: a looser lint"
+expect fail "lint levels changed without a Guard-change trailer" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+git -C "$d" reset -q --hard "$base"
+printf '[workspace]\nmembers = ["a"]\n\n[workspace.lints.clippy]\ntodo = "warn"\n' >"$d/Cargo.toml"
+commit "$d" -m "build: a member"
+expect pass "Cargo.toml changed outside the lints" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
 
 if ((failed)); then
     exit 1

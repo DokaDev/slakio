@@ -58,10 +58,11 @@ budgets (`docs/perf.md`).
   `tests/snapshots/` (CI checks every pushed commit, `.github/scripts/history-rules.sh`).
 - The guards are changed on purpose only. A commit that changes the size limit of
   `.github/scripts/file-size.sh`, a script of `.github/scripts/` that checks the repository,
-  `clippy.toml` or `.github/workflows/ci.yml` says why in a trailer,
+  `clippy.toml`, the lint levels of `Cargo.toml` (`[workspace.lints]`) or
+  `.github/workflows/ci.yml` says why in a trailer,
   `Guard-change: <reason>` (CI fails without it), and a pull request that does names each
   changed file in its description. The file-size allowlist holds a path and a whole number of
-  lines per entry, and may only be lowered, never raised or added to, in any commit
+  lines per entry, each path once, and may only be lowered, never raised or added to, in any commit
   (`.github/scripts/test-guards.sh` tests these rules).
 - The code, comments and documentation are in English; Korean text only appears as the values
   of `locales/ko.toml` (CI checks this).
