@@ -72,6 +72,21 @@ sed -i.bak 's/ 700$/ 1200.0/' "$d/.github/scripts/file-size-allowlist.txt" && rm
 commit "$d" -m "ci: loosen"
 expect fail "an allowlist raised to a size that is not a whole number" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
 
+d=$(repo restored 700 700)
+base=$(git -C "$d" rev-parse HEAD)
+seq 720 | sed 's/^/\/\/ /' >"$d/src/big.rs"
+sed -i.bak 's/ 700$/ 720/' "$d/.github/scripts/file-size-allowlist.txt" && rm "$d/.github/scripts/file-size-allowlist.txt.bak"
+commit "$d" -m "feat: grows"
+seq 690 | sed 's/^/\/\/ /' >"$d/src/big.rs"
+sed -i.bak 's/ 720$/ 690/' "$d/.github/scripts/file-size-allowlist.txt" && rm "$d/.github/scripts/file-size-allowlist.txt.bak"
+commit "$d" -m "refactor: shrinks back"
+expect pass "a raise restored by a later commit of the range" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+expect fail "the raise alone, before its fix" in_repo "$d" bash .github/scripts/history-rules.sh "$base" HEAD~1
+seq 710 | sed 's/^/\/\/ /' >"$d/src/big.rs"
+sed -i.bak 's/ 690$/ 710/' "$d/.github/scripts/file-size-allowlist.txt" && rm "$d/.github/scripts/file-size-allowlist.txt.bak"
+commit "$d" -m "feat: grows again"
+expect fail "a raise not back under its old size by the end" in_repo "$d" bash .github/scripts/history-rules.sh "$base~0" HEAD
+
 d=$(repo guard 700 700)
 base=$(git -C "$d" rev-parse HEAD)
 echo "too-many-lines-threshold = 90" >"$d/clippy.toml"

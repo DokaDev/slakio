@@ -4,7 +4,9 @@
 #   1. the subject is a Conventional Commit with a lowercase type (`fix(tui): …`);
 #   2. a `refactor` commit changes no screen snapshot (no behavior changed, so no screen did);
 #   3. a commit that touches the file-size allowlist adds no entry and raises none against its
-#      parent (and the same holds over the whole range);
+#      parent — unless the entry is back at or under its old size at the end of the range checked
+#      (a raise fixed by a later commit is said, not failed) — and the same holds over the whole
+#      range;
 #   4. a commit that changes a guard (the limit of file-size.sh, these scripts and their tests,
 #      clippy.toml, the lint levels of every Cargo.toml — the workspace's `[workspace.lints…]` and
 #      each crate's `[lints…]` — the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
@@ -26,9 +28,10 @@ failed=0
 warn() { echo "::warning::$*"; }
 # The allowlist as `path size` lines, comments and blank lines left out.
 entries() { grep -v -e '^#' -e '^[[:space:]]*$' || true; }
-# Fails (and says why) when the allowlist at $2 adds an entry or raises one against $1.
+# Fails (and says why) when the allowlist at $2 adds an entry or raises one against $1; with $4
+# (the end of the range), a raise whose entry is back at or under its old size there only warns.
 loosened() {
-    local before after path lines was out=0
+    local before after path lines was later out=0
     before=$(git show "$1:$allowlist" 2>/dev/null | entries)
     after=$(git show "$2:$allowlist" 2>/dev/null | entries)
     for path in $(awk '{ print $1 }' <<<"$after" | sort | uniq -d); do
@@ -45,8 +48,13 @@ loosened() {
             echo "$allowlist ($3): $path was added; split the file instead"
             out=1
         elif [[ ! "$was" =~ ^[0-9]+$ ]] || ((lines > was)); then
-            echo "$allowlist ($3): $path raised from $was to $lines; it may only be lowered"
-            out=1
+            later=$([[ -n "${4:-}" ]] && git show "$4:$allowlist" 2>/dev/null | entries | awk -v f="$path" '$1 == f { print $2 }')
+            if [[ "$was" =~ ^[0-9]+$ && "$later" =~ ^[0-9]+$ ]] && ((later <= was)); then
+                warn "$allowlist ($3): $path raised from $was to $lines, back to $later by the end of the range"
+            else
+                echo "$allowlist ($3): $path raised from $was to $lines; it may only be lowered"
+                out=1
+            fi
         fi
     done <<<"$after"
     return "$out"
@@ -87,7 +95,7 @@ for commit in $(git rev-list --no-merges "$range"); do
     parent=$(git rev-parse -q --verify "$commit^" || true)
     if [[ -n "$parent" ]] && git diff-tree --no-commit-id --name-only -r "$commit" | grep -qx "$allowlist" &&
         git cat-file -e "$parent:$allowlist" 2>/dev/null; then
-        loosened "$parent" "$commit" "$short" || failed=1
+        loosened "$parent" "$commit" "$short" "$head" || failed=1
     fi
     touched=$(git diff-tree --no-commit-id --root --name-only -r "$commit" -- "${guards[@]}")
     if [[ -n "$parent" && "$(lints "$parent")" != "$(lints "$commit")" ]]; then
