@@ -78,6 +78,8 @@ jobs:
           # The pushed commits, for the rules on them.
           fetch-depth: 0
       - run: bash .github/scripts/repo-rules.sh
+      # The guard scripts' own tests, in throwaway repositories.
+      - run: bash .github/scripts/test-guards.sh
       # Commit subjects, refactors without snapshot changes, an allowlist that only shrinks (per
       # commit), guard changes named in the pull request's body or flagged.
       - name: Rules on the pushed commits

@@ -14,12 +14,21 @@ failed=0
 # The lines `path size` of the allowlist, comments and blank lines left out.
 entries() { grep -v -e '^#' -e '^[[:space:]]*$' "$allowlist" || true; }
 
+# Every entry is a path and a whole number of lines, nothing else.
+while read -r path lines rest; do
+    if [[ ! "$lines" =~ ^[0-9]+$ || -n "$rest" ]]; then
+        echo "$allowlist: \"$path $lines${rest:+ $rest}\": an entry is a path and a whole number of lines"
+        failed=1
+    fi
+done < <(entries)
+
 while IFS= read -r -d '' file; do
     case "$file" in
     */tests/* | */tests.rs) continue ;;
     esac
     n=$(wc -l <"$file" | tr -d ' ')
     max=$(entries | awk -v f="$file" '$1 == f { print $2 }')
+    [[ -n "$max" && ! "$max" =~ ^[0-9]+$ ]] && continue
     if [[ -z "$max" ]]; then
         if ((n > LIMIT)); then
             echo "$file: $n lines (at most $LIMIT; split it)"

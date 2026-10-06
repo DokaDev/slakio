@@ -5,9 +5,10 @@
 #   2. a `refactor` commit changes no screen snapshot (no behavior changed, so no screen did);
 #   3. a commit that touches the file-size allowlist adds no entry and raises none against its
 #      parent (and the same holds over the whole range);
-#   4. a change to a guard (the limit of file-size.sh, these scripts, clippy.toml, the CI
-#      workflow) is named in the pull request's body (PR=true, PR_BODY), or, on a push,
-#      flagged with a warning.
+#   4. a commit that changes a guard (the limit of file-size.sh, these scripts, clippy.toml,
+#      the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
+#      (PR=true) also names each changed guard in its body (PR_BODY). Commits up to
+#      GUARD_TRAILER_SINCE, from before the rule, are exempt.
 # Without a usable BASE (a new branch, a force push, a shallow clone) the range falls back to
 # the merge base with origin/main, else to the whole history, with a warning; it never passes
 # silently.
@@ -32,16 +33,20 @@ loosened() {
     while read -r path lines; do
         [[ -z "$path" ]] && continue
         was=$(awk -v f="$path" '$1 == f { print $2 }' <<<"$before")
-        if [[ -z "$was" ]]; then
+        if [[ ! "$lines" =~ ^[0-9]+$ ]]; then
+            echo "$allowlist ($3): $path has \"$lines\", not a whole number of lines"
+            out=1
+        elif [[ -z "$was" ]]; then
             echo "$allowlist ($3): $path was added; split the file instead"
             out=1
-        elif ((lines > was)); then
+        elif [[ ! "$was" =~ ^[0-9]+$ ]] || ((lines > was)); then
             echo "$allowlist ($3): $path raised from $was to $lines; it may only be lowered"
             out=1
         fi
     done <<<"$after"
     return "$out"
 }
+since=${GUARD_TRAILER_SINCE:-1a64ad3b62676a55f11fe6daee95d5b86e77f068}
 guards=(.github/scripts/file-size.sh .github/scripts/history-rules.sh
     .github/scripts/repo-rules.sh .github/scripts/dependency-direction.sh clippy.toml .github/workflows/ci.yml)
 usable() { [[ -n "$1" && ! "$1" =~ ^0+$ ]] && git cat-file -e "$1^{commit}" 2>/dev/null; }
@@ -69,6 +74,14 @@ for commit in $(git rev-list --no-merges "$range"); do
     if [[ -n "$parent" ]] && git diff-tree --no-commit-id --name-only -r "$commit" | grep -qx "$allowlist" &&
         git cat-file -e "$parent:$allowlist" 2>/dev/null; then
         loosened "$parent" "$commit" "$short" || failed=1
+    fi
+    touched=$(git diff-tree --no-commit-id --root --name-only -r "$commit" -- "${guards[@]}")
+    if [[ -n "$touched" ]] && ! git merge-base --is-ancestor "$commit" "$since" 2>/dev/null; then
+        reason=$(git log -1 --format='%(trailers:key=Guard-change,valueonly)' "$commit" | tr -d '[:space:]')
+        if [[ -z "$reason" ]]; then
+            echo "$short \"$subject\": changes a guard ($(tr '\n' ' ' <<<"$touched")) without a Guard-change: trailer"
+            failed=1
+        fi
     fi
     if [[ "$subject" =~ ^refactor(\(|!|:) ]]; then
         changed=$(git diff-tree --no-commit-id --root --name-only -r "$commit" | grep '/snapshots/' || true)
@@ -100,7 +113,7 @@ while IFS= read -r file; do
             failed=1
         fi
     else
-        warn "a guard changed: $file"
+        warn "a guard changed: $file (see the Guard-change trailers)"
     fi
 done <<<"$changed"
 

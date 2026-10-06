@@ -56,11 +56,13 @@ budgets (`docs/perf.md`).
   squash-merged.
 - A `refactor:` commit changes no behavior, so it changes no snapshot under
   `tests/snapshots/` (CI checks every pushed commit, `.github/scripts/history-rules.sh`).
-- The guards are changed on purpose only: a pull request that changes the size limit of
+- The guards are changed on purpose only. A commit that changes the size limit of
   `.github/scripts/file-size.sh`, a script of `.github/scripts/` that checks the repository,
-  `clippy.toml` or `.github/workflows/ci.yml` names each changed file in its description and
-  says why (CI fails otherwise; a push to `main` gets a warning). The file-size allowlist may
-  only be lowered, never raised or added to, in any commit.
+  `clippy.toml` or `.github/workflows/ci.yml` says why in a trailer,
+  `Guard-change: <reason>` (CI fails without it), and a pull request that does names each
+  changed file in its description. The file-size allowlist holds a path and a whole number of
+  lines per entry, and may only be lowered, never raised or added to, in any commit
+  (`.github/scripts/test-guards.sh` tests these rules).
 - The code, comments and documentation are in English; Korean text only appears as the values
   of `locales/ko.toml` (CI checks this).
 
