@@ -11,7 +11,7 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 **Pre-alpha, early development. slakio does not connect to Slack yet.**
 
 What exists today is the project's foundation and the first part of the interface, on
-invented data only (`slakio --demo`): the top bar, the list panel of channels and DMs, the
+invented data only (`slakio --demo`): the list panel with its workspace and views, the channels and DMs, the
 conversation pane with a thread panel and a composer, and the status line. There is no sign-in
 and no real workspace yet; nothing is ever sent anywhere, and there is no release to install.
 Nothing here is ready for daily use.
@@ -28,15 +28,18 @@ images, and settings. This README only lists what works; it will grow with each 
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
-  - the top bar across the first row shows the workspace (its color band, its name, `▾`, then
-    each other workspace that wants you by its letter and mark, `· B @9`) and the views Home,
-    DMs, Activity, Files and Later (the last three say they come in a later version) with their
-    counts — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where
-    a mention is behind it, in the list, the tabs and the bar alike (a DM's pill counts its unread
-    messages, red when one mentions you); the status line repeats no count; the names shorten
-    only on a narrow screen; `Ctrl+R` or `Space r` (`:nav`) goes there from anywhere (and `Ctrl+R` back),
+  - the left column navigates, the right one is the work: the list panel's title is the
+    workspace (its color band, its name, `▾`, then each other workspace that wants you by its
+    letter and mark, `· B @9`), its first row the view switcher — Home, DMs, Activity, Files
+    and Later (the last three say they come in a later version) as icons (or letters) with their
+    counts, the view shown spelled out — `@3` mentions, `●16` the DMs' unread messages, `●`
+    unread channels; red only where a mention is behind it, in the list, the tabs and the
+    switcher alike (a DM's pill counts its unread messages, red when one mentions you); the
+    status line repeats no count; `[` / `]` in the list show the view before or after;
+    `Ctrl+R` or `Space r` (`:nav`) goes to the switcher from anywhere (and `Ctrl+R` back),
     `h` / `l` and `Enter` pick a view, `Esc` leaves; the workspace (or `Space W`, or a click on
-    it) opens a switcher of the workspaces with their counts;
+    it) opens a switcher of the workspaces with their counts; when the list panel makes room
+    for a thread on a narrow screen, the status line names the workspace and the view;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
     in the list and in the conversation's title;
   - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
@@ -75,8 +78,8 @@ images, and settings. This README only lists what works; it will grow with each 
   - every name and message from the (invented) remote side is shown through a sanitiser that
     removes terminal escape sequences, control and bidi characters; the demo has a channel of
     hostile strings and a few hostile names to show it;
-  - `Tab` / `Shift+Tab` go round the top bar, the list, the main pane and the thread panel; `Ctrl+h` /
-    `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the top bar left of the list; `Space h` /
+  - `Tab` / `Shift+Tab` go round the view switcher, the list, the main pane and the thread panel; `Ctrl+h` /
+    `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the view switcher before the list; `Space h` /
     `Space d` show Home / DMs; `Space e` hides the list panel;
   - the status line shows the keys worth knowing where you are, and every key is listed in
     [docs/keybindings.md](docs/keybindings.md).
@@ -103,7 +106,7 @@ Six keys get you everywhere:
 |---|---|
 | `?` (or `F1`) | The keyboard help for where you are: every key, searchable, and `Enter` runs one |
 | `Space` | Wait a moment: a popup lists what may follow (`Space h` Home, `Space d` DMs, …) |
-| `Tab` | The next panel, the top bar included (`Shift+Tab` the previous one) |
+| `Tab` | The next panel, the view switcher included (`Shift+Tab` the previous one) |
 | `Ctrl+P` | The command palette: every command and action by name, with its keys |
 | `Esc` | One step out; never closes anything |
 | `Ctrl+Q` | Quit (also `Space q`, `:qa`; `:q` and `Ctrl+W` only close the pane, then its tab) |
@@ -143,9 +146,9 @@ is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (als
 keeping your comments. `:avatars` (or `:set avatars=off`) does the same for `avatars`;
 `avatars = "image"` is kept for profile photos, which come in a later version, and draws
 initials until then. With `icons = "ask"`, `slakio
---demo` asks once whether your font shows the icons (the top bar previews the answer) and saves
+--demo` asks once whether your font shows the icons (the view switcher previews the answer) and saves
 the answer in the config file; `:icons on|off` changes it later. `rail_expand`, a setting of the
-left rail the top bar replaced, is ignored (the status line says it can be removed).
+left rail (later the top bar, now the view switcher), is ignored (the status line says it can be removed).
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.
