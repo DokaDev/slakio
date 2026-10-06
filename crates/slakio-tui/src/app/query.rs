@@ -116,17 +116,6 @@ impl App {
         }
     }
 
-    /// The popup that takes the keys, if one is up.
-    pub fn overlay(&self) -> Option<Overlay> {
-        if let Some(d) = &self.dialog {
-            return Some(Overlay::Dialog(d.question));
-        }
-        if self.help.is_some() {
-            return Some(Overlay::Help);
-        }
-        self.cmdline.is_open().then_some(Overlay::Palette)
-    }
-
     /// The pane `handle` names, while it is open.
     pub fn pane_for(&self, handle: PaneHandle) -> Option<PaneRef<'_>> {
         self.pane_ref(handle.0)

@@ -33,6 +33,7 @@ pub(crate) mod drafts;
 pub mod help;
 mod layout;
 pub mod model;
+mod overlay;
 pub mod palette;
 pub mod pane;
 pub mod query;
@@ -42,9 +43,7 @@ pub mod status;
 pub(crate) mod timelines;
 pub(crate) mod work;
 
-use crate::action::{
-    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
-};
+use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, DialogAction, PaneAction, ShellAction};
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
@@ -53,6 +52,7 @@ use composer::Composer;
 use dialog::{Dialog, Question};
 use help::Help;
 use model::Model;
+pub(crate) use overlay::Layer;
 pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
@@ -229,15 +229,15 @@ impl App {
         }
     }
 
-    /// Where the keyboard is.
+    /// Where the keyboard is: the top popup, else the screen.
     pub fn key_context(&self) -> Ctx {
-        if self.dialog.is_some() {
-            return Ctx::Dialog;
+        match self.overlay() {
+            Some(Overlay::Dialog(_)) => Ctx::Dialog,
+            Some(Overlay::Help) if self.help.as_ref().is_some_and(|h| h.typing) => Ctx::HelpFilter,
+            Some(Overlay::Help) => Ctx::Help,
+            Some(Overlay::Palette) => Ctx::CommandLine,
+            None => self.region_context(),
         }
-        if let Some(h) = &self.help {
-            return if h.typing { Ctx::HelpFilter } else { Ctx::Help };
-        }
-        self.screen_context()
     }
 
     /// Where the keyboard is on the screen under any popup.
@@ -430,10 +430,12 @@ impl App {
     /// on a composer writes in it; the wheel scrolls what is under it. `true` when the screen
     /// changed.
     fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
-        if self.cmdline.is_open() && self.dialog.is_none() {
-            return self.palette_mouse(m, now);
+        match self.overlay() {
+            Some(Overlay::Dialog(_)) => return false,
+            Some(Overlay::Palette) => return self.palette_mouse(m, now),
+            _ => {}
         }
-        if self.backend.is_none() || self.dialog.is_some() || screen::too_small(self.size) {
+        if self.backend.is_none() || screen::too_small(self.size) {
             return false;
         }
         let at = Position { x: m.column, y: m.row };
@@ -848,63 +850,6 @@ impl App {
         self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
         self.info(Msg::AvatarsChanged { name: value }, now);
         Ok(())
-    }
-
-    /// Open the keyboard help for context `ctx`.
-    fn open_help(&mut self, ctx: Ctx) {
-        self.keys.clear();
-        self.guide = Guide::default();
-        self.help = Some(Help::new(ctx));
-    }
-
-    fn help(&mut self, a: HelpAction, now: Instant) {
-        if a == HelpAction::Open {
-            if self.dialog.is_some() {
-                return;
-            }
-            match self.help {
-                Some(_) => self.help = None,
-                None => self.open_help(self.screen_context()),
-            }
-            return;
-        }
-        let Some(mut h) = self.help.take() else { return };
-        let rows = h.rows(&self.keymap, &self.i18n);
-        let page = h.height.get().max(1) as isize;
-        match a {
-            HelpAction::Open | HelpAction::Close => return,
-            HelpAction::Next => h.step(1, rows.len()),
-            HelpAction::Prev => h.step(-1, rows.len()),
-            HelpAction::PageDown => h.step(page, rows.len()),
-            HelpAction::PageUp => h.step(-page, rows.len()),
-            HelpAction::First => h.cursor = 0,
-            HelpAction::Last => h.cursor = rows.len().saturating_sub(1),
-            HelpAction::Expand => h.set_open(&rows, true),
-            HelpAction::Collapse => h.set_open(&rows, false),
-            HelpAction::Search => {
-                h.typing = true;
-                h.cursor = 0;
-            }
-            HelpAction::SearchDone => h.typing = false,
-            HelpAction::SearchCancel => {
-                h.typing = false;
-                h.filter.clear();
-                h.cursor = 0;
-            }
-            HelpAction::Run => match rows.get(h.cursor) {
-                Some(help::Row::Section { open, .. }) => h.set_open(&rows, !open),
-                Some(help::Row::Entry { action, .. }) => {
-                    // The help closes, then the key's action runs where the keyboard was.
-                    let action = *action;
-                    if !matches!(action, Action::Help(_) | Action::Dialog(_)) {
-                        self.dispatch(action, now);
-                    }
-                    return;
-                }
-                None => {}
-            },
-        }
-        self.help = Some(h);
     }
 
     fn answer(&mut self, a: DialogAction) {

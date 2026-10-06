@@ -3,11 +3,13 @@
 //! open first; the others are folded with their number of keys. `/` filters the rows; `Enter`
 //! runs the action of a row (or opens a section).
 
-use crate::action::{self, Action};
+use super::{App, Guide};
+use crate::action::{self, Action, HelpAction};
 use crate::keymap::{Ctx, Keymap, keys};
 use slakio_core::i18n::{I18n, Label};
 use std::cell::Cell;
 use std::collections::HashSet;
+use std::time::Instant;
 
 /// One row of the help.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,10 +115,70 @@ impl Help {
     }
 }
 
+/// The help's actions, routed here by [`App`].
+impl App {
+    /// Open the keyboard help for context `ctx`.
+    pub(super) fn open_help(&mut self, ctx: Ctx) {
+        self.keys.clear();
+        self.guide = Guide::default();
+        self.help = Some(Help::new(ctx));
+    }
+
+    pub(super) fn help(&mut self, a: HelpAction, now: Instant) {
+        if a == HelpAction::Open {
+            if self.dialog.is_some() {
+                return;
+            }
+            match self.help {
+                Some(_) => self.help = None,
+                None => self.open_help(self.screen_context()),
+            }
+            return;
+        }
+        let Some(mut h) = self.help.take() else { return };
+        let rows = h.rows(&self.keymap, &self.i18n);
+        let page = h.height.get().max(1) as isize;
+        match a {
+            HelpAction::Open | HelpAction::Close => return,
+            HelpAction::Next => h.step(1, rows.len()),
+            HelpAction::Prev => h.step(-1, rows.len()),
+            HelpAction::PageDown => h.step(page, rows.len()),
+            HelpAction::PageUp => h.step(-page, rows.len()),
+            HelpAction::First => h.cursor = 0,
+            HelpAction::Last => h.cursor = rows.len().saturating_sub(1),
+            HelpAction::Expand => h.set_open(&rows, true),
+            HelpAction::Collapse => h.set_open(&rows, false),
+            HelpAction::Search => {
+                h.typing = true;
+                h.cursor = 0;
+            }
+            HelpAction::SearchDone => h.typing = false,
+            HelpAction::SearchCancel => {
+                h.typing = false;
+                h.filter.clear();
+                h.cursor = 0;
+            }
+            HelpAction::Run => match rows.get(h.cursor) {
+                Some(Row::Section { open, .. }) => h.set_open(&rows, !open),
+                Some(Row::Entry { action, .. }) => {
+                    // The help closes, then the key's action runs where the keyboard was.
+                    let action = *action;
+                    if !matches!(action, Action::Help(_) | Action::Dialog(_)) {
+                        self.dispatch(action, now);
+                    }
+                    return;
+                }
+                None => {}
+            },
+        }
+        self.help = Some(h);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::{AppAction, HelpAction, ShellAction};
+    use crate::action::{AppAction, ShellAction};
     use slakio_core::i18n::Lang;
 
     #[test]

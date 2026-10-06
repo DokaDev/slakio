@@ -250,3 +250,17 @@ fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
     d.keys("enter");
     assert!(d.app.quit);
 }
+
+#[test]
+fn the_help_opened_over_the_palette_is_drawn_on_top_and_takes_the_mouse() {
+    let mut d = Demo::new(120, 40);
+    d.keys(":");
+    d.keys("f1");
+    assert_eq!(d.app.overlay(), Some(Overlay::Help), "the keys go to the help");
+    let s = d.screen();
+    assert!(s.contains("Keys — Command line"), "the help shows: {s}");
+    assert!(!s.contains("Tab/↑↓ select"), "the palette under it is not drawn over it: {s}");
+    let selected = d.app.cmdline.selected;
+    d.mouse(MouseEventKind::ScrollDown, 60, 20);
+    assert_eq!(d.app.cmdline.selected, selected, "the wheel goes to the help, not the palette under it");
+}

@@ -24,6 +24,7 @@ pub mod timeline;
 mod work;
 
 use crate::app::App;
+use crate::app::Layer;
 use crate::app::shell::{Region, View};
 use crate::avatar;
 use crate::screen;
@@ -61,23 +62,32 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
         rail::draw(f, app, a.rail);
     }
     statusline::draw(f, app, status, now);
-    if app.which_key_visible(now) && app.help.is_none() && app.dialog.is_none() {
-        app.theme.dim_area(f.buffer_mut(), body);
-        guide::draw(f, app, body);
-    }
-    if app.help.is_some() {
-        app.theme.dim_area(f.buffer_mut(), body);
-        help::draw(f, app, body);
-    }
-    if app.cmdline.is_open() && app.dialog.is_none() && !screen::too_small(area) {
-        // The whole screen dims, the mode badge stays; the palette goes on top.
-        app.theme.dim_area(f.buffer_mut(), area);
-        statusline::badge(f, app, status);
-        palette::draw(f, app);
-    }
-    if app.dialog.is_some() {
-        app.theme.dim_area(f.buffer_mut(), area);
-        dialog::draw(f, app, body);
+    // The popups bottom up, in the order the keys and the mouse follow; the palette and the
+    // which-key popup only on top.
+    let layers = app.layers(Some(now));
+    for (i, layer) in layers.iter().enumerate().rev() {
+        let top = i == 0;
+        match layer {
+            Layer::WhichKey if top => {
+                app.theme.dim_area(f.buffer_mut(), body);
+                guide::draw(f, app, body);
+            }
+            Layer::Palette if top && !screen::too_small(area) => {
+                // The whole screen dims, the mode badge stays; the palette goes on top.
+                app.theme.dim_area(f.buffer_mut(), area);
+                statusline::badge(f, app, status);
+                palette::draw(f, app);
+            }
+            Layer::Help => {
+                app.theme.dim_area(f.buffer_mut(), body);
+                help::draw(f, app, body);
+            }
+            Layer::Dialog => {
+                app.theme.dim_area(f.buffer_mut(), area);
+                dialog::draw(f, app, body);
+            }
+            Layer::WhichKey | Layer::Palette => {}
+        }
     }
 }
 
