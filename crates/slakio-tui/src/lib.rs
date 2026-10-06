@@ -20,6 +20,7 @@ pub mod action;
 pub mod app;
 pub mod avatar;
 pub mod demo;
+pub mod emoji;
 pub mod exchange;
 pub mod input;
 pub mod keymap;
