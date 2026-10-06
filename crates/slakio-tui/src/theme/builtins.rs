@@ -24,11 +24,9 @@ pub const WORKSPACE_COLORS: [Color; 12] = [
 pub const ANSI_WORKSPACE_COLORS: [Color; 6] =
     [Color::Green, Color::Magenta, Color::Cyan, Color::Yellow, Color::Blue, Color::Red];
 
-/// Avatar hues of the dark themes and of `catppuccin-latte`: soft light colors. A dark theme
-/// draws a chip as a tint of its hue on the background with the hue as the initials
-/// ([`Theme::avatar_tint`]), so it stays quieter than the selection bar and the accent;
-/// `catppuccin-latte` draws them solid under its dark badge text. No red, pink or salmon: red
-/// is the mention pills' alone.
+/// Avatar hues of the dark themes: soft light colors, each drawn as a tint of the hue on the
+/// background with the hue as the initials ([`Theme::avatar_tint`]), so a chip stays quieter
+/// than the selection bar and the accent. No red, pink or salmon: red is the mention pills'.
 pub const AVATARS_BRIGHT: [Color; 8] = [
     rgb(0xCCC77E),
     rgb(0xB5CC7A),
@@ -40,8 +38,8 @@ pub const AVATARS_BRIGHT: [Color; 8] = [
     rgb(0xA8B8C8),
 ];
 
-/// Avatar chips of the light themes whose badge text is light: deep colors, each 4.5:1 with
-/// it, none red.
+/// Avatar hues of the light themes: deep colors, drawn as a light tint of the hue with the hue,
+/// darker still, as the initials (4.5:1). None red.
 pub const AVATARS_DEEP: [Color; 8] = [
     rgb(0x6B5E00),
     rgb(0x2F6A3A),
@@ -53,9 +51,10 @@ pub const AVATARS_DEEP: [Color; 8] = [
     rgb(0x556B2F),
 ];
 
-/// Avatar chips of the ANSI theme: bright colors under black text, red left to the pills.
-pub const ANSI_AVATARS: [Color; 6] =
-    [Color::LightBlue, Color::LightMagenta, Color::LightCyan, Color::LightGreen, Color::LightYellow, Color::Gray];
+/// Avatar initials of the ANSI theme, bold without a background (a solid block is a pill's):
+/// no red, no magenta (it reads pink), and none of the accent, the borders or the marks.
+pub const ANSI_AVATARS: [Color; 5] =
+    [Color::LightBlue, Color::LightCyan, Color::LightGreen, Color::LightYellow, Color::Blue];
 
 /// The terminal's own 16 colors, so it follows the user's palette. Muted text is ANSI 7 on a
 /// dark background; [`resolve`] makes it ANSI 8 on a light one.
@@ -176,7 +175,7 @@ pub const TOKYO_NIGHT_DAY: Theme = Theme {
     mode_fg: rgb(0xE1E2E7),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
-    avatar_tint: 0,
+    avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 79 },
 };
 
@@ -206,7 +205,7 @@ pub const LIGHT: Theme = Theme {
     mode_fg: rgb(0xFFFFFF),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
-    avatar_tint: 0,
+    avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 55 },
 };
 
@@ -298,8 +297,8 @@ pub const CATPPUCCIN_LATTE: Theme = Theme {
     mode_command: rgb(0xFE640B),
     mode_fg: rgb(0x11111B),
     workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
-    avatar_tint: 0,
+    avatars: &AVATARS_DEEP,
+    avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 78 },
 };
 
@@ -362,7 +361,7 @@ pub const GRUVBOX_LIGHT: Theme = Theme {
     mode_fg: rgb(0xFBF1C7),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
-    avatar_tint: 0,
+    avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x606060), keep: 60 },
 };
 

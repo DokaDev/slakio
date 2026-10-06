@@ -27,6 +27,13 @@ use slakio_core::model::{Presence, WorkspaceColor};
 mod builtins;
 pub use builtins::*;
 
+/// `c` with `keep` percent of its brightness (toward black).
+fn darken(c: Color, keep: u16) -> Color {
+    let Color::Rgb(r, g, b) = c else { return c };
+    let k = |v: u8| (u16::from(v) * keep / 100) as u8;
+    Color::Rgb(k(r), k(g), k(b))
+}
+
 const fn rgb(hex: u32) -> Color {
     Color::Rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
 }
@@ -353,35 +360,45 @@ impl Theme {
         Style::new().fg(self.mode_fg).bg(bg).add_modifier(Modifier::BOLD)
     }
 
-    /// A person's avatar chip, of color slot `slot`: their initials bold on their color (a tint
-    /// of it with the initials in it on a dark theme), or reversed without colors.
+    /// A person's avatar chip, of color slot `slot`: their initials bold in their color on a
+    /// tint of it (darkened on a light background, for 4.5:1), solid under [`Self::mode_fg`]
+    /// where a theme has no tint; colored initials alone in the 16-color theme (a solid block
+    /// there is a pill); reversed without colors.
     pub fn avatar(&self, slot: usize) -> Style {
-        if self.plain() {
-            return Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD);
-        }
         let hue = self.avatars[slot % self.avatars.len()];
         let style = Style::new().add_modifier(Modifier::BOLD);
-        match self.tint(hue, self.avatar_tint) {
-            Some(bg) => style.fg(hue).bg(bg),
-            None => style.fg(self.mode_fg).bg(hue),
+        match self.kind {
+            Kind::NoColor => style.add_modifier(Modifier::REVERSED),
+            Kind::Ansi => style.fg(hue),
+            Kind::Truecolor => match self.tint(hue, self.avatar_tint) {
+                Some(bg) if self.light() => style.fg(darken(hue, 80)).bg(bg),
+                Some(bg) => style.fg(hue).bg(bg),
+                None => style.fg(self.mode_fg).bg(hue),
+            },
         }
     }
 
     /// The chip of a group DM (how many people are in it): body text on a tint of the muted
-    /// color, visible on the background.
+    /// color, visible on the background; muted bold text in the 16-color theme.
     pub fn avatar_group(&self) -> Style {
         match self.kind {
             Kind::NoColor => self.bold(),
-            Kind::Ansi => Style::new().fg(self.fg).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            Kind::Ansi => self.muted().add_modifier(Modifier::BOLD),
             Kind::Truecolor => self.text().bg(self.neutral_chip()).add_modifier(Modifier::BOLD),
         }
+    }
+
+    /// The theme's background is light (an RGB one brighter than mid gray).
+    fn light(&self) -> bool {
+        matches!(self.bg, Color::Rgb(r, g, b) if u16::from(r) + u16::from(g) + u16::from(b) > 384)
     }
 
     /// The chip of a muted conversation: muted initials on the group chip's background.
     pub fn avatar_muted(&self) -> Style {
         match self.kind {
             Kind::NoColor => self.faint(),
-            _ => self.muted().bg(self.avatar_group().bg.unwrap_or(self.bg)),
+            Kind::Ansi => self.muted(),
+            Kind::Truecolor => self.muted().bg(self.neutral_chip()),
         }
     }
 

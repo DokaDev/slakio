@@ -239,6 +239,7 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
     for t in truecolor() {
         let n = t.name;
         assert!(t.avatars.len() >= 6, "{n}");
+        assert!(TERMINAL.avatars.len() >= 5);
         let mut bgs = Vec::new();
         for slot in 0..t.avatars.len() {
             let chip = t.avatar(slot);
@@ -257,8 +258,10 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
                 assert!((35.0..=290.0).contains(&h), "{n}: chip {slot} hue {h:.0} is in the red family");
                 assert!(apart >= 40.0, "{n}: chip {slot} hue {h:.0} is near the pills' {e:.0}");
             }
+            // A tint, never a solid block (blocks are the pills'): close to the background.
+            assert!(contrast(bg, t.bg) <= 1.6, "{n}: chip {slot} is a block {:.2}", contrast(bg, t.bg));
             if dark(t) {
-                // A tint: no louder than the selection bar, far below the accent.
+                // No louder than the selection bar, far below the accent.
                 assert!(luminance(bg) <= luminance(t.selection), "{n}: chip {slot} brighter than the selection bar");
                 assert!(luminance(bg) < luminance(t.accent), "{n}: chip {slot} brighter than the accent");
             }
@@ -273,15 +276,25 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
         assert!(contrast(gbg, t.bg) >= 1.15, "{n}: group chip on the background {:.2}", contrast(gbg, t.bg));
         assert!(contrast(group.fg.unwrap(), gbg) >= 4.5, "{n}: group chip text");
     }
-    // The 16-color theme: bright colors under black, no red; the group chip has a background.
-    assert!(TERMINAL.avatars.iter().all(|c| !matches!(c, Color::Black | Color::DarkGray | Color::Reset | Color::Red)));
-    assert!(!matches!(TERMINAL.avatar_group().bg, None | Some(Color::Reset)));
+    // The 16-color theme: colored bold initials without a background (a solid block is a
+    // pill), never red or magenta (it reads pink).
+    for c in TERMINAL.avatars {
+        assert!(!matches!(c, Color::Red | Color::LightRed | Color::Magenta | Color::LightMagenta), "{c:?}");
+        assert!(!matches!(c, Color::Black | Color::DarkGray | Color::Reset), "{c:?}");
+        let t = &TERMINAL;
+        assert!(![t.accent, t.border, t.success, t.warning, t.error, t.fg_muted].contains(c), "{c:?} is a token's");
+    }
+    for slot in 0..TERMINAL.avatars.len() {
+        assert_eq!(TERMINAL.avatar(slot).bg, None, "chip {slot}");
+        assert!(TERMINAL.avatar(slot).add_modifier.contains(Modifier::BOLD));
+    }
+    assert_eq!(TERMINAL.avatar_group().bg, None);
     for t in BUILTINS {
         let mut buf = Buffer::empty(Rect::new(0, 0, 4, 1));
         buf[(1, 0)].set_style(t.avatar(3));
         buf[(2, 0)].set_style(t.avatar_group());
         t.paint_selection(&mut buf, Rect::new(0, 0, 4, 1), Selection::Focused);
-        if t.kind != Kind::NoColor {
+        if t.kind == Kind::Truecolor {
             assert_eq!(Some(buf[(1, 0)].bg), t.avatar(3).bg, "{}: the chip keeps its color", t.name);
             assert_eq!(Some(buf[(2, 0)].bg), t.avatar_group().bg, "{}: the group chip too", t.name);
         }

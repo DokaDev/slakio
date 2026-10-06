@@ -141,8 +141,10 @@ truecolor theme passes WCAG contrast checks (`theme/tests.rs`): body text 4.5:1 
 muted text and marks 3:1, pills, mode badges and the initials on avatar chips 4.5:1 (4.3:1 on
 a dark theme's tinted chip). An avatar chip (`avatar.rs`: initials and a color slot hashed
 from the person's id) takes one of the theme's avatar hues, none in the red family (red is the
-mention pills'); a dark theme draws it as a tint of the hue on the background with the hue as
-the initials, never brighter than the selection bar or the accent. Two rules hold in every theme and are
+mention pills'); a truecolor theme draws it as a tint of the hue on the background with the
+hue as the initials (darkened on a light theme), never brighter than the selection bar or the
+accent, and the 16-color theme as colored initials without a background: a solid block is a
+pill's. Two rules hold in every theme and are
 tested cell by cell (`tests/style_flows.rs`): the focus shows on a panel's border and title
 only, and a selection is a background (or a bar in the left gutter), never an underline.
 
