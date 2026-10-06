@@ -12,7 +12,7 @@ failed=0
 repo() {
     local dir=$scratch/$1 lines=$2 entry=$3
     mkdir -p "$dir/.github/scripts" "$dir/src"
-    cp "$here/file-size.sh" "$here/history-rules.sh" "$dir/.github/scripts/"
+    cp "$here/file-size.sh" "$here/history-rules.sh" "$here/repo-rules.sh" "$dir/.github/scripts/"
     seq "$lines" | sed 's/^/\/\/ /' >"$dir/src/big.rs"
     printf '# test\nsrc/big.rs %s\n' "$entry" >"$dir/.github/scripts/file-size-allowlist.txt"
     git -C "$dir" init -q -b main
@@ -110,6 +110,20 @@ git -C "$d" reset -q --hard "$base"
 printf '[package]\nname = "a"\nversion = "1.0.0"\n\n[lints]\nworkspace = true\n' >"$d/crates/a/Cargo.toml"
 commit "$d" -m "build: a version"
 expect pass "a crate's Cargo.toml changed outside its lints" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+
+d=$(repo inner-expect 10 10)
+printf '#![expect(clippy::too_many_lines, reason = "a whole file")]\nfn f() {}\n' >"$d/src/lib.rs"
+commit "$d" -m "feat: a file-wide expectation"
+expect fail "a clippy lint expected for a whole file" in_repo "$d" bash .github/scripts/repo-rules.sh
+printf '#![allow(clippy::all)]\nfn f() {}\n' >"$d/src/lib.rs"
+commit "$d" -m "feat: a file-wide allow"
+expect fail "a clippy lint allowed for a whole file" in_repo "$d" bash .github/scripts/repo-rules.sh
+printf '#![cfg_attr(test, expect(clippy::too_many_lines, reason = "x"))]\nfn f() {}\n' >"$d/src/lib.rs"
+commit "$d" -m "feat: a conditional file-wide expectation"
+expect fail "a clippy lint expected for a whole file under cfg_attr" in_repo "$d" bash .github/scripts/repo-rules.sh
+printf '#[expect(clippy::too_many_lines, reason = "one function")]\nfn f() {}\n' >"$d/src/lib.rs"
+commit "$d" -m "feat: one function"
+expect pass "a clippy lint expected on one function" in_repo "$d" bash .github/scripts/repo-rules.sh
 
 if ((failed)); then
     exit 1

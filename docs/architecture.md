@@ -43,7 +43,9 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
   `#[expect(clippy::too_many_lines)]` on the function — and may only shrink; the repository
   rules and clippy fail on a new one.
 - A lint is silenced only with `#[expect(<lint>, reason = "…")]`, which fails once the lint no
-  longer fires; clippy refuses `#[allow]` (`allow_attributes`, `allow_attributes_without_reason`).
+  longer fires; clippy refuses `#[allow]` (`allow_attributes`, `allow_attributes_without_reason`),
+  and the repository rules refuse a clippy lint silenced for a whole file or crate (`#![…]`):
+  it goes on the one item that needs it.
 
 ## The UI: state, actions, effects
 

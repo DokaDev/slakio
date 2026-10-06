@@ -5,6 +5,9 @@
 #      parts, so this file does not trip the rule itself).
 #   3. No absolute paths of someone's home directory (`/Users/<name>`, `C:\Users\<name>`).
 #   4. No Rust file grows past the size limit, and the longer ones only shrink (file-size.sh).
+#   5. No clippy lint is allowed or expected for a whole file or crate (`#![allow(clippy::…)]`,
+#      `#![expect(clippy::…)]`, also under `cfg_attr`): a lint is silenced on the one item that
+#      needs it, so the function-length guard cannot be switched off wholesale.
 # Binary files are skipped. Prints every offending line and fails when there is one.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -30,6 +33,8 @@ while (my $file = <STDIN>) {
         }
         push @why, "the old project name" if $line =~ /\Q$old\E/i;
         push @why, "an absolute home path" if $line =~ m{/Users/[A-Za-z]|[A-Za-z]:\\{1,2}Users\\{1,2}[A-Za-z]}i;
+        push @why, "a clippy lint silenced for a whole file (put it on the item)"
+            if $file =~ /\.rs$/ && $line =~ /^\s*#!\[.*\b(?:allow|expect)\s*\(.*\bclippy::/;
         for my $w (@why) {
             print "$file:$.: $w\n";
             $failed = 1;
