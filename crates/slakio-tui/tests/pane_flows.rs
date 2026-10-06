@@ -334,3 +334,25 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
     assert_eq!(d.pane(PaneKind::Thread).unwrap().messages().len(), 1_201, "the thread's message and its replies");
     check(&mut d, "thread gg");
 }
+
+#[test]
+fn two_panes_on_one_conversation_share_its_messages_and_load_it_once() {
+    let mut d = Demo::new(200, 50);
+    d.open("backend");
+    let target = d.app.open_target().unwrap().clone();
+    d.app.open_beside(target.clone());
+    assert!(d.app.take_commands().is_empty(), "the second pane loads nothing");
+    let panes = d.app.open_panes();
+    assert_eq!(panes.len(), 2);
+    assert!(!panes[0].messages().is_empty() && panes[0].messages() == panes[1].messages());
+    assert_eq!(d.app.focused_pane().map(|p| p.handle()), Some(panes[1].handle()));
+    assert!(d.app.pane_showing(&target).is_some());
+    // Written in one, sent: the message is in both, and the draft is gone from both.
+    d.keys("i");
+    d.type_text("both");
+    d.keys("enter esc");
+    for p in d.app.open_panes() {
+        assert_eq!(p.messages().last().unwrap().text.as_str(), "both");
+        assert!(p.composer_text().is_empty());
+    }
+}
