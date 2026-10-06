@@ -8,7 +8,7 @@ mod demo;
 
 use demo::Demo;
 use ratatui::crossterm::event::{MouseButton, MouseEventKind};
-use slakio_tui::app::{Focus, Overlay, PaneKind};
+use slakio_tui::app::{Focus, Mode, Overlay, PaneKind};
 use slakio_tui::tabbar::{Hit, Part};
 
 /// The titles of the tabs, in order.
@@ -305,4 +305,23 @@ fn each_tab_keeps_the_history_of_its_own_pane() {
     assert_eq!(focused_name(&d), "backend", "the first tab's pane goes back in its own history");
     d.keys("space 2 ctrl+o");
     assert_eq!(focused_name(&d), "incidents");
+}
+
+#[test]
+fn switching_tabs_by_any_path_leaves_insert_mode() {
+    let mut d = two_tabs(120, 40);
+    d.keys("i");
+    assert_eq!(d.app.mode(), Mode::Insert);
+    let (x, y) = (column(&d, 0, Part::Title), bar_row(&d));
+    click(&mut d, MouseButton::Left, x, y);
+    assert_eq!((d.app.current_tab(), d.app.mode()), (Some(0), Mode::Normal), "a click on another tab");
+    d.keys("space 2 i ctrl+p");
+    d.type_text("tabnext");
+    d.keys("enter");
+    assert_eq!((d.app.current_tab(), d.app.mode()), (Some(0), Mode::Normal), "a command from the palette");
+    // Writing in the same pane, the composer keeps Insert mode.
+    d.keys("i");
+    let (x, y) = (column(&d, 0, Part::Number), bar_row(&d));
+    click(&mut d, MouseButton::Left, x, y);
+    assert_eq!(d.app.mode(), Mode::Insert, "a click on the tab shown changes nothing");
 }

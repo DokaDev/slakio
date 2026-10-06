@@ -141,12 +141,15 @@ impl Work {
         self.active().and_then(|id| self.panes.get_mut(&id))
     }
 
-    /// Make pane `id` the active one, showing its tab (the app does, as it moves the focus);
-    /// Insert mode goes along. A pane that is not open is not made active.
+    /// Make pane `id` the active one, showing its tab (the app does, as it moves the focus).
+    /// Another pane than the active one is reached in Normal mode, by whatever path (a key, a
+    /// click, a command); the active pane keeps Insert mode. A pane that is not open is not made
+    /// active.
     pub fn activate(&mut self, id: PaneId) {
-        let insert = self.insert();
+        if self.active() != Some(id) {
+            self.set_insert(false);
+        }
         self.point(id);
-        self.set_insert(insert);
         self.check();
     }
 
