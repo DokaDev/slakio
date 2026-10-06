@@ -13,8 +13,9 @@
 //! conversation that is already open focuses it instead of loading it again.
 //!
 //! The panes are views. What they show is held once per target, outside them: the messages in
-//! the [`TimelineStore`], what is being written in the [`DraftStore`]. A target no pane shows any
-//! more is dropped from both, so opening it again loads it afresh. Pages are asked for through
+//! the [`TimelineStore`], what is being written in the [`DraftStore`]. The messages of a target no
+//! pane shows any more are dropped, so opening it again loads it afresh; its draft stays, and is
+//! there again when it is opened. Pages are asked for through
 //! the app's one [`Requests`] allocator; an answer for an older request or another target is
 //! dropped.
 
@@ -160,11 +161,12 @@ impl Work {
         }
     }
 
-    /// Drop the messages and drafts of the targets no pane shows.
+    /// Drop the messages of the targets no pane shows, and the empty drafts. A draft with text
+    /// stays for when its target is opened again.
     fn prune(&mut self) {
         let shown: Vec<Target> = [&self.main, &self.thread].into_iter().flatten().map(|p| p.target.clone()).collect();
         self.timelines.retain(|t| shown.contains(t));
-        self.drafts.retain(|t| shown.contains(t));
+        self.drafts.retain(|t, c| shown.contains(t) || !c.is_empty());
     }
 
     /// Open the conversation `target` in the main pane (focusing it if it is open already).
@@ -263,7 +265,7 @@ impl Work {
         closed
     }
 
-    /// Any composer holds text that was not sent.
+    /// Any draft holds text that was not sent, open in a pane or not.
     pub fn unsent(&self) -> bool {
         self.drafts.unsent()
     }
@@ -363,6 +365,7 @@ impl Work {
         }
         self.back.retain(|t| model.target(t).is_some());
         self.forward.retain(|t| model.target(t).is_some());
+        self.drafts.retain(|t, _| model.target(t).is_some());
     }
 }
 

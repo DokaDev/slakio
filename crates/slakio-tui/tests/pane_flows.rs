@@ -7,7 +7,8 @@
 mod demo;
 
 use demo::{Demo, assert_harmless, mask_hangul};
-use slakio_tui::app::{Effect, Focus, Mode, PaneKind, PaneRef};
+use slakio_tui::app::dialog::Question;
+use slakio_tui::app::{Effect, Focus, Mode, Overlay, PaneKind, PaneRef};
 use slakio_tui::ui::timeline;
 
 /// The conversation pane (open).
@@ -355,4 +356,22 @@ fn two_panes_on_one_conversation_share_its_messages_and_load_it_once() {
         assert_eq!(p.messages().last().unwrap().text.as_str(), "both");
         assert!(p.composer_text().is_empty());
     }
+}
+
+#[test]
+fn a_draft_is_kept_when_its_conversation_closes_and_quitting_asks_about_it() {
+    let mut d = Demo::new(120, 40);
+    d.open("backend");
+    d.keys("i");
+    d.type_text("half written");
+    d.keys("esc ctrl+w");
+    assert!(d.app.open_target().is_none());
+    d.open("incidents");
+    assert_eq!(conversation(&d).composer_text(), "", "another conversation, another draft");
+    d.open("backend");
+    assert_eq!(conversation(&d).composer_text(), "half written", "back where it was left");
+    d.open("incidents");
+    d.keys("ctrl+q");
+    assert!(!d.app.quit);
+    assert_eq!(d.app.overlay(), Some(Overlay::Dialog(Question::Quit)), "a draft of a closed pane is not sent");
 }

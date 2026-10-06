@@ -171,7 +171,7 @@ fn two_panes_on_one_target_share_its_messages_and_load_them_once() {
     w.close();
     assert!(w.timelines.get(&target).is_some());
     w.close();
-    assert!(w.timelines.get(&target).is_none() && w.drafts.get(&target).is_none());
+    assert!(w.timelines.get(&target).is_none());
 }
 
 #[test]
@@ -188,4 +188,25 @@ fn a_page_for_a_closed_pane_is_dropped_and_reopening_loads_afresh() {
     let asked = w.take_requests();
     assert_eq!(asked.len(), 1, "loaded again");
     assert!(asked[0].0 > g, "one allocator: every request a new id");
+}
+
+#[test]
+fn a_draft_outlives_its_pane_and_is_there_when_its_target_opens_again() {
+    let m = model();
+    let mut w = Work::default();
+    let (backend, incidents) = (conversation(&m, "backend"), conversation(&m, "incidents"));
+    w.open(backend.clone());
+    w.with_draft(|c| c.insert("half written"));
+    w.open(incidents.clone());
+    assert!(w.unsent(), "a draft of a closed pane is still not sent");
+    w.with_draft(|c| c.insert(" "));
+    w.with_draft(|c| {
+        c.backspace();
+    });
+    w.close();
+    assert!(w.drafts.get(&incidents).is_none(), "an empty draft is not kept");
+    w.open(backend.clone());
+    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "half written");
+    w.clamp(&m);
+    assert!(w.drafts.get(&backend).is_some(), "kept while its conversation exists");
 }
