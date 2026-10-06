@@ -3,13 +3,16 @@
 //!
 //! ```toml
 //! language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
-//! theme = "auto"           # "auto", "terminal", "dark", "tokyo-night" (-night / -day)
+//! theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast", "nord",
+//!                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
+//!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
 //! rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
-//! terminal's own colors.
+//! terminal's own colors. A family takes its light or its dark variant by the terminal's
+//! background. `:theme <name>` changes it while the app runs and saves it here (comments kept).
 //!
 //! `rail_expand` is temporary: both ways exist until one is chosen, then the setting goes.
 //!
@@ -52,7 +55,24 @@ impl Default for Config {
 pub const LANGUAGES: &[&str] = &["auto", "en", "ko"];
 
 /// The values `theme` takes (the UI's built-in themes).
-pub const THEMES: &[&str] = &["auto", "terminal", "dark", "tokyo-night", "tokyo-night-night", "tokyo-night-day"];
+pub const THEMES: &[&str] = &[
+    "auto",
+    "terminal",
+    "dark",
+    "light",
+    "high-contrast",
+    "catppuccin",
+    "catppuccin-latte",
+    "catppuccin-mocha",
+    "tokyo-night",
+    "tokyo-night-day",
+    "tokyo-night-night",
+    "gruvbox",
+    "gruvbox-light",
+    "gruvbox-dark",
+    "nord",
+    "dracula",
+];
 
 /// The values `icons` takes (`true` and `false` are `on` and `off`).
 pub const ICONS: &[&str] = &["on", "off", "ask"];

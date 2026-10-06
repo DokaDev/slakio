@@ -2,9 +2,11 @@
 //! never name a color of their own; they ask the theme for a role ([`Theme::text`],
 //! [`Theme::title`], [`Theme::badge`], …).
 //!
-//! The built-ins ([`BUILTINS`]): `terminal` (the terminal's own 16 ANSI colors, so it follows
-//! the user's palette), `dark`, and `tokyo-night` (a family: `tokyo-night-night` on a dark
-//! background, `tokyo-night-day` on a light one). The setting `theme = "auto"` (the default)
+//! The built-ins ([`BUILTINS`]): `terminal` (the terminal's own 16 ANSI
+//! colors, so it follows the user's palette), `dark`, `light`, `high-contrast`, `nord`,
+//! `dracula`, and three families that take their light or dark variant by the terminal's
+//! background: `catppuccin` (`-latte` / `-mocha`), `tokyo-night` (`-day` / `-night`) and
+//! `gruvbox` (`-light` / `-dark`). The setting `theme = "auto"` (the default)
 //! takes `tokyo-night` on a terminal that says it shows 24-bit color (`COLORTERM` is `truecolor`
 //! or `24bit`), else `terminal` ([`resolve`]). With `NO_COLOR` set (to anything but the empty
 //! string, <https://no-color.org>) [`Theme::no_color`] draws without any color: everything a

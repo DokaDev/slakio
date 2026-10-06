@@ -14,16 +14,13 @@ use slakio_core::i18n::Lang;
 use slakio_tui::app::Settings;
 use slakio_tui::app::shell::Region;
 use slakio_tui::screen;
-use slakio_tui::theme::{Background, Kind, Theme, resolve};
+use slakio_tui::theme::{BUILTINS, Background, Kind, Theme, resolve};
 
+/// Every built-in theme (the terminal's colors on a dark background), and none.
 fn themes() -> Vec<Theme> {
-    vec![
-        resolve("terminal", false, Background::Dark),
-        resolve("dark", true, Background::Dark),
-        resolve("tokyo-night", true, Background::Dark),
-        resolve("tokyo-night", true, Background::Light),
-        Theme::no_color(),
-    ]
+    let mut out: Vec<Theme> = BUILTINS.iter().map(|t| resolve(t.name, true, Background::Dark)).collect();
+    out.push(Theme::no_color());
+    out
 }
 
 fn demo(theme: &Theme, w: u16, h: u16) -> Demo {

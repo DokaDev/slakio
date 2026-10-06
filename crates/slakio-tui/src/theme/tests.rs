@@ -42,18 +42,63 @@ fn colors(t: &Theme) -> Vec<Color> {
     v
 }
 
+/// The built-in themes that draw with 24-bit colors (the contrast checks are about RGB).
+fn truecolor() -> impl Iterator<Item = &'static Theme> {
+    BUILTINS.iter().copied().filter(|t| t.kind == Kind::Truecolor)
+}
+
+/// A theme for a dark background (its body text is lighter than its background).
+fn dark(t: &Theme) -> bool {
+    luminance(t.fg) > luminance(t.bg)
+}
+
+/// WCAG 2 contrast: body text 4.5:1 on every surface it is drawn on (also on the selection and
+/// the cursor line), muted text and marks 3:1, the pills and the mode badges 4.5:1.
 #[test]
-fn truecolor_themes_keep_text_readable() {
-    for t in [&DARK, &TOKYO_NIGHT_NIGHT, &TOKYO_NIGHT_DAY] {
+fn every_truecolor_theme_keeps_text_readable() {
+    assert!(truecolor().count() >= 11, "every built-in but the terminal's own colors");
+    for t in truecolor() {
         let n = t.name;
-        assert!(contrast(t.fg, t.bg) >= 4.5, "{n}: body text {:.2}", contrast(t.fg, t.bg));
-        assert!(contrast(t.fg_muted, t.bg) >= 3.0, "{n}: muted text {:.2}", contrast(t.fg_muted, t.bg));
+        for bg in [t.bg, t.surface, t.surface_alt, t.selection, t.cursor_line, t.range] {
+            assert!(contrast(t.fg, bg) >= 4.5, "{n}: body text on {bg:?} {:.2}", contrast(t.fg, bg));
+        }
+        for bg in [t.bg, t.surface, t.surface_alt] {
+            assert!(contrast(t.fg_muted, bg) >= 3.0, "{n}: muted on {bg:?} {:.2}", contrast(t.fg_muted, bg));
+            for c in [t.accent, t.accent_warm, t.success, t.warning, t.error] {
+                assert!(contrast(c, bg) >= 3.0, "{n}: {c:?} on {bg:?} {:.2}", contrast(c, bg));
+            }
+        }
         assert!(contrast(t.mode_fg, t.error) >= 4.5, "{n}: badge {:.2}", contrast(t.mode_fg, t.error));
-        assert!(contrast(t.fg, t.selection) >= 4.5, "{n}: text on the selection {:.2}", contrast(t.fg, t.selection));
-        assert!(contrast(t.fg, t.surface) >= 4.5, "{n}: status line {:.2}", contrast(t.fg, t.surface));
         for m in [t.mode_normal, t.mode_insert, t.mode_visual, t.mode_command] {
             assert!(contrast(t.mode_fg, m) >= 4.5, "{n}: mode badge {m:?} {:.2}", contrast(t.mode_fg, m));
         }
+    }
+}
+
+/// Workspace colors are the same in every theme (a workspace keeps its color): marks (3:1) on
+/// the background of every dark theme, and apart from each other.
+#[test]
+fn workspace_colors_read_on_every_dark_theme() {
+    for t in truecolor().filter(|t| dark(t)) {
+        assert_eq!(t.workspaces, &WORKSPACE_COLORS, "{}", t.name);
+        for c in t.workspaces {
+            assert!(contrast(*c, t.bg) >= 3.0, "{}: {c:?} {:.2}", t.name, contrast(*c, t.bg));
+        }
+    }
+}
+
+/// Each family has a light and a dark variant, picked by the terminal's background.
+#[test]
+fn a_family_takes_its_variant_by_the_background() {
+    for (name, light, dark_t) in FAMILIES {
+        assert!(!dark(light) && dark(dark_t), "{name}");
+        assert_eq!(resolve(name, true, Background::Light).name, light.name);
+        assert_eq!(resolve(name, true, Background::Dark).name, dark_t.name);
+        assert_eq!(resolve(name, true, Background::Unknown).name, dark_t.name, "dark when not known");
+    }
+    for t in BUILTINS {
+        assert!(NAMES.contains(&t.name), "{} is a name the setting takes", t.name);
+        assert_eq!(resolve(t.name, true, Background::Light).name, t.name, "a theme named is a theme taken");
     }
 }
 
@@ -100,7 +145,7 @@ fn auto_takes_tokyo_night_on_a_truecolor_terminal_and_its_variant_by_the_backgro
 
 #[test]
 fn mode_badges_are_apart_in_color_and_still_marked_without_it() {
-    for t in [&TERMINAL, &DARK, &TOKYO_NIGHT_NIGHT, &TOKYO_NIGHT_DAY] {
+    for t in BUILTINS {
         let bgs = [t.mode_normal, t.mode_command, t.mode_insert, t.mode_visual];
         for (i, a) in bgs.iter().enumerate() {
             assert!(!bgs[i + 1..].contains(a), "{}: badge {i}", t.name);
