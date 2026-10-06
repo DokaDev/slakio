@@ -159,9 +159,14 @@ impl Demo {
 
     /// The list panel (Home, unfolded) gets the keyboard, its cursor on the conversation `name`.
     pub fn list_cursor_on(&mut self, name: &str) {
+        self.app.show_unfolded(slakio_tui::app::shell::View::Home);
+        self.list_cursor_on_view(name);
+    }
+
+    /// The list panel gets the keyboard, its cursor on the conversation `name` of the view it
+    /// shows.
+    pub fn list_cursor_on_view(&mut self, name: &str) {
         use slakio_tui::app::model::Row;
-        use slakio_tui::app::shell::View;
-        self.app.show_unfolded(View::Home);
         let rows = self.app.list_rows();
         let at = rows
             .iter()

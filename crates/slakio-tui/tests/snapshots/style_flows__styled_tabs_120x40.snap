@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&tabs(&t))
 ---
-╭──╮╭ Home ──────────────────╮ 1 #incidents ●8 ×  2 #backend ×  3 #general ×
+╭──╮╭ Home ──────────────────╮ 1 #incidents @3 ×  2 #backend ×  3 #general ×
     [bdr 0..5] [mut 5..11] [bdr 11..30] [mut 30..43] [err B 43..46] [mut 46..47] [dim 47..48] [mut 48..49] [acc/surf2 B 49..52] [/surf2 B 52..61] [mut/surf2 61..62] [/surf2 B 62..63] [mut 63..75] [dim 75..76] [mut 76..77]
 │▌A││ ▾ Favorites            │╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..1] [ws 1..2] [acc B 2..3] [bdr 3..5] [dim 6..7] [mut B 8..17] [bdr 29..30] [acc 30..32] [ws 32..33] [ B 33..42] [acc 42..120]

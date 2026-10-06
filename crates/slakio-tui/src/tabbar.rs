@@ -1,5 +1,5 @@
 //! The tab bar's geometry, shared by drawing ([`crate::ui`]) and the mouse, so a click lands
-//! on exactly what was drawn there. Each tab is ` <n> <title> [●<unread>] × `; the tab shown is
+//! on exactly what was drawn there. Each tab is ` <n> <title> [<unread mark>] × `; the tab shown is
 //! drawn apart by its style only. When the tabs do not fit, the titles are shortened in steps
 //! ([`TITLE_STEPS`]), then the bar shows a window of tabs around the one shown, with `‹` / `›`
 //! at the ends for the tabs left out on that side (a click shows the nearest of them).

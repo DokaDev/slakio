@@ -278,7 +278,7 @@ fn t_on_a_message_opens_its_thread_in_a_tab_titled_by_its_first_line() {
 }
 
 #[test]
-fn a_tab_not_shown_carries_the_unread_count_of_its_conversations() {
+fn a_tab_not_shown_carries_the_mark_of_its_unread_conversations() {
     let mut d = Demo::new(120, 40);
     let unread = (0..)
         .map(|i| d.app.model.conversation(i))
@@ -289,7 +289,7 @@ fn a_tab_not_shown_carries_the_unread_count_of_its_conversations() {
     d.open(&name);
     let bar_text = |d: &Demo| d.screen().lines().next().unwrap().to_string();
     d.open_in_tab("backend");
-    let badge = format!("●{}", unread.unread);
+    let badge = if unread.mentions > 0 { format!("@{}", unread.mentions) } else { "●".to_string() };
     assert!(bar_text(&d).contains(&format!("#{name} {badge} ×")), "{}", bar_text(&d));
     d.keys("space 1");
     assert!(!bar_text(&d).contains(&badge), "the tab shown has none: {}", bar_text(&d));

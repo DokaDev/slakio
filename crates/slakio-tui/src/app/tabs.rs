@@ -12,8 +12,8 @@
 //!
 //! A tab is called by the name the user gave it, else by what its active pane shows:
 //! `#channel`, `@person`, `⤷ ` and the first line of a thread. Tabs other than the one shown
-//! carry the unread count of their conversations (`●3`); nothing else about them changes on its
-//! own, least of all their order.
+//! carry what their conversations hold unread, as the list counts it ([`Unread`]); nothing else
+//! about them changes on its own, least of all their order.
 
 use super::model::breadcrumb;
 use super::pane::Pane;
@@ -28,6 +28,34 @@ use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::tabs::Tab;
 use slakio_core::model::Target;
 use std::time::Instant;
+
+/// What a tab's conversations hold unread, as the list panel shows it: their mentions (the
+/// list's pill), the unread messages of DMs without mentions (a DM's pill), and whether any
+/// conversation not muted is unread (a channel is bold, with no count).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Unread {
+    pub mentions: u32,
+    pub dms: u32,
+    pub any: bool,
+}
+
+impl Unread {
+    /// The tab's mark: `@3` for mentions, `●2` for a DM's unread messages, `●` for unread
+    /// channels; none when nothing is unread.
+    pub fn badge(self) -> Option<String> {
+        match self {
+            Unread { mentions: m, .. } if m > 0 => Some(format!("@{m}")),
+            Unread { dms: d, .. } if d > 0 => Some(format!("●{d}")),
+            Unread { any: true, .. } => Some("●".to_string()),
+            _ => None,
+        }
+    }
+
+    /// How strong the mark is: 2 a mention, 1 unread, 0 nothing.
+    pub fn level(self) -> u8 {
+        if self.mentions > 0 { 2 } else { u8::from(self.any) }
+    }
+}
 
 impl App {
     pub(super) fn tab(&mut self, a: TabAction, now: Instant) {
@@ -139,11 +167,10 @@ impl App {
         self.work.pane(tab.active).map(|p| self.pane_title(p)).unwrap_or_default()
     }
 
-    /// The unread messages of the conversations `tab` shows (of a muted one, its mentions), and
-    /// whether any mention the user.
-    pub fn tab_unread(&self, tab: &Tab) -> (u32, bool) {
+    /// What the conversations `tab` shows hold unread, counted as the list's pills count it.
+    pub fn tab_unread(&self, tab: &Tab) -> Unread {
         let mut seen: Vec<&Target> = Vec::new();
-        let (mut n, mut mention) = (0, false);
+        let mut u = Unread::default();
         for id in tab.root.leaves() {
             let Some(p) = self.work.pane(id) else { continue };
             let Some(c) = self.model.target(&p.target).filter(|_| !p.is_thread()) else { continue };
@@ -151,10 +178,15 @@ impl App {
                 continue;
             }
             seen.push(&p.target);
-            n += if c.muted { c.mentions } else { c.unread };
-            mention |= c.mentions > 0;
+            u.mentions += c.mentions;
+            if c.unread > 0 && !c.muted {
+                u.any = true;
+                if c.is_dm() && c.mentions == 0 {
+                    u.dms += c.unread;
+                }
+            }
         }
-        (n, mention)
+        u
     }
 
     /// The tab bar as laid out now, while it shows (two tabs or more).
@@ -167,8 +199,7 @@ impl App {
             .iter()
             .enumerate()
             .map(|(i, t)| {
-                let (n, _) = self.tab_unread(t);
-                let badge = (i != current && n > 0).then(|| format!("●{n}"));
+                let badge = self.tab_unread(t).badge().filter(|_| i != current);
                 TabLabel { number: (i + 1).to_string(), title: self.tab_title(t), badge }
             })
             .collect();

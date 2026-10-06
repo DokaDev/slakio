@@ -366,9 +366,13 @@ impl Theme {
         }
     }
 
-    /// The `‹` / `›` marks of tabs left out of the bar.
-    pub fn tab_more(&self) -> Style {
-        self.key()
+    /// The `‹` / `›` marks of tabs left out of the bar, by the strongest thing the tabs they
+    /// hide hold: 2 a mention (its color), 1 unread (bold body text), 0 nothing (the accent).
+    pub fn tab_more(&self, level: u8) -> Style {
+        match level {
+            0 => self.key(),
+            l => self.dot(l > 1),
+        }
     }
 
     /// The "N replies" row of a message with a thread.

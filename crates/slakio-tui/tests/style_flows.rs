@@ -53,7 +53,7 @@ fn frames(theme: &Theme) -> Vec<(&'static str, Demo)> {
     out
 }
 
-/// Three tabs, the second shown, the first with unread messages (a badge on the bar).
+/// Three tabs, the second shown, the first with mentions (a badge on the bar).
 fn tabs(theme: &Theme) -> Demo {
     let mut d = demo(theme, 120, 40);
     d.open("incidents");
@@ -88,7 +88,11 @@ fn the_tab_shown_stands_out_on_the_bar() {
         }
         let p = bar.pieces.iter().find(|p| p.tab == 0 && p.part == Part::Badge).expect("a badge");
         let badge = &buf[(p.x + 1, bar.area.y)];
-        assert!(badge.symbol() == "●" && badge.modifier.contains(Modifier::BOLD), "{}: {badge:?}", t.name);
+        // #incidents mentions the user: `@n` in the mention color.
+        assert!(badge.symbol() == "@" && badge.modifier.contains(Modifier::BOLD), "{}: {badge:?}", t.name);
+        if t.kind != Kind::NoColor {
+            assert_eq!(badge.fg, t.error, "{}", t.name);
+        }
     }
 }
 
@@ -311,4 +315,76 @@ fn styled_snapshots_in_tokyo_night() {
     d.keys("ctrl+h");
     insta::assert_snapshot!("styled_rail_overlay_focus_terminal_80x24", screen_styled(&d));
     insta::assert_snapshot!("styled_tabs_120x40", screen_styled(&tabs(&t)));
+}
+
+/// A conversation of workspace A, not muted, that `pick` takes.
+fn conversation_where(d: &Demo, pick: impl Fn(&slakio_core::model::Conversation) -> bool) -> String {
+    (0..)
+        .map(|i| d.app.model.conversation(i))
+        .find(|c| c.workspace.as_str() == "TDEMOA" && !c.muted && pick(c))
+        .map(|c| c.name.line().as_str().to_string())
+        .expect("the demo world has one")
+}
+
+// A tab not shown says what the list says of its conversation: `@n` mentions in the mention
+// color, `●n` a DM's unread messages, `●` a channel's, both plain bold.
+#[test]
+fn a_tab_badge_matches_the_list_pill_and_only_mentions_are_red() {
+    let t = resolve("tokyo-night", true, Background::Dark);
+    let probe = demo(&t, 160, 40);
+    let mention = conversation_where(&probe, |c| c.mentions > 0 && !c.is_dm());
+    let quiet = conversation_where(&probe, |c| c.unread > 0 && c.mentions == 0 && !c.is_dm());
+    let dm = conversation_where(&probe, |c| c.unread > 0 && c.mentions == 0 && c.is_dm());
+    let counts = |name: &str| {
+        let c = (0..).map(|i| probe.app.model.conversation(i)).find(|c| c.name.line().as_str() == name).unwrap();
+        (c.mentions, c.unread)
+    };
+    let mut d = demo(&t, 200, 40);
+    d.open(&mention);
+    d.keys("space d");
+    d.list_cursor_on_view(&dm);
+    d.keys("t");
+    d.open_in_tab(&quiet);
+    d.open_in_tab("backend");
+    let bar = d.app.tab_bar().unwrap();
+    let buf = d.buffer();
+    let badge = |tab: usize| {
+        let p = bar.pieces.iter().find(|p| p.tab == tab && p.part == Part::Badge).expect("a badge");
+        (p.text.trim().to_string(), buf[(p.x + 1, bar.area.y)].clone())
+    };
+    let (text, cell) = badge(0);
+    assert_eq!(text, format!("@{}", counts(&mention).0), "mentions, as the list's pill counts them");
+    assert_eq!((cell.fg, cell.modifier.contains(Modifier::BOLD)), (t.error, true));
+    let (text, cell) = badge(1);
+    assert_eq!(text, format!("●{}", counts(&dm).1), "a DM's unread messages, as its pill");
+    assert_eq!((cell.fg, cell.modifier.contains(Modifier::BOLD)), (t.fg, true), "not the mention color");
+    let (text, cell) = badge(2);
+    assert_eq!(text, "●", "a channel's unread: a mark, no count (the list has none)");
+    assert_eq!(cell.fg, t.fg);
+}
+
+// The `‹` / `›` marks take the strongest mark of the tabs they hide: a mention's color, else
+// bold for unread, else the plain accent.
+#[test]
+fn the_overflow_marks_carry_what_the_hidden_tabs_hold() {
+    let t = resolve("tokyo-night", true, Background::Dark);
+    let probe = demo(&t, 80, 24);
+    let mention = conversation_where(&probe, |c| c.mentions > 0 && !c.is_dm());
+    let mut d = demo(&t, 80, 24);
+    d.open(&mention);
+    for name in ["incidents", "general", "random", "deploys", "long-threads", "big-history", "alerts"] {
+        if name != mention {
+            d.open_in_tab(name);
+        }
+    }
+    let bar = d.app.tab_bar().unwrap();
+    let (x, _) = bar.left.expect("tabs hidden on the left");
+    let cell = d.buffer()[(x, bar.area.y)].clone();
+    assert_eq!((cell.symbol(), cell.fg), ("‹", t.error), "a hidden tab mentions the user");
+    d.keys("space 1");
+    let bar = d.app.tab_bar().unwrap();
+    let (x, _) = bar.right.expect("tabs hidden on the right");
+    let cell = d.buffer()[(x, bar.area.y)].clone();
+    assert_eq!(cell.symbol(), "›");
+    assert_ne!(cell.fg, t.error, "the tabs on the right mention nobody");
 }
