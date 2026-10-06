@@ -12,7 +12,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                                                │
 │   # deploys                ││ AM  Alex Morgan  12:23                         │
 │   # alerts                 ││     Meeting moved to 3pm                       │
-│   # partner-shared ext     ││      ✅ 2                                      │
+│   # partner-shared ext     ││     ✅ 2                                       │
 │   # hostile-strings        ││                                                │
 │▎  # big-history            ││ IM  Ivy Moon  12:53                            │
 │   # long-threads           ││     We rollback after                          │

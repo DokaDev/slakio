@@ -209,6 +209,12 @@ fn a_thread_without_replies_says_so_under_its_message() {
     d.keys("enter");
     let s = d.screen();
     assert!(s.contains("No replies yet · i reply"), "{s}");
+    // A blank row between the message and it, as between blocks.
+    let lines: Vec<&str> = s.lines().collect();
+    let at = lines.iter().position(|l| l.contains("No replies yet")).unwrap();
+    let col = lines[at][..lines[at].find("No replies yet").unwrap()].chars().count();
+    let above: String = lines[at - 1].chars().skip(col).take(14).collect();
+    assert!(above.trim().is_empty(), "{s}");
     insta::assert_snapshot!("thread_no_replies_120x40", demo::mask_hangul(&s));
 }
 

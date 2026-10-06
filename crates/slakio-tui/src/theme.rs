@@ -341,15 +341,22 @@ impl Theme {
         self.accent()
     }
 
+    /// A reaction chip: a pill on the raised background (the cursor line's color on a dark
+    /// theme, [`Self::raised`]), never darker than the background there; body text on it.
     pub fn reaction(&self) -> Style {
         match self.kind {
-            Kind::Truecolor => self.muted().bg(self.surface_alt),
+            Kind::Truecolor => self.text().bg(self.raised()),
             _ => self.muted(),
         }
     }
 
+    /// The user's own reaction: a pill filled with the accent (the background's color on it),
+    /// bold; without truecolor the accent on no background.
     pub fn reaction_mine(&self) -> Style {
-        self.reaction().fg(self.accent).add_modifier(Modifier::BOLD)
+        match self.kind {
+            Kind::Truecolor => Style::new().fg(self.bg).bg(self.accent).add_modifier(Modifier::BOLD),
+            _ => self.reaction().fg(self.accent).add_modifier(Modifier::BOLD),
+        }
     }
 
     pub fn warning(&self) -> Style {

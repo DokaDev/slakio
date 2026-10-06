@@ -8,7 +8,7 @@ expression: mask_hangul(&narrow.snap())
 │▎MK● Minsu Kim           3  ││                                                │
 │ JP● Jiho Park              ││ M  Me · 04:08                                  │
 │ ＊○ ＊＊＊                 ││    Rolling back                                │
-│ JL◐ Jiyoung Lee            ││     🎉 3                                       │
+│ JL◐ Jiyoung Lee            ││    🎉 3                                        │
 │ AM● Alex Morgan            ││                                                │
 │ ＊○ ＊＊＊                 ││ MK Minsu Kim · 05:26                           │
 │ H ● Hana                4  ││    Done schema for please today deploy looks   │
@@ -21,7 +21,7 @@ expression: mask_hangul(&narrow.snap())
 │ 3   Jiho Park, ＊＊＊…  2  ││    Metrics staging dashboard index design      │
 │                            ││    today lunch review review migration again   │
 │                            ││    on branch                                   │
-│                            ││     👍 1                                       │
+│                            ││    👍 1                                        │
 │                            │├─ Message @Minsu Kim ───────────────────────────┤
 │                            ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯

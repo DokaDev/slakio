@@ -17,7 +17,7 @@ expression: mask_hangul(&small.snap())
 │ TK◐ Taylor Kim             ││                  ⤷ 12 replies · last 04:02                         │
 │ CP● Chris Park             ││                                                                    │
 │ ＊○ ＊＊＊              2  ││ M  Me            Rolling back                                04:08 │
-│ ML◐ Mallory live           ││                   🎉 3                                             │
+│ ML◐ Mallory live           ││                  🎉 3                                              │
 │ 3   Jiho Park, ＊＊＊…  2  ││                                                                    │
 │                            ││ MK Minsu Kim     Done schema for please today deploy looks   05:26 │
 │                            ││                  fine timeout retry maybe looks                    │
@@ -27,7 +27,7 @@ expression: mask_hangul(&small.snap())
 │                            ││ M  Me            Metrics staging dashboard index design      07:27 │
 │                            ││                  today lunch review review migration again         │
 │                            ││                  on branch                                         │
-│                            ││                   👍 1                                             │
+│                            ││                  👍 1                                              │
 │                            │├─ Message @Minsu Kim ───────────────────────────────────────────────┤
 │                            ││ › Press i to write                                                 │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯

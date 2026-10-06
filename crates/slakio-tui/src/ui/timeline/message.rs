@@ -280,8 +280,10 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
         let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));
         out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(text, t.link())]), Kind::Link));
     }
+    // A chip's first cell is its pad: it sits in the gap, so the emoji lines up with the text.
+    let chip_indent = " ".repeat(indent_w.saturating_sub(1));
     for line in chips(app, m, text_w) {
-        let mut spans = vec![Span::raw(indent.clone())];
+        let mut spans = vec![Span::raw(chip_indent.clone())];
         spans.extend(line);
         out.push((Line::from(spans), Kind::Content));
     }
@@ -291,6 +293,8 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
             let label = app.i18n.msg(&Msg::ThreadReplies { count: replies as u64 }).to_string();
             out.push((rule(&label, w, t.faint()), Kind::Rule));
         } else if tl.complete {
+            // A blank row apart from the message, as between blocks.
+            out.push((Line::raw(""), Kind::Gap));
             out.push((Line::styled(no_replies(app), t.faint()), Kind::Rule));
         }
     }

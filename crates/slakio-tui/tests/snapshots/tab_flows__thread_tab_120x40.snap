@@ -8,7 +8,7 @@ expression: "demo::mask_hangul(&d.screen())"
 │ ▾ Favorites                ││  H    Hana  08:35                                                                      │
 │   # backend                ││       For cache timeout ticket migration pager rollback branch tracing after a done on │
 │   # incidents           3  ││       tomorrow broken schema                                                           │
-│                            ││        👍 3                                                                            │
+│                            ││       👍 3                                                                             │
 │ ▾ Ops                      ││ ────────────────────────────────────── 1 reply ─────────────────────────────────────── │
 │   # deploys                ││  TK   Tom Ko  08:36                                                                    │
 │   # alerts                 ││       Metrics tracing again release invoice for meeting staging                        │

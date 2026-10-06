@@ -117,10 +117,11 @@ fn blocks_are_one_blank_row_apart_and_reactions_never_touch_the_next_message() {
 }
 
 #[test]
-fn reactions_are_emoji_chips_and_the_users_own_are_in_the_accent() {
+fn reactions_are_raised_emoji_chips_at_the_text_and_the_users_own_are_filled_with_the_accent() {
     let d = open("general", 160, 50);
     let t = d.app.theme.clone();
     let pane = d.pane(PaneKind::Conversation).unwrap();
+    let area = d.app.message_area(pane.handle()).unwrap();
     let buf = d.buffer();
     let s = d.screen();
     let mut seen = 0;
@@ -142,9 +143,17 @@ fn reactions_are_emoji_chips_and_the_users_own_are_in_the_accent() {
             seen += 1;
             let ok = at.iter().any(|&(x, y)| {
                 let c = &buf[(x, y)];
-                if r.mine { c.fg == t.accent } else { c.bg == t.surface_alt }
+                let pill = if r.mine { c.bg == t.accent } else { c.bg == t.raised() && c.bg != t.bg };
+                // The first chip's pad sits in the gap: its emoji lines up with the text (the
+                // gutter, the picture's four cells and two blank ones).
+                let first = buf[(x - 2, y)].bg == t.bg && buf[(x - 3, y)].bg == t.bg;
+                pill && (!first || x == area.x + 7)
             });
-            assert!(ok, "{chip}: {}", if r.mine { "mine in the accent" } else { "a pill" });
+            assert!(
+                ok,
+                "{chip}: {}",
+                if r.mine { "mine filled with the accent" } else { "a raised pill, at the text" }
+            );
         }
     }
     assert!(seen >= 2, "{seen}: {s}");

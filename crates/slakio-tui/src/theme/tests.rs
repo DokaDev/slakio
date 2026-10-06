@@ -302,3 +302,21 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
     let plain = Theme::no_color().avatar(0);
     assert!(plain.add_modifier.contains(Modifier::REVERSED | Modifier::BOLD), "no colors: reversed");
 }
+
+/// A reaction chip reads as a pill: its background stands apart from the background (on a dark
+/// theme lighter, never darker), its count (body text) reads on it at 4.5:1; the user's own is
+/// filled with the accent, the background's color on it at 3:1.
+#[test]
+fn reaction_chips_stand_off_the_background_and_their_text_reads() {
+    for t in truecolor() {
+        let (n, chip) = (t.name, t.raised());
+        assert!(contrast(chip, t.bg) >= 1.15, "{n}: chip {chip:?} on bg {:.2}", contrast(chip, t.bg));
+        if dark(t) {
+            assert!(luminance(chip) > luminance(t.bg), "{n}: a dark theme's chip is lighter than its bg");
+        }
+        assert!(contrast(t.fg, chip) >= 4.5, "{n}: text on the chip {:.2}", contrast(t.fg, chip));
+        assert!(contrast(t.bg, t.accent) >= 3.0, "{n}: the user's own chip {:.2}", contrast(t.bg, t.accent));
+        assert_eq!(t.reaction().bg, Some(chip), "{n}");
+        assert_eq!((t.reaction_mine().fg, t.reaction_mine().bg), (Some(t.bg), Some(t.accent)), "{n}");
+    }
+}

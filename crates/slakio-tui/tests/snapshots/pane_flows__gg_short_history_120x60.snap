@@ -8,7 +8,7 @@ expression: mask_hangul(&d.screen())
 │ ▾ Favorites                ││                                                                                        │
 │   # backend                ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
 │   # incidents           3  ││ ＊ ＊＊＊        Suspect the DB pool                                             09:28 │
-│                            ││                   ✅ 2                                                                 │
+│                            ││                  ✅ 2                                                                  │
 │ ▾ Ops                      ││                                                                                        │
 │   # deploys                ││ AR Amy Ryu       Queue the merge today rollback                                  10:34 │
 │   # alerts                 ││                  ⤷ 6 replies · last 10:40                                              │
@@ -19,7 +19,7 @@ expression: mask_hangul(&d.screen())
 │                            ││ NH Noah Han      Looking into it                                                 12:05 │
 │ ▾ Channels                 ││                                                                                        │
 │   # announcements          ││ ＊ ＊＊＊        Lunch budget waiting branch migration check schema              12:22 │
-│   # design-review          ││                   👍 2   🔥 5   ✅ 2                                                   │
+│   # design-review          ││                  👍 2   🔥 5   ✅ 2                                                    │
 │   # feed-alert-134         ││                                                                                        │
 │   # feed-alert-8           ││ ＊ ＊＊＊        ＊＊ ＊＊＊?                                                    13:38 │
 │   # feed-budget-162        ││                                                                                        │
@@ -45,10 +45,10 @@ expression: mask_hangul(&d.screen())
 │   # feed-merge-192         ││ DY Dana Yoon     Design lunch ticket now dashboard draft looks                   19:22 │
 │   # feed-merge-54          ││                                                                                        │
 │   # feed-metrics-125       ││ OH Owen Hwang    Merge queue cache we                                            20:02 │
-│   # feed-metrics-13        ││                   👍 2   ✅ 4                                                          │
+│   # feed-metrics-13        ││                  👍 2   ✅ 4                                                           │
 │   # feed-metrics-18        ││                                                                                        │
 │   # feed-production-111    ││ AR Amy Ryu       Retry production branch again alert staging looks pager ticket  20:46 │
-│   # feed-production-44     ││                   👀 3                                                                 │
+│   # feed-production-44     ││                  👀 3                                                                  │
 │   # feed-queue-224         ││                                                                                        │
 │   # feed-retry-63          ││ MK Minsu Kim     Is is latency rollback budget schema queue should again         21:29 │
 │   # feed-review-152        ││                                                                                        │

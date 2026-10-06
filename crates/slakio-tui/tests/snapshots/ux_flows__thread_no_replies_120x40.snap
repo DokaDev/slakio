@@ -6,8 +6,8 @@ expression: "demo::mask_hangul(&s)"
 │ Home @24  D●11  A@37  F  L ││                                                    ││ ────────── 2026-01-06 ────────── │
 ├────────────────────────────┤│ KN  Kate Nam  06:13                                ││ SR  Sam Rivera  07:14            │
 │ ▾ Favorites                ││     Suspect the DB pool 🎉                         ││     Meeting moved to 3pm         │
-│▎  # backend                ││                                                    ││ No replies yet · i reply         │
-│   # incidents           3  ││ LJ  Lily Jeon  06:19                               ││                                  │
+│▎  # backend                ││                                                    ││                                  │
+│   # incidents           3  ││ LJ  Lily Jeon  06:19                               ││ No replies yet · i reply         │
 │                            ││     Dashboard schema budget draft please is now    ││                                  │
 │ ▾ Ops                      ││     waiting fine a lunch production someone cache  ││                                  │
 │   # deploys                ││     release done                                   ││                                  │

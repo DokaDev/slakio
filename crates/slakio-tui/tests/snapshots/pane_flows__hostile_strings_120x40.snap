@@ -6,7 +6,7 @@ expression: mask_hangul(&s)
 │ Home @24  D●11  A@37  F  L ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
 ├────────────────────────────┤│  JP   Jiho Park  13:43                                                                 │
 │ ▾ Favorites                ││       beforeafter                                                                      │
-│   # backend                ││        :blink: 2                                                                       │
+│   # backend                ││       :blink: 2                                                                        │
 │   # incidents           3  ││                                                                                        │
 │                            ││  JP   Jiho Park  14:04                                                                 │
 │ ▾ Ops                      ││       abc                                                                              │
@@ -37,7 +37,7 @@ expression: mask_hangul(&s)
 │   # feed-draft-84          ││                                                                                        │
 │   # feed-index-199      2  ││  JH   Jiwon Han  17:28                                                                 │
 │   # feed-index-39          ││       dangling (edited)                                                                │
-│   # feed-index-5        1  ││        🎉 4                                                                            │
+│   # feed-index-5        1  ││       🎉 4                                                                             │
 │   # feed-invoice-16        │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────┤
 │   # feed-invoice-168       ││ › Press i to write                                                                     │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
