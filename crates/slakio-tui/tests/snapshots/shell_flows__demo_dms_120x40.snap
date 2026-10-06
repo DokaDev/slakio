@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
-╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ MK● Minsu Kim          ││                                                                                        │
-│▌B││ JP● Jiho Park          ││                                                                                        │
-│──││ ＊○ ＊＊＊             ││                                                                                        │
-│H ││ JL◐ Jiyoung Lee        ││                                                                                        │
-│D●││ AM● Alex Morgan        ││                                                                                        │
-│A●││ 3   Jiho Park, ＊…  1  ││                                                                                        │
-│F ││                        ││                                                                                        │
-│L ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                         No conversation open                                           │
-│  ││                        ││                         Pick one in the list and press Enter.                          │
-│  ││                        ││                                                                                        │
-│  ││                        ││                         Enter    Open                                                  │
-│  ││                        ││                         Space h  Home                                                  │
-│  ││                        ││                         Space d  DMs                                                   │
-│  ││                        ││                         Ctrl+O   Back to the last one                                  │
-│  ││                        ││                         ?        Keyboard help                                         │
-│  ││                        ││                         Ctrl+Q   Quit                                                  │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › DMs │ Enter open · t new tab · Tab next pane · Ctrl+R rail · ? help · Space more │  @37  DM 1 │ demo
+ ▌B side @28 ▾ │ Home @8  DMs @1  Activity @37  Files  Later
+╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
+│ MK● Minsu Kim          ││                                                                                            │
+│ JP● Jiho Park          ││                                                                                            │
+│ ＊○ ＊＊＊             ││                                                                                            │
+│ JL◐ Jiyoung Lee        ││                                                                                            │
+│ AM● Alex Morgan        ││                                                                                            │
+│ 3   Jiho Park, ＊…  1  ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                           No conversation open                                             │
+│                        ││                           Pick one in the list and press Enter.                            │
+│                        ││                                                                                            │
+│                        ││                           Enter    Open                                                    │
+│                        ││                           Space h  Home                                                    │
+│                        ││                           Space d  DMs                                                     │
+│                        ││                           Ctrl+O   Back to the last one                                    │
+│                        ││                           ?        Keyboard help                                           │
+│                        ││                           Ctrl+Q   Quit                                                    │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌B side › DMs │ Enter open · t new tab · : commands · Ctrl+R top bar · ? help · Space more │  @37  DM 1 │ demo

@@ -25,13 +25,17 @@ fn every_action_is_registered() {
             FocusDown,
             FocusNext,
             FocusPrev,
-            FocusRail,
-            RailNext,
-            RailPrev,
-            RailFirst,
-            RailLast,
-            RailSelect,
-            RailLeave,
+            FocusNav,
+            NavNext,
+            NavPrev,
+            NavFirst,
+            NavLast,
+            NavSelect,
+            NavLeave,
+            SwitcherNext,
+            SwitcherPrev,
+            SwitcherChoose,
+            SwitcherClose,
             ListNext,
             ListPrev,
             ListFirst,
@@ -139,7 +143,7 @@ fn search_finds_actions_by_their_words_from_word_starts() {
     let en = I18n::new(Lang::En);
     let first = |q: &str| search(q, &en).first().map(|&i| REGISTRY[i].id);
     assert_eq!(first("dms"), Some("view.dms"));
-    assert_eq!(first("rail"), Some("rail.focus"));
+    assert_eq!(first("rail"), Some("nav.focus"));
     assert_eq!(first("help"), Some("help.open"));
     assert!(word_score("wq", "Pick another workspace").is_none(), "q is not there");
     assert!(word_score("ot", "Show the rail item").is_none(), "o must start a word");

@@ -1,0 +1,84 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [err/surf B 11..14] [bdr/surf 14..16] [/surf 16..17] [bdr/surf 17..18] [/surf2 B 18..23] [err/surf2 B 23..27] [/surf2 B 27..28] [/sel 28..32] [err/sel B 32..35] [/sel 35..36] [mut/surf 36..45] [err/surf B 45..49] [mut/surf 49..64] [/surf 64..120]
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
+    [bdr 0..1] [mut 1..7] [bdr 7..120]
+│ ▾ Favorites            ││                                                                                            │
+    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 25..27] [bdr 119..120]
+│   # backend            ││                                                                                            │
+    [bdr 0..1] [/cl 1..25] [bdr 25..27] [bdr 119..120]
+│   # incidents       3  ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 21..24] [bdr 25..27] [bdr 119..120]
+│                        ││                                                                                            │
+    [bdr 0..1] [bdr 25..27] [bdr 119..120]
+│ ▾ Ops                  ││                                                                                            │
+    [bdr 0..1] [dim 2..3] [mut B 4..7] [bdr 25..27] [bdr 119..120]
+│   # deploys            ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # alerts             ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # partner-shared ext ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [dim 20..24] [bdr 25..27] [bdr 119..120]
+│   # hostile-strings    ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 25..27] [bdr 119..120]
+│   # big-history        ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # long-threads       ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│                        ││                                                                                            │
+    [bdr 0..1] [bdr 25..27] [bdr 119..120]
+│ ▾ Channels             ││                                                                                            │
+    [bdr 0..1] [dim 2..3] [mut B 4..12] [bdr 25..27] [bdr 119..120]
+│   # announcements      ││                           No conversation open                                             │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [ B 54..74] [bdr 119..120]
+│   # design-review      ││                           Pick one in the list and press Enter.                            │
+    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 25..27] [mut 54..91] [bdr 119..120]
+│   # feed-alert-134     ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-alert-8       ││                           Enter    Open                                                    │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 54..59] [bdr 119..120]
+│   # feed-budget-162    ││                           Space h  Home                                                    │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 54..61] [bdr 119..120]
+│   # feed-budget-33     ││                           Space d  DMs                                                     │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 54..61] [bdr 119..120]
+│   # feed-build-50      ││                           Ctrl+O   Back to the last one                                    │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 54..60] [bdr 119..120]
+│   # feed-cache-119     ││                           ?        Keyboard help                                           │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 54..55] [bdr 119..120]
+│   # feed-customer-161  ││                           Ctrl+Q   Quit                                                    │
+    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 25..27] [warm B 54..60] [bdr 119..120]
+│   # feed-customer…  1  ││                                                                                            │
+    [bdr 0..1] [dim 4..5] [dim 6..20] [on/err B 21..24] [bdr 25..27] [bdr 119..120]
+│   # feed-dashboard-22  ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-dashboard-41  ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-design-34     ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-design-83     ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-draft-142     ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-draft-58      ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..19] [bdr 25..27] [bdr 119..120]
+│   # feed-draft-84      ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-index-199  2  ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..20] [on/err B 21..24] [bdr 25..27] [bdr 119..120]
+│   # feed-index-39      ││                                                                                            │
+    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 25..27] [bdr 119..120]
+│   # feed-index-5    1  ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..18] [on/err B 21..24] [bdr 25..27] [bdr 119..120]
+│   # feed-invoice-16    ││                                                                                            │
+    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 25..27] [bdr 119..120]
+│   # feed-invoice-168   ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+│   # feed-latency-144   ││                                                                                            │
+    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
+╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
+    [bdr 0..120]
+ NORMAL  ▌A company › Home                │ Enter show · h/l move · Esc back · ? help · Space more │  @37  DM 16 │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..41] [bdr/surf 41..44] [/surf B 44..49] [mut/surf 49..54] [dim/surf 54..57] [/surf B 57..60] [mut/surf 60..65] [dim/surf 65..68] [/surf B 68..71] [mut/surf 71..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

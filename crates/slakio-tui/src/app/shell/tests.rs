@@ -13,16 +13,16 @@ fn focus_moves_between_the_regions_and_skips_a_hidden_list() {
     let mut f = Region::List;
     assert_eq!(f, Region::List);
     s.update(ShellAction::FocusLeft, &m, 10, &mut f);
-    assert_eq!(f, Region::Rail);
+    assert_eq!(f, Region::Nav);
     s.update(ShellAction::FocusLeft, &m, 10, &mut f);
-    assert_eq!(f, Region::Rail, "stays at the edge");
+    assert_eq!(f, Region::Nav, "stays at the edge");
     s.update(ShellAction::FocusRight, &m, 10, &mut f);
     s.update(ShellAction::FocusRight, &m, 10, &mut f);
     assert_eq!(f, Region::Work);
     s.update(ShellAction::ToggleList, &m, 10, &mut f);
     assert!(s.list_hidden);
     s.update(ShellAction::FocusLeft, &m, 10, &mut f);
-    assert_eq!(f, Region::Rail, "the hidden list is skipped");
+    assert_eq!(f, Region::Nav, "the hidden list is skipped");
 }
 
 #[test]
@@ -37,23 +37,29 @@ fn hiding_the_focused_list_moves_the_focus_to_the_work_area() {
 }
 
 #[test]
-fn the_rail_selects_workspaces_and_views() {
+fn the_top_bar_selects_views_and_the_switcher_workspaces() {
     let m = model();
     let mut s = Shell::default();
     let mut f = Region::List;
     s.update(ShellAction::FocusLeft, &m, 10, &mut f);
-    s.update(ShellAction::RailNext, &m, 10, &mut f);
-    s.update(ShellAction::RailSelect, &m, 10, &mut f);
-    assert_eq!((s.workspace, s.view, f), (1, View::Home, Region::List));
+    assert_eq!(nav_items()[s.nav_cursor], NavItem::View(View::Home), "on the view shown");
+    s.update(ShellAction::NavPrev, &m, 10, &mut f);
+    assert_eq!(nav_items()[s.nav_cursor], NavItem::Workspace);
+    s.update(ShellAction::NavSelect, &m, 10, &mut f);
+    assert_eq!(f, Region::Nav, "the workspace is picked in the switcher (the app's)");
+    s.update(ShellAction::NavNext, &m, 10, &mut f);
+    s.update(ShellAction::NavNext, &m, 10, &mut f);
+    s.update(ShellAction::NavSelect, &m, 10, &mut f);
+    assert_eq!((s.workspace, s.view, f), (0, View::Dms, Region::List));
     s.update(ShellAction::FocusLeft, &m, 10, &mut f);
     for _ in 0..20 {
-        s.update(ShellAction::RailNext, &m, 10, &mut f);
+        s.update(ShellAction::NavNext, &m, 10, &mut f);
     }
-    assert_eq!(rail_items(2)[s.rail_cursor], RailItem::View(View::Later), "stops at the last item");
-    s.update(ShellAction::RailSelect, &m, 10, &mut f);
-    assert_eq!((s.workspace, s.view), (1, View::Later));
+    assert_eq!(nav_items()[s.nav_cursor], NavItem::View(View::Later), "stops at the last item");
+    s.select_workspace(1, &m);
+    assert_eq!((s.workspace, s.view), (1, View::Home));
     s.update(ShellAction::Show(View::Dms), &m, 10, &mut f);
-    assert_eq!(rail_items(2)[s.rail_cursor], RailItem::View(View::Dms), "the rail follows");
+    assert_eq!(nav_items()[s.nav_cursor], NavItem::View(View::Dms), "the top bar follows");
     assert!(View::Later.is_placeholder() && !View::Dms.is_placeholder());
 }
 

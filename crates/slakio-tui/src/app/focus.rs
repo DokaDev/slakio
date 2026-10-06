@@ -1,4 +1,4 @@
-//! Where the keyboard is: the rail, the list panel or the work area — one [`Region`] field of
+//! Where the keyboard is: the top bar, the list panel or the work area — one [`Region`] field of
 //! the app, changed in one place ([`App::set_focus`]) and read by the key map, drawing and the
 //! mouse alike ([`App::focus`]). Which pane of the work area has it is not kept twice: it is the
 //! work area's active pane (the one the keyboard goes back to there), so the focus can never
@@ -27,7 +27,7 @@ impl App {
     /// area itself, with no pane open).
     pub fn focus(&self) -> Focus {
         match self.region {
-            Region::Rail => Focus::Rail,
+            Region::Nav => Focus::Nav,
             Region::List => Focus::List,
             Region::Work => self.work.active().map_or(Focus::Work, Focus::on),
         }
@@ -37,7 +37,7 @@ impl App {
     /// not open takes nothing.
     pub(crate) fn set_focus(&mut self, focus: Focus) {
         self.region = match focus {
-            Focus::Rail => Region::Rail,
+            Focus::Nav => Region::Nav,
             Focus::List => Region::List,
             Focus::Work => Region::Work,
             Focus::Pane(h) if self.work.pane(h.id()).is_some() => {
@@ -67,18 +67,17 @@ impl App {
     /// The focus goes to `region` (the work area: its active pane).
     pub(crate) fn focus_region(&mut self, region: Region) {
         match region {
-            Region::Rail => self.set_focus(Focus::Rail),
+            Region::Nav => self.set_focus(Focus::Nav),
             Region::List => self.set_focus(Focus::List),
             Region::Work => self.focus_work(),
         }
     }
 
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: rail, list, the panes in
+    /// Move the focus to the next (`1`) or previous (`-1`) panel: top bar, list, the panes in
     /// reading order (the conversation, the thread panel beside it), round again. A hidden list
-    /// or a closed pane is skipped. The rail is expanded only while it has the focus, so passing
-    /// it never leaves it open.
+    /// or a closed pane is skipped.
     pub(super) fn cycle(&mut self, step: isize) {
-        let mut stops = vec![Focus::Rail];
+        let mut stops = vec![Focus::Nav];
         if !self.shell.list_hidden {
             stops.push(Focus::List);
         }

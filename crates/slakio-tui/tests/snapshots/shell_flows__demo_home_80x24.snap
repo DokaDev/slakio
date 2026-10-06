@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
-╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││                                                │
-│▌B││   # backend            ││                                                │
-│──││   # incidents       3  ││                                                │
-│H ││                        ││                                                │
-│D●││ ▾ Ops                  ││                                                │
-│A●││   # deploys            ││                                                │
-│F ││   # alerts             ││     No conversation open                       │
-│L ││   # partner-shared ext ││     Pick one in the list and press Enter.      │
-│  ││   # hostile-strings    ││                                                │
-│  ││   # big-history        ││     Enter    Open                              │
-│  ││   # long-threads       ││     Space h  Home                              │
-│  ││                        ││     Space d  DMs                               │
-│  ││ ▾ Channels             ││     Ctrl+O   Back to the last one              │
-│  ││   # announcements      ││     ?        Keyboard help                     │
-│  ││   # design-review      ││     Ctrl+Q   Quit                              │
-│  ││   # feed-alert-134     ││                                                │
-│  ││   # feed-alert-8       ││                                                │
-│  ││   # feed-budget-162    ││                                                │
-│  ││   # feed-budget-33     ││                                                │
-│  ││   # feed-build-50      ││                                                │
-│  ││   # feed-cache-119     ││                                                │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
+│ ▾ Favorites            ││                                                    │
+│   # backend            ││                                                    │
+│   # incidents       3  ││                                                    │
+│                        ││                                                    │
+│ ▾ Ops                  ││                                                    │
+│   # deploys            ││       No conversation open                         │
+│   # alerts             ││       Pick one in the list and press Enter.        │
+│   # partner-shared ext ││                                                    │
+│   # hostile-strings    ││       Enter    Open                                │
+│   # big-history        ││       Space h  Home                                │
+│   # long-threads       ││       Space d  DMs                                 │
+│                        ││       Ctrl+O   Back to the last one                │
+│ ▾ Channels             ││       ?        Keyboard help                       │
+│   # announcements      ││       Ctrl+Q   Quit                                │
+│   # design-review      ││                                                    │
+│   # feed-alert-134     ││                                                    │
+│   # feed-alert-8       ││                                                    │
+│   # feed-budget-162    ││                                                    │
+│   # feed-budget-33     ││                                                    │
+│   # feed-build-50      ││                                                    │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home  │ Enter open · l peek · ? help │  @37  DM 16 │ demo

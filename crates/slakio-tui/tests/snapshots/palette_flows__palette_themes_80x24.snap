@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/palette_flows.rs
 expression: small.snap()
 ---
-╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││                                                │
-│▌B││   # backend            ││                                                │
-│──││   # incidents       3  ││                                                │
-│H ││     ╭ Commands ────────────────────────────────────────────────╮         │
-│D●││ ▾ Op│ : theme                                                  │         │
-│A●││   # ├──────────────────────────────────────────────────────────┤         │
-│F ││   # │  auto               Tokyo Night with 24-bit co…  current │         │
-│L ││   # │  terminal           Your terminal's own colors           │er.      │
-│  ││   # │  dark               Dark, truecolor                      │         │
-│  ││   # │  light              Light, truecolor                     │         │
-│  ││   # │  high-contrast      White on black with strong marks     │         │
-│  ││     │  catppuccin         Catppuccin: Latte or Mocha, by the … │         │
-│  ││ ▾ Ch│  catppuccin-latte   Catppuccin Latte (light)             │         │
-│  ││   # │  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
-│  ││   # │  tokyo-night        Tokyo Night: Day or Night, by the t… │         │
-│  ││   # │  tokyo-night-day    Tokyo Night Day (light)              │         │
-│  ││   # │  tokyo-night-night  Tokyo Night (dark)                   │         │
-│  ││   # │  gruvbox            Gruvbox: light or dark, by the term… │         │
-│  ││   # ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
-│  ││   # feed-build-50      ││                                                │
-│  ││   # feed-cache-119     ││                                                │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
+│ ▾ Favorites            ││                                                    │
+│   # backend            ││                                                    │
+│   # inci╭ Commands ────────────────────────────────────────────────╮         │
+│         │ : theme                                                  │         │
+│ ▾ Ops   ├──────────────────────────────────────────────────────────┤         │
+│   # depl│  auto               Tokyo Night with 24-bit co…  current │         │
+│   # aler│  terminal           Your terminal's own colors           │.        │
+│   # part│  dark               Dark, truecolor                      │         │
+│   # host│  light              Light, truecolor                     │         │
+│   # big-│  high-contrast      White on black with strong marks     │         │
+│   # long│  catppuccin         Catppuccin: Latte or Mocha, by the … │         │
+│         │  catppuccin-latte   Catppuccin Latte (light)             │         │
+│ ▾ Channe│  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
+│   # anno│  tokyo-night        Tokyo Night: Day or Night, by the t… │         │
+│   # desi│  tokyo-night-day    Tokyo Night Day (light)              │         │
+│   # feed│  tokyo-night-night  Tokyo Night (dark)                   │         │
+│   # feed│  gruvbox            Gruvbox: light or dark, by the term… │         │
+│   # feed╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
+│   # feed-budget-33     ││                                                    │
+│   # feed-build-50      ││                                                    │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  COMMAND  ▌A company › Home       │ Enter run · Esc cancel │  @37  DM 16 │ demo

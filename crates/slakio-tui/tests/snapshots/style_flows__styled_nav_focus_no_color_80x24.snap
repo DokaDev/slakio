@@ -1,0 +1,42 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+    [ B 2..11] [ B R 11..14] [ B R 18..28] [ B R 32..35] [ B R 45..49]
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
+│ ▾ Favorites            ││                                                    │
+    [ D 2..3] [ B 4..13]
+│▎  # backend            ││                                                    │
+│   # incidents       3  ││                                                    │
+    [ B 4..5] [ B 6..15] [ B R 21..24]
+│                        ││                                                    │
+│ ▾ Ops                  ││                                                    │
+    [ D 2..3] [ B 4..7]
+│   # deploys            ││       No conversation open                         │
+    [ B 34..54]
+│   # alerts             ││       Pick one in the list and press Enter.        │
+│   # partner-shared ext ││                                                    │
+    [ D 20..24]
+│   # hostile-strings    ││       Enter    Open                                │
+    [ B 4..5] [ B 6..21] [ B 34..39]
+│   # big-history        ││       Space h  Home                                │
+    [ B 34..41]
+│   # long-threads       ││       Space d  DMs                                 │
+    [ B 34..41]
+│                        ││       Ctrl+O   Back to the last one                │
+    [ B 34..40]
+│ ▾ Channels             ││       ?        Keyboard help                       │
+    [ D 2..3] [ B 4..12] [ B 34..35]
+│   # announcements      ││       Ctrl+Q   Quit                                │
+    [ B 34..40]
+│   # design-review      ││                                                    │
+    [ D 4..5] [ D 6..19]
+│   # feed-alert-134     ││                                                    │
+│   # feed-alert-8       ││                                                    │
+│   # feed-budget-162    ││                                                    │
+│   # feed-budget-33     ││                                                    │
+│   # feed-build-50      ││                                                    │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
+ NORMAL  ▌A compa… › Home │ Enter show · h/l move · ? help │  @37  DM 16 │ demo
+    [ B R 0..8] [ D 18..21] [ B 28..33] [ D 38..41] [ B 41..44] [ D 49..52] [ B 52..53] [ B R 61..66] [ B 67..72]

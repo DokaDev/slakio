@@ -57,7 +57,24 @@ fn text_on_a_selection_bar_stays_readable() {
 
 #[test]
 fn questions_never_leave_a_period_on_its_own_line() {
-    let orphan = |s: &str| s.lines().any(|l| l.split('│').any(|part| part.trim() == "."));
+    // Inside the question's box (what shows of the screen under it, dimmed, is not its text).
+    let orphan = |s: &str| {
+        let lines: Vec<Vec<char>> = s.lines().map(|l| l.chars().collect()).collect();
+        let Some((top, from)) = lines.iter().enumerate().find_map(|(y, l)| {
+            let line: String = l.iter().collect();
+            ["╭ Nerd Font icons?", "╭ Quit slakio?"]
+                .iter()
+                .find_map(|t| line.find(t))
+                .map(|b| (y, line[..b].chars().count()))
+        }) else {
+            return false;
+        };
+        let to = (from + 1..lines[top].len()).find(|&x| lines[top][x] == '╮').unwrap_or(lines[top].len());
+        lines[top..].iter().take_while(|l| l.get(from) != Some(&'╰')).any(|l| {
+            let inside: String = l.iter().skip(from + 1).take(to - from - 1).collect();
+            inside.split('│').any(|part| part.trim() == ".")
+        })
+    };
     for w in [120, 100, 90, 80] {
         let mut d = Demo::new(w, 30);
         d.app.ask_icons();
@@ -94,13 +111,18 @@ fn help_stays_on_the_hint_line_at_80_columns() {
 }
 
 #[test]
-fn the_collapsed_rail_marks_a_workspace_with_its_stripe_not_a_red_dot() {
+fn the_top_bar_marks_the_workspace_with_its_band_and_mentions_only_in_red() {
     let d = tokyo(120, 40);
     let buf = d.buffer();
     let t = d.app.theme.clone();
-    for y in [1, 2] {
-        assert_eq!(buf[(1, y)].symbol(), "▌", "row {y}");
-        assert_ne!(buf[(2, y)].fg, t.error);
+    assert_eq!(buf[(1, 0)].symbol(), "▌");
+    assert_eq!(Some(buf[(1, 0)].fg), t.workspace(d.app.model.workspaces()[0].color).fg, "the workspace's color");
+    let bar = d.app.nav_bar().unwrap();
+    for p in
+        bar.pieces.iter().filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark))
+    {
+        let c = &buf[(p.x + 1, 0)];
+        assert_eq!(c.fg == t.error, p.text.trim().starts_with('@'), "{:?}: red for mentions only", p.text);
     }
 }
 

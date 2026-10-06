@@ -53,11 +53,16 @@ fn backend(w: u16, h: u16, theme: Theme, avatars: bool) -> Demo {
 fn first_rows(d: &Demo) -> Vec<(usize, u16)> {
     let _ = d.buffer();
     let pane = d.pane(PaneKind::Conversation).unwrap();
+    let top = d.app.message_area(pane.handle()).map_or(0, |a| a.y);
     let mut out: Vec<(usize, u16)> = Vec::new();
     for (message, y) in pane.drawn_rows() {
         if !out.iter().any(|(m, _)| *m == message) {
             out.push((message, y));
         }
+    }
+    // A message cut at the top shows its lower rows only: its first row is not on screen.
+    if out.first().is_some_and(|(_, y)| *y == top) {
+        out.remove(0);
     }
     out
 }

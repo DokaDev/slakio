@@ -114,7 +114,7 @@ fn a_dm_title_says_whether_its_peer_is_around() {
     let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == Presence::Away).expect("someone away");
     d.app.move_list_cursor_to(index_of(&d, name));
     d.keys("enter");
-    let title = d.screen().lines().next().unwrap().to_string();
+    let title = d.screen().lines().nth(1).unwrap().to_string();
     assert!(title.contains(&format!("@{name} ○ away")), "{title}");
 }
 

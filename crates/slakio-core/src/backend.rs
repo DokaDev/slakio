@@ -48,7 +48,7 @@ pub struct Page {
 /// Everything the UI lists right after start: the answer to [`Command::Boot`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Snapshot {
-    /// In the rail's order.
+    /// In the top bar's order.
     pub workspaces: Vec<Workspace>,
     pub users: Vec<User>,
     /// Per workspace, in sidebar order.

@@ -65,7 +65,6 @@ fn main() -> ExitCode {
     app.theme_setting.clone_from(&cfg.theme);
     app.settings = Settings {
         icons: cfg.icons == "on",
-        rail_push: cfg.rail_expand == "push",
         // `image` (photos) comes later; until then it draws initials.
         avatars: cfg.avatars != "off",
     };
@@ -73,7 +72,7 @@ fn main() -> ExitCode {
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {
         app.connect(b.capabilities());
-        // Asked once, where the rail can preview the answer; the answer is saved.
+        // Asked once, where the top bar can preview the answer; the answer is saved.
         if cfg.icons == "ask" && config_path.is_some() && cfg_err.is_none() {
             app.ask_icons();
         }
@@ -81,6 +80,9 @@ fn main() -> ExitCode {
     // A config file that could not be used is never written over (a setting changed in the app
     // is then not saved, and the app says so).
     let writable = cfg_err.is_none();
+    for key in &cfg.retired {
+        app.warn(slakio_core::i18n::Msg::ConfigRetired { key: key.clone() }, Instant::now());
+    }
     if let Some(e) = cfg_err {
         ErrorLog::new(paths.errors_log()).record("config", &e.fault());
         app.warn(config_message(&e), Instant::now());

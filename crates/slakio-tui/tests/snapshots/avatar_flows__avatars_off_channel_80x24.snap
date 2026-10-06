@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&small.snap())
 ---
-╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││   Check a customer should maybe                │
-│▌B││▎  # backend            ││ Mia Jang · 06:35                               │
-│──││   # incidents       3  ││   Budget metrics merge design rollback alert   │
-│H ││                        ││   alert should draft after alert on staging    │
-│D●││ ▾ Ops                  ││   tomorrow                                     │
-│A●││   # deploys            ││ Tom Ko · 06:41                                 │
-│F ││   # alerts             ││   On waiting migration someone index can       │
-│L ││   # partner-shared ext ││   staging should                               │
-│  ││   # hostile-strings    ││ Kate Nam · 06:51                               │
-│  ││   # big-history        ││   Production roadmap customer build alert now  │
-│  ││   # long-threads       ││   latency fine review latency roadmap broken   │
-│  ││                        ││   should for                                   │
-│  ││ ▾ Channels             ││ ＊＊＊ · 06:59                                 │
-│  ││   # announcements      ││   Confirmed                                    │
-│  ││   # design-review      ││ Kate Nam · 07:05                               │
-│  ││   # feed-alert-134     ││   Ticket review pager pager production on      │
-│  ││   # feed-alert-8       ││   build alert the on draft                     │
-│  ││   # feed-budget-162    ││ Sam Rivera · 07:14                             │
-│  ││   # feed-budget-33     ││   Meeting moved to 3pm                         │
-│  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
-│  ││   # feed-cache-119     ││ › Press i to write                             │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮
+│ ▾ Favorites            ││   Check a customer should maybe                    │
+│▎  # backend            ││ Mia Jang · 06:35                                   │
+│   # incidents       3  ││   Budget metrics merge design rollback alert alert │
+│                        ││   should draft after alert on staging tomorrow     │
+│ ▾ Ops                  ││ Tom Ko · 06:41                                     │
+│   # deploys            ││   On waiting migration someone index can staging   │
+│   # alerts             ││   should                                           │
+│   # partner-shared ext ││ Kate Nam · 06:51                                   │
+│   # hostile-strings    ││   Production roadmap customer build alert now      │
+│   # big-history        ││   latency fine review latency roadmap broken       │
+│   # long-threads       ││   should for                                       │
+│                        ││ ＊＊＊ · 06:59                                     │
+│ ▾ Channels             ││   Confirmed                                        │
+│   # announcements      ││ Kate Nam · 07:05                                   │
+│   # design-review      ││   Ticket review pager pager production on build    │
+│   # feed-alert-134     ││   alert the on draft                               │
+│   # feed-alert-8       ││ Sam Rivera · 07:14                                 │
+│   # feed-budget-162    ││   Meeting moved to 3pm                             │
+│   # feed-budget-33     │├─ Message #backend ─────────────────────────────────┤
+│   # feed-build-50      ││ › Press i to write                                 │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #backend          │ i write · ? help │  @37  DM 16 │ demo

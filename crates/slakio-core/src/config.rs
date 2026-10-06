@@ -8,7 +8,6 @@
 //!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
 //! avatars = "initials"     # a person's initials on a colored chip, or "off"
-//! rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -19,7 +18,8 @@
 //! draws initials, as it will where a terminal cannot show images. `:avatars` changes the
 //! setting while the app runs and saves it here too.
 //!
-//! `rail_expand` is temporary: both ways exist until one is chosen, then the setting goes.
+//! `rail_expand` was a setting of the left rail, which became the top bar: a file that still has
+//! it is used as it is, and the app says the key can go ([`Config::retired`]).
 //!
 //! A missing file is the defaults. A file that exists but cannot be used (unreadable, not valid
 //! TOML, an unknown key, a value out of range) is never treated as missing: the app runs with
@@ -38,12 +38,13 @@ pub struct Config {
     pub theme: String,
     /// Nerd Font icons instead of letters: `on`, `off`, or `ask` (asked once, the answer saved).
     pub icons: String,
-    /// How the rail expands: `overlay` or `push` ([`RAIL_EXPAND`]).
-    pub rail_expand: String,
     /// How a person is pictured: `initials`, `off`, or `image` (initials for now) ([`AVATARS`]).
     pub avatars: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
+    /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
+    /// can go, and uses the file.
+    pub retired: Vec<String>,
 }
 
 impl Default for Config {
@@ -52,9 +53,9 @@ impl Default for Config {
             language: "auto".to_string(),
             theme: "auto".to_string(),
             icons: "ask".to_string(),
-            rail_expand: "overlay".to_string(),
             avatars: "initials".to_string(),
             path: None,
+            retired: Vec::new(),
         }
     }
 }
@@ -88,8 +89,8 @@ pub const ICONS: &[&str] = &["on", "off", "ask"];
 /// The values `avatars` takes.
 pub const AVATARS: &[&str] = &["initials", "off", "image"];
 
-/// The values `rail_expand` takes.
-pub const RAIL_EXPAND: &[&str] = &["overlay", "push"];
+/// Keys an older version had: ignored, never an error ([`Config::retired`]).
+pub const RETIRED: &[&str] = &["rail_expand"];
 
 /// Why the config file cannot be used.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,7 +145,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
         };
         match key {
             "language" => cfg.language = one_of(item, LANGUAGES).ok_or_else(|| bad(LANGUAGES.join(", ")))?,
-            "rail_expand" => cfg.rail_expand = one_of(item, RAIL_EXPAND).ok_or_else(|| bad(RAIL_EXPAND.join(", ")))?,
+            k if RETIRED.contains(&k) => cfg.retired.push(k.to_string()),
             "avatars" => cfg.avatars = one_of(item, AVATARS).ok_or_else(|| bad(AVATARS.join(", ")))?,
             "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
             "icons" => {

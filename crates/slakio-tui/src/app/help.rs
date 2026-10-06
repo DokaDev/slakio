@@ -193,7 +193,7 @@ mod tests {
             .find(|r| matches!(r, Row::Entry { action: Action::Shell(ShellAction::ListNext), .. }))
             .expect("the list's keys");
         assert!(matches!(next, Row::Entry { keys, .. } if keys == "j / Down"), "{next:?}");
-        assert!(rows.iter().any(|r| matches!(r, Row::Section { ctx: Ctx::Rail, open: false, count } if *count > 0)));
+        assert!(rows.iter().any(|r| matches!(r, Row::Section { ctx: Ctx::Nav, open: false, count } if *count > 0)));
         let quit = rows.iter().any(|r| matches!(r, Row::Entry { action: Action::App(AppAction::Quit), .. }));
         assert!(quit, "the global keys are open too");
     }

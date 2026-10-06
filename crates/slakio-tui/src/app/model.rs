@@ -58,6 +58,11 @@ impl Model {
         &self.snapshot.sections[i]
     }
 
+    /// Every conversation of every workspace.
+    pub fn conversations(&self) -> &[Conversation] {
+        &self.snapshot.conversations
+    }
+
     pub fn conversation(&self, i: usize) -> &Conversation {
         &self.snapshot.conversations[i]
     }

@@ -1,5 +1,5 @@
 //! The look, not only the text: text snapshots cannot see an underline, a gray that hides text
-//! or a panel blanked under the rail. These tests read every cell's style, in every built-in
+//! or a panel blanked under a popup. These tests read every cell's style, in every built-in
 //! theme and without color, and some screens are snapshots with their styles written beside
 //! each row as theme token names (`screen_styled`).
 
@@ -30,7 +30,7 @@ fn demo(theme: &Theme, w: u16, h: u16) -> Demo {
 }
 
 /// The frames the checks look at: the list focused and not, a pane with a selected message
-/// focused and not, the thread panel, the rail focused.
+/// focused and not, the thread panel, the top bar focused.
 fn frames(theme: &Theme) -> Vec<(&'static str, Demo)> {
     let mut out = Vec::new();
     out.push(("home", demo(theme, 120, 40)));
@@ -47,8 +47,8 @@ fn frames(theme: &Theme) -> Vec<(&'static str, Demo)> {
     d.keys("k ctrl+h");
     out.push(("list after a pane", d));
     let mut d = demo(theme, 120, 40);
-    d.keys("ctrl+h");
-    out.push(("rail", d));
+    d.keys("ctrl+r");
+    out.push(("top bar", d));
     out.push(("tabs", tabs(theme)));
     out
 }
@@ -142,19 +142,28 @@ fn unfocused_text_keeps_its_color() {
     }
 }
 
-// ③ The overlay rail leaves the list drawn beside it.
+// ③ The top bar (the app's: on the status line's surface) and the tab bar (the work area's: on
+// the background) read as two things; the view shown is raised like the tab shown.
 #[test]
-fn the_overlay_rail_leaves_the_list_visible() {
-    for t in themes() {
-        let mut d = demo(&t, 120, 40);
-        d.keys("ctrl+h");
-        let a = d.app.areas();
-        let list = a.list.unwrap();
+fn the_top_bar_and_the_tab_bar_read_apart() {
+    for t in themes().into_iter().filter(|t| t.kind == Kind::Truecolor) {
+        let d = tabs(&t);
         let buf = d.buffer();
-        let shown = (list.y + 1..list.bottom() - 1)
-            .filter(|&y| (a.rail.right()..list.right() - 1).any(|x| buf[(x, y)].symbol() != " "))
-            .count();
-        assert!(shown > 10, "{}: only {shown} rows of the list show beside the rail", t.name);
+        let tabs_row = d.app.areas().tabs.unwrap().y;
+        let blank_nav = (0..120).rev().find(|&x| buf[(x, 0)].symbol() == " ").unwrap();
+        assert_eq!(buf[(blank_nav, 0)].bg, t.surface, "{}: the top bar's surface", t.name);
+        assert_eq!(buf[(119, tabs_row)].bg, t.bg, "{}: the tab bar on the background", t.name);
+        let bar = d.app.nav_bar().unwrap();
+        let home = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(1)).unwrap();
+        let cell = &buf[(home.x, 0)];
+        assert_eq!(
+            (cell.bg, cell.modifier.contains(Modifier::BOLD)),
+            (t.surface_alt, true),
+            "{}: Home is shown",
+            t.name
+        );
+        let files = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(4)).unwrap();
+        assert_eq!(buf[(files.x, 0)].fg, t.fg_muted, "{}", t.name);
     }
 }
 
@@ -165,13 +174,10 @@ fn one_accent_border() {
         for (what, d) in frames(&t) {
             let buf = d.buffer();
             let corners = buf.content().iter().filter(|c| c.symbol() == "╭" && c.fg == t.accent).count();
-            assert_eq!(corners, 1, "{} {what}", t.name);
+            // The top bar has no border: with the focus there, its cursor is the selection bar.
+            let want = usize::from(what != "top bar");
+            assert_eq!(corners, want, "{} {what}", t.name);
         }
-        // Hovered, the rail opens without the focus: no accent on it.
-        let mut d = demo(&t, 120, 40);
-        d.mouse(ratatui::crossterm::event::MouseEventKind::Moved, 1, 5);
-        let buf = d.buffer();
-        assert_ne!(buf[(0, 0)].fg, t.accent, "{}: a hovered rail is not focused", t.name);
     }
 }
 
@@ -306,14 +312,17 @@ fn styled_snapshots_in_tokyo_night() {
     d.keys("g g enter");
     insta::assert_snapshot!("styled_case2_thread_120x40", screen_styled(&d));
     let mut d = demo(&t, 120, 40);
-    d.keys("ctrl+h");
-    insta::assert_snapshot!("styled_rail_overlay_focus_120x40", screen_styled(&d));
+    d.keys("ctrl+r l");
+    insta::assert_snapshot!("styled_nav_focus_120x40", screen_styled(&d));
     let mut d = demo(&t, 120, 40);
-    d.mouse(ratatui::crossterm::event::MouseEventKind::Moved, 1, 5);
-    insta::assert_snapshot!("styled_rail_overlay_hover_120x40", screen_styled(&d));
+    d.keys("space W");
+    insta::assert_snapshot!("styled_switcher_120x40", screen_styled(&d));
     let mut d = demo(&resolve("terminal", false, Background::Dark), 80, 24);
-    d.keys("ctrl+h");
-    insta::assert_snapshot!("styled_rail_overlay_focus_terminal_80x24", screen_styled(&d));
+    d.keys("ctrl+r");
+    insta::assert_snapshot!("styled_nav_focus_terminal_80x24", screen_styled(&d));
+    let mut d = demo(&Theme::no_color(), 80, 24);
+    d.keys("ctrl+r");
+    insta::assert_snapshot!("styled_nav_focus_no_color_80x24", screen_styled(&d));
     insta::assert_snapshot!("styled_tabs_120x40", screen_styled(&tabs(&t)));
 }
 

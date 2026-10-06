@@ -10,8 +10,6 @@ impl App {
     /// What the layout depends on now besides the size.
     fn shape(&self) -> screen::Shape {
         screen::Shape {
-            rail_expanded: self.shell.rail_expanded(self.focus() == Focus::Rail),
-            push: self.settings.rail_push,
             list_hidden: self.shell.list_hidden,
             thread: self.work.has_panel(),
             list_focused: self.focus() == Focus::List,

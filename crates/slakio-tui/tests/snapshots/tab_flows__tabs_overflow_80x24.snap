@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
-╭──╮╭ Home ──────────────────╮‹ 4 #rand… ×  5 #depl… ×  6 #long… ×  7 #big-… ×
-│▌A││ ▾ Favorites            │╭ ▌#big-history ─────────────────────────────────╮
-│▌B││   # backend            ││ MB Max Baek · 09:59                            │
-│──││   # incidents       3  ││    ＊＊ ＊＊＊＊＊＊                           │
-│H ││                        ││ OH Owen Hwang · 10:45                          │
-│D●││ ▾ Ops                  ││    Should retry production                     │
-│A●││   # deploys            ││    :+1: 4  :eyes: 1                            │
-│F ││   # alerts             ││ LK Leo Kang · 11:14                            │
-│L ││   # partner-shared ext ││    Deploy customer sprint staging can          │
-│  ││   # hostile-strings    ││ MB Max Baek · 11:30                            │
-│  ││▎  # big-history        ││    PR is up                                    │
-│  ││   # long-threads       ││ AM Alex Morgan · 12:23                         │
-│  ││                        ││    Meeting moved to 3pm                        │
-│  ││ ▾ Channels             ││    :white_check_mark: 2                        │
-│  ││   # announcements      ││ IM Ivy Moon · 12:53                            │
-│  ││   # design-review      ││    We rollback after                           │
-│  ││   # feed-alert-134     ││ JL Jordan Lee · 13:32                          │
-│  ││   # feed-alert-8       ││    We on fine                                  │
-│  ││   # feed-budget-162    ││ RO Ryan Oh · 13:48                             │
-│  ││   # feed-budget-33     ││    ＊＊ ＊＊＊＊＊＊                           │
-│  ││   # feed-build-50      │├─ Message #big-history ─────────────────────────┤
-│  ││   # feed-cache-119     ││ › Press i to write                             │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮‹ 4 #rand… ×  5 #depl… ×  6 #long… ×  7 #big-… ×
+│ ▾ Favorites            │╭ ▌#big-history ─────────────────────────────────────╮
+│   # backend            ││    ＊＊ ＊＊＊＊＊＊                               │
+│   # incidents       3  ││ OH Owen Hwang · 10:45                              │
+│                        ││    Should retry production                         │
+│ ▾ Ops                  ││    :+1: 4  :eyes: 1                                │
+│   # deploys            ││ LK Leo Kang · 11:14                                │
+│   # alerts             ││    Deploy customer sprint staging can              │
+│   # partner-shared ext ││ MB Max Baek · 11:30                                │
+│   # hostile-strings    ││    PR is up                                        │
+│▎  # big-history        ││ AM Alex Morgan · 12:23                             │
+│   # long-threads       ││    Meeting moved to 3pm                            │
+│                        ││    :white_check_mark: 2                            │
+│ ▾ Channels             ││ IM Ivy Moon · 12:53                                │
+│   # announcements      ││    We rollback after                               │
+│   # design-review      ││ JL Jordan Lee · 13:32                              │
+│   # feed-alert-134     ││    We on fine                                      │
+│   # feed-alert-8       ││ RO Ryan Oh · 13:48                                 │
+│   # feed-budget-162    ││    ＊＊ ＊＊＊＊＊＊                               │
+│   # feed-budget-33     │├─ Message #big-history ─────────────────────────────┤
+│   # feed-build-50      ││ › Press i to write                                 │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #big-history      │ i write · ? help │  @37  DM 16 │ demo

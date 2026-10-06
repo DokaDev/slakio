@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/ux_flows.rs
 expression: d.snap()
 ---
-╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││                                                │
-│▌B││   # backend            ││                                                │
-│──││   # incidents       3  ││                                                │
-│H ││                        ││                                                │
-│D●││ ▾ Ops                  ││                                                │
-│A●││   # deploys            ││                                                │
-│F ││   # alerts             ││                                                │
-│L ││   # partner-shared ext ││                                                │
-│  ││   # hostile-strings    ││                                                │
-│  ││   # big-history        ││                                                │
-│  ││   # long-threads       ││                                                │
-│  ││                        ││                                                │
-│  ││ ▾ Channels             ││                                                │
-│  ││   # announcements      ││                                                │
-│  ││   # design-review      ││     No conversation open                       │
-│  ││   # feed-alert-134     ││     Pick one in the list and press Enter.      │
-│  ││   # feed-alert-8       ││                                                │
-│  ││   # feed-budget-162    ││     Enter    Open                              │
-│  ││   # feed-budget-33     ││     Space h  Home                              │
-│  ││   # feed-build-50      ││     Space d  DMs                               │
-│  ││   # feed-cache-119     ││     Ctrl+O   Back to the last one              │
-│  ││   # feed-customer-161  ││     ?        Keyboard help                     │
-│  ││   # feed-customer…  1  ││     Ctrl+Q   Quit                              │
-│  ││   # feed-dashboard-22  ││                                                │
-│  ││   # feed-dashboard-41  ││                                                │
-│  ││   # feed-design-34     ││                                                │
-│  ││   # feed-design-83     ││                                                │
-│  ││   # feed-draft-142     ││                                                │
-│  ││   # feed-draft-58      ││                                                │
-│  ││   # feed-draft-84      ││                                                │
-│  ││   # feed-index-199  2  ││                                                │
-│  ││   # feed-index-39      ││                                                │
-│  ││   # feed-index-5    1  ││                                                │
-│  ││   # feed-invoice-16    ││                                                │
-│  ││   # feed-invoice-168   ││                                                │
-│  ││   # feed-latency-144   ││                                                │
-│  ││   # feed-meeting-82    ││                                                │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
+│ ▾ Favorites            ││                                                    │
+│   # backend            ││                                                    │
+│   # incidents       3  ││                                                    │
+│                        ││                                                    │
+│ ▾ Ops                  ││                                                    │
+│   # deploys            ││                                                    │
+│   # alerts             ││                                                    │
+│   # partner-shared ext ││                                                    │
+│   # hostile-strings    ││                                                    │
+│   # big-history        ││                                                    │
+│   # long-threads       ││                                                    │
+│                        ││                                                    │
+│ ▾ Channels             ││                                                    │
+│   # announcements      ││       No conversation open                         │
+│   # design-review      ││       Pick one in the list and press Enter.        │
+│   # feed-alert-134     ││                                                    │
+│   # feed-alert-8       ││       Enter    Open                                │
+│   # feed-budget-162    ││       Space h  Home                                │
+│   # feed-budget-33     ││       Space d  DMs                                 │
+│   # feed-build-50      ││       Ctrl+O   Back to the last one                │
+│   # feed-cache-119     ││       ?        Keyboard help                       │
+│   # feed-customer-161  ││       Ctrl+Q   Quit                                │
+│   # feed-customer…  1  ││                                                    │
+│   # feed-dashboard-22  ││                                                    │
+│   # feed-dashboard-41  ││                                                    │
+│   # feed-design-34     ││                                                    │
+│   # feed-design-83     ││                                                    │
+│   # feed-draft-142     ││                                                    │
+│   # feed-draft-58      ││                                                    │
+│   # feed-draft-84      ││                                                    │
+│   # feed-index-199  2  ││                                                    │
+│   # feed-index-39      ││                                                    │
+│   # feed-index-5    1  ││                                                    │
+│   # feed-invoice-16    ││                                                    │
+│   # feed-invoice-168   ││                                                    │
+│   # feed-latency-144   ││                                                    │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home  │ Enter open · l peek · ? help │  @37  DM 16 │ demo

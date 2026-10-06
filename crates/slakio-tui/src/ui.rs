@@ -1,10 +1,10 @@
 //! Drawing a frame of [`App`]. Without a backend: the welcome text and the status line. With
-//! one: the shell — rail, list panel, work area — over the status line (see [`crate::screen`]
+//! one: the shell — the top bar, the list panel, the work area — over the status line (see [`crate::screen`]
 //! for the geometry), or, on a terminal too small for it, only how much room it needs. Popups
 //! go on top: the which-key popup above the status line, the keyboard help, the command palette
 //! and a question over the dimmed screen.
 //!
-//! * [`rail`], [`list`], [`work`] — the three regions; [`tabbar`] — the work area's tabs, when
+//! * [`navbar`], [`list`], [`work`] — the three regions (and [`switcher`], the workspace switcher); [`tabbar`] — the work area's tabs, when
 //!   there are two or more; [`timeline`] — a pane's messages;
 //!   [`statusline`] — the bottom line with its hints; [`empty`] — empty states that list keys;
 //!   [`guide`], [`help`], [`palette`], [`dialog`] — the popups.
@@ -18,9 +18,10 @@ mod empty;
 mod guide;
 mod help;
 mod list;
+mod navbar;
 mod palette;
-mod rail;
 mod statusline;
+mod switcher;
 mod tabbar;
 pub mod timeline;
 mod work;
@@ -39,7 +40,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use slakio_core::i18n::{Label, Localized, Msg};
 use slakio_core::model::{Presence, UserId};
-use slakio_core::sanitize::Safe;
 use std::time::Instant;
 
 /// Draw the whole screen at `now` (notices that ran out are not drawn).
@@ -62,9 +62,9 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
         if let Some(bar) = app.tab_bar() {
             tabbar::draw(f, app, &bar);
         }
-        // An expanded rail over the list panel clears only its own cells: the list shows
-        // beside it.
-        rail::draw(f, app, a.rail);
+        if let Some(bar) = app.nav_bar() {
+            navbar::draw(f, app, &bar);
+        }
     }
     statusline::draw(f, app, status, now);
     // The popups bottom up, in the order the keys and the mouse follow; the palette and the
@@ -91,7 +91,8 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
                 app.theme.dim_area(f.buffer_mut(), area);
                 dialog::draw(f, app, body);
             }
-            Layer::WhichKey | Layer::Palette => {}
+            Layer::Switcher if !screen::too_small(area) => switcher::draw(f, app),
+            Layer::WhichKey | Layer::Palette | Layer::Switcher => {}
         }
     }
 }
@@ -149,7 +150,7 @@ fn draw_too_small(f: &mut Frame, app: &App, area: Rect) {
 fn frame<'a>(app: &App, region: Region, title: &str) -> Block<'a> {
     let focused = matches!(
         (region, app.focus()),
-        (Region::Rail, Focus::Rail) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_) | Focus::Work)
+        (Region::Nav, Focus::Nav) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_) | Focus::Work)
     );
     panel(app, focused, Line::from(title_span(app, title, focused)))
 }
@@ -168,31 +169,14 @@ fn title_span(app: &App, text: &str, focused: bool) -> Span<'static> {
     Span::styled(format!(" {text} "), app.theme.title(focused))
 }
 
-/// The name of a view (rail labels, list title, breadcrumb).
-fn view_label(view: View) -> Label {
-    match view {
-        View::Home => Label::RailHome,
-        View::Dms => Label::RailDms,
-        View::Activity => Label::RailActivity,
-        View::Files => Label::RailFiles,
-        View::Later => Label::RailLater,
-    }
+/// The name of a view (top bar labels, list title, breadcrumb).
+pub(crate) fn view_label(view: View) -> Label {
+    view.label()
 }
 
-/// The rail's letter, or its Nerd Font icon, for a view.
-fn view_glyph(view: View, icons: bool) -> &'static str {
-    match (view, icons) {
-        (View::Home, false) => "H",
-        (View::Dms, false) => "D",
-        (View::Activity, false) => "A",
-        (View::Files, false) => "F",
-        (View::Later, false) => "L",
-        (View::Home, true) => "\u{F02DC}",
-        (View::Dms, true) => "\u{F0361}",
-        (View::Activity, true) => "\u{F009A}",
-        (View::Files, true) => "\u{F0219}",
-        (View::Later, true) => "\u{F00C0}",
-    }
+/// The top bar's letter, or its Nerd Font icon, for a view.
+pub(crate) fn view_glyph(view: View, icons: bool) -> &'static str {
+    view.glyph(icons)
 }
 
 /// A person's presence mark: `●` active, `○` away, `◐` in do not disturb; none while
@@ -216,11 +200,6 @@ fn avatar_chip(app: &App, id: &UserId, name: &str) -> Option<Span<'static>> {
     }
     let handle = || app.model.user(id).map(|u| u.name.line().as_str().to_string()).unwrap_or_default();
     Some(Span::styled(avatar::initials(name, handle), app.theme.avatar(avatar::slot(id))))
-}
-
-/// The first letter of a workspace's name, upper case: its rail letter.
-fn workspace_letter(name: &Safe) -> String {
-    name.as_str().chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_default()
 }
 
 /// The pill of count `n` (` 3 `, ` 99+ `).

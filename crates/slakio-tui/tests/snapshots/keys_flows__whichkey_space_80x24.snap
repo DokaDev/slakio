@@ -2,21 +2,21 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: d.snap()
 ---
-╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││                                                │
-│▌B││   # backend            ││                                                │
-│──││   # incidents       3  ││                                                │
-│H ││                        ││                                                │
-│D●││ ▾ Ops                  ││                                                │
-│A●││   # deploys            ││                                                │
-│F ││   # alerts             ││     No conversation open                       │
-│L ││   # partner-shared ext ││     Pick one in the list and press Enter.      │
-│  ││   # hostile-strings    ││                                                │
-│  ││   # big-history        ││     Enter    Open                              │
-│  ││   # long-threads       ││     Space h  Home                              │
-│  ││                        ││     Space d  DMs                               │
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
+│ ▾ Favorites            ││                                                    │
+│   # backend            ││                                                    │
+│   # incidents       3  ││                                                    │
+│                        ││                                                    │
+│ ▾ Ops                  ││                                                    │
+│   # deploys            ││       No conversation open                         │
+│   # alerts             ││       Pick one in the list and press Enter.        │
+│   # partner-shared ext ││                                                    │
+│   # hostile-strings    ││       Enter    Open                                │
+│   # big-history        ││       Space h  Home                                │
+│   # long-threads       ││       Space d  DMs                                 │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────╮
-│ r    Rail: workspaces and views        [    Back to the conversation before  │
+│ r    Top bar: workspace, views         [    Back to the conversation before  │
 │ h    Show Home                         ]    Forward again                    │
 │ d    Show DMs                          1…9  Show tab 1 to 9                  │
 │ a    Show Activity                     ?    Keyboard help                    │

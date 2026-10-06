@@ -1,5 +1,5 @@
 //! What the app shows, asked from outside: where the keyboard is, which popup is up, the panes
-//! and what they hold, the list panel and the rail, the keyboard help. Tests read the app through
+//! and what they hold, the list panel and the top bar, the keyboard help. Tests read the app through
 //! these queries, never through the sub-states (which are private to the crate), so the state
 //! can change shape without touching them. Panes are named by a [`PaneHandle`], never by their
 //! place, so the queries hold when the work area gains splits.
@@ -38,7 +38,7 @@ impl PaneHandle {
 /// Where the keyboard is, under any popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
-    Rail,
+    Nav,
     List,
     Pane(PaneHandle),
     /// The work area with no pane open.
@@ -58,6 +58,8 @@ pub enum Overlay {
     Dialog(Question),
     Help,
     Palette,
+    /// The workspace switcher.
+    Switcher,
 }
 
 /// A pane, read only.
@@ -204,14 +206,14 @@ impl App {
         self.shell.workspace
     }
 
-    /// The rail item under the rail's cursor.
-    pub fn rail_cursor(&self) -> usize {
-        self.shell.rail_cursor
+    /// The top bar's item under its cursor (index into [`super::shell::nav_items`]).
+    pub fn nav_cursor(&self) -> usize {
+        self.shell.nav_cursor
     }
 
-    /// The rail is drawn wide, with labels.
-    pub fn rail_expanded(&self) -> bool {
-        self.shell.rail_expanded(self.focus() == Focus::Rail)
+    /// The workspace switcher's cursor (index into the workspaces), while it is open.
+    pub fn switcher(&self) -> Option<usize> {
+        self.switcher
     }
 
     /// The rows of the keyboard help, while it is open (else none).

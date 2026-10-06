@@ -45,7 +45,7 @@ fn ctrl_p_opens_a_box_of_every_command_and_action_with_its_keys() {
     assert_eq!(last.keys, "Ctrl+Q / Space q");
     assert!(!all.contains("Quit"), "not in the first screen: {all}");
     assert_ne!(rows[d.app.cmdline.selected].label, "Quit");
-    for (name, keys) in [(":theme <theme>", ""), (":rail", "Ctrl+R / Space r"), (":home", "Space h")] {
+    for (name, keys) in [(":theme <theme>", ""), (":nav, :rail", "Ctrl+R / Space r"), (":home", "Space h")] {
         assert!(rows.iter().any(|r| r.name == name && r.keys == keys), "{name}: {rows:#?}");
     }
     assert!(rows.iter().any(|r| r.name.is_empty() && r.label == "Next panel" && r.keys == "Tab / F6"), "{rows:#?}");
@@ -76,10 +76,10 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.keys("ctrl+p");
     d.type_text("rail");
     let rows = d.app.palette_rows();
-    assert_eq!(rows[0].name, ":rail");
+    assert_eq!(rows[0].name, ":nav, :rail", "the old name still finds the top bar");
     assert_eq!(rows[0].keys, "Ctrl+R / Space r", "the keys from where the keyboard is");
     d.keys("enter");
-    assert_eq!(d.app.focus(), Focus::Rail);
+    assert_eq!(d.app.focus(), Focus::Nav);
     // An action without a command: found by its label.
     d.keys("esc ctrl+p");
     d.type_text("next panel");
@@ -88,7 +88,7 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.type_text("nextpan");
     assert_eq!(d.app.palette_rows()[0].label, "Next panel");
     d.keys("enter");
-    assert_eq!(d.app.focus(), Focus::Rail, "Tab's action ran: nothing is open, the rail is next");
+    assert_eq!(d.app.focus(), Focus::Nav, "Tab's action ran: nothing is open, the top bar is next");
 }
 
 #[test]

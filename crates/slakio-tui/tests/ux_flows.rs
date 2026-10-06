@@ -62,16 +62,17 @@ fn the_first_cursor_is_on_the_first_conversation_not_a_header() {
 }
 
 #[test]
-fn the_overlay_rail_leaves_the_list_visible_beside_it() {
+fn the_top_bar_takes_a_row_and_the_list_starts_at_the_left_edge() {
     let mut d = Demo::new(120, 40);
-    d.keys("ctrl+h");
+    d.keys("ctrl+r");
     let a = d.app.areas();
     let list = a.list.expect("the list panel");
-    assert!(a.rail.right() < list.right());
+    assert_eq!((list.x, list.y, a.nav.height), (0, 1, 1));
     let buf = d.buffer();
-    // The list's right border shows beside the rail on every row of the panel.
+    // Focused, the bar covers nothing: the list's borders show on every row.
     for y in list.y + 1..list.bottom() - 1 {
-        assert_eq!(buf[(list.right() - 1, y)].symbol(), "│", "row {y}: the list is drawn under the rail");
+        assert_eq!(buf[(0, y)].symbol(), "│", "row {y}");
+        assert_eq!(buf[(list.right() - 1, y)].symbol(), "│", "row {y}");
     }
 }
 
@@ -146,7 +147,7 @@ fn tab_moves_the_focus_to_the_next_pane_and_back() {
     d.open("long-threads");
     d.keys("g g enter");
     d.keys("tab");
-    assert_eq!(d.app.focus(), Focus::Rail, "after the thread panel comes the rail");
+    assert_eq!(d.app.focus(), Focus::Nav, "after the thread panel comes the rail");
     d.keys("tab");
     assert_eq!(d.app.focus(), Focus::List, "then the list");
     d.keys("tab");

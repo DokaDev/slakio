@@ -104,7 +104,7 @@ pub struct Theme {
     pub surface_alt: Color,
     /// Borders of panels without the focus, dividers.
     pub border: Color,
-    /// The focused panel's border, links, prompts, the current rail item, keys in popups.
+    /// The focused panel's border, links, prompts, the current workspace, keys in popups.
     pub accent: Color,
     /// Key groups and keys of an empty state, the backend's state.
     pub accent_warm: Color,
@@ -296,7 +296,7 @@ impl Theme {
         Style::new().fg(self.accent)
     }
 
-    /// The current workspace or view on the rail.
+    /// The current workspace or view.
     pub fn current(&self) -> Style {
         if self.plain() { self.bold() } else { self.accent().add_modifier(Modifier::BOLD) }
     }
@@ -363,6 +363,31 @@ impl Theme {
         match self.tab(shown).bg {
             Some(bg) => dot.bg(bg),
             None => dot,
+        }
+    }
+
+    /// The top bar's row (the status line's surface: the app's own lines, apart from the tabs).
+    pub fn nav_bar(&self) -> Style {
+        if self.plain() { Style::new() } else { self.text().bg(self.surface) }
+    }
+
+    /// A view on the top bar: the one the list shows raised and bold like the tab shown, the
+    /// others muted.
+    pub fn nav_item(&self, shown: bool) -> Style {
+        match (self.plain(), shown) {
+            (true, _) => self.tab(shown),
+            (false, true) => self.tab(true),
+            (false, false) => self.muted().bg(self.surface),
+        }
+    }
+
+    /// A count on the top bar (`@3`, `●2`, `●`): a mention in the mention color, unread bold;
+    /// without truecolor a mention is reversed too, so it never reads by color alone.
+    pub fn marker(&self, mention: bool) -> Style {
+        match (mention, self.kind) {
+            (true, Kind::Truecolor) => self.dot(true),
+            (true, _) => self.dot(true).add_modifier(Modifier::REVERSED),
+            (false, _) => self.bold(),
         }
     }
 

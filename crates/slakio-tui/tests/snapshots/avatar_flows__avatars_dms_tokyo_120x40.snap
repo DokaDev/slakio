@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&d.screen())
 ---
-╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ MK● Minsu Kim       1  ││                                                                                        │
-│▌B││ JP● Jiho Park          ││                                                                                        │
-│──││ ＊○ ＊＊＊             ││                                                                                        │
-│H ││ JL◐ Jiyoung Lee        ││                                                                                        │
-│D●││ AM● Alex Morgan        ││                                                                                        │
-│A●││ ＊○ ＊＊＊             ││                                                                                        │
-│F ││ H ● Hana            2  ││                                                                                        │
-│L ││ SR● Sam Rivera      1  ││                                                                                        │
-│  ││ ＊○ ＊＊＊             ││                                                                                        │
-│  ││ TK◐ Taylor Kim         ││                                                                                        │
-│  ││ CP● Chris Park         ││                                                                                        │
-│  ││ ＊○ ＊＊＊          2  ││                                                                                        │
-│  ││ ML◐ Mallory live       ││                                                                                        │
-│  ││ 3   Jiho Park, ＊…  2  ││                                                                                        │
-│  ││                        ││                         No conversation open                                           │
-│  ││                        ││                         Pick one in the list and press Enter.                          │
-│  ││                        ││                                                                                        │
-│  ││                        ││                         Enter    Open                                                  │
-│  ││                        ││                         Space h  Home                                                  │
-│  ││                        ││                         Space d  DMs                                                   │
-│  ││                        ││                         Ctrl+O   Back to the last one                                  │
-│  ││                        ││                         ?        Keyboard help                                         │
-│  ││                        ││                         Ctrl+Q   Quit                                                  │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › DMs │ Enter open · l peek · t new tab · Tab next pane · Ctrl+R rail · ? help │  @37  DM 16 │ demo
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
+│ MK● Minsu Kim       1  ││                                                                                            │
+│ JP● Jiho Park          ││                                                                                            │
+│ ＊○ ＊＊＊             ││                                                                                            │
+│ JL◐ Jiyoung Lee        ││                                                                                            │
+│ AM● Alex Morgan        ││                                                                                            │
+│ ＊○ ＊＊＊             ││                                                                                            │
+│ H ● Hana            2  ││                                                                                            │
+│ SR● Sam Rivera      1  ││                                                                                            │
+│ ＊○ ＊＊＊             ││                                                                                            │
+│ TK◐ Taylor Kim         ││                                                                                            │
+│ CP● Chris Park         ││                                                                                            │
+│ ＊○ ＊＊＊          2  ││                                                                                            │
+│ ML◐ Mallory live       ││                                                                                            │
+│ 3   Jiho Park, ＊…  2  ││                           No conversation open                                             │
+│                        ││                           Pick one in the list and press Enter.                            │
+│                        ││                                                                                            │
+│                        ││                           Enter    Open                                                    │
+│                        ││                           Space h  Home                                                    │
+│                        ││                           Space d  DMs                                                     │
+│                        ││                           Ctrl+O   Back to the last one                                    │
+│                        ││                           ?        Keyboard help                                           │
+│                        ││                           Ctrl+Q   Quit                                                    │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+│                        ││                                                                                            │
+╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › DMs │ Enter open · l peek · t new tab · Ctrl+R top bar · ? help · Space more │  @37  DM 16 │ demo

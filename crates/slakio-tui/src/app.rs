@@ -20,11 +20,11 @@
 //! | a selected message | no selection (back to the newest) | |
 //! | the thread panel | the main pane | closes it; the main pane selects its message |
 //! | the main pane | the list, on its conversation | closes it, and its tab with its last pane: the tab shown next, else the list, on its conversation |
-//! | the rail | the list | |
+//! | the top bar | the list | |
 //! | the list | nothing | |
 //!
-//! The rail is reached from anywhere outside text with `Ctrl+R` or `Space r`, and is a stop of
-//! the `Tab` round (left of the list). Tabs ([`tabs`]) keep their own panes; the mouse is
+//! The top bar is reached from anywhere outside text with `Ctrl+R` or `Space r` ([`nav`]), and
+//! is a stop of the `Tab` round (before the list). Tabs ([`tabs`]) keep their own panes; the mouse is
 //! [`mouse`]'s.
 
 pub mod cmdline;
@@ -36,6 +36,7 @@ pub mod help;
 mod layout;
 pub mod model;
 mod mouse;
+mod nav;
 mod overlay;
 pub mod palette;
 pub mod pane;
@@ -65,6 +66,7 @@ use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEven
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
 use std::time::{Duration, Instant};
+pub use tabs::Unread;
 use work::Work;
 
 /// How long an unfinished key sequence waits before the which-key popup lists what may follow
@@ -101,15 +103,13 @@ pub enum Effect {
 pub struct Settings {
     /// Nerd Font icons instead of letters.
     pub icons: bool,
-    /// The expanded rail pushes the list panel aside instead of covering it.
-    pub rail_push: bool,
     /// People are pictured by an initials chip (`avatars = "initials"`, the default).
     pub avatars: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { icons: false, rail_push: false, avatars: true }
+        Self { icons: false, avatars: true }
     }
 }
 
@@ -152,6 +152,8 @@ pub struct App {
     last_click: Option<(Instant, Position)>,
     /// The tab being dragged along the tab bar (its index now).
     tab_drag: Option<usize>,
+    /// The workspace switcher's cursor, while it is open.
+    pub(crate) switcher: Option<usize>,
     /// The terminal's size, for the mouse and scrolling.
     pub size: Rect,
     /// Set once the user asked to quit; the binary's loop ends.
@@ -182,6 +184,7 @@ impl App {
             effects: Vec::new(),
             last_click: None,
             tab_drag: None,
+            switcher: None,
             size: Rect::default(),
             quit: false,
         }
@@ -193,7 +196,7 @@ impl App {
         self.boot = self.work.requests.ask(Command::Boot);
     }
 
-    /// Ask once whether the terminal shows Nerd Font icons; the rail previews the answer that
+    /// Ask once whether the terminal shows Nerd Font icons; the top bar previews the answer that
     /// has the focus, and the answer is saved ([`Effect::Save`]).
     pub fn ask_icons(&mut self) {
         self.dialog = Some(Dialog::new(Question::Icons));
@@ -246,6 +249,7 @@ impl App {
             Some(Overlay::Help) if self.help.as_ref().is_some_and(|h| h.typing) => Ctx::HelpFilter,
             Some(Overlay::Help) => Ctx::Help,
             Some(Overlay::Palette) => Ctx::CommandLine,
+            Some(Overlay::Switcher) => Ctx::Switcher,
             None => self.region_context(),
         }
     }
@@ -265,7 +269,7 @@ impl App {
             return Ctx::Root;
         }
         match self.focus() {
-            Focus::Rail => Ctx::Rail,
+            Focus::Nav => Ctx::Nav,
             Focus::List => Ctx::List,
             Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
             Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
@@ -485,12 +489,7 @@ impl App {
                     self.warn(msg, now);
                 }
             }
-            AppAction::ChooseWorkspace => {
-                if self.backend.is_some() {
-                    self.set_focus(Focus::Rail);
-                    self.shell.rail_cursor = self.shell.workspace;
-                }
-            }
+            AppAction::ChooseWorkspace => self.open_switcher(),
         }
     }
 
@@ -515,6 +514,11 @@ impl App {
             // Never onto an empty work area: nothing there takes a key.
             ShellAction::FocusRight if self.focus() == Focus::List && self.work.ids().is_empty() => return,
             ShellAction::FocusRight if self.focus().is_pane() => return self.pane(PaneAction::Right, now),
+            ShellAction::SwitcherNext
+            | ShellAction::SwitcherPrev
+            | ShellAction::SwitcherChoose
+            | ShellAction::SwitcherClose => return self.switcher_key(a),
+            ShellAction::NavSelect if self.nav_select() => return,
             _ => {}
         }
         let height = self.list_height();
@@ -599,7 +603,7 @@ impl App {
                     return self.set_focus(Focus::on(id));
                 }
                 if self.shell.list_hidden {
-                    self.set_focus(Focus::Rail);
+                    self.set_focus(Focus::Nav);
                 } else {
                     self.focus_list(main_target);
                 }
@@ -682,7 +686,7 @@ impl App {
             DialogAction::Toggle => {
                 d.yes = !d.yes;
                 if d.question == Question::Icons {
-                    // The rail shows the answer that has the focus.
+                    // The top bar shows the answer that has the focus.
                     self.settings.icons = d.yes;
                 }
                 self.dialog = Some(d);

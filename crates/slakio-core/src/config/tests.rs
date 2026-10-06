@@ -26,7 +26,8 @@ fn the_settings_are_read() {
     assert_eq!(lang("language = \"EN\""), Ok("en".to_string()));
     let cfg = parse("icons = true\nrail_expand = \"push\"\ntheme = \"Tokyo-Night\"\n").unwrap();
     assert_eq!((cfg.icons.as_str(), cfg.theme.as_str()), ("on", "tokyo-night"));
-    assert_eq!(cfg.rail_expand, "push");
+    assert_eq!(cfg.retired, ["rail_expand"], "a key of the old rail: ignored, the file still used");
+    assert!(parse("unknown_key = 1").is_err(), "any other unknown key is still an error");
     assert_eq!(parse("icons = false").unwrap().icons, "off");
     assert_eq!(parse("avatars = \"off\"").unwrap().avatars, "off");
     assert_eq!(parse("avatars = \"Image\"").unwrap().avatars, "image", "kept for photos, later");
@@ -42,19 +43,13 @@ fn the_settings_are_read() {
     assert_eq!(parse("icons = \"ask\"").unwrap().icons, "ask");
     assert_eq!(parse("").unwrap(), Config::default());
     let d = Config::default();
-    assert_eq!((d.icons.as_str(), d.theme.as_str(), d.rail_expand.as_str()), ("ask", "auto", "overlay"));
+    assert_eq!((d.icons.as_str(), d.theme.as_str()), ("ask", "auto"));
+    assert!(d.retired.is_empty());
 }
 
 #[test]
 fn a_bad_value_names_the_allowed_ones() {
-    assert_eq!(
-        parse("rail_expand = \"side\""),
-        Err(ConfigError::Value {
-            key: "rail_expand".into(),
-            value: "\"side\"".into(),
-            allowed: "overlay, push".into()
-        })
-    );
+    assert_eq!(parse("rail_expand = \"side\"").map(|c| c.retired), Ok(vec!["rail_expand".to_string()]), "never judged");
     assert_eq!(
         parse("icons = \"yes\""),
         Err(ConfigError::Value { key: "icons".into(), value: "\"yes\"".into(), allowed: "on, off, ask".into() })

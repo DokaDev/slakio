@@ -11,7 +11,7 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 **Pre-alpha, early development. slakio does not connect to Slack yet.**
 
 What exists today is the project's foundation and the first part of the interface, on
-invented data only (`slakio --demo`): the rail, the list panel of channels and DMs, the
+invented data only (`slakio --demo`): the top bar, the list panel of channels and DMs, the
 conversation pane with a thread panel and a composer, and the status line. There is no sign-in
 and no real workspace yet; nothing is ever sent anywhere, and there is no release to install.
 Nothing here is ready for daily use.
@@ -28,9 +28,13 @@ images, and settings. This README only lists what works; it will grow with each 
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
-  - the rail (workspaces, Home, DMs; Activity, Files and Later say they come in a later
-    version) expands when focused or hovered; `Ctrl+R` or `Space r` goes there from anywhere
-    (and `Ctrl+R` back), `j` / `k` and `Enter` pick a workspace or a view, `Esc` leaves;
+  - the top bar across the first row shows the workspace (its color band, its name, a mark when
+    another workspace wants you, `▾`) and the views Home, DMs, Activity, Files and Later (the
+    last three say they come in a later version) with their counts — `@3` mentions, `●2` a DM's
+    unread messages, `●` unread channels, as the list says them; the names shorten only on a
+    narrow screen; `Ctrl+R` or `Space r` (`:nav`) goes there from anywhere (and `Ctrl+R` back),
+    `h` / `l` and `Enter` pick a view, `Esc` leaves; the workspace (or `Space W`, or a click on
+    it) opens a switcher of the workspaces with their counts;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
     in the list and in the conversation's title;
   - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
@@ -64,8 +68,8 @@ images, and settings. This README only lists what works; it will grow with each 
   - every name and message from the (invented) remote side is shown through a sanitiser that
     removes terminal escape sequences, control and bidi characters; the demo has a channel of
     hostile strings and a few hostile names to show it;
-  - `Tab` / `Shift+Tab` go round the rail, the list, the main pane and the thread panel; `Ctrl+h` /
-    `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the rail included; `Space h` /
+  - `Tab` / `Shift+Tab` go round the top bar, the list, the main pane and the thread panel; `Ctrl+h` /
+    `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the top bar left of the list; `Space h` /
     `Space d` show Home / DMs; `Space e` hides the list panel;
   - the status line shows the keys worth knowing where you are, and every key is listed in
     [docs/keybindings.md](docs/keybindings.md).
@@ -92,7 +96,7 @@ Six keys get you everywhere:
 |---|---|
 | `?` (or `F1`) | The keyboard help for where you are: every key, searchable, and `Enter` runs one |
 | `Space` | Wait a moment: a popup lists what may follow (`Space h` Home, `Space d` DMs, …) |
-| `Tab` | The next panel, the rail included (`Shift+Tab` the previous one) |
+| `Tab` | The next panel, the top bar included (`Shift+Tab` the previous one) |
 | `Ctrl+P` | The command palette: every command and action by name, with its keys |
 | `Esc` | One step out; never closes anything |
 | `Ctrl+Q` | Quit (also `Space q`, `:qa`; `:q` and `Ctrl+W` only close the pane, then its tab) |
@@ -123,7 +127,6 @@ theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast",
                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
 avatars = "initials"     # a person's initials on a colored chip, or "off"
-rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
@@ -132,8 +135,9 @@ is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (als
 keeping your comments. `:avatars` (or `:set avatars=off`) does the same for `avatars`;
 `avatars = "image"` is kept for profile photos, which come in a later version, and draws
 initials until then. With `icons = "ask"`, `slakio
---demo` asks once whether your font shows the icons (the rail previews the answer) and saves
-the answer in the config file. `rail_expand` is temporary: both ways exist until one is chosen.
+--demo` asks once whether your font shows the icons (the top bar previews the answer) and saves
+the answer in the config file; `:icons on|off` changes it later. `rail_expand`, a setting of the
+left rail the top bar replaced, is ignored (the status line says it can be removed).
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.

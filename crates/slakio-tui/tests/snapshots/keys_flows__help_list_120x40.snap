@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
-╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ ▾ Fa╭ Keys — List panel ───────────────────────────────────────────────────────────────────────────────╮         │
-│▌B││   # │ / Type / to search                                                                               │         │
-│──││   # │──────────────────────────────────────────────────────────────────────────────────────────────────│         │
-│H ││     │ ▾ List panel                                                                                     │         │
-│D●││ ▾ Op│   Next row                                                                              j / Down │         │
-│A●││   # │   Previous row                                                                            k / Up │         │
-│F ││   # │   First row                                                                           g g / Home │         │
-│L ││   # │   Last row                                                                               G / End │         │
-│  ││   # │   Half a page down                                                                        Ctrl+D │         │
-│  ││   # │   Half a page up                                                                          Ctrl+U │         │
-│  ││   # │   A page down                                                                           PageDown │         │
-│  ││     │   A page up                                                                               PageUp │         │
-│  ││ ▾ Ch│   Open the conversation, or fold the section                                               Enter │         │
-│  ││   # │   Open, staying in the list (or unfold)                                                l / Right │         │
-│  ││   # │   To the section header, fold it, then the rail                                         h / Left │         │
-│  ││   # │   Previous section                                                                             { │         │
-│  ││   # │   Next section                                                                                 } │         │
-│  ││   # │   Open in a new tab (a message: its thread)                                                    t │         │
-│  ││   # │ ▾ Main screen                                                                                    │         │
-│  ││   # │   Next panel                                                                            Tab / F6 │         │
-│  ││   # │   Previous panel                                                            Shift+Tab / Shift+F6 │         │
-│  ││   # │   Rail: workspaces and views                                                    Ctrl+R / Space r │         │
-│  ││   # │   Move the focus left                                                         Ctrl+H / Space w h │         │
-│  ││   # │   Move the focus down                                                         Ctrl+J / Space w j │         │
-│  ││   # │   Move the focus up                                                           Ctrl+K / Space w k │         │
-│  ││   # │   Move the focus right                                                        Ctrl+L / Space w l │         │
-│  ││   # │   Close the pane, then its tab                                                         Space w c │         │
-│  ││   # │   Show Home                                                                              Space h │         │
-│  ││   # │   Show DMs                                                                               Space d │         │
-│  ││   # │   Show Activity                                                                          Space a │         │
-│  ││   # │   Show Files                                                                             Space f │         │
-│  ││   # │   Show Later                                                                             Space l │         │
-│  ││   # │   Show or hide the list panel                                                            Space e │         │
-│  ││   # │   Switch workspace                                                                       Space W │         │
-│  ││   # │   Back to the conversation before                                    Ctrl+O / Alt+Left / Space [ │         │
-│  ││   # │   Forward again                                                              Alt+Right / Space ] │         │
-│  ││   # ╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ───╭ Keys — List panel ───────────────────────────────────────────────────────────────────────────────╮─────────╮
+│ ▾ Favori│ / Type / to search                                                                               │         │
+│   # back│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│   # inci│ ▾ List panel                                                                                     │         │
+│         │   Next row                                                                              j / Down │         │
+│ ▾ Ops   │   Previous row                                                                            k / Up │         │
+│   # depl│   First row                                                                           g g / Home │         │
+│   # aler│   Last row                                                                               G / End │         │
+│   # part│   Half a page down                                                                        Ctrl+D │         │
+│   # host│   Half a page up                                                                          Ctrl+U │         │
+│   # big-│   A page down                                                                           PageDown │         │
+│   # long│   A page up                                                                               PageUp │         │
+│         │   Open the conversation, or fold the section                                               Enter │         │
+│ ▾ Channe│   Open, staying in the list (or unfold)                                                l / Right │         │
+│   # anno│   To the section header, fold it, then the top bar                                      h / Left │         │
+│   # desi│   Previous section                                                                             { │         │
+│   # feed│   Next section                                                                                 } │         │
+│   # feed│   Open in a new tab (a message: its thread)                                                    t │         │
+│   # feed│ ▾ Main screen                                                                                    │         │
+│   # feed│   Next panel                                                                            Tab / F6 │         │
+│   # feed│   Previous panel                                                            Shift+Tab / Shift+F6 │         │
+│   # feed│   Top bar: workspace, views                                                     Ctrl+R / Space r │         │
+│   # feed│   Move the focus left                                                         Ctrl+H / Space w h │         │
+│   # feed│   Move the focus down                                                         Ctrl+J / Space w j │         │
+│   # feed│   Move the focus up                                                           Ctrl+K / Space w k │         │
+│   # feed│   Move the focus right                                                        Ctrl+L / Space w l │         │
+│   # feed│   Close the pane, then its tab                                                         Space w c │         │
+│   # feed│   Show Home                                                                              Space h │         │
+│   # feed│   Show DMs                                                                               Space d │         │
+│   # feed│   Show Activity                                                                          Space a │         │
+│   # feed│   Show Files                                                                             Space f │         │
+│   # feed│   Show Later                                                                             Space l │         │
+│   # feed│   Show or hide the list panel                                                            Space e │         │
+│   # feed│   Switch workspace                                                                       Space W │         │
+│   # feed│   Back to the conversation before                                    Ctrl+O / Alt+Left / Space [ │         │
+│   # feed│   Forward again                                                              Alt+Right / Space ] │         │
+│   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
+╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo

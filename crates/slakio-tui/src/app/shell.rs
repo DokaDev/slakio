@@ -1,17 +1,17 @@
-//! The shell: the regions the focus moves between (rail, list panel, work area), the rail's cursor, the
-//! view the list panel shows, the list's cursor and scroll, and folded sections. It owns its
-//! update ([`Shell::update`]), which hands back a conversation to open (the work area opens
-//! it); the rows come from the read model.
+//! The shell: the regions the focus moves between (the top bar, the list panel, the work area),
+//! the top bar's cursor, the workspace and the view the list panel shows, the list's cursor and
+//! scroll, and folded sections. It owns its update ([`Shell::update`]), which hands back a
+//! conversation to open (the work area opens it); the rows come from the read model.
 //!
 //! ```text
-//! rail          list panel          work area
-//! ▌A  ▌B        ▾ Favorites         #backend
-//! ──            # backend   3
-//! H D A F L     # incidents ●
+//! ▌A company ▾ │ Home  DMs ●2  Activity @3  Files  Later        the top bar
+//! ▾ Favorites         #backend                                   list panel, work area
+//! # backend   3
 //! ```
 
 use super::model::{Model, Row};
 use crate::action::ShellAction;
+use slakio_core::i18n::Label;
 use slakio_core::model::{SectionId, Target};
 
 /// A conversation to open from the list: `focus` moves the keyboard to it (`Enter`), else the
@@ -26,12 +26,12 @@ use std::collections::HashSet;
 /// The regions of the main screen, left to right.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Region {
-    Rail,
+    Nav,
     List,
     Work,
 }
 
-/// What the list panel shows, picked on the rail.
+/// What the list panel shows, picked on the top bar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum View {
     Home,
@@ -42,8 +42,35 @@ pub enum View {
 }
 
 impl View {
-    /// In the rail's order.
+    /// In the top bar's order.
     pub const ALL: &'static [View] = &[View::Home, View::Dms, View::Activity, View::Files, View::Later];
+
+    /// The view's name (top bar, list title, breadcrumb).
+    pub fn label(self) -> Label {
+        match self {
+            View::Home => Label::NavHome,
+            View::Dms => Label::NavDms,
+            View::Activity => Label::NavActivity,
+            View::Files => Label::NavFiles,
+            View::Later => Label::NavLater,
+        }
+    }
+
+    /// Its Nerd Font glyph (`icons`), else its letter.
+    pub fn glyph(self, icons: bool) -> &'static str {
+        match (self, icons) {
+            (View::Home, false) => "H",
+            (View::Dms, false) => "D",
+            (View::Activity, false) => "A",
+            (View::Files, false) => "F",
+            (View::Later, false) => "L",
+            (View::Home, true) => "\u{F02DC}",
+            (View::Dms, true) => "\u{F0361}",
+            (View::Activity, true) => "\u{F009A}",
+            (View::Files, true) => "\u{F0219}",
+            (View::Later, true) => "\u{F00C0}",
+        }
+    }
 
     /// Built in a later version: the list panel shows a placeholder, never invented data that
     /// could pass for the real thing.
@@ -52,23 +79,23 @@ impl View {
     }
 }
 
-/// One item of the rail.
+/// One item of the top bar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RailItem {
-    /// A workspace (index into the model's workspaces).
-    Workspace(usize),
+pub enum NavItem {
+    /// The workspace shown (picking it opens the workspace switcher).
+    Workspace,
     View(View),
 }
 
-/// The rail's items for `workspaces` workspaces: the workspaces, then the views.
-pub fn rail_items(workspaces: usize) -> Vec<RailItem> {
-    (0..workspaces).map(RailItem::Workspace).chain(View::ALL.iter().map(|v| RailItem::View(*v))).collect()
+/// The top bar's items: the workspace, then the views.
+pub fn nav_items() -> Vec<NavItem> {
+    std::iter::once(NavItem::Workspace).chain(View::ALL.iter().map(|v| NavItem::View(*v))).collect()
 }
 
 #[derive(Clone, Debug)]
 pub struct Shell {
-    /// Index into [`rail_items`].
-    pub rail_cursor: usize,
+    /// Index into [`nav_items`].
+    pub nav_cursor: usize,
     /// The workspace the list panel shows.
     pub workspace: usize,
     pub view: View,
@@ -78,10 +105,6 @@ pub struct Shell {
     pub list_top: usize,
     pub collapsed: HashSet<SectionId>,
     pub list_hidden: bool,
-    /// The mouse is over the rail.
-    pub hover_rail: bool,
-    /// The rail item under the mouse (index into [`rail_items`]).
-    pub hover_item: Option<usize>,
     /// The list cursor goes to the first conversation once the rows are known.
     pending_home: bool,
 }
@@ -89,26 +112,20 @@ pub struct Shell {
 impl Default for Shell {
     fn default() -> Self {
         Self {
-            rail_cursor: 0,
+            // On the view shown (Home).
+            nav_cursor: 1,
             workspace: 0,
             view: View::Home,
             list_cursor: 0,
             list_top: 0,
             collapsed: HashSet::new(),
             list_hidden: false,
-            hover_rail: false,
-            hover_item: None,
             pending_home: true,
         }
     }
 }
 
 impl Shell {
-    /// The rail shows labels: it has the focus (`rail_focused`) or the mouse.
-    pub fn rail_expanded(&self, rail_focused: bool) -> bool {
-        rail_focused || self.hover_rail
-    }
-
     pub fn rows(&self, model: &Model) -> Vec<Row> {
         model.rows(self.workspace, self.view, &self.collapsed)
     }
@@ -124,29 +141,27 @@ impl Shell {
         here: &mut Region,
     ) -> Option<Open> {
         let mut open = None;
-        let items = rail_items(model.workspaces().len());
+        let items = nav_items();
         let list = self.rows(model);
         let rows = list.len();
-        let last_item = items.len().saturating_sub(1);
         let page = list_height.max(1) as isize;
         match action {
             ShellAction::FocusLeft => *here = self.neighbour(*here, -1),
             ShellAction::FocusRight => *here = self.neighbour(*here, 1),
             // Up, down, next and previous need the work area: the app moves those.
             ShellAction::FocusUp | ShellAction::FocusDown | ShellAction::FocusNext | ShellAction::FocusPrev => {}
-            ShellAction::FocusRail if *here == Region::Rail => *here = self.leave_rail(),
-            ShellAction::FocusRail => *here = Region::Rail,
-            ShellAction::RailNext => self.rail_cursor = (self.rail_cursor + 1).min(last_item),
-            ShellAction::RailPrev => self.rail_cursor = self.rail_cursor.saturating_sub(1),
-            ShellAction::RailFirst => self.rail_cursor = 0,
-            ShellAction::RailLast => self.rail_cursor = last_item,
-            ShellAction::RailSelect => {
-                if let Some(item) = items.get(self.rail_cursor).copied() {
-                    self.select(item, &items, model);
-                    *here = Region::List;
-                }
-            }
-            ShellAction::RailLeave => *here = self.leave_rail(),
+            ShellAction::FocusNav if *here == Region::Nav => *here = self.leave_nav(),
+            ShellAction::FocusNav => *here = Region::Nav,
+            ShellAction::NavNext
+            | ShellAction::NavPrev
+            | ShellAction::NavFirst
+            | ShellAction::NavLast
+            | ShellAction::NavSelect
+            | ShellAction::NavLeave
+            | ShellAction::SwitcherNext
+            | ShellAction::SwitcherPrev
+            | ShellAction::SwitcherChoose
+            | ShellAction::SwitcherClose => self.nav(action, &items, model, here),
             ShellAction::ListNext => self.list_cursor = step(&list, self.list_cursor, 1),
             ShellAction::ListPrev => self.list_cursor = step(&list, self.list_cursor, -1),
             ShellAction::ListHalfDown => self.list_cursor = step(&list, self.list_cursor, (page / 2).max(1)),
@@ -169,16 +184,16 @@ impl Shell {
                 Some(Row::Conversation(_)) => {
                     match list[..self.list_cursor].iter().rposition(|r| matches!(r, Row::Section(_))) {
                         Some(header) => self.list_cursor = header,
-                        None => *here = Region::Rail,
+                        None => *here = Region::Nav,
                     }
                 }
                 Some(Row::Section(i)) => {
                     let id = model.section(*i).id.clone();
                     if !self.collapsed.insert(id) {
-                        *here = Region::Rail;
+                        *here = Region::Nav;
                     }
                 }
-                _ => *here = Region::Rail,
+                _ => *here = Region::Nav,
             },
             ShellAction::ListSectionPrev | ShellAction::ListSectionNext => {
                 let header = |r: &Row| matches!(r, Row::Section(_));
@@ -198,12 +213,37 @@ impl Shell {
                 }
             }
             ShellAction::Show(view) => {
-                self.select(RailItem::View(view), &items, model);
+                self.select(NavItem::View(view), &items, model);
                 *here = Region::List;
             }
         }
         self.scroll(list_height);
         open
+    }
+
+    /// The top bar's keys (the switcher's are the app's).
+    fn nav(&mut self, action: ShellAction, items: &[NavItem], model: &Model, here: &mut Region) {
+        let last_item = items.len().saturating_sub(1);
+        match action {
+            ShellAction::NavNext => self.nav_cursor = (self.nav_cursor + 1).min(last_item),
+            ShellAction::NavPrev => self.nav_cursor = self.nav_cursor.saturating_sub(1),
+            ShellAction::NavFirst => self.nav_cursor = 0,
+            ShellAction::NavLast => self.nav_cursor = last_item,
+            // The workspace is picked in its switcher (the app opens it).
+            ShellAction::NavSelect => {
+                if let Some(NavItem::View(v)) = items.get(self.nav_cursor).copied() {
+                    self.select(NavItem::View(v), items, model);
+                    *here = Region::List;
+                }
+            }
+            ShellAction::NavLeave => *here = self.leave_nav(),
+            // The app keeps the switcher.
+            ShellAction::SwitcherNext
+            | ShellAction::SwitcherPrev
+            | ShellAction::SwitcherChoose
+            | ShellAction::SwitcherClose => {}
+            _ => {}
+        }
     }
 
     /// Put the list cursor on the row of the conversation `target` names, if the list shows it.
@@ -240,17 +280,22 @@ impl Shell {
         }
     }
 
-    /// Show `item` (one of `items`, the rail) in the list panel (the focus goes there: the app
-    /// moves it).
-    pub fn select(&mut self, item: RailItem, items: &[RailItem], model: &Model) {
-        match item {
-            RailItem::Workspace(ws) => {
-                self.workspace = ws;
-                self.view = View::Home;
-            }
-            RailItem::View(v) => self.view = v,
+    /// Show `item` (one of `items`, the top bar) in the list panel (the focus goes there: the
+    /// app moves it). The workspace item shows nothing by itself ([`Self::select_workspace`]).
+    pub fn select(&mut self, item: NavItem, items: &[NavItem], model: &Model) {
+        if let NavItem::View(v) = item {
+            self.view = v;
         }
-        self.rail_cursor = items.iter().position(|i| *i == item).unwrap_or(self.rail_cursor);
+        self.nav_cursor = items.iter().position(|i| *i == item).unwrap_or(self.nav_cursor);
+        self.home_cursor(model);
+        self.list_hidden = false;
+    }
+
+    /// Show workspace `ws` (index into the model's workspaces), from its Home.
+    pub fn select_workspace(&mut self, ws: usize, model: &Model) {
+        self.workspace = ws.min(model.workspaces().len().saturating_sub(1));
+        self.view = View::Home;
+        self.nav_cursor = 1;
         self.home_cursor(model);
         self.list_hidden = false;
     }
@@ -306,7 +351,7 @@ impl Shell {
     pub fn clamp(&mut self, model: &Model, list_height: usize) {
         let n = model.workspaces().len();
         self.workspace = self.workspace.min(n.saturating_sub(1));
-        self.rail_cursor = self.rail_cursor.min(rail_items(n).len() - 1);
+        self.nav_cursor = self.nav_cursor.min(nav_items().len() - 1);
         if model.is_loaded() && std::mem::take(&mut self.pending_home) {
             self.home_cursor(model);
         }
@@ -314,16 +359,16 @@ impl Shell {
         self.scroll(list_height);
     }
 
-    /// Where the focus goes from the rail without picking anything: the list, or the work area
+    /// Where the focus goes from the top bar without picking anything: the list, or the work area
     /// when the list is hidden.
-    fn leave_rail(&self) -> Region {
+    fn leave_nav(&self) -> Region {
         if self.list_hidden { Region::Work } else { Region::List }
     }
 
     /// The region `step` places to the left (-1) or right (1) of `here`, skipping a hidden list
     /// panel.
     fn neighbour(&self, here: Region, step: i8) -> Region {
-        let order: Vec<Region> = [Region::Rail, Region::List, Region::Work]
+        let order: Vec<Region> = [Region::Nav, Region::List, Region::Work]
             .into_iter()
             .filter(|r| *r != Region::List || !self.list_hidden)
             .collect();

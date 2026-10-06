@@ -3,7 +3,7 @@
 //! top is always what the keys and the mouse go to.
 //!
 //! From the top: a question ([`super::dialog`]), the keyboard help, the command palette, the
-//! which-key popup. The palette and the which-key popup are drawn only on top; the help stays
+//! workspace switcher ([`super::nav`]), the which-key popup. The palette and the which-key popup are drawn only on top; the help stays
 //! visible under a question.
 
 use super::App;
@@ -16,6 +16,7 @@ pub enum Layer {
     Dialog,
     Help,
     Palette,
+    Switcher,
     WhichKey,
 }
 
@@ -27,6 +28,7 @@ impl App {
             (Layer::Dialog, self.dialog.is_some()),
             (Layer::Help, self.help.is_some()),
             (Layer::Palette, self.cmdline.is_open()),
+            (Layer::Switcher, self.switcher.is_some()),
             (Layer::WhichKey, now.is_some_and(|t| self.which_key_visible(t))),
         ];
         up.into_iter().filter(|(_, on)| *on).map(|(l, _)| l).collect()
@@ -38,6 +40,7 @@ impl App {
             Layer::Dialog => self.dialog.map(|d| Overlay::Dialog(d.question)),
             Layer::Help => Some(Overlay::Help),
             Layer::Palette => Some(Overlay::Palette),
+            Layer::Switcher => Some(Overlay::Switcher),
             Layer::WhichKey => None,
         }
     }

@@ -58,7 +58,7 @@ fn t_opens_a_tab_and_the_bar_shows_from_two_tabs_on() {
     assert_eq!(focused_name(&d), "incidents", "the new tab has the keyboard");
     assert!(d.app.focused_pane().is_some_and(|p| !p.messages().is_empty()), "and loads its messages");
     let s = d.screen();
-    let bar = s.lines().next().unwrap();
+    let bar = s.lines().nth(1).unwrap();
     assert!(bar.ends_with(" 1 #backend ×  2 #incidents ×"), "{s}");
     insta::assert_snapshot!("two_tabs_120x40", d.snap());
     let d = two_tabs(80, 24);
@@ -161,7 +161,7 @@ fn a_tab_is_renamed_by_keys_command_or_double_click_and_an_empty_name_gives_its_
     assert!(d.screen().contains(":rename Incident room"), "{}", d.screen());
     d.keys("enter");
     assert_eq!(titles(&d), ["#backend", "Incident room"]);
-    assert!(d.screen().lines().next().unwrap().contains("2 Incident room ×"));
+    assert!(d.screen().lines().nth(1).unwrap().contains("2 Incident room ×"));
     d.keys("space t r");
     assert_eq!(d.app.cmdline.text(), "rename Incident room", "the name to edit");
     d.keys("esc");
@@ -242,7 +242,7 @@ fn tabs_that_do_not_fit_scroll_with_marks_that_reveal_the_rest() {
     let (x, hidden) = bar.left.expect("tabs left out on the left");
     assert!(bar.right.is_none(), "the last tab is shown");
     let s = d.screen();
-    assert!(s.lines().next().unwrap().contains('‹'), "{s}");
+    assert!(s.lines().nth(1).unwrap().contains('‹'), "{s}");
     insta::assert_snapshot!("tabs_overflow_80x24", d.snap());
     let (x, y) = (x, bar_row(&d));
     click(&mut d, MouseButton::Left, x, y);
@@ -287,7 +287,7 @@ fn a_tab_not_shown_carries_the_mark_of_its_unread_conversations() {
         .clone();
     let name = unread.name.line().as_str().to_string();
     d.open(&name);
-    let bar_text = |d: &Demo| d.screen().lines().next().unwrap().to_string();
+    let bar_text = |d: &Demo| d.screen().lines().nth(1).unwrap().to_string();
     d.open_in_tab("backend");
     let badge = if unread.mentions > 0 { format!("@{}", unread.mentions) } else { "●".to_string() };
     assert!(bar_text(&d).contains(&format!("#{name} {badge} ×")), "{}", bar_text(&d));

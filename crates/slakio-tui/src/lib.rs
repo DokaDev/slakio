@@ -24,6 +24,7 @@ pub mod exchange;
 pub mod input;
 pub mod keymap;
 pub mod kitty;
+pub mod navbar;
 pub mod screen;
 pub mod tabbar;
 pub mod terminal;

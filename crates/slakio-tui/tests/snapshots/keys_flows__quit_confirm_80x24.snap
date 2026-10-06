@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
-╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││    Check a customer should maybe               │
-│▌B││▎  # backend            ││ MJ Mia Jang · 06:35                            │
-│──││   # incidents       3  ││    Budget metrics merge design rollback alert  │
-│H ││                        ││    alert should draft after alert on staging   │
-│D●││ ▾ Ops                  ││    tomorrow                                    │
-│A●││   # deploys            ││ TK Tom Ko · 06:41                              │
-│F ││   # alerts             ││    On waiting migration someone index can      │
-│L ││   # ╭ Quit slakio? ────────────────────────────────────────────╮         │
-│  ││   # │ A message you wrote has not been sent; quitting loses    │         │
-│  ││   # │ it.                                                      │lert now │
-│  ││   # │                                                          │ broken  │
-│  ││     │                    [ Stay ]   [ Quit ]                   │         │
-│  ││ ▾ Ch╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
-│  ││   # announcements      ││    Confirmed                                   │
-│  ││   # design-review      ││ KN Kate Nam · 07:05                            │
-│  ││   # feed-alert-134     ││    Ticket review pager pager production on     │
-│  ││   # feed-alert-8       ││    build alert the on draft                    │
-│  ││   # feed-budget-162    ││ SR Sam Rivera · 07:14                          │
-│  ││   # feed-budget-33     ││    Meeting moved to 3pm                        │
-│  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
-│  ││   # feed-cache-119     ││ › half written                                 │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮
+│ ▾ Favorites            ││ MJ Mia Jang · 06:35                                │
+│▎  # backend            ││    Budget metrics merge design rollback alert      │
+│   # incidents       3  ││    alert should draft after alert on staging       │
+│                        ││    tomorrow                                        │
+│ ▾ Ops                  ││ TK Tom Ko · 06:41                                  │
+│   # deploys            ││    On waiting migration someone index can staging  │
+│   # aler╭ Quit slakio? ────────────────────────────────────────────╮         │
+│   # part│ A message you wrote has not been sent; quitting loses    │         │
+│   # host│ it.                                                      │ now     │
+│   # big-│                                                          │ken      │
+│   # long│                    [ Stay ]   [ Quit ]                   │         │
+│         ╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
+│ ▾ Channels             ││    Confirmed                                       │
+│   # announcements      ││ KN Kate Nam · 07:05                                │
+│   # design-review      ││    Ticket review pager pager production on build   │
+│   # feed-alert-134     ││    alert the on draft                              │
+│   # feed-alert-8       ││ SR Sam Rivera · 07:14                              │
+│   # feed-budget-162    ││    Meeting moved to 3pm                            │
+│   # feed-budget-33     │├─ Message #backend ─────────────────────────────────┤
+│   # feed-build-50      ││ › half written                                     │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #backend                             │  @37  DM 16 │ demo

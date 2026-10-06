@@ -31,7 +31,7 @@ pub enum AppAction {
     Interrupt,
     /// The command palette (the `:` command line); closes it when it is open.
     Palette,
-    /// Pick another workspace (on the rail).
+    /// Pick another workspace (the switcher under the top bar's workspace).
     ChooseWorkspace,
     /// Picture people by their initials chip, or not (`:avatars`); saved in the config file.
     ToggleAvatars,
@@ -50,7 +50,7 @@ pub enum CommandLineAction {
     Prev,
 }
 
-/// Actions of the shell: focus between the panels, the rail, the list panel.
+/// Actions of the shell: focus between the panels, the top bar, the list panel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShellAction {
     FocusLeft,
@@ -58,19 +58,24 @@ pub enum ShellAction {
     /// No panel is above or below another yet (splits come later): says so.
     FocusUp,
     FocusDown,
-    /// The next panel: rail, list, main pane, thread panel, round again.
+    /// The next panel: top bar, list, main pane, thread panel, round again.
     FocusNext,
     FocusPrev,
-    /// Go to the rail (it expands while it has the focus); from the rail, back to the list.
-    FocusRail,
-    RailNext,
-    RailPrev,
-    RailFirst,
-    RailLast,
-    /// Show the rail item under the cursor in the list panel.
-    RailSelect,
+    /// Go to the top bar; from the top bar, back to the list.
+    FocusNav,
+    NavNext,
+    NavPrev,
+    NavFirst,
+    NavLast,
+    /// Show the top bar's item under the cursor in the list panel (the workspace: its switcher).
+    NavSelect,
     /// Back to the list panel, showing nothing new.
-    RailLeave,
+    NavLeave,
+    /// The workspace switcher's next and previous workspace, switching to it, closing it.
+    SwitcherNext,
+    SwitcherPrev,
+    SwitcherChoose,
+    SwitcherClose,
     ListNext,
     ListPrev,
     ListFirst,
@@ -83,13 +88,13 @@ pub enum ShellAction {
     ListOpen,
     /// Open the conversation under the cursor and stay in the list, or unfold its section.
     ListPeek,
-    /// To the conversation's section header; fold the section; from a folded one, the rail.
+    /// To the conversation's section header; fold the section; from a folded one, the top bar.
     ListLeft,
     ListSectionPrev,
     ListSectionNext,
     /// Show or hide the list panel.
     ToggleList,
-    /// Show a view of the rail in the list panel.
+    /// Show a view of the top bar in the list panel.
     Show(View),
 }
 
@@ -256,13 +261,18 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::FocusDown, "focus.down", Label::ActionFocusDown, &[]),
     shell(ShellAction::FocusUp, "focus.up", Label::ActionFocusUp, &[]),
     shell(ShellAction::FocusRight, "focus.right", Label::ActionFocusRight, &[]),
-    shell(ShellAction::FocusRail, "rail.focus", Label::ActionRailFocus, &["rail"]),
-    shell(ShellAction::RailNext, "rail.next", Label::ActionRailNext, &[]),
-    shell(ShellAction::RailPrev, "rail.prev", Label::ActionRailPrev, &[]),
-    shell(ShellAction::RailFirst, "rail.first", Label::ActionRailFirst, &[]),
-    shell(ShellAction::RailLast, "rail.last", Label::ActionRailLast, &[]),
-    shell(ShellAction::RailSelect, "rail.select", Label::ActionRailSelect, &[]),
-    shell(ShellAction::RailLeave, "rail.leave", Label::ActionRailLeave, &[]),
+    // `:rail` is the name it had before the top bar.
+    shell(ShellAction::FocusNav, "nav.focus", Label::ActionNavFocus, &["nav", "rail"]),
+    shell(ShellAction::NavNext, "nav.next", Label::ActionNavNext, &[]),
+    shell(ShellAction::NavPrev, "nav.prev", Label::ActionNavPrev, &[]),
+    shell(ShellAction::NavFirst, "nav.first", Label::ActionNavFirst, &[]),
+    shell(ShellAction::NavLast, "nav.last", Label::ActionNavLast, &[]),
+    shell(ShellAction::NavSelect, "nav.select", Label::ActionNavSelect, &[]),
+    shell(ShellAction::NavLeave, "nav.leave", Label::ActionNavLeave, &[]),
+    shell(ShellAction::SwitcherNext, "switcher.next", Label::ActionSwitcherNext, &[]),
+    shell(ShellAction::SwitcherPrev, "switcher.prev", Label::ActionSwitcherPrev, &[]),
+    shell(ShellAction::SwitcherChoose, "switcher.choose", Label::ActionSwitcherChoose, &[]),
+    shell(ShellAction::SwitcherClose, "switcher.close", Label::ActionSwitcherClose, &[]),
     shell(ShellAction::ListNext, "list.next", Label::ActionListNext, &[]),
     shell(ShellAction::ListPrev, "list.prev", Label::ActionListPrev, &[]),
     shell(ShellAction::ListFirst, "list.first", Label::ActionListFirst, &[]),

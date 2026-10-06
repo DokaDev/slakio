@@ -104,7 +104,7 @@ pub(super) fn list(f: &mut Frame, app: &App, area: Rect) {
     } else {
         app.i18n.label(Label::ListEmpty).to_string()
     };
-    let others: Vec<(Action, Label)> = [(View::Home, Label::RailHome), (View::Dms, Label::RailDms)]
+    let others: Vec<(Action, Label)> = [(View::Home, Label::NavHome), (View::Dms, Label::NavDms)]
         .into_iter()
         .filter(|(v, _)| *v != view)
         .map(|(v, l)| (Action::Shell(crate::action::ShellAction::Show(v)), l))
@@ -127,8 +127,8 @@ pub(super) fn work(f: &mut Frame, app: &App, area: Rect) {
         app,
         Ctx::PaneNormal,
         &[
-            (Action::Shell(ShellAction::Show(View::Home)), Label::RailHome),
-            (Action::Shell(ShellAction::Show(View::Dms)), Label::RailDms),
+            (Action::Shell(ShellAction::Show(View::Home)), Label::NavHome),
+            (Action::Shell(ShellAction::Show(View::Dms)), Label::NavDms),
             (Action::Pane(PaneAction::Back), Label::EmptyBack),
             (Action::Help(HelpAction::Open), Label::EmptyHelp),
             (Action::App(AppAction::Quit), Label::EmptyQuit),

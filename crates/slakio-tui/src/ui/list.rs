@@ -1,4 +1,4 @@
-//! The list panel: the view picked on the rail. Home lists the workspace's sidebar sections
+//! The list panel: the view picked on the top bar. Home lists the workspace's sidebar sections
 //! (folded with `Enter`) and their conversations, a blank row between two sections; DMs lists
 //! the DMs. Views built in a later version say so and how to get back.
 //!

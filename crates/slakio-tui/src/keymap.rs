@@ -8,7 +8,7 @@
 //! global           (always first: Ctrl+Q, F1, Ctrl+P)
 //! root
 //! └─ shell            (the non-text regions: leader `Space`, focus keys, back/forward)
-//!    ├─ rail
+//!    ├─ nav          (the top bar)
 //!    ├─ list
 //!    └─ pane.normal   (the work area in Normal mode)
 //!       └─ pane.visual   (a VISUAL range of messages)
@@ -53,8 +53,8 @@ pub enum Ctx {
     Root,
     /// The non-text regions of the main screen.
     Shell,
-    /// The rail: workspaces and views.
-    Rail,
+    /// The top bar: the workspace and the views.
+    Nav,
     /// The list panel: sections, channels, DMs.
     List,
     /// The work area in Normal mode.
@@ -71,6 +71,8 @@ pub enum Ctx {
     HelpFilter,
     /// A question with two answers (modal).
     Dialog,
+    /// The workspace switcher (modal).
+    Switcher,
 }
 
 impl Ctx {
@@ -79,7 +81,7 @@ impl Ctx {
         Ctx::Global,
         Ctx::Root,
         Ctx::Shell,
-        Ctx::Rail,
+        Ctx::Nav,
         Ctx::List,
         Ctx::PaneNormal,
         Ctx::PaneVisual,
@@ -88,6 +90,7 @@ impl Ctx {
         Ctx::Help,
         Ctx::HelpFilter,
         Ctx::Dialog,
+        Ctx::Switcher,
     ];
 
     /// The id config files and the docs use.
@@ -96,7 +99,7 @@ impl Ctx {
             Ctx::Global => "global",
             Ctx::Root => "root",
             Ctx::Shell => "shell",
-            Ctx::Rail => "rail",
+            Ctx::Nav => "nav",
             Ctx::List => "list",
             Ctx::PaneNormal => "pane.normal",
             Ctx::PaneVisual => "pane.visual",
@@ -105,6 +108,7 @@ impl Ctx {
             Ctx::Help => "help",
             Ctx::HelpFilter => "help.filter",
             Ctx::Dialog => "dialog",
+            Ctx::Switcher => "switcher",
         }
     }
 
@@ -113,7 +117,7 @@ impl Ctx {
             Ctx::Global => Label::CtxGlobal,
             Ctx::Root => Label::CtxRoot,
             Ctx::Shell => Label::CtxShell,
-            Ctx::Rail => Label::CtxRail,
+            Ctx::Nav => Label::CtxNav,
             Ctx::List => Label::CtxList,
             Ctx::PaneNormal => Label::CtxPaneNormal,
             Ctx::PaneVisual => Label::CtxPaneVisual,
@@ -122,6 +126,7 @@ impl Ctx {
             Ctx::Help => Label::CtxHelp,
             Ctx::HelpFilter => Label::CtxHelpFilter,
             Ctx::Dialog => Label::CtxDialog,
+            Ctx::Switcher => Label::CtxSwitcher,
         }
     }
 
@@ -135,9 +140,10 @@ impl Ctx {
             | Ctx::ComposerInsert
             | Ctx::Help
             | Ctx::HelpFilter
-            | Ctx::Dialog => None,
+            | Ctx::Dialog
+            | Ctx::Switcher => None,
             Ctx::Shell => Some(Ctx::Root),
-            Ctx::Rail | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
+            Ctx::Nav | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
             Ctx::PaneVisual => Some(Ctx::PaneNormal),
         }
     }
@@ -154,7 +160,7 @@ impl Ctx {
 
     /// Only its own keys (and the global ones) work here.
     pub fn is_modal(self) -> bool {
-        matches!(self, Ctx::Help | Ctx::Dialog)
+        matches!(self, Ctx::Help | Ctx::Dialog | Ctx::Switcher)
     }
 }
 
@@ -219,16 +225,16 @@ pub const DEFAULTS: &[Binding] = &[
     cmdline(Ctx::Root, ":", CommandLineAction::Open),
     help(Ctx::Root, "?", HelpAction::Open),
     app(Ctx::Root, "ctrl+c", AppAction::Interrupt),
-    // Between the panels. `Tab` goes round rail, list, main pane and thread panel (the rail is
-    // expanded only while it has the focus). `Ctrl+R` and `Space r` go straight to the rail and
+    // Between the panels. `Tab` goes round the top bar, list, main pane and thread panel.
+    // `Ctrl+R` and `Space r` go straight to the top bar and
     // `Ctrl+R` back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
     // `Backspace` as `^H`; `Space w h` works everywhere.
     shell(Ctx::Shell, "tab", ShellAction::FocusNext),
     shell(Ctx::Shell, "f6", ShellAction::FocusNext),
     shell(Ctx::Shell, "shift+tab", ShellAction::FocusPrev),
     shell(Ctx::Shell, "shift+f6", ShellAction::FocusPrev),
-    shell(Ctx::Shell, "ctrl+r", ShellAction::FocusRail),
-    shell(Ctx::Shell, "space r", ShellAction::FocusRail),
+    shell(Ctx::Shell, "ctrl+r", ShellAction::FocusNav),
+    shell(Ctx::Shell, "space r", ShellAction::FocusNav),
     shell(Ctx::Shell, "ctrl+h", ShellAction::FocusLeft),
     shell(Ctx::Shell, "ctrl+j", ShellAction::FocusDown),
     shell(Ctx::Shell, "ctrl+k", ShellAction::FocusUp),
@@ -238,7 +244,7 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space w k", ShellAction::FocusUp),
     shell(Ctx::Shell, "space w l", ShellAction::FocusRight),
     pane(Ctx::Shell, "space w c", PaneAction::Close),
-    // The rail's entry points.
+    // The top bar.s views, by key.
     shell(Ctx::Shell, "space h", ShellAction::Show(View::Home)),
     shell(Ctx::Shell, "space d", ShellAction::Show(View::Dms)),
     shell(Ctx::Shell, "space a", ShellAction::Show(View::Activity)),
@@ -287,18 +293,28 @@ pub const DEFAULTS: &[Binding] = &[
     help(Ctx::Shell, "space ?", HelpAction::Open),
     cmdline(Ctx::Shell, "space /", CommandLineAction::Open),
     app(Ctx::Shell, "space q", AppAction::Quit),
-    shell(Ctx::Rail, "j", ShellAction::RailNext),
-    shell(Ctx::Rail, "down", ShellAction::RailNext),
-    shell(Ctx::Rail, "k", ShellAction::RailPrev),
-    shell(Ctx::Rail, "up", ShellAction::RailPrev),
-    shell(Ctx::Rail, "g g", ShellAction::RailFirst),
-    shell(Ctx::Rail, "home", ShellAction::RailFirst),
-    shell(Ctx::Rail, "G", ShellAction::RailLast),
-    shell(Ctx::Rail, "end", ShellAction::RailLast),
-    shell(Ctx::Rail, "enter", ShellAction::RailSelect),
-    shell(Ctx::Rail, "esc", ShellAction::RailLeave),
-    shell(Ctx::Rail, "l", ShellAction::RailLeave),
-    shell(Ctx::Rail, "right", ShellAction::RailLeave),
+    // The top bar runs left to right; down (or Esc) goes back to the panels under it.
+    shell(Ctx::Nav, "l", ShellAction::NavNext),
+    shell(Ctx::Nav, "right", ShellAction::NavNext),
+    shell(Ctx::Nav, "h", ShellAction::NavPrev),
+    shell(Ctx::Nav, "left", ShellAction::NavPrev),
+    shell(Ctx::Nav, "g g", ShellAction::NavFirst),
+    shell(Ctx::Nav, "home", ShellAction::NavFirst),
+    shell(Ctx::Nav, "G", ShellAction::NavLast),
+    shell(Ctx::Nav, "end", ShellAction::NavLast),
+    shell(Ctx::Nav, "enter", ShellAction::NavSelect),
+    shell(Ctx::Nav, "esc", ShellAction::NavLeave),
+    shell(Ctx::Nav, "j", ShellAction::NavLeave),
+    shell(Ctx::Nav, "down", ShellAction::NavLeave),
+    // The workspace switcher (a popup).
+    shell(Ctx::Switcher, "j", ShellAction::SwitcherNext),
+    shell(Ctx::Switcher, "down", ShellAction::SwitcherNext),
+    shell(Ctx::Switcher, "k", ShellAction::SwitcherPrev),
+    shell(Ctx::Switcher, "up", ShellAction::SwitcherPrev),
+    shell(Ctx::Switcher, "enter", ShellAction::SwitcherChoose),
+    shell(Ctx::Switcher, "esc", ShellAction::SwitcherClose),
+    shell(Ctx::Switcher, "q", ShellAction::SwitcherClose),
+    shell(Ctx::Switcher, "ctrl+c", ShellAction::SwitcherClose),
     shell(Ctx::List, "j", ShellAction::ListNext),
     shell(Ctx::List, "down", ShellAction::ListNext),
     shell(Ctx::List, "k", ShellAction::ListPrev),

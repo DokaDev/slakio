@@ -29,8 +29,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `F6` | Next panel | `focus.next` |
 | `Shift+Tab` | Previous panel | `focus.prev` |
 | `Shift+F6` | Previous panel | `focus.prev` |
-| `Ctrl+R` | Rail: workspaces and views | `rail.focus` |
-| `Space r` | Rail: workspaces and views | `rail.focus` |
+| `Ctrl+R` | Top bar: workspace, views | `nav.focus` |
+| `Space r` | Top bar: workspace, views | `nav.focus` |
 | `Ctrl+H` | Move the focus left | `focus.left` |
 | `Ctrl+J` | Move the focus down | `focus.down` |
 | `Ctrl+K` | Move the focus up | `focus.up` |
@@ -85,22 +85,22 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space /` | Open the command line | `cmdline.open` |
 | `Space q` | Quit | `app.quit` |
 
-## Rail (`rail`)
+## Top bar (`nav`)
 
 | Keys | Action | Id |
 |---|---|---|
-| `j` | Next rail item | `rail.next` |
-| `Down` | Next rail item | `rail.next` |
-| `k` | Previous rail item | `rail.prev` |
-| `Up` | Previous rail item | `rail.prev` |
-| `g g` | First rail item | `rail.first` |
-| `Home` | First rail item | `rail.first` |
-| `G` | Last rail item | `rail.last` |
-| `End` | Last rail item | `rail.last` |
-| `Enter` | Show the rail item | `rail.select` |
-| `Esc` | Back to the list | `rail.leave` |
-| `l` | Back to the list | `rail.leave` |
-| `Right` | Back to the list | `rail.leave` |
+| `l` | Next item of the top bar | `nav.next` |
+| `Right` | Next item of the top bar | `nav.next` |
+| `h` | Previous item of the top bar | `nav.prev` |
+| `Left` | Previous item of the top bar | `nav.prev` |
+| `g g` | First item of the top bar | `nav.first` |
+| `Home` | First item of the top bar | `nav.first` |
+| `G` | Last item of the top bar | `nav.last` |
+| `End` | Last item of the top bar | `nav.last` |
+| `Enter` | Show it (the workspace: switch workspaces) | `nav.select` |
+| `Esc` | Back to the list | `nav.leave` |
+| `j` | Back to the list | `nav.leave` |
+| `Down` | Back to the list | `nav.leave` |
 
 ## List panel (`list`)
 
@@ -121,8 +121,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Enter` | Open the conversation, or fold the section | `list.open` |
 | `l` | Open, staying in the list (or unfold) | `list.peek` |
 | `Right` | Open, staying in the list (or unfold) | `list.peek` |
-| `h` | To the section header, fold it, then the rail | `list.fold` |
-| `Left` | To the section header, fold it, then the rail | `list.fold` |
+| `h` | To the section header, fold it, then the top bar | `list.fold` |
+| `Left` | To the section header, fold it, then the top bar | `list.fold` |
 | `{` | Previous section | `list.section_prev` |
 | `}` | Next section | `list.section_next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
@@ -234,6 +234,19 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `h` | The other answer | `dialog.toggle` |
 | `l` | The other answer | `dialog.toggle` |
 
+## Workspace switcher (`switcher`) **[modal]**
+
+| Keys | Action | Id |
+|---|---|---|
+| `j` | Next workspace | `switcher.next` |
+| `Down` | Next workspace | `switcher.next` |
+| `k` | Previous workspace | `switcher.prev` |
+| `Up` | Previous workspace | `switcher.prev` |
+| `Enter` | Switch to the workspace | `switcher.choose` |
+| `Esc` | Close the workspace switcher | `switcher.close` |
+| `q` | Close the workspace switcher | `switcher.close` |
+| `Ctrl+C` | Close the workspace switcher | `switcher.close` |
+
 ## Commands
 
 Type `:` and the command, then `Enter`.
@@ -245,7 +258,7 @@ Type `:` and the command, then `Enter`.
 | `:help` |  | Keyboard help |
 | `:avatars` |  | Show or hide avatars (initials) |
 | `:icons` |  | Show Nerd Font icons, or text instead |
-| `:rail` |  | Rail: workspaces and views |
+| `:nav` | `:rail` | Top bar: workspace, views |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |
 | `:dms` |  | Show DMs |

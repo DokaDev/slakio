@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&narrow.snap())
 ---
-╭──╮╭ DMs ───────────────────╮╭ ▌MK @Minsu Kim ● active ───────────────────────╮
-│▌A││▎MK● Minsu Kim       1  ││ M  Me · 02:16                                  │
-│▌B││ JP● Jiho Park          ││    Ok, monitoring                              │
-│──││ ＊○ ＊＊＊             ││ M  Me · 03:50                                  │
-│H ││ JL◐ Jiyoung Lee        ││    Staging today ticket the broken broken      │
-│D●││ AM● Alex Morgan        ││    still pager review done lunch someone       │
-│A●││ ＊○ ＊＊＊             ││    ⤷ 12 replies · last 04:02                   │
-│F ││ H ● Hana            2  ││ M  Me · 04:08                                  │
-│L ││ SR● Sam Rivera      1  ││    Rolling back                                │
-│  ││ ＊○ ＊＊＊             ││    :tada: 3                                    │
-│  ││ TK◐ Taylor Kim         ││ MK Minsu Kim · 05:26                           │
-│  ││ CP● Chris Park         ││    Done schema for please today deploy looks   │
-│  ││ ＊○ ＊＊＊          2  ││    fine timeout retry maybe looks              │
-│  ││ ML◐ Mallory live       ││ MK Minsu Kim · 06:17                           │
-│  ││ 3   Jiho Park, ＊…  2  ││    For looks maybe rollback                    │
-│  ││                        ││ M  Me · 07:27                                  │
-│  ││                        ││    Metrics staging dashboard index design      │
-│  ││                        ││    today lunch review review migration again   │
-│  ││                        ││    on branch                                   │
-│  ││                        ││    :+1: 1                                      │
-│  ││                        │├─ Message @Minsu Kim ───────────────────────────┤
-│  ││                        ││ › Press i to write                             │
-╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+╭ DMs ───────────────────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────╮
+│▎MK● Minsu Kim       1  ││ M  Me · 02:16                                      │
+│ JP● Jiho Park          ││    Ok, monitoring                                  │
+│ ＊○ ＊＊＊             ││ M  Me · 03:50                                      │
+│ JL◐ Jiyoung Lee        ││    Staging today ticket the broken broken still    │
+│ AM● Alex Morgan        ││    pager review done lunch someone                 │
+│ ＊○ ＊＊＊             ││    ⤷ 12 replies · last 04:02                       │
+│ H ● Hana            2  ││ M  Me · 04:08                                      │
+│ SR● Sam Rivera      1  ││    Rolling back                                    │
+│ ＊○ ＊＊＊             ││    :tada: 3                                        │
+│ TK◐ Taylor Kim         ││ MK Minsu Kim · 05:26                               │
+│ CP● Chris Park         ││    Done schema for please today deploy looks fine  │
+│ ＊○ ＊＊＊          2  ││    timeout retry maybe looks                       │
+│ ML◐ Mallory live       ││ MK Minsu Kim · 06:17                               │
+│ 3   Jiho Park, ＊…  2  ││    For looks maybe rollback                        │
+│                        ││ M  Me · 07:27                                      │
+│                        ││    Metrics staging dashboard index design today    │
+│                        ││    lunch review review migration again on branch   │
+│                        ││    :+1: 1                                          │
+│                        │├─ Message @Minsu Kim ───────────────────────────────┤
+│                        ││ › Press i to write                                 │
+╰────────────────────────╯╰────────────────────────────────────────────────────╯
  NORMAL  ▌A company › @Minsu Kim        │ i write · ? help │  @37  DM 16 │ demo

@@ -59,22 +59,21 @@ fn an_answer_to_an_older_boot_request_is_dropped() {
 }
 
 #[test]
-fn the_focused_rail_expands_over_the_list_or_pushes_it_aside() {
+fn the_top_bar_shows_the_workspace_and_the_views() {
     let mut d = Demo::new(120, 40);
-    d.keys("ctrl+h");
-    assert_eq!(d.app.focus(), Focus::Rail);
-    let s = d.screen();
-    assert!(s.contains("A company") && s.contains("Home") && s.contains("Activity"), "{s}");
-    insta::assert_snapshot!("demo_rail_overlay_120x40", mask_hangul(&s));
-    let mut push = Demo::with(120, 40, Lang::En, Settings { rail_push: true, ..Settings::default() });
-    push.keys("space w h");
-    insta::assert_snapshot!("demo_rail_push_120x40", push.snap());
+    let top = d.screen().lines().next().unwrap().to_string();
+    assert!(top.contains("▌A company") && top.contains("Home") && top.contains("Activity"), "{top}");
+    d.keys("ctrl+r");
+    assert_eq!(d.app.focus(), Focus::Nav);
+    insta::assert_snapshot!("demo_nav_focus_120x40", d.snap());
 }
 
 #[test]
-fn the_rail_switches_workspace_and_view() {
+fn the_switcher_changes_workspace_and_the_keys_the_view() {
     let mut d = Demo::new(120, 40);
-    d.keys("ctrl+h j enter");
+    d.keys("space W");
+    insta::assert_snapshot!("demo_switcher_120x40", d.snap());
+    d.keys("j enter");
     assert_eq!((d.app.workspace(), d.app.focus()), (1, Focus::List));
     assert!(d.status_line().contains("B side"), "{}", d.status_line());
     d.keys("space d");
@@ -136,7 +135,7 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
     assert!(d.status_line().contains("Space w"), "{}", d.status_line());
     assert_eq!(d.app.focus(), Focus::List);
     d.keys("h");
-    assert_eq!(d.app.focus(), Focus::Rail);
+    assert_eq!(d.app.focus(), Focus::Nav);
     assert!(!d.status_line().contains("Space w"));
     d.keys("space w l ctrl+l");
     assert_eq!(d.app.focus(), Focus::List, "never onto an empty work area");
@@ -159,23 +158,18 @@ fn the_list_panel_hides_and_comes_back() {
 }
 
 #[test]
-fn hovering_the_rail_expands_it_and_clicks_select_and_open() {
+fn clicks_switch_workspace_and_open_a_conversation() {
     let mut d = Demo::new(120, 40);
-    assert!(d.mouse(MouseEventKind::Moved, 1, 5), "entering the rail redraws");
-    assert!(d.app.rail_expanded());
-    assert!(!d.mouse(MouseEventKind::Moved, 2, 5), "moving along the same item does not");
-    assert!(d.mouse(MouseEventKind::Moved, 2, 6), "another item is lit");
-    assert!(d.mouse(MouseEventKind::Moved, 60, 6));
-    assert!(!d.app.rail_expanded());
-    // Row 2 of the rail is workspace B (row 0 is the border).
-    d.mouse(MouseEventKind::Down(MouseButton::Left), 1, 2);
+    assert!(!d.mouse(MouseEventKind::Moved, 1, 5), "moving the mouse changes nothing");
+    // The chip opens the switcher; its second row is workspace B.
+    d.mouse(MouseEventKind::Down(MouseButton::Left), 3, 0);
+    let b = d.app.switcher_box().expect("the switcher");
+    d.mouse(MouseEventKind::Down(MouseButton::Left), b.x + 3, b.y + 2);
     assert_eq!(d.app.workspace(), 1);
-    // The separator does nothing.
-    d.mouse(MouseEventKind::Down(MouseButton::Left), 1, 3);
-    assert_eq!(d.app.workspace(), 1);
-    // A list row opens it: row 2 is the first channel under the first section.
+    // A list row opens it: row 3 is the first channel under the first section (row 1 is the
+    // list's border, under the top bar).
     let list = d.app.areas().list.unwrap();
-    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 2);
+    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 3);
     let open = d.app.open_target().expect("opened").clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);
@@ -235,8 +229,8 @@ fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
     assert!(d.status_line().contains("@Mallory live"), "{}", d.status_line());
     assert!(!s.contains("owned"), "the title sequence is gone, its text too: {s}");
     // A hostile section name of the other workspace.
-    // Home puts the rail cursor on Home; one up is workspace B.
-    d.keys("space h ctrl+h k enter");
+    // The switcher: workspace B is the second row.
+    d.keys("space W j enter");
     assert_eq!(d.app.workspace(), 1);
     let s = d.screen();
     assert_harmless(&s);

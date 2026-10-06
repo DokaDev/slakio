@@ -19,7 +19,7 @@ pub enum Place {
     ListSection,
     /// The list panel with nothing to list (a view of a later version).
     ListEmpty,
-    Rail,
+    Nav,
     /// The work area with nothing open.
     WorkEmpty,
     /// A main pane, no message selected.
@@ -51,7 +51,7 @@ use Hint::{Leader, One, Pair};
 
 const OPEN: Action = Action::Shell(ShellAction::ListOpen);
 const NEXT_PANE: Action = Action::Shell(ShellAction::FocusNext);
-const RAIL: Action = Action::Shell(ShellAction::FocusRail);
+const NAV: Action = Action::Shell(ShellAction::FocusNav);
 const COMMANDS: Action = Action::CommandLine(CommandLineAction::Open);
 const HELP: Action = Action::Help(HelpAction::Open);
 const QUIT: Action = Action::App(AppAction::Quit);
@@ -72,7 +72,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(NEW_TAB, Label::HintNewTab),
             One(NEXT_PANE, Label::HintNextPane),
             One(COMMANDS, Label::HintCommands),
-            One(RAIL, Label::HintRail),
+            One(NAV, Label::HintNav),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -80,27 +80,27 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(OPEN, Label::HintFold),
             Pair(Action::Shell(ShellAction::ListNext), Action::Shell(ShellAction::ListPrev), Label::HintMove),
             One(NEXT_PANE, Label::HintNextPane),
-            One(RAIL, Label::HintRail),
+            One(NAV, Label::HintNav),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
         Place::ListEmpty => &[
             One(NEXT_PANE, Label::HintNextPane),
-            One(RAIL, Label::HintRail),
+            One(NAV, Label::HintNav),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
-        Place::Rail => &[
-            One(Action::Shell(ShellAction::RailSelect), Label::HintShow),
-            Pair(Action::Shell(ShellAction::RailNext), Action::Shell(ShellAction::RailPrev), Label::HintMove),
-            One(Action::Shell(ShellAction::RailLeave), Label::HintBack),
+        Place::Nav => &[
+            One(Action::Shell(ShellAction::NavSelect), Label::HintShow),
+            Pair(Action::Shell(ShellAction::NavPrev), Action::Shell(ShellAction::NavNext), Label::HintMove),
+            One(Action::Shell(ShellAction::NavLeave), Label::HintBack),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
         Place::WorkEmpty => &[
             One(Action::Pane(PaneAction::Back), Label::HintBack),
             One(NEXT_PANE, Label::HintNextPane),
-            One(RAIL, Label::HintRail),
+            One(NAV, Label::HintNav),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -108,7 +108,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(WRITE, Label::HintWrite),
             One(PREV_MSG, Label::HintMessages),
             One(ESCAPE, Label::HintList),
-            One(RAIL, Label::HintRail),
+            One(NAV, Label::HintNav),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -195,7 +195,7 @@ mod tests {
             (Place::ListConversation, Ctx::List),
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),
-            (Place::Rail, Ctx::Rail),
+            (Place::Nav, Ctx::Nav),
             (Place::WorkEmpty, Ctx::PaneNormal),
             (Place::Pane, Ctx::PaneNormal),
             (Place::PaneSelected, Ctx::PaneNormal),

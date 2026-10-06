@@ -56,7 +56,7 @@ fn sequences_wait_for_their_next_key_and_drop_when_it_does_not_fit() {
     let mut st = KeyState::default();
     assert_eq!(km.feed(&mut st, Ctx::List, KeyChord::char('g')), Resolved::Pending);
     assert_eq!(st.pending(), parse_keys("g").unwrap());
-    assert_eq!(km.feed(&mut st, Ctx::Rail, KeyChord::char('g')), Resolved::Unbound(parse_keys("g").unwrap()));
+    assert_eq!(km.feed(&mut st, Ctx::Nav, KeyChord::char('g')), Resolved::Unbound(parse_keys("g").unwrap()));
     assert!(st.pending().is_empty());
     assert_eq!(km.keys_for(quit, Ctx::List), [parse_keys("space w q").unwrap()]);
 }

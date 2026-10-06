@@ -7,25 +7,18 @@ fn plain() -> Shape {
 }
 
 #[test]
-fn the_regions_tile_the_screen_above_the_status_line() {
+fn the_regions_tile_the_screen_under_the_top_bar_and_above_the_status_line() {
     let a = areas(SIZE, plain());
+    assert_eq!(a.nav, Rect::new(0, 0, 120, 1), "the top bar, the whole width");
     assert_eq!(a.status, Rect::new(0, 39, 120, 1));
-    assert_eq!(a.rail, Rect::new(0, 0, RAIL_WIDTH, 39));
     let list = a.list.unwrap();
-    assert_eq!((list.x, list.width), (RAIL_WIDTH, 26));
-    assert_eq!((a.work.x, a.work.right()), (list.right(), 120));
+    assert_eq!(list, Rect::new(0, 1, 26, 38), "the list from the left edge");
+    assert_eq!((a.work.x, a.work.y, a.work.right()), (list.right(), 1, 120));
     assert_eq!(list_width(200), 36);
-}
-
-#[test]
-fn an_expanded_rail_covers_the_list_or_pushes_it_aside() {
-    let overlay = areas(SIZE, Shape { rail_expanded: true, ..plain() });
-    assert_eq!(overlay.rail.width, RAIL_EXPANDED_WIDTH);
-    assert_eq!(overlay.list, areas(SIZE, plain()).list, "the list stays where it was");
-    let push = areas(SIZE, Shape { rail_expanded: true, push: true, ..plain() });
-    assert_eq!(push.list.unwrap().x, RAIL_EXPANDED_WIDTH);
     let hidden = areas(SIZE, Shape { list_hidden: true, ..plain() });
-    assert_eq!((hidden.list, hidden.work.x), (None, RAIL_WIDTH));
+    assert_eq!((hidden.list, hidden.work.x, hidden.work.width), (None, 0, 120));
+    let tabs = areas(SIZE, Shape { tabs: true, ..plain() });
+    assert_eq!((tabs.tabs, tabs.work.y), (Some(Rect::new(26, 1, 94, 1)), 2), "the tab bar under the top bar");
 }
 
 #[test]
@@ -59,16 +52,10 @@ fn a_pane_has_its_messages_a_divider_and_the_composer() {
 }
 
 #[test]
-fn rail_rows_map_to_items_around_the_separator() {
-    let rail = areas(SIZE, plain()).rail;
-    // Row 0 is the border; two workspaces, the separator, then five views.
-    assert_eq!(rail_item_at(rail, 2, 7, 0), None);
-    assert_eq!(rail_item_at(rail, 2, 7, 1), Some(0));
-    assert_eq!(rail_item_at(rail, 2, 7, 2), Some(1));
-    assert_eq!(rail_item_at(rail, 2, 7, 3), None);
-    assert_eq!(rail_item_at(rail, 2, 7, 4), Some(2));
-    assert_eq!(rail_item_at(rail, 2, 7, 8), Some(6));
-    assert_eq!(rail_item_at(rail, 2, 7, 9), None);
+fn the_switcher_sits_under_the_top_bar_inside_the_screen() {
+    assert_eq!(switcher(SIZE, 1, 2), Rect::new(1, 1, SWITCHER_WIDTH, 4));
+    assert_eq!(switcher(Rect::new(0, 0, 50, 10), 40, 2).right(), 50, "kept on screen");
+    assert_eq!(switcher(Rect::new(0, 0, 20, 10), 0, 30).height, 8);
 }
 
 #[test]
@@ -77,7 +64,7 @@ fn small_screens_are_too_small_and_never_panic() {
     assert!(too_small(Rect::new(0, 0, 120, MIN_HEIGHT - 1)));
     assert!(!too_small(Rect::new(0, 0, MIN_WIDTH, MIN_HEIGHT)));
     for (w, h) in [(0, 0), (1, 1), (3, 2)] {
-        let a = areas(Rect::new(0, 0, w, h), Shape { rail_expanded: true, thread: true, ..plain() });
+        let a = areas(Rect::new(0, 0, w, h), Shape { tabs: true, thread: true, ..plain() });
         let _ = work_panes(a.work, &beside(), Some(THREAD));
         let _ = pane_parts(a.work, 3);
     }
@@ -136,7 +123,7 @@ fn the_frame_lays_out_each_open_pane_with_its_composer() {
         assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x, f.areas.work.right()));
         let inside = Position { x: t.rect.x + 1, y: t.rect.y + 1 };
         assert_eq!(f.pane_at(inside).map(|p| p.id), Some(THREAD));
-        assert_eq!(f.pane_at(Position { x: 0, y: 0 }), None, "the rail is no pane");
+        assert_eq!(f.pane_at(Position { x: 0, y: 0 }), None, "the top bar is no pane");
     }
 }
 

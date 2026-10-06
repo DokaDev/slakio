@@ -37,7 +37,7 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
     let place = match ctx {
         Ctx::CommandLine => Place::CommandLine,
         Ctx::Root => Place::Welcome,
-        Ctx::Rail => Place::Rail,
+        Ctx::Nav => Place::Nav,
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_)) => Place::ListSection,
             Some(_) => Place::ListConversation,
@@ -215,7 +215,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints, m, d))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
-    // the next pane, the rail), the workspace's name (cut with `…`, eight cells kept), the other hints by
+    // the next pane, the top bar), the workspace's name (cut with `…`, eight cells kept), the other hints by
     // worth, the middle of the place, the place's first key and help, the name, the DM count, the
     // mentions. Then what is left is filled again: a dropped hint comes back where cutting
     // the name makes room for it, and the name grows into the rest, so no run of blank cells is
@@ -230,8 +230,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         full_name.as_ref().map(|n| clip(n, width(n).saturating_sub(by).max(8.min(width(n)))))
     };
     let name_room = full_name.as_ref().map_or(0, |n| width(n).saturating_sub(8));
-    let low = |l: Label| matches!(l, Label::HintPeek | Label::HintCommands | Label::HintNextPane | Label::HintRail);
-    let low_order: Vec<usize> = [Label::HintPeek, Label::HintCommands, Label::HintNextPane, Label::HintRail]
+    let low = |l: Label| matches!(l, Label::HintPeek | Label::HintCommands | Label::HintNextPane | Label::HintNav);
+    let low_order: Vec<usize> = [Label::HintPeek, Label::HintCommands, Label::HintNextPane, Label::HintNav]
         .iter()
         .filter_map(|l| resolved.iter().position(|(_, x)| x == l))
         .collect();
@@ -313,12 +313,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             // a peek is the row's other way to open).
             let left_out = |l: Label| (0..n).any(|j| resolved[j].1 == l && !with.contains(&j));
             let tab_left_out = left_out(Label::HintNewTab);
-            // The way to the rail comes before the next pane, which leads there too.
+            // The way to the top bar comes before the next pane, which leads there too.
             let has = |l: Label| with.iter().any(|&j| resolved[j].1 == l);
             let broken = (!with.is_empty() && needs(5))
                 || (with.iter().any(|&i| worth(i) < 4) && needs(4))
                 || (with.iter().any(|&i| worth(i) <= 2 && resolved[i].1 != Label::HintPeek) && tab_left_out)
-                || (has(Label::HintNextPane) && left_out(Label::HintRail))
+                || (has(Label::HintNextPane) && left_out(Label::HintNav))
                 || (with.iter().any(|&i| worth(i) == 1) && needs(2));
             if broken {
                 continue;
