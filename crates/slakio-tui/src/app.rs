@@ -30,6 +30,7 @@ pub mod cmdline;
 pub mod composer;
 pub mod dialog;
 pub(crate) mod drafts;
+mod focus;
 pub mod help;
 mod layout;
 pub mod model;
@@ -46,7 +47,7 @@ pub(crate) mod work;
 use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, DialogAction, PaneAction, ShellAction};
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
-use crate::screen;
+use crate::screen::{self, Slot};
 use crate::theme::{self, Look, Theme};
 use composer::Composer;
 use dialog::{Dialog, Question};
@@ -56,7 +57,7 @@ pub(crate) use overlay::Layer;
 pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-use shell::{Region, Shell, rail_items};
+use shell::{Shell, rail_items};
 use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEvent, Generation};
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
@@ -254,12 +255,12 @@ impl App {
         if self.backend.is_none() {
             return Ctx::Root;
         }
-        match self.shell.focus {
-            Region::Rail => Ctx::Rail,
-            Region::List => Ctx::List,
-            Region::Work if self.work.insert() => Ctx::ComposerInsert,
-            Region::Work if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
-            Region::Work => Ctx::PaneNormal,
+        match self.focus() {
+            Focus::Rail => Ctx::Rail,
+            Focus::List => Ctx::List,
+            Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
+            Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
+            Focus::Pane(_) => Ctx::PaneNormal,
         }
     }
 
@@ -486,7 +487,7 @@ impl App {
                     if inner.contains(at) {
                         let row = self.shell.list_top + usize::from(at.y - inner.y);
                         if self.shell.rows(&self.model).get(row).is_some_and(|r| r.is_selectable()) {
-                            self.shell.focus = Region::List;
+                            self.set_focus(Focus::List);
                             self.shell.list_cursor = row;
                             if let Some(t) = self.shell.open_row(&self.model) {
                                 self.open(t, true);
@@ -506,11 +507,7 @@ impl App {
     fn click_work(&mut self, at: Position, double: bool) {
         let Some(&layout) = self.frame().pane_at(at) else { return };
         let side = Side::of(layout.slot);
-        self.shell.focus = Region::Work;
-        if side != self.work.side {
-            self.work.set_insert(false);
-            self.work.turn(side);
-        }
+        self.set_focus(Focus::on(layout.slot));
         let Some(pane) = self.work.focused() else { return };
         let parts = layout.parts;
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
@@ -571,7 +568,7 @@ impl App {
             }
             AppAction::ChooseWorkspace => {
                 if self.backend.is_some() {
-                    self.shell.focus = Region::Rail;
+                    self.set_focus(Focus::Rail);
                     self.shell.rail_cursor = self.shell.workspace;
                 }
             }
@@ -595,10 +592,10 @@ impl App {
             ShellAction::FocusPrev => return self.cycle(-1),
             ShellAction::FocusUp => return self.info(Msg::Label(Label::StatusNoPaneAbove), now),
             ShellAction::FocusDown => return self.info(Msg::Label(Label::StatusNoPaneBelow), now),
-            ShellAction::FocusLeft if self.shell.focus == Region::Work => return self.pane(PaneAction::Left, now),
+            ShellAction::FocusLeft if self.focus().is_pane() => return self.pane(PaneAction::Left, now),
             // Never onto an empty work area: nothing there takes a key.
-            ShellAction::FocusRight if self.shell.focus == Region::List && self.work.main.is_none() => return,
-            ShellAction::FocusRight if self.shell.focus == Region::Work => return self.pane(PaneAction::Right, now),
+            ShellAction::FocusRight if self.focus() == Focus::List && self.work.main.is_none() => return,
+            ShellAction::FocusRight if self.focus().is_pane() => return self.pane(PaneAction::Right, now),
             _ => {}
         }
         let height = self.list_height();
@@ -628,11 +625,11 @@ impl App {
         if self.work.thread.is_some() {
             stops.push(Stop::Thread);
         }
-        let here = match (self.shell.focus, self.work.side) {
-            (Region::Rail, _) => Stop::Rail,
-            (Region::Work, Side::Thread) => Stop::Thread,
-            (Region::Work, Side::Main) => Stop::Main,
-            _ => Stop::List,
+        let here = match self.focus() {
+            Focus::Rail => Stop::Rail,
+            Focus::List => Stop::List,
+            f if f == Focus::on(Slot::Thread) => Stop::Thread,
+            Focus::Pane(_) => Stop::Main,
         };
         let at = stops.iter().position(|s| *s == here);
         let n = stops.len() as isize;
@@ -641,18 +638,12 @@ impl App {
             None => stops[0],
         };
         self.work.set_insert(false);
-        match to {
-            Stop::Rail => self.shell.focus = Region::Rail,
-            Stop::List => self.shell.focus = Region::List,
-            Stop::Main => {
-                self.shell.focus = Region::Work;
-                self.work.turn(Side::Main);
-            }
-            Stop::Thread => {
-                self.shell.focus = Region::Work;
-                self.work.turn(Side::Thread);
-            }
-        }
+        self.set_focus(match to {
+            Stop::Rail => Focus::Rail,
+            Stop::List => Focus::List,
+            Stop::Main => Focus::on(Slot::Main),
+            Stop::Thread => Focus::on(Slot::Thread),
+        });
     }
 
     /// Open a conversation in the main pane; `focus`: give it the keyboard, as GUI Slack does
@@ -660,7 +651,7 @@ impl App {
     fn open(&mut self, target: slakio_core::model::Target, focus: bool) {
         self.work.open(target);
         if focus {
-            self.shell.focus = Region::Work;
+            self.focus_work();
         }
     }
 
@@ -668,7 +659,7 @@ impl App {
     fn focus_list(&mut self, target: Option<slakio_core::model::Target>) {
         self.work.set_insert(false);
         self.shell.list_hidden = false;
-        self.shell.focus = Region::List;
+        self.set_focus(Focus::List);
         if let Some(t) = target {
             let height = self.list_height();
             self.shell.reveal(&self.model, &t, height);
@@ -685,7 +676,7 @@ impl App {
             PaneAction::Back | PaneAction::Forward => {
                 let moved = if a == PaneAction::Back { self.work.back() } else { self.work.forward() };
                 if moved {
-                    self.shell.focus = Region::Work;
+                    self.focus_work();
                 } else {
                     let l = if a == PaneAction::Back { Label::StatusNoEarlier } else { Label::StatusNoLater };
                     self.info(Msg::Label(l), now);
@@ -721,22 +712,22 @@ impl App {
                 }
             }
             PaneAction::Left => {
-                if self.shell.focus == Region::Work && self.work.focus_side(-1) {
+                if self.focus().is_pane() && self.work.focus_side(-1) {
                     return;
                 }
                 if self.shell.list_hidden {
-                    self.shell.focus = Region::Rail;
+                    self.set_focus(Focus::Rail);
                 } else {
                     self.focus_list(main_target);
                 }
             }
             PaneAction::Right => {
-                if self.shell.focus == Region::Work {
+                if self.focus().is_pane() {
                     self.work.focus_side(1);
                 }
             }
             PaneAction::Close => {
-                if self.shell.focus != Region::Work {
+                if !self.focus().is_pane() {
                     return;
                 }
                 if let Some(closed) = self.work.close() {

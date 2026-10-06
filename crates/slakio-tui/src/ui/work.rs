@@ -13,11 +13,11 @@
 
 use super::{avatar_chip, frame, panel, presence_mark, timeline};
 use crate::action::{Action, PaneAction};
-use crate::app::App;
 use crate::app::composer::View;
 use crate::app::pane::Pane;
 use crate::app::shell::Region;
 use crate::app::work::Side;
+use crate::app::{App, Focus, PaneHandle};
 use crate::keymap::Ctx;
 use crate::screen::{self, FrameLayout, PaneLayout, Slot};
 use crate::text::{clip, width};
@@ -48,7 +48,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Slo
 fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View), side: Side) {
     let area = layout.rect;
     let t = &app.theme;
-    let focused = app.shell.focus == Region::Work && app.work.side == side;
+    let focused = app.focus() == Focus::Pane(PaneHandle::of(side.slot()));
+    let thread = pane.is_thread();
     let conversation = app.model.target(&pane.target);
     let name = conversation.map(breadcrumb).unwrap_or_default();
     let stripe = app
@@ -56,12 +57,10 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         .workspace(pane.target.workspace())
         .map(|w| Span::styled("▌", t.workspace(w.color)))
         .unwrap_or_default();
-    let text = match side {
-        Side::Main => format!("{name} "),
-        Side::Thread => format!("⤷ {} · {name} ", app.i18n.label(Label::PaneThread)),
-    };
+    let text =
+        if thread { format!("⤷ {} · {name} ", app.i18n.label(Label::PaneThread)) } else { format!("{name} ") };
     let peer = match conversation.map(|c| &c.kind) {
-        Some(ConversationKind::Dm { user }) if side == Side::Main => app.model.user(user),
+        Some(ConversationKind::Dm { user }) if !thread => app.model.user(user),
         _ => None,
     };
     let mut spans = vec![Span::raw(" "), stripe];
@@ -86,9 +85,10 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     timeline::draw(f, app, pane, layout.parts.messages, focused);
     let Some(divider) = layout.parts.divider else { return };
     // The divider is joined to the pane's border: `├─ Message #backend ───┤`.
-    let label = match side {
-        Side::Main => app.i18n.msg(&Msg::ComposerMessage { name }).to_string(),
-        Side::Thread => app.i18n.label(Label::ComposerReply).to_string(),
+    let label = if thread {
+        app.i18n.label(Label::ComposerReply).to_string()
+    } else {
+        app.i18n.msg(&Msg::ComposerMessage { name }).to_string()
     };
     let w = usize::from(area.width);
     let label = clip(&format!(" {label} "), w.saturating_sub(5));
@@ -109,9 +109,9 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     if app.work.draft(pane).is_empty() && !insert {
         let insert_key = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal);
         let hint = insert_key
-            .map(|keys| match side {
-                Side::Main => app.i18n.msg(&Msg::ComposerHint { keys }).to_string(),
-                Side::Thread => app.i18n.msg(&Msg::ComposerReplyHint { keys }).to_string(),
+            .map(|keys| {
+                let hint = if thread { Msg::ComposerReplyHint { keys } } else { Msg::ComposerHint { keys } };
+                app.i18n.msg(&hint).to_string()
             })
             .unwrap_or_default();
         f.render_widget(Paragraph::new(clip(&hint, usize::from(text_area.width))).style(t.faint()), text_area);

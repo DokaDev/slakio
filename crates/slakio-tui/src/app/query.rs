@@ -13,7 +13,7 @@ use super::dialog::Question;
 use super::help;
 use super::model::Row;
 use super::pane::{Pane, Shown};
-use super::shell::{Region, View};
+use super::shell::View;
 use super::timelines::Timeline;
 use crate::keymap::Ctx;
 use crate::screen::Slot;
@@ -23,6 +23,17 @@ use slakio_core::model::Target;
 /// An open pane, as long as it stays open.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PaneHandle(Slot);
+
+impl PaneHandle {
+    /// The handle of the pane laid out in `slot`.
+    pub(crate) fn of(slot: Slot) -> Self {
+        Self(slot)
+    }
+
+    pub(crate) fn slot(self) -> Slot {
+        self.0
+    }
+}
 
 /// Where the keyboard is, under any popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,15 +116,6 @@ impl App {
         let pane = self.work.pane(slot)?;
         let (timeline, draft) = (self.work.timeline(pane), self.work.draft(pane));
         Some(PaneRef { pane, handle: PaneHandle(slot), timeline, draft })
-    }
-
-    /// Where the keyboard is, under any popup.
-    pub fn focus(&self) -> Focus {
-        match self.shell.focus {
-            Region::Rail => Focus::Rail,
-            Region::List => Focus::List,
-            Region::Work => Focus::Pane(PaneHandle(self.work.side.slot())),
-        }
     }
 
     /// The pane `handle` names, while it is open.
@@ -214,7 +216,7 @@ impl App {
     /// click does but without asking for older messages.
     #[doc(hidden)]
     pub fn select_message(&mut self, index: usize) {
-        if self.shell.focus != Region::Work {
+        if !self.focus().is_pane() {
             return;
         }
         let Some(p) = self.work.focused() else { return };
@@ -229,8 +231,8 @@ impl App {
     /// (the work area offers no such split yet; two panes on one target share its messages).
     #[doc(hidden)]
     pub fn open_beside(&mut self, target: Target) {
-        self.shell.focus = Region::Work;
         self.work.show_beside(target);
+        self.set_focus(Focus::Pane(PaneHandle(Slot::Thread)));
     }
 
     /// Test driver: put the list panel's cursor on row `row` (the last one if past it).
@@ -243,7 +245,7 @@ impl App {
     /// Test driver: the list panel gets the keyboard, its cursor on row `row`.
     #[doc(hidden)]
     pub fn focus_list_row(&mut self, row: usize) {
-        self.shell.focus = Region::List;
+        self.set_focus(Focus::List);
         self.move_list_cursor_to(row);
     }
 

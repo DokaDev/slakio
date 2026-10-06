@@ -23,9 +23,9 @@ mod statusline;
 pub mod timeline;
 mod work;
 
-use crate::app::App;
 use crate::app::Layer;
 use crate::app::shell::{Region, View};
+use crate::app::{App, Focus};
 use crate::avatar;
 use crate::screen;
 use crate::text::clip;
@@ -142,7 +142,11 @@ fn draw_too_small(f: &mut Frame, app: &App, area: Rect) {
 
 /// A region's frame: rounded, its border marking the focus.
 fn frame<'a>(app: &App, region: Region, title: &str) -> Block<'a> {
-    panel(app, app.shell.focus == region, Line::from(title_span(app, title, app.shell.focus == region)))
+    let focused = matches!(
+        (region, app.focus()),
+        (Region::Rail, Focus::Rail) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_))
+    );
+    panel(app, focused, Line::from(title_span(app, title, focused)))
 }
 
 /// A panel: rounded, the focus shown by its border (accent) and its title (bold) and nothing

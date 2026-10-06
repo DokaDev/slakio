@@ -16,7 +16,6 @@ use super::{count_pill, view_glyph, view_label};
 use crate::app::model::Row;
 use crate::app::shell::View;
 use crate::app::status::Level;
-use crate::app::work::Side;
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
 use crate::keymap::{Ctx, keys};
@@ -48,9 +47,9 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::PaneVisual => Place::Visual,
         _ => match app.work.focused() {
             None => Place::WorkEmpty,
-            Some(p) if p.selected.is_some() && app.work.side == Side::Main => Place::PaneSelected,
-            Some(p) if app.work.side == Side::Thread && p.selected.is_some() => Place::ThreadSelected,
-            Some(_) if app.work.side == Side::Thread => Place::Thread,
+            Some(p) if p.selected.is_some() && !p.is_thread() => Place::PaneSelected,
+            Some(p) if p.is_thread() && p.selected.is_some() => Place::ThreadSelected,
+            Some(p) if p.is_thread() => Place::Thread,
             Some(_) => Place::Pane,
         },
     };
@@ -119,7 +118,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let stripe = ws.map(|w| Span::styled("▌", t.workspace(w.color)));
     let main = app.work.main.as_ref().and_then(|p| app.model.target(&p.target));
     let mut place_text = app.backend.map(|_| match main {
-        Some(c) if app.work.side == Side::Thread && app.work.thread.is_some() => {
+        Some(c) if app.work.focused().is_some_and(|p| p.is_thread()) => {
             format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))
         }
         Some(c) => breadcrumb(c),

@@ -1,10 +1,9 @@
 //! The app's frame: what the layout of [`crate::screen`] depends on now, and the layout itself
 //! with the composer views it measured, so drawing does not wrap a composer's text twice.
 
-use super::App;
 use super::composer::View;
-use super::shell::Region;
 use super::work::Side;
+use super::{App, Focus};
 use crate::screen::{self, FrameLayout, Slot};
 
 impl App {
@@ -15,7 +14,7 @@ impl App {
             push: self.settings.rail_push,
             list_hidden: self.shell.list_hidden,
             thread: self.work.thread.is_some(),
-            list_focused: self.shell.focus == Region::List,
+            list_focused: self.focus() == Focus::List,
             main: self.work.main.is_some(),
             thread_focused: self.work.side == Side::Thread,
         }

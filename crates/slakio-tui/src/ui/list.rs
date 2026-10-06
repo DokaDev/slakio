@@ -23,9 +23,9 @@
 //! Unread conversations are bold, muted ones faint; nothing else marks them.
 
 use super::{avatar_chip, count_pill, frame, highlight, presence_mark, view_label};
-use crate::app::App;
 use crate::app::model::Row;
 use crate::app::shell::{Region, View};
+use crate::app::{App, Focus};
 use crate::avatar;
 use crate::screen;
 use crate::text::{clip, width};
@@ -61,7 +61,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         super::empty::list(f, app, inner);
         return;
     }
-    let focused = app.shell.focus == Region::List;
+    let focused = app.focus() == Focus::List;
     for (k, &row) in rows.iter().enumerate().skip(app.shell.list_top).take(usize::from(inner.height)) {
         let y = inner.y + (k - app.shell.list_top) as u16;
         let area = Rect { y, height: 1, ..inner };

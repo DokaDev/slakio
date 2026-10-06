@@ -14,8 +14,8 @@
 //! ```
 
 use super::{count_pill, frame, highlight, view_glyph, view_label, workspace_letter};
-use crate::app::App;
 use crate::app::shell::{RailItem, Region, View, rail_items};
+use crate::app::{App, Focus};
 use crate::screen;
 use crate::text::width;
 use crate::theme::{GUTTER, Selection};
@@ -29,7 +29,7 @@ use ratatui::widgets::{Clear, Paragraph};
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let expanded = app.shell.rail_expanded();
-    let focused = app.shell.focus == Region::Rail;
+    let focused = app.focus() == Focus::Rail;
     // Over the list panel only its own cells are cleared: the list shows beside it.
     f.render_widget(Clear, area);
     f.buffer_mut().set_style(area, t.base());

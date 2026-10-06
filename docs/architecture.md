@@ -56,7 +56,9 @@ rows drawn), the messages of each target a pane shows, held once however many pa
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the
 keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
-(tabs and splits) joins as it is built. The geometry of the screen (`screen.rs`) is pure:
+(tabs and splits) joins as it is built. Where the keyboard is is one `Focus` — rail, list panel or a pane (`app/focus.rs`) — and the
+popups come in one order (`app/overlay.rs`); the key map, the mouse and drawing all read
+those two. The geometry of the screen (`screen.rs`) is pure:
 `screen::frame` lays out a frame once — the regions, each open pane, its messages and its
 composer — and drawing, the mouse and scrolling all read that one layout. Rules:
 
