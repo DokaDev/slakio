@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-latency-144   │├─ Message #backend ─────────────────────────────────────────────────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                                                     │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #backend          │ i write · k messages · Esc list · Tab next pane · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend            │ i write · k messages · Esc list · Ctrl+R rail · ? help │  @37  DM 16 │ demo

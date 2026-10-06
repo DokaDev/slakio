@@ -51,4 +51,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-retry-63                │├─ Message #backend ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ││   # feed-review-152              ││ › Press i to write                                                                                                                                           │
 ╰──╯╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #backend                                                                             │ i write · k messages · Esc list · Tab next pane · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend                                                                               │ i write · k messages · Esc list · Ctrl+R rail · ? help · Space more │  @37  DM 16 │ demo

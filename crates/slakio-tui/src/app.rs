@@ -20,6 +20,9 @@
 //! | the thread panel | the main pane | closes it; the main pane selects its message |
 //! | the main pane | the list, on its conversation | closes it; the list, on its conversation |
 //! | the rail | the list | |
+//!
+//! The rail is reached from anywhere outside text with `Ctrl+R` or `Space r`, and is a stop of
+//! the `Tab` round (left of the list).
 //! | the list | nothing | |
 
 pub mod cmdline;
@@ -605,16 +608,18 @@ impl App {
         }
     }
 
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: list, main pane, thread panel,
-    /// round again. A hidden list or a closed pane is skipped; the rail is never in the round.
+    /// Move the focus to the next (`1`) or previous (`-1`) panel: rail, list, main pane, thread
+    /// panel, round again. A hidden list or a closed pane is skipped. The rail is expanded only
+    /// while it has the focus, so passing it never leaves it open.
     fn cycle(&mut self, step: isize) {
         #[derive(Clone, Copy, PartialEq, Eq)]
         enum Stop {
+            Rail,
             List,
             Main,
             Thread,
         }
-        let mut stops = Vec::new();
+        let mut stops = vec![Stop::Rail];
         if !self.shell.list_hidden {
             stops.push(Stop::List);
         }
@@ -624,10 +629,8 @@ impl App {
         if self.work.thread.is_some() {
             stops.push(Stop::Thread);
         }
-        if stops.is_empty() {
-            return;
-        }
         let here = match (self.shell.focus, self.work.side) {
+            (Region::Rail, _) => Stop::Rail,
             (Region::Work, Side::Thread) => Stop::Thread,
             (Region::Work, Side::Main) => Stop::Main,
             _ => Stop::List,
@@ -640,6 +643,7 @@ impl App {
         };
         self.work.insert = false;
         match to {
+            Stop::Rail => self.shell.focus = Region::Rail,
             Stop::List => self.shell.focus = Region::List,
             Stop::Main => {
                 self.shell.focus = Region::Work;

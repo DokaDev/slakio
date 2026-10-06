@@ -29,6 +29,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `F6` | Next panel | `focus.next` |
 | `Shift+Tab` | Previous panel | `focus.prev` |
 | `Shift+F6` | Previous panel | `focus.prev` |
+| `Ctrl+R` | Rail: workspaces and views | `rail.focus` |
+| `Space r` | Rail: workspaces and views | `rail.focus` |
 | `Ctrl+H` | Move the focus left | `focus.left` |
 | `Ctrl+J` | Move the focus down | `focus.down` |
 | `Ctrl+K` | Move the focus up | `focus.up` |
@@ -206,6 +208,7 @@ Type `:` and the command, then `Enter`.
 | `:qa` | `:qall` `:quitall` `:q` `:quit` | Quit |
 | `:workspace` |  | Switch workspace |
 | `:help` |  | Keyboard help |
+| `:rail` |  | Rail: workspaces and views |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |
 | `:dms` |  | Show DMs |

@@ -215,14 +215,16 @@ pub const DEFAULTS: &[Binding] = &[
     cmdline(Ctx::Root, ":", CommandLineAction::Open),
     help(Ctx::Root, "?", HelpAction::Open),
     app(Ctx::Root, "ctrl+c", AppAction::Interrupt),
-    // Between the panels. `Tab` goes round list, main pane and thread panel (the rail is
-    // reached with `h`, `Left` or `Ctrl+H`, so `Tab` never flashes it open). `Ctrl+H` needs the
-    // kitty keyboard protocol on terminals that send `Backspace` as `^H`; `Space w h` works
-    // everywhere.
+    // Between the panels. `Tab` goes round rail, list, main pane and thread panel (the rail is
+    // expanded only while it has the focus). `Ctrl+R` and `Space r` go straight to the rail and
+    // `Ctrl+R` back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
+    // `Backspace` as `^H`; `Space w h` works everywhere.
     shell(Ctx::Shell, "tab", ShellAction::FocusNext),
     shell(Ctx::Shell, "f6", ShellAction::FocusNext),
     shell(Ctx::Shell, "shift+tab", ShellAction::FocusPrev),
     shell(Ctx::Shell, "shift+f6", ShellAction::FocusPrev),
+    shell(Ctx::Shell, "ctrl+r", ShellAction::FocusRail),
+    shell(Ctx::Shell, "space r", ShellAction::FocusRail),
     shell(Ctx::Shell, "ctrl+h", ShellAction::FocusLeft),
     shell(Ctx::Shell, "ctrl+j", ShellAction::FocusDown),
     shell(Ctx::Shell, "ctrl+k", ShellAction::FocusUp),

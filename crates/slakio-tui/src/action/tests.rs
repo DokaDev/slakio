@@ -24,6 +24,7 @@ fn every_action_is_registered() {
             FocusDown,
             FocusNext,
             FocusPrev,
+            FocusRail,
             RailNext,
             RailPrev,
             RailFirst,

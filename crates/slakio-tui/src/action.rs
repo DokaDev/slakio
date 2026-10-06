@@ -50,9 +50,11 @@ pub enum ShellAction {
     /// No panel is above or below another yet (splits come later): says so.
     FocusUp,
     FocusDown,
-    /// The next panel: list, main pane, thread panel, round again.
+    /// The next panel: rail, list, main pane, thread panel, round again.
     FocusNext,
     FocusPrev,
+    /// Go to the rail (it expands while it has the focus); from the rail, back to the list.
+    FocusRail,
     RailNext,
     RailPrev,
     RailFirst,
@@ -218,6 +220,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::FocusDown, "focus.down", Label::ActionFocusDown, &[]),
     shell(ShellAction::FocusUp, "focus.up", Label::ActionFocusUp, &[]),
     shell(ShellAction::FocusRight, "focus.right", Label::ActionFocusRight, &[]),
+    shell(ShellAction::FocusRail, "rail.focus", Label::ActionRailFocus, &["rail"]),
     shell(ShellAction::RailNext, "rail.next", Label::ActionRailNext, &[]),
     shell(ShellAction::RailPrev, "rail.prev", Label::ActionRailPrev, &[]),
     shell(ShellAction::RailFirst, "rail.first", Label::ActionRailFirst, &[]),

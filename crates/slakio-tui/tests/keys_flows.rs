@@ -142,13 +142,21 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
 fn tab_and_f6_go_round_the_open_panels_skipping_a_hidden_list() {
     let mut d = Demo::new(120, 40);
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::List, "nothing open: the list is the only stop");
+    assert_eq!(d.app.shell.focus, Region::Rail, "nothing open: the rail and the list are the stops");
+    d.keys("tab");
+    assert_eq!(d.app.shell.focus, Region::List);
     d.open("long-threads");
     d.keys("g g enter f6");
+    assert_eq!(d.app.shell.focus, Region::Rail);
+    d.keys("f6");
     assert_eq!(d.app.shell.focus, Region::List);
+    d.keys("shift+f6");
+    assert_eq!(d.app.shell.focus, Region::Rail, "backwards, the rail is before the list");
     d.keys("shift+f6");
     assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Thread));
     d.keys("space e tab");
+    assert_eq!(d.app.shell.focus, Region::Rail);
+    d.keys("tab");
     assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Main), "the hidden list is skipped");
 }
 
@@ -383,7 +391,7 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     let mut d = Demo::new(160, 40);
     let hints = |d: &Demo| d.status_line();
     assert!(
-        hints(&d).contains("Enter open · l peek · Tab next pane · : commands · ? help · Space more"),
+        hints(&d).contains("Enter open · l peek · Tab next pane · : commands · Ctrl+R rail · ? help · Space more"),
         "{}",
         hints(&d)
     );
@@ -393,7 +401,7 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     assert!(hints(&d).contains("Enter show · j/k move · Esc back"), "{}", hints(&d));
     d.keys("esc");
     d.open("long-threads");
-    assert!(hints(&d).contains("i write · k messages · Esc list · Tab next pane"), "{}", hints(&d));
+    assert!(hints(&d).contains("i write · k messages · Esc list · Ctrl+R rail"), "{}", hints(&d));
     d.keys("k");
     assert!(hints(&d).contains("Enter thread · y copy · V select · i write · Esc deselect"), "{}", hints(&d));
     d.keys("V");

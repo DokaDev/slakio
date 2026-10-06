@@ -211,7 +211,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints, m, d))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
-    // the next pane), the workspace's name (cut with `…`, eight cells kept), the other hints by
+    // the next pane, the rail), the workspace's name (cut with `…`, eight cells kept), the other hints by
     // worth, the middle of the place, the place's first key and help, the name, the DM count, the
     // mentions. Then what is left is filled again: a dropped hint comes back where cutting
     // the name makes room for it, and the name grows into the rest, so no run of blank cells is
@@ -226,8 +226,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         full_name.as_ref().map(|n| clip(n, width(n).saturating_sub(by).max(8.min(width(n)))))
     };
     let name_room = full_name.as_ref().map_or(0, |n| width(n).saturating_sub(8));
-    let low = |l: Label| matches!(l, Label::HintPeek | Label::HintCommands | Label::HintNextPane);
-    let low_order: Vec<usize> = [Label::HintPeek, Label::HintCommands, Label::HintNextPane]
+    let low = |l: Label| matches!(l, Label::HintPeek | Label::HintCommands | Label::HintNextPane | Label::HintRail);
+    let low_order: Vec<usize> = [Label::HintPeek, Label::HintCommands, Label::HintNextPane, Label::HintRail]
         .iter()
         .filter_map(|l| resolved.iter().position(|(_, x)| x == l))
         .collect();

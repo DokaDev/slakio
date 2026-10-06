@@ -47,6 +47,7 @@ use Hint::{Leader, One, Pair};
 
 const OPEN: Action = Action::Shell(ShellAction::ListOpen);
 const NEXT_PANE: Action = Action::Shell(ShellAction::FocusNext);
+const RAIL: Action = Action::Shell(ShellAction::FocusRail);
 const COMMANDS: Action = Action::CommandLine(CommandLineAction::Open);
 const HELP: Action = Action::Help(HelpAction::Open);
 const QUIT: Action = Action::App(AppAction::Quit);
@@ -64,6 +65,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(Action::Shell(ShellAction::ListPeek), Label::HintPeek),
             One(NEXT_PANE, Label::HintNextPane),
             One(COMMANDS, Label::HintCommands),
+            One(RAIL, Label::HintRail),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -71,10 +73,16 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(OPEN, Label::HintFold),
             Pair(Action::Shell(ShellAction::ListNext), Action::Shell(ShellAction::ListPrev), Label::HintMove),
             One(NEXT_PANE, Label::HintNextPane),
+            One(RAIL, Label::HintRail),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
-        Place::ListEmpty => &[One(NEXT_PANE, Label::HintNextPane), One(HELP, Label::HintHelp), Leader(Label::HintMore)],
+        Place::ListEmpty => &[
+            One(NEXT_PANE, Label::HintNextPane),
+            One(RAIL, Label::HintRail),
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
         Place::Rail => &[
             One(Action::Shell(ShellAction::RailSelect), Label::HintShow),
             Pair(Action::Shell(ShellAction::RailNext), Action::Shell(ShellAction::RailPrev), Label::HintMove),
@@ -85,6 +93,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
         Place::WorkEmpty => &[
             One(Action::Pane(PaneAction::Back), Label::HintBack),
             One(NEXT_PANE, Label::HintNextPane),
+            One(RAIL, Label::HintRail),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -92,7 +101,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(WRITE, Label::HintWrite),
             One(PREV_MSG, Label::HintMessages),
             One(ESCAPE, Label::HintList),
-            One(NEXT_PANE, Label::HintNextPane),
+            One(RAIL, Label::HintRail),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -186,7 +195,7 @@ mod tests {
             assert_eq!(got.len(), entries(place).len(), "{place:?}: every hint has a key: {got:?}");
         }
         let pane: Vec<String> = resolve(&km, Place::Pane, Ctx::PaneNormal).into_iter().map(|(k, _)| k).collect();
-        assert_eq!(pane, ["i", "k", "Esc", "Tab", "?", "Space"]);
+        assert_eq!(pane, ["i", "k", "Esc", "Ctrl+R", "?", "Space"]);
         let insert: Vec<String> =
             resolve(&km, Place::Insert, Ctx::ComposerInsert).into_iter().map(|(k, _)| k).collect();
         assert_eq!(insert, ["Enter", "Alt+Enter", "Esc"], "never a key that needs the kitty protocol");

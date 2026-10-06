@@ -129,6 +129,8 @@ impl Shell {
             ShellAction::FocusRight => self.focus = self.neighbour(1),
             // Up, down, next and previous need the work area: the app moves those.
             ShellAction::FocusUp | ShellAction::FocusDown | ShellAction::FocusNext | ShellAction::FocusPrev => {}
+            ShellAction::FocusRail if self.focus == Region::Rail => self.focus = self.leave_rail(),
+            ShellAction::FocusRail => self.focus = Region::Rail,
             ShellAction::RailNext => self.rail_cursor = (self.rail_cursor + 1).min(last_item),
             ShellAction::RailPrev => self.rail_cursor = self.rail_cursor.saturating_sub(1),
             ShellAction::RailFirst => self.rail_cursor = 0,
@@ -138,7 +140,7 @@ impl Shell {
                     self.select(item, &items, model);
                 }
             }
-            ShellAction::RailLeave => self.focus = if self.list_hidden { Region::Work } else { Region::List },
+            ShellAction::RailLeave => self.focus = self.leave_rail(),
             ShellAction::ListNext => self.list_cursor = step(&list, self.list_cursor, 1),
             ShellAction::ListPrev => self.list_cursor = step(&list, self.list_cursor, -1),
             ShellAction::ListHalfDown => self.list_cursor = step(&list, self.list_cursor, (page / 2).max(1)),
@@ -290,6 +292,12 @@ impl Shell {
         }
         self.list_cursor = self.list_cursor.min(self.rows(model).len().saturating_sub(1));
         self.scroll(list_height);
+    }
+
+    /// Where the focus goes from the rail without picking anything: the list, or the work area
+    /// when the list is hidden.
+    fn leave_rail(&self) -> Region {
+        if self.list_hidden { Region::Work } else { Region::List }
     }
 
     /// The region `step` places to the left (-1) or right (1), skipping a hidden list panel.

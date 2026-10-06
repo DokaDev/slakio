@@ -149,7 +149,9 @@ fn tab_moves_the_focus_to_the_next_pane_and_back() {
     d.open("long-threads");
     d.keys("g g enter");
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::List, "after the thread panel comes the list");
+    assert_eq!(d.app.shell.focus, Region::Rail, "after the thread panel comes the rail");
+    d.keys("tab");
+    assert_eq!(d.app.shell.focus, Region::List, "then the list");
     d.keys("tab");
     assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Main));
     d.keys("shift+tab");
