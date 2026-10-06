@@ -22,7 +22,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, bar: &Bar) {
             Part::Number => t.tab_number(shown),
             Part::Title | Part::Blank => t.tab(shown),
             Part::Badge => {
-                let mention = tabs.all().get(p.tab).is_some_and(|tab| app.tab_unread(tab).mentions > 0);
+                let mention = tabs.all().get(p.tab).is_some_and(|tab| app.tab_unread(tab).red());
                 t.tab_badge(shown, mention)
             }
             Part::Close => t.tab_close(shown),

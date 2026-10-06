@@ -164,15 +164,14 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                 }
                 None => prefix,
             };
-            // Mentions always show; a DM's unread messages unless it is muted.
-            let count = if c.mentions > 0 {
-                c.mentions
-            } else if unread && c.is_dm() {
-                c.unread
-            } else {
-                0
+            // A DM: its unread messages (unless muted), red only when one mentions the user. A
+            // channel: its mentions, red. Red is for mentions only (ui-ux-spec).
+            let count = match (c.is_dm(), unread) {
+                (true, true) => c.unread,
+                _ => c.mentions,
             };
-            let pill = if count > 0 { right(f, area, &count_pill(count), t.badge()) } else { 0 };
+            let style = if c.mentions > 0 { t.badge() } else { t.pill() };
+            let pill = if count > 0 { right(f, area, &count_pill(count), style) } else { 0 };
             // DMs has no sections: its rows start where a section's name would.
             let x = if app.shell.view == View::Home { 3 } else { 1 };
             // With avatars, a DM starts with its peer's chip and the presence mark at its

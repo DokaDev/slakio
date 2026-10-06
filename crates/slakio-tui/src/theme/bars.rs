@@ -23,10 +23,15 @@ impl Theme {
     }
 
     /// The background of what is shown among its peers (the tab shown, the view shown): the
-    /// unfocused selection's, unless the top bar's surface or the background is that color
-    /// already, then the selection's.
+    /// unfocused selection's on a dark theme, unless the top bar's surface or the background is
+    /// that color already; the selection's on a light one (its unfocused one is too faint there).
     pub fn raised(&self) -> Color {
-        if self.cursor_line == self.surface || self.cursor_line == self.bg { self.selection } else { self.cursor_line }
+        let light = luminance(self.bg).is_some_and(|l| l > 0.5);
+        if light || self.cursor_line == self.surface || self.cursor_line == self.bg {
+            self.selection
+        } else {
+            self.cursor_line
+        }
     }
 
     /// A tab's number: the accent on the tab shown.
@@ -77,7 +82,8 @@ impl Theme {
     pub fn nav_marker(&self, mention: bool) -> Style {
         match (self.kind, mention) {
             (Kind::Truecolor, m) => self.dot(m).bg(self.surface),
-            (_, true) => self.dot(true).remove_modifier(Modifier::REVERSED),
+            // Inside the reversed row: a mention in its color there, unread bold.
+            (_, true) => self.nav_bar().patch(self.dot(true)),
             (_, false) => self.nav_bar().add_modifier(Modifier::BOLD),
         }
     }
@@ -117,4 +123,14 @@ impl Theme {
             l => self.dot(l > 1),
         }
     }
+}
+
+/// The relative luminance of an RGB color (`None` for a terminal color).
+fn luminance(c: Color) -> Option<f64> {
+    let Color::Rgb(r, g, b) = c else { return None };
+    let lin = |v: u8| {
+        let v = f64::from(v) / 255.0;
+        if v <= 0.039_28 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+    };
+    Some(0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b))
 }

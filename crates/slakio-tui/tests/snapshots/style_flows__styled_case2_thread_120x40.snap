@@ -3,7 +3,7 @@ source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [mut/surf 32..36] [/surf B 36..40] [mut/surf 40..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [mut/surf 32..36] [err/surf B 36..40] [mut/surf 40..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
 ╭ Home ──────────────────╮╭ ▌#long-threads ───────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..28] [ws 28..29] [mut 29..43] [bdr 43..83] [acc 83..85] [ws 85..86] [ B 86..111] [acc 111..120]
 │ ▾ Favorites            ││ ──────────────────── 2026-01-06 ───────────────────── ││    metrics done build build       │

@@ -11,6 +11,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use slakio_core::i18n::Lang;
+use slakio_tui::app::shell::View;
 use slakio_tui::app::{Focus, PaneKind, Settings};
 use slakio_tui::screen;
 use slakio_tui::tabbar::Part;
@@ -434,5 +435,83 @@ fn the_top_bar_and_the_tab_shown_read_apart_in_every_theme() {
         // Nothing between the name shown and its caret: the other workspaces' marks follow it.
         let name = piece(slakio_tui::navbar::Part::Name, None);
         assert_eq!(name.x + name.width, caret.x, "{}", t.name);
+    }
+}
+
+// A pill is red only for a real mention; a DM's pill counts its unread messages, neutral
+// without a mention. Its counts add up to the top bar's DMs `●n`. Nothing is red anywhere —
+// list, tabs, top bar — without a mention behind it.
+#[test]
+fn red_means_a_mention_and_the_dm_counts_add_up() {
+    use slakio_tui::app::model::Row;
+    let t = resolve("tokyo-night", true, Background::Dark);
+    let mut d = demo(&t, 160, 60);
+    d.keys("space d");
+    let list = screen::inner(d.app.areas().list.unwrap());
+    let buf = d.buffer();
+    let mut sum = 0u32;
+    for (k, row) in d.app.list_rows().iter().enumerate().skip(d.app.list_top()).take(usize::from(list.height)) {
+        let Row::Conversation(i) = row else { continue };
+        let c = d.app.model.conversation(*i);
+        let y = list.y + (k - d.app.list_top()) as u16;
+        let cells: Vec<&ratatui::buffer::Cell> = (list.x..list.right()).map(|x| &buf[(x, y)]).collect();
+        let text: String = cells.iter().map(|c| c.symbol()).collect();
+        let red = cells.iter().any(|cell| cell.bg == t.error);
+        assert_eq!(red, c.mentions > 0, "{text}: red only with a mention");
+        if c.unread > 0 && !c.muted {
+            assert!(text.trim_end().ends_with(&format!(" {}", c.unread)), "{text}: its unread count");
+            sum += c.unread;
+        }
+    }
+    let rows_all = d.app.list_rows().len();
+    assert!(rows_all <= usize::from(list.height), "every DM row is on screen for the sum");
+    let top: String = (0..160).map(|x| buf[(x, 0)].symbol().to_string()).collect();
+    assert!(top.contains(&format!("DMs ●{sum}")), "{top}");
+    // Tabs and the top bar: red only where a mention is.
+    let mut d = demo(&t, 160, 40);
+    d.keys("space d");
+    let quiet = (0..)
+        .map(|i| d.app.model.conversation(i))
+        .find(|c| c.workspace.as_str() == "TDEMOA" && c.is_dm() && c.unread > 0 && c.mentions == 0 && !c.muted)
+        .unwrap()
+        .name
+        .line()
+        .as_str()
+        .to_string();
+    d.list_cursor_on_view(&quiet);
+    d.keys("t");
+    d.open_in_tab("backend");
+    let buf = d.buffer();
+    let tabs = d.app.tab_bar().unwrap();
+    let badge = tabs.pieces.iter().find(|p| p.tab == 0 && p.part == Part::Badge).expect("the DM tab's mark");
+    assert!(badge.text.trim().starts_with('●'), "{:?}: a DM's unread, never @", badge.text);
+    assert_ne!(buf[(badge.x + 1, tabs.area.y)].fg, t.error, "no mention: not red");
+    let bar = d.app.nav_bar().unwrap();
+    for p in
+        bar.pieces.iter().filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark))
+    {
+        let red = buf[(p.x + 1, 0)].fg == t.error;
+        let mention = match p.item.filter(|i| *i > 0) {
+            Some(i) => d.app.view_unread(d.app.workspace(), View::ALL[i - 1]).red(),
+            None => p.text.trim().starts_with('@'),
+        };
+        assert_eq!(red, mention, "{:?}: red only with a mention behind it", p.text);
+    }
+}
+
+// Without truecolor a mention on the top bar stays inside its reversed row (unless it is the
+// view shown's); a light theme raises the view shown clearly.
+#[test]
+fn marks_stay_inside_the_reversed_top_bar_and_light_themes_raise_clearly() {
+    let t = resolve("terminal", false, Background::Dark);
+    let d = demo(&t, 160, 40);
+    let buf = d.buffer();
+    let bar = d.app.nav_bar().unwrap();
+    let activity = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Badge && p.item == Some(3)).unwrap();
+    let cell = &buf[(activity.x + 1, 0)];
+    assert!(cell.modifier.contains(Modifier::REVERSED), "Activity @n inside the reversed bar");
+    for name in ["light", "catppuccin-latte"] {
+        let t = resolve(name, true, Background::Light);
+        assert_eq!(t.raised(), t.selection, "{name}: the selection's color, clearly apart from the surface");
     }
 }

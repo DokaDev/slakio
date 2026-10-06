@@ -31,9 +31,12 @@ impl App {
                     u.any |= c.unread > 0 && !c.muted;
                 }
                 // A DM's unread messages, all of them (a DM is for the user anyway): `●n`.
-                View::Dms if c.is_dm() && c.unread > 0 && !c.muted => {
-                    u.any = true;
-                    u.dms += c.unread;
+                View::Dms if c.is_dm() => {
+                    if c.unread > 0 && !c.muted {
+                        u.any = true;
+                        u.dms += c.unread;
+                    }
+                    u.dm_mention |= c.mentions > 0;
                 }
                 View::Activity => u.mentions += c.mentions,
                 _ => {}
@@ -49,8 +52,11 @@ impl App {
         let others = (0..self.model.workspaces().len())
             .filter(|w| *w != self.shell.workspace)
             .filter_map(|w| {
-                let u =
-                    Unread { mentions: self.model.workspace_mentions(w), dms: 0, any: self.model.workspace_unread(w) };
+                let u = Unread {
+                    mentions: self.model.workspace_mentions(w),
+                    any: self.model.workspace_unread(w),
+                    ..Unread::default()
+                };
                 let letter = self.model.workspaces()[w].name.line().as_str().chars().next()?.to_uppercase().to_string();
                 u.badge().map(|m| (letter, m))
             })

@@ -122,7 +122,11 @@ fn the_top_bar_marks_the_workspace_with_its_band_and_mentions_only_in_red() {
         bar.pieces.iter().filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark))
     {
         let c = &buf[(p.x + 1, 0)];
-        assert_eq!(c.fg == t.error, p.text.trim().starts_with('@'), "{:?}: red for mentions only", p.text);
+        let mention = match p.item.filter(|i| *i > 0) {
+            Some(i) => d.app.view_unread(d.app.workspace(), slakio_tui::app::shell::View::ALL[i - 1]).red(),
+            None => p.text.trim().starts_with('@'),
+        };
+        assert_eq!(c.fg == t.error, mention, "{:?}: red for mentions only", p.text);
     }
 }
 

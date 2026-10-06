@@ -31,7 +31,11 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
             break;
         }
         let row = Rect { y, height: 1, ..inner };
-        let unread = Unread { mentions: app.model.workspace_mentions(i), dms: 0, any: app.model.workspace_unread(i) };
+        let unread = Unread {
+            mentions: app.model.workspace_mentions(i),
+            any: app.model.workspace_unread(i),
+            ..Unread::default()
+        };
         let mark = unread.badge();
         let mark_w = mark.as_deref().map_or(0, width);
         let buf = f.buffer_mut();

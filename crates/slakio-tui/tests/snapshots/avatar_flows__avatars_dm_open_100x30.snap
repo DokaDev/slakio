@@ -4,13 +4,13 @@ expression: mask_hangul(&small.snap())
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ DMs ───────────────────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────────╮
-│▎MK● Minsu Kim       1  ││                  after                                                 │
+│▎MK● Minsu Kim       3  ││                  after                                                 │
 │ JP● Jiho Park          ││ M  Me            Ok, monitoring                                  21:25 │
 │ ＊○ ＊＊＊             ││ MK Minsu Kim     ```                                             22:20 │
 │ JL◐ Jiyoung Lee        ││                  SELECT count(*) FROM jobs WHERE state =               │
 │ AM● Alex Morgan        ││                  'stuck';                                              │
 │ ＊○ ＊＊＊             ││                  ```                                                   │
-│ H ● Hana            2  ││ M  Me            Please customer queue migration index a merge   23:35 │
+│ H ● Hana            4  ││ M  Me            Please customer queue migration index a merge   23:35 │
 │ SR● Sam Rivera      1  ││                  merge budget waiting can staging merge roadmap        │
 │ ＊○ ＊＊＊             ││ ───────────────────────────── 2026-01-09 ───────────────────────────── │
 │ TK◐ Taylor Kim         ││ MK Minsu Kim     Waiting on deploy alert staging lunch           00:44 │

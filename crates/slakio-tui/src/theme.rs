@@ -268,6 +268,15 @@ impl Theme {
         Style::new().fg(self.mode_fg).bg(self.error).add_modifier(Modifier::BOLD)
     }
 
+    /// A count pill that is not a mention (a DM's unread messages): bold body text on the
+    /// raised background, reversed without truecolor.
+    pub fn pill(&self) -> Style {
+        match self.kind {
+            Kind::Truecolor => self.bold().bg(self.raised()),
+            _ => Style::new().add_modifier(Modifier::REVERSED),
+        }
+    }
+
     /// An unread mark that is not a count (`●`): plain, or a mention's color.
     pub fn dot(&self, mention: bool) -> Style {
         if mention && !self.plain() { Style::new().fg(self.error).add_modifier(Modifier::BOLD) } else { self.bold() }

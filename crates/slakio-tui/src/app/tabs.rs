@@ -34,9 +34,13 @@ use std::time::Instant;
 /// conversation not muted is unread (a channel is bold, with no count).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Unread {
+    /// Mentions in channels (`@n`).
     pub mentions: u32,
+    /// Unread messages of DMs (`●n`).
     pub dms: u32,
     pub any: bool,
+    /// A DM of those mentions the user: its `●n` is red.
+    pub dm_mention: bool,
 }
 
 impl Unread {
@@ -53,7 +57,12 @@ impl Unread {
 
     /// How strong the mark is: 2 a mention, 1 unread, 0 nothing.
     pub fn level(self) -> u8 {
-        if self.mentions > 0 { 2 } else { u8::from(self.any) }
+        if self.red() { 2 } else { u8::from(self.any) }
+    }
+
+    /// Something mentions the user: the mark is red.
+    pub fn red(self) -> bool {
+        self.mentions > 0 || self.dm_mention
     }
 }
 
@@ -200,12 +209,16 @@ impl App {
                 continue;
             }
             seen.push(&p.target);
-            u.mentions += c.mentions;
-            if c.unread > 0 && !c.muted {
-                u.any = true;
-                if c.is_dm() && c.mentions == 0 {
+            if c.is_dm() {
+                // A DM counts its unread messages; a mention in it only makes the mark red.
+                if c.unread > 0 && !c.muted {
+                    u.any = true;
                     u.dms += c.unread;
                 }
+                u.dm_mention |= c.mentions > 0;
+            } else {
+                u.mentions += c.mentions;
+                u.any |= c.unread > 0 && !c.muted;
             }
         }
         u

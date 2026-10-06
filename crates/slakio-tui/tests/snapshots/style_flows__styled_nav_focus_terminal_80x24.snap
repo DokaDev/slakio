@@ -3,7 +3,7 @@ source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-    [ R 0..1] [ws R 1..2] [ B R 2..11] [ R 11..16] [ B R 16..17] [err B 17..20] [ R 20..22] [/bdr B 22..27] [err/bdr B 27..31] [/bdr B 31..32] [ R 32..36] [ B R 36..40] [ R 40..50] [err B 50..54] [ R 54..80]
+    [ R 0..1] [ws R 1..2] [ B R 2..11] [ R 11..16] [ B R 16..17] [err B R 17..20] [ R 20..22] [/bdr B 22..27] [err/bdr B 27..31] [/bdr B 31..32] [ R 32..36] [err B R 36..40] [ R 40..50] [err B R 50..54] [ R 54..80]
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..80]
 │ ▾ Favorites            ││                                                    │

@@ -33,12 +33,14 @@ pub(super) fn draw(f: &mut Frame, app: &App, bar: &Bar) {
             Part::Name => t.nav_bar().add_modifier(ratatui::style::Modifier::BOLD),
             Part::Caret | Part::Sep => t.nav_quiet(),
             Part::Other => t.nav_quiet().add_modifier(ratatui::style::Modifier::BOLD),
-            Part::Mark | Part::Badge => t.nav_marker(p.text.trim_start().starts_with('@')),
+            Part::Mark => t.nav_marker(true),
+            Part::Badge => t.nav_marker(view.is_some_and(|v| app.view_unread(app.shell.workspace, v).red())),
             Part::Glyph | Part::Label | Part::Blank if view.is_some() => t.nav_item(shown),
             Part::Glyph | Part::Label | Part::Blank => t.nav_bar(),
         };
         // On the view shown, its count keeps the raised background.
-        let style = if p.part == Part::Badge && shown { t.nav_shown_marker(p.text.contains('@')) } else { style };
+        let red = view.is_some_and(|v| app.view_unread(app.shell.workspace, v).red());
+        let style = if p.part == Part::Badge && shown { t.nav_shown_marker(red) } else { style };
         if p.part == Part::Glyph {
             super::glyph_cell(buf, p.x, y, &p.text, style);
         } else {
