@@ -11,7 +11,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 |---|---|---|
 | `Ctrl+Q` | Quit | `app.quit` |
 | `F1` | Keyboard help | `help.open` |
-| `Ctrl+P` | Quick switcher (the command line for now) | `palette.open` |
+| `Ctrl+P` | Command palette: every command and action by name, with its keys | `palette.open` |
 
 ## Everywhere (`root`)
 
@@ -133,6 +133,11 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Enter` | Run the typed command | `cmdline.run` |
 | `Esc` | Close the command line | `cmdline.cancel` |
 | `Ctrl+C` | Close the command line | `cmdline.cancel` |
+| `Down` | Next entry of the command list | `cmdline.next` |
+| `Tab` | Next entry of the command list | `cmdline.next` |
+| `Ctrl+N` | Next entry of the command list | `cmdline.next` |
+| `Up` | Previous entry of the command list | `cmdline.prev` |
+| `Shift+Tab` | Previous entry of the command list | `cmdline.prev` |
 
 ## Composer (Insert mode) (`composer.insert`) **[text]**
 

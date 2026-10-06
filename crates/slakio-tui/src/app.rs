@@ -1,5 +1,6 @@
 //! The application state. `App` is a thin router: each part of the state lives in a sub-state
-//! that owns its data and its update ([`cmdline::CommandLine`], [`status::Status`],
+//! that owns its data and its update ([`cmdline::CommandLine`] with its [`palette`],
+//! [`status::Status`],
 //! [`shell::Shell`], [`work::Work`] with its [`pane::Pane`]s and their [`composer::Composer`]s,
 //! [`model::Model`], the keyboard [`help::Help`] and a [`dialog::Dialog`]); `App` turns input
 //! into [`Action`]s through the key map and routes each action to its owner.
@@ -30,13 +31,14 @@ pub mod composer;
 pub mod dialog;
 pub mod help;
 pub mod model;
+pub mod palette;
 pub mod pane;
 pub mod shell;
 pub mod status;
 pub mod work;
 
 use crate::action::{
-    self, Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
+    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
 };
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
@@ -233,6 +235,12 @@ impl App {
         if self.cmdline.is_open() {
             return Ctx::CommandLine;
         }
+        self.region_context()
+    }
+
+    /// Where the keyboard is in the regions of the screen, under the command line too (the keys
+    /// the palette shows are those of this context).
+    pub fn region_context(&self) -> Ctx {
         if self.backend.is_none() {
             return Ctx::Root;
         }
@@ -440,7 +448,10 @@ impl App {
     /// on a composer writes in it; the wheel scrolls what is under it. `true` when the screen
     /// changed.
     fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
-        if self.backend.is_none() || self.cmdline.is_open() || self.dialog.is_some() || screen::too_small(self.size) {
+        if self.cmdline.is_open() && self.dialog.is_none() {
+            return self.palette_mouse(m, now);
+        }
+        if self.backend.is_none() || self.dialog.is_some() || screen::too_small(self.size) {
             return false;
         }
         let at = Position { x: m.column, y: m.row };
@@ -579,7 +590,9 @@ impl App {
             AppAction::Palette => {
                 if self.dialog.is_none() {
                     self.help = None;
-                    if !self.cmdline.is_open() {
+                    if self.cmdline.is_open() {
+                        self.cmdline.close();
+                    } else {
                         self.cmdline.open();
                     }
                 }
@@ -824,23 +837,9 @@ impl App {
                 self.cmdline.open();
             }
             CommandLineAction::Cancel => self.cmdline.close(),
-            CommandLineAction::Run => {
-                let text = self.cmdline.take();
-                let name = text.trim();
-                if name.is_empty() {
-                    return;
-                }
-                if let Some(arg) = theme_arg(name) {
-                    if let Err(msg) = self.set_theme(arg, now) {
-                        self.warn(msg, now);
-                    }
-                    return;
-                }
-                match action::by_command(name) {
-                    Some(a) => self.dispatch(a, now),
-                    None => self.warn(Msg::CommandUnknown { name: name.to_string() }, now),
-                }
-            }
+            CommandLineAction::Run => self.palette_run(now),
+            CommandLineAction::Next => self.palette_step(1),
+            CommandLineAction::Prev => self.palette_step(-1),
         }
     }
 

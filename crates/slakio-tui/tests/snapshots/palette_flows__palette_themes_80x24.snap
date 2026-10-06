@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/palette_flows.rs
+expression: small.snap()
+---
+╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
+│▌A││ ▾ Favorites            ││                                                │
+│▌B││   # backend            ││                                                │
+│──││   # incidents       3  ││                                                │
+│H ││     ╭ Commands ────────────────────────────────────────────────╮         │
+│D●││ ▾ Op│ : theme                                                  │         │
+│A●││   # ├──────────────────────────────────────────────────────────┤         │
+│F ││   # │  auto               Tokyo Night with 24-bit co…  current │         │
+│L ││   # │  terminal           Your terminal's own colors           │er.      │
+│  ││   # │  dark               Dark, truecolor                      │         │
+│  ││   # │  light              Light, truecolor                     │         │
+│  ││   # │  high-contrast      White on black with strong marks     │         │
+│  ││     │  catppuccin         Catppuccin: Latte or Mocha, by the … │         │
+│  ││ ▾ Ch│  catppuccin-latte   Catppuccin Latte (light)             │         │
+│  ││   # │  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
+│  ││   # │  tokyo-night        Tokyo Night: Day or Night, by the t… │         │
+│  ││   # │  tokyo-night-day    Tokyo Night Day (light)              │         │
+│  ││   # │  tokyo-night-night  Tokyo Night (dark)                   │         │
+│  ││   # │  gruvbox            Gruvbox: light or dark, by the term… │         │
+│  ││   # ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
+│  ││   # feed-build-50      ││                                                │
+│  ││   # feed-cache-119     ││                                                │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ COMMAND  ▌A company › Home       │ Enter run · Esc cancel │  @37  DM 16 │ demo

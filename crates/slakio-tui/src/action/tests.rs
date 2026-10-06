@@ -92,7 +92,16 @@ fn every_action_is_registered() {
     };
     let all = app
         .into_iter()
-        .chain([CommandLineAction::Open, CommandLineAction::Run, CommandLineAction::Cancel].map(Action::CommandLine))
+        .chain(
+            [
+                CommandLineAction::Open,
+                CommandLineAction::Run,
+                CommandLineAction::Cancel,
+                CommandLineAction::Next,
+                CommandLineAction::Prev,
+            ]
+            .map(Action::CommandLine),
+        )
         .chain(shell)
         .chain(pane)
         .chain(composer)
@@ -113,4 +122,20 @@ fn commands_find_their_action() {
     assert_eq!(by_command("dms"), Some(Action::Shell(ShellAction::Show(View::Dms))));
     assert_eq!(by_command("wq"), None);
     assert_eq!(by_command(""), None);
+}
+
+#[test]
+fn search_finds_actions_by_their_words_from_word_starts() {
+    use slakio_core::i18n::{I18n, Lang};
+    let en = I18n::new(Lang::En);
+    let first = |q: &str| search(q, &en).first().map(|&i| REGISTRY[i].id);
+    assert_eq!(first("dms"), Some("view.dms"));
+    assert_eq!(first("rail"), Some("rail.focus"));
+    assert_eq!(first("help"), Some("help.open"));
+    assert!(word_score("wq", "Pick another workspace").is_none(), "q is not there");
+    assert!(word_score("ot", "Show the rail item").is_none(), "o must start a word");
+    assert!(word_score("sd", "Show DMs") > word_score("sd", "Show the rail item and DMs"));
+    // English words find actions in Korean too.
+    let ko = I18n::new(Lang::Ko);
+    assert_eq!(search("dms", &ko).first().map(|&i| REGISTRY[i].id), Some("view.dms"));
 }

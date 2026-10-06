@@ -1,12 +1,12 @@
 //! Drawing a frame of [`App`]. Without a backend: the welcome text and the status line. With
 //! one: the shell — rail, list panel, work area — over the status line (see [`crate::screen`]
 //! for the geometry), or, on a terminal too small for it, only how much room it needs. Popups
-//! go on top: the which-key popup above the status line, the keyboard help and a question over
-//! the dimmed screen.
+//! go on top: the which-key popup above the status line, the keyboard help, the command palette
+//! and a question over the dimmed screen.
 //!
 //! * [`rail`], [`list`], [`work`] — the three regions; [`timeline`] — a pane's messages;
 //!   [`statusline`] — the bottom line with its hints; [`empty`] — empty states that list keys;
-//!   [`guide`], [`help`], [`dialog`] — the popups.
+//!   [`guide`], [`help`], [`palette`], [`dialog`] — the popups.
 //!
 //! Names and messages drawn here are remote text ([`slakio_core::sanitize::Remote`]): it can
 //! only be drawn through the sanitiser (`line()`, `block()`), never as it came. A test keeps
@@ -17,6 +17,7 @@ mod empty;
 mod guide;
 mod help;
 mod list;
+mod palette;
 mod rail;
 mod statusline;
 pub mod timeline;
@@ -65,6 +66,12 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
     if app.help.is_some() {
         app.theme.dim_area(f.buffer_mut(), body);
         help::draw(f, app, body);
+    }
+    if app.cmdline.is_open() && app.dialog.is_none() && !screen::too_small(area) {
+        // The whole screen dims, the mode badge stays; the palette goes on top.
+        app.theme.dim_area(f.buffer_mut(), area);
+        statusline::badge(f, app, status);
+        palette::draw(f, app);
     }
     if app.dialog.is_some() {
         app.theme.dim_area(f.buffer_mut(), area);

@@ -1,7 +1,7 @@
 //! Themes while the app runs: `:theme <name>` (also `:colorscheme`, `:colo` and `:set theme=`)
 //! draws with the theme at once and asks for it to be saved in the config file; a family takes
 //! the variant of the terminal's background; `NO_COLOR` keeps the screen without color; a name
-//! the setting does not take changes nothing.
+//! the setting does not take changes nothing and the palette says which names there are.
 
 #[path = "support/demo.rs"]
 mod demo;
@@ -69,6 +69,6 @@ fn an_unknown_theme_changes_nothing_and_names_the_ones_there_are() {
     d.command("theme solarized");
     assert_eq!(d.app.theme.name, "nord");
     assert!(saved(&mut d).is_empty(), "nothing saved");
-    let s = d.status_line();
-    assert!(s.contains("Unknown theme solarized (use auto, terminal"), "{s}");
+    let why = d.app.palette_error(d.app.size).join(" ");
+    assert!(why.starts_with("Unknown theme solarized (use auto, terminal") && why.contains("dracula"), "{why}");
 }

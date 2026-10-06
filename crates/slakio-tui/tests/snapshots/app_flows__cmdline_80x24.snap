@@ -6,11 +6,11 @@ expression: "screen(&app, 80, 24, now)"
 
 
 
-
-
-
-
-               slakio
+          ╭ Commands ────────────────────────────────────────────────╮
+          │ : wq                                                     │
+          ├──────────────────────────────────────────────────────────┤
+          │  No matching commands                                    │
+          ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯
                Early development: nothing connects to Slack yet.
 
                Ctrl+Q  Quit
@@ -25,4 +25,4 @@ expression: "screen(&app, 80, 24, now)"
 
 
 
- COMMAND  :wq                                             Enter run · Esc cancel
+ COMMAND                                               │ Enter run · Esc cancel

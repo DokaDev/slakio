@@ -1,6 +1,6 @@
 //! Context key map: one table of default bindings ([`DEFAULTS`]) decides what a key does in the
 //! current [`Ctx`]. A few keys work everywhere, also while typing ([`Ctx::Global`]: quit, help,
-//! the quick switcher); then keys resolve in the current context first, then in its parents. A
+//! the command palette); then keys resolve in the current context first, then in its parents. A
 //! text input context has no parent, so every key no binding of its own claims is typed; a
 //! modal context (the help, a question) has none either, so only its own keys work there.
 //!
@@ -208,7 +208,7 @@ const fn cmdline(ctx: Ctx, keys: &'static str, action: CommandLineAction) -> Bin
 /// kitty keyboard protocol is the one hints show.
 pub const DEFAULTS: &[Binding] = &[
     // Everywhere, also while typing: quit (asks first when a message is not sent), help and the
-    // quick switcher. `q` alone never quits: in a chat it is too easily typed in Normal mode.
+    // command palette. `q` alone never quits: in a chat it is too easily typed in Normal mode.
     app(Ctx::Global, "ctrl+q", AppAction::Quit),
     help(Ctx::Global, "f1", HelpAction::Open),
     app(Ctx::Global, "ctrl+p", AppAction::Palette),
@@ -324,6 +324,12 @@ pub const DEFAULTS: &[Binding] = &[
     cmdline(Ctx::CommandLine, "enter", CommandLineAction::Run),
     cmdline(Ctx::CommandLine, "esc", CommandLineAction::Cancel),
     cmdline(Ctx::CommandLine, "ctrl+c", CommandLineAction::Cancel),
+    // The palette's list (`Ctrl+P`, global, closes it).
+    cmdline(Ctx::CommandLine, "down", CommandLineAction::Next),
+    cmdline(Ctx::CommandLine, "tab", CommandLineAction::Next),
+    cmdline(Ctx::CommandLine, "ctrl+n", CommandLineAction::Next),
+    cmdline(Ctx::CommandLine, "up", CommandLineAction::Prev),
+    cmdline(Ctx::CommandLine, "shift+tab", CommandLineAction::Prev),
     help(Ctx::Help, "j", HelpAction::Next),
     help(Ctx::Help, "down", HelpAction::Next),
     help(Ctx::Help, "k", HelpAction::Prev),

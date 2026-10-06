@@ -8,7 +8,7 @@ use slakio_core::i18n::Lang;
 use slakio_tui::app::{App, Mode};
 use slakio_tui::theme::Theme;
 use slakio_tui::ui;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 fn key(code: KeyCode) -> Event {
     Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
@@ -90,20 +90,19 @@ fn the_empty_frame_shows_the_status_line_and_how_to_quit() {
 }
 
 #[test]
-fn an_unknown_command_warns_in_the_status_line_until_its_time_is_up() {
+fn an_unknown_command_says_so_in_the_palette_until_the_line_changes() {
     let now = Instant::now();
     let mut app = App::new(Lang::En, Theme::terminal());
     type_text(&mut app, ":wq", now);
     insta::assert_snapshot!("cmdline_80x24", screen(&app, 80, 24, now));
     app.handle_event(key(KeyCode::Enter), now);
     assert!(!app.quit);
+    assert_eq!(app.mode(), Mode::Command, "the palette stays, to fix the line");
     let shown = screen(&app, 80, 24, now);
-    assert!(shown.lines().last().unwrap().contains("Not a command: wq"), "{shown}");
-    let at = app.deadline().expect("the notice goes away by itself");
-    assert!(at > now && at <= now + Duration::from_secs(10));
-    assert!(app.on_tick(at), "the screen changes when it goes");
-    assert!(!screen(&app, 80, 24, at).contains("Not a command"));
-    assert_eq!(app.deadline(), None, "then nothing to wake up for");
+    assert!(shown.contains("│  Not a command: wq"), "under the list, not in the status line: {shown}");
+    assert_eq!(app.deadline(), None, "nothing to wake up for");
+    app.handle_event(key(KeyCode::Backspace), now);
+    assert!(!screen(&app, 80, 24, now).contains("Not a command"), "the line changed");
 }
 
 #[test]

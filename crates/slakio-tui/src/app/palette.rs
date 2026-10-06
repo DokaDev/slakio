@@ -1,0 +1,278 @@
+//! The command palette: the `:` command line (also `Ctrl+P`) with the entries the text matches
+//! listed under it, generated from the action registry with the keys of each. With nothing
+//! typed it lists every command and every action that works where the keyboard is; a word
+//! lists the commands it starts (an exact name first), then the actions its letters find
+//! ([`crate::action::search`]); `:theme ` lists the themes. `Enter` runs the selected entry (a
+//! command that needs its argument is completed into the input instead); an empty line, or
+//! text that matches nothing, runs nothing: the first closes, the second says why under the
+//! list and the palette stays.
+//!
+//! ```text
+//! ╭ Commands ──────────────────────────────────────────────────────╮
+//! │ : type a command or an action name                              │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │  :qa, :qall, :quitall  Quit                    Ctrl+Q / Space q │
+//! │  :theme <theme>        Change the color theme                   │
+//! │                        Next panel                      Tab / F6 │
+//! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
+//! ```
+
+use super::{App, theme_arg};
+use crate::action::{self, Action, AppAction, HelpAction, REGISTRY};
+use crate::keymap::keys;
+use crate::screen::{self, PaletteBox};
+use crate::text::wrap;
+use crate::theme::NAMES;
+use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::{Position, Rect};
+use slakio_core::i18n::{Label, Msg};
+use std::time::Instant;
+
+/// The names `:theme` goes by (vim's `:colorscheme` too). `:set theme=<name>` works as well.
+const THEME_COMMANDS: &[&str] = &["theme", "colorscheme", "colo"];
+
+const HELP: Action = Action::Help(HelpAction::Open);
+
+/// At most this many of a command's names are shown (all of them are typed).
+const NAMES_SHOWN: usize = 3;
+
+/// One entry of the palette's list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Item {
+    /// A `:` command of the registry (index into [`REGISTRY`]).
+    Command(usize),
+    /// `:theme`, which takes the name of a theme.
+    ThemeCommand,
+    /// A theme for `:theme` (index into [`NAMES`]).
+    Theme(usize),
+    /// An action found by its words (index into [`REGISTRY`]).
+    Action(usize),
+}
+
+/// An entry ready to draw: what it completes to (empty for an action), what it does, and its
+/// keys where the keyboard is.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Row {
+    pub name: String,
+    pub label: String,
+    pub keys: String,
+}
+
+/// Actions the palette offers: not the keys of another popup, of typing, or of the palette
+/// itself; the shell's and the panes' only with a backend.
+fn offered(a: Action, backend: bool) -> bool {
+    match a {
+        Action::App(AppAction::Quit) => true,
+        Action::App(AppAction::ChooseWorkspace) | Action::Shell(_) | Action::Pane(_) => backend,
+        Action::Help(h) => h == HelpAction::Open,
+        Action::App(_) | Action::CommandLine(_) | Action::Composer(_) | Action::Dialog(_) => false,
+    }
+}
+
+/// The themes `arg` names: the exact name, then those it starts, then those its letters find.
+fn themes(arg: &str) -> Vec<usize> {
+    let arg = arg.trim().to_ascii_lowercase();
+    let mut hits: Vec<(u8, i32, usize)> = NAMES
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| match () {
+            _ if *n == arg => Some((0, 0, i)),
+            _ if n.starts_with(&arg) => Some((1, 0, i)),
+            _ => action::word_score(&arg, n).map(|s| (2, -s, i)),
+        })
+        .collect();
+    hits.sort_unstable();
+    hits.into_iter().map(|(.., i)| i).collect()
+}
+
+/// What a theme name stands for.
+fn theme_label(name: &str) -> Label {
+    match name {
+        "terminal" => Label::ThemesTerminal,
+        "dark" => Label::ThemesDark,
+        "light" => Label::ThemesLight,
+        "high-contrast" => Label::ThemesHighContrast,
+        "catppuccin" => Label::ThemesCatppuccin,
+        "catppuccin-latte" => Label::ThemesCatppuccinLatte,
+        "catppuccin-mocha" => Label::ThemesCatppuccinMocha,
+        "tokyo-night" => Label::ThemesTokyoNight,
+        "tokyo-night-day" => Label::ThemesTokyoNightDay,
+        "tokyo-night-night" => Label::ThemesTokyoNightNight,
+        "gruvbox" => Label::ThemesGruvbox,
+        "gruvbox-light" => Label::ThemesGruvboxLight,
+        "gruvbox-dark" => Label::ThemesGruvboxDark,
+        "nord" => Label::ThemesNord,
+        "dracula" => Label::ThemesDracula,
+        _ => Label::ThemesAuto,
+    }
+}
+
+impl App {
+    /// The palette's entries for the text typed so far.
+    pub fn palette_items(&self) -> Vec<Item> {
+        let line = self.cmdline.text().trim_start();
+        if let Some(arg) = theme_arg(line) {
+            return themes(arg).into_iter().map(Item::Theme).collect();
+        }
+        let word = line.trim_end();
+        if word.contains(char::is_whitespace) {
+            return Vec::new();
+        }
+        let backend = self.backend.is_some();
+        let below = self.region_context();
+        // What works here: a command, or a key from where the keyboard is.
+        let works = |i: usize| {
+            let s = &REGISTRY[i];
+            offered(s.action, backend) && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty())
+        };
+        let mut commands: Vec<usize> = (0..REGISTRY.len())
+            .filter(|&i| works(i) && REGISTRY[i].commands.iter().any(|c| c.starts_with(word)))
+            .collect();
+        commands.sort_by_key(|&i| !REGISTRY[i].commands.contains(&word));
+        let mut out: Vec<Item> = commands.iter().map(|&i| Item::Command(i)).collect();
+        if THEME_COMMANDS.iter().any(|c| c.starts_with(word)) {
+            // First when named; else after the help, so the empty list shows it early.
+            let help = out.iter().position(|it| matches!(it, Item::Command(i) if REGISTRY[*i].action == HELP));
+            let at = match help {
+                _ if THEME_COMMANDS.contains(&word) => 0,
+                Some(h) => h + 1,
+                None => out.len(),
+            };
+            out.insert(at, Item::ThemeCommand);
+        }
+        out.extend(
+            action::search(word, &self.i18n)
+                .into_iter()
+                .filter(|&i| works(i) && !commands.contains(&i))
+                .map(Item::Action),
+        );
+        out
+    }
+
+    /// The entries as drawn.
+    pub fn palette_rows(&self) -> Vec<Row> {
+        let below = self.region_context();
+        let keys_of = |a: Action| {
+            let mut all = self.keymap.keys_for(a, below);
+            all.sort_by_key(Vec::len);
+            all.dedup();
+            all.iter().take(2).map(|k| keys::label(k)).collect::<Vec<_>>().join(" / ")
+        };
+        let label = |l: Label| self.i18n.label(l).to_string();
+        self.palette_items()
+            .into_iter()
+            .map(|item| match item {
+                Item::Command(i) => Row {
+                    name: REGISTRY[i]
+                        .commands
+                        .iter()
+                        .take(NAMES_SHOWN)
+                        .map(|c| format!(":{c}"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    label: label(REGISTRY[i].label),
+                    keys: keys_of(REGISTRY[i].action),
+                },
+                Item::ThemeCommand => Row {
+                    name: format!(":theme {}", label(Label::PaletteThemeArg)),
+                    label: label(Label::ActionTheme),
+                    keys: String::new(),
+                },
+                Item::Theme(i) => Row {
+                    name: NAMES[i].to_string(),
+                    label: label(theme_label(NAMES[i])),
+                    keys: if NAMES[i] == self.theme_setting { label(Label::PaletteCurrent) } else { String::new() },
+                },
+                Item::Action(i) => {
+                    Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
+                }
+            })
+            .collect()
+    }
+
+    /// Why the last `Enter` ran nothing, wrapped to the width of the palette on a screen `size`
+    /// (four lines at most).
+    pub fn palette_error(&self, size: Rect) -> Vec<String> {
+        let Some(e) = &self.cmdline.error else { return Vec::new() };
+        let w = usize::from(screen::palette_width(size.width)).saturating_sub(6);
+        wrap(self.i18n.msg(e).as_ref(), w, 4).0
+    }
+
+    /// Where the palette is drawn now (`None` when closed or the screen is too small).
+    pub fn palette_box(&self) -> Option<PaletteBox> {
+        self.palette_box_in(self.size)
+    }
+
+    /// Where the palette is drawn on a screen `size`.
+    pub fn palette_box_in(&self, size: Rect) -> Option<PaletteBox> {
+        if !self.cmdline.is_open() {
+            return None;
+        }
+        let n = self.palette_items().len();
+        screen::palette(size, n, self.cmdline.selected, self.palette_error(size).len() as u16)
+    }
+
+    /// Move the selection by `by` entries.
+    pub(super) fn palette_step(&mut self, by: isize) {
+        let n = self.palette_items().len();
+        self.cmdline.step(by, n);
+    }
+
+    /// `Enter`: run the selected entry (see the module's text).
+    pub(super) fn palette_run(&mut self, now: Instant) {
+        let text = self.cmdline.text().trim().to_string();
+        if text.is_empty() && !self.cmdline.picked {
+            return self.cmdline.close();
+        }
+        match self.palette_items().get(self.cmdline.selected).copied() {
+            Some(Item::Command(i) | Item::Action(i)) => {
+                self.cmdline.close();
+                self.dispatch(REGISTRY[i].action, now);
+            }
+            Some(Item::ThemeCommand) => self.cmdline.set("theme "),
+            Some(Item::Theme(i)) => {
+                self.cmdline.close();
+                if let Err(msg) = self.set_theme(NAMES[i], now) {
+                    self.warn(msg, now);
+                }
+            }
+            None => {
+                let error = match theme_arg(&text) {
+                    Some(name) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
+                    None => {
+                        let word = text.split_whitespace().next().unwrap_or_default().to_string();
+                        if action::by_command(&word).is_some() {
+                            Msg::CommandNoArgs { name: word }
+                        } else {
+                            Msg::CommandUnknown { name: text }
+                        }
+                    }
+                };
+                self.cmdline.error = Some(error);
+            }
+        }
+    }
+
+    /// The mouse over the palette: the wheel moves the selection, a click on an entry runs it,
+    /// a click outside closes the palette. `true` when the screen changed.
+    pub(super) fn palette_mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
+        let Some(b) = self.palette_box() else { return false };
+        let at = Position { x: m.column, y: m.row };
+        match m.kind {
+            MouseEventKind::ScrollDown => self.palette_step(1),
+            MouseEventKind::ScrollUp => self.palette_step(-1),
+            MouseEventKind::Down(MouseButton::Left) if b.list.contains(at) => {
+                let i = b.first + usize::from(at.y - b.list.y);
+                if i >= self.palette_items().len() {
+                    return false;
+                }
+                self.cmdline.selected = i;
+                self.cmdline.picked = true;
+                self.palette_run(now);
+            }
+            MouseEventKind::Down(MouseButton::Left) if !b.rect.contains(at) => self.cmdline.close(),
+            _ => return false,
+        }
+        true
+    }
+}

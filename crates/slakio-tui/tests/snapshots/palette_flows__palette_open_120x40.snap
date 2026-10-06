@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/palette_flows.rs
+expression: d.snap()
+---
+╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│▌A││ ▾ Favorites            ││                                                                                        │
+│▌B││   # backend            ││                                                                                        │
+│──││   # incidents       3  ││                                                                                        │
+│H ││                        ││                                                                                        │
+│D●││ ▾ Ops                  ││                                                                                        │
+│A●││   # deploys       ╭ Commands ────────────────────────────────────────────────────────────╮                       │
+│F ││   # alerts        │ : type a command or an action name                                   │                       │
+│L ││   # partner-shared├──────────────────────────────────────────────────────────────────────┤                       │
+│  ││   # hostile-string│  :qa, :qall, :quitall  Quit                         Ctrl+Q / Space q │                       │
+│  ││   # big-history   │  :workspace            Switch workspace                      Space W │                       │
+│  ││   # long-threads  │  :help                 Keyboard help                          ? / F1 │                       │
+│  ││                   │  :theme <theme>        Change the color theme                        │                       │
+│  ││ ▾ Channels        │  :rail                 Rail: workspaces and views   Ctrl+R / Space r │                       │
+│  ││   # announcements │  :list                 Show or hide the list panel           Space e │                       │
+│  ││   # design-review │  :home                 Show Home                             Space h │                       │
+│  ││   # feed-alert-134│  :dms                  Show DMs                              Space d │                       │
+│  ││   # feed-alert-8  │  :activity             Show Activity                         Space a │                       │
+│  ││   # feed-budget-16│  :files                Show Files                            Space f │                       │
+│  ││   # feed-budget-33│  :later                Show Later                            Space l │                       │
+│  ││   # feed-build-50 │  :close                Close the pane                      Space w c │                       │
+│  ││   # feed-cache-119╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
+│  ││   # feed-customer-161  ││                         ?        Keyboard help                                         │
+│  ││   # feed-customer…  1  ││                         Ctrl+Q   Quit                                                  │
+│  ││   # feed-dashboard-22  ││                                                                                        │
+│  ││   # feed-dashboard-41  ││                                                                                        │
+│  ││   # feed-design-34     ││                                                                                        │
+│  ││   # feed-design-83     ││                                                                                        │
+│  ││   # feed-draft-142     ││                                                                                        │
+│  ││   # feed-draft-58      ││                                                                                        │
+│  ││   # feed-draft-84      ││                                                                                        │
+│  ││   # feed-index-199  2  ││                                                                                        │
+│  ││   # feed-index-39      ││                                                                                        │
+│  ││   # feed-index-5    1  ││                                                                                        │
+│  ││   # feed-invoice-16    ││                                                                                        │
+│  ││   # feed-invoice-168   ││                                                                                        │
+│  ││   # feed-latency-144   ││                                                                                        │
+│  ││   # feed-meeting-82    ││                                                                                        │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ COMMAND  ▌A company › Home                                               │ Enter run · Esc cancel │  @37  DM 16 │ demo

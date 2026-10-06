@@ -130,6 +130,54 @@ pub fn pane_parts(area: Rect, lines: usize) -> PaneParts {
     PaneParts { messages, divider: Some(divider), input }
 }
 
+/// The most entries the command palette lists at once (the list scrolls).
+pub const PALETTE_ROWS: usize = 12;
+
+/// Where the command palette is drawn: a box near the top, centered, its first line the input,
+/// a rule, then the entries and, under them, `extra` lines (why `Enter` did nothing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PaletteBox {
+    pub rect: Rect,
+    /// The input line (inside the border).
+    pub input: Rect,
+    /// The entries shown, one per line.
+    pub list: Rect,
+    /// The first entry shown (the selected one is kept in view).
+    pub first: usize,
+    /// Below the entries.
+    pub extra: Rect,
+}
+
+/// The palette's width on a screen `width` wide: 60%, 60 to 100 cells, never wider than the
+/// screen less a margin.
+pub fn palette_width(width: u16) -> u16 {
+    (width * 6 / 10).clamp(60, 100).min(width.saturating_sub(4)).max(8)
+}
+
+/// The palette for a screen of `size` listing `entries`, `selected` among them, with `extra`
+/// lines under them; `None` on a screen too small for it.
+pub fn palette(size: Rect, entries: usize, selected: usize, extra: u16) -> Option<PaletteBox> {
+    if size.height < 6 || size.width < 12 {
+        return None;
+    }
+    let w = palette_width(size.width);
+    let x = size.x + (size.width - w) / 2;
+    let top = size.y + (size.height / 6).max(1);
+    // Borders, input and rule take four lines; the status line stays clear.
+    let room = usize::from((size.y + size.height).saturating_sub(top + 4 + extra + 1));
+    let n = entries.clamp(1, PALETTE_ROWS.min(room.max(1)));
+    let rect = Rect::new(x, top, w, 4 + n as u16 + extra);
+    let inner = inner(rect);
+    let list = Rect { y: inner.y + 2, height: n as u16, ..inner };
+    Some(PaletteBox {
+        rect,
+        input: Rect { height: 1, ..inner },
+        list,
+        first: selected.saturating_sub(n - 1),
+        extra: Rect { y: list.bottom(), height: extra, ..inner },
+    })
+}
+
 /// The rail item (index into [`crate::app::shell::rail_items`]) on screen row `y`, given
 /// `workspaces` workspaces: workspaces first, a separator line, then the views.
 pub fn rail_item_at(rail: Rect, workspaces: usize, items: usize, y: u16) -> Option<usize> {

@@ -28,7 +28,7 @@ pub enum AppAction {
     Quit,
     /// `Ctrl+C`: cancel what is pending and say how to quit.
     Interrupt,
-    /// The quick switcher (for now the `:` command line).
+    /// The command palette (the `:` command line); closes it when it is open.
     Palette,
     /// Pick another workspace (on the rail).
     ChooseWorkspace,
@@ -40,6 +40,9 @@ pub enum CommandLineAction {
     Open,
     Run,
     Cancel,
+    /// The next entry of the list under the input (round again past the last).
+    Next,
+    Prev,
 }
 
 /// Actions of the shell: focus between the panels, the rail, the list panel.
@@ -214,6 +217,8 @@ pub const REGISTRY: &[ActionSpec] = &[
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),
+    spec_of(Action::CommandLine(CommandLineAction::Next), "cmdline.next", Label::ActionCmdlineNext, &[]),
+    spec_of(Action::CommandLine(CommandLineAction::Prev), "cmdline.prev", Label::ActionCmdlinePrev, &[]),
     shell(ShellAction::FocusNext, "focus.next", Label::ActionFocusNext, &[]),
     shell(ShellAction::FocusPrev, "focus.prev", Label::ActionFocusPrev, &[]),
     shell(ShellAction::FocusLeft, "focus.left", Label::ActionFocusLeft, &[]),
@@ -292,6 +297,57 @@ pub const REGISTRY: &[ActionSpec] = &[
 /// The registry entry of `action` (every action has one; a test checks it).
 pub fn spec(action: Action) -> &'static ActionSpec {
     REGISTRY.iter().find(|s| s.action == action).expect("every action is registered")
+}
+
+/// Fuzzy subsequence score of `query` in `text` (case and spaces in `query` ignored); `None`
+/// when `query` is not a subsequence of `text`. The first character of `query` must start a
+/// word of `text`, so a short word does not pick an action that merely holds its letters.
+/// Higher is better: bonuses for word starts and runs, a cost for gaps and a late start.
+pub fn word_score(query: &str, text: &str) -> Option<i32> {
+    let q: Vec<char> = query.chars().filter(|c| !c.is_whitespace()).flat_map(char::to_lowercase).collect();
+    if q.is_empty() {
+        return Some(0);
+    }
+    let t: Vec<char> = text.chars().flat_map(char::to_lowercase).collect();
+    let boundary = |i: usize| i == 0 || matches!(t[i - 1], ' ' | '.' | '_' | '-' | '/' | '(' | ':');
+    let mut best: Option<i32> = None;
+    // Every start of the first query character at a word start; greedy after it.
+    for start in (0..t.len()).filter(|&i| t[i] == q[0] && boundary(i)) {
+        let (mut score, mut qi, mut prev) = (0i32, 0, None::<usize>);
+        for (i, &c) in t.iter().enumerate().skip(start) {
+            if qi < q.len() && c == q[qi] {
+                score += 1 + if boundary(i) { 8 } else { 0 };
+                score += match prev {
+                    Some(p) if p + 1 == i => 5,
+                    Some(p) => -((i - p - 1) as i32).min(3),
+                    None => -(start as i32).min(5),
+                };
+                prev = Some(i);
+                qi += 1;
+            }
+        }
+        if qi == q.len() {
+            best = Some(best.map_or(score, |b| b.max(score)));
+        }
+    }
+    best
+}
+
+/// Registry indices whose label (in the UI language or in English) or id matches `query`
+/// ([`word_score`]), best first; ties keep the registry's order. English words find actions
+/// while the UI is in Korean too.
+pub fn search(query: &str, i18n: &slakio_core::i18n::I18n) -> Vec<usize> {
+    let english = slakio_core::i18n::I18n::new(slakio_core::i18n::Lang::En);
+    let mut hits: Vec<(i32, usize)> = REGISTRY
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| {
+            let (own, en) = (i18n.label(s.label).to_string(), english.label(s.label).to_string());
+            [own.as_str(), en.as_str(), s.id].iter().filter_map(|t| word_score(query, t)).max().map(|sc| (sc, i))
+        })
+        .collect();
+    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    hits.into_iter().map(|(_, i)| i).collect()
 }
 
 /// The action a `:` command names (surrounding spaces ignored), if any.

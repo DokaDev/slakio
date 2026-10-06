@@ -13,7 +13,7 @@
 //!    `Ctrl` keys above (they need the kitty protocol, or a terminal that sends a code of its
 //!    own) or an `Alt` key (macOS terminals send it only with "Option as Alt"). Every such
 //!    action also needs a binding that works everywhere, e.g. `Space w h` next to `Ctrl+H`;
-//! 7. take a global key ([`Ctx::Global`]: quit, help, the quick switcher), which is looked up
+//! 7. take a global key ([`Ctx::Global`]: quit, help, the command palette), which is looked up
 //!    before every context, for another action or as the start of a sequence
 //!    ([`ConflictKind::Protected`]): the binding could never be reached.
 

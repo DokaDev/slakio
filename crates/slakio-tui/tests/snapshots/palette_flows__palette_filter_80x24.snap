@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/palette_flows.rs
+expression: d.snap()
+---
+╭──╮╭ Home ──────────────────╮╭────────────────────────────────────────────────╮
+│▌A││ ▾ Favorites            ││                                                │
+│▌B││   # backend            ││                                                │
+│──││   # incidents       3  ││                                                │
+│H ││     ╭ Commands ────────────────────────────────────────────────╮         │
+│D●││ ▾ Op│ : dm                                                     │         │
+│A●││   # ├──────────────────────────────────────────────────────────┤         │
+│F ││   # │  :dms  Show DMs                                  Space d │         │
+│L ││   # ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯er.      │
+│  ││   # hostile-strings    ││                                                │
+│  ││   # big-history        ││     Enter    Open                              │
+│  ││   # long-threads       ││     Space h  Home                              │
+│  ││                        ││     Space d  DMs                               │
+│  ││ ▾ Channels             ││     Ctrl+O   Back to the last one              │
+│  ││   # announcements      ││     ?        Keyboard help                     │
+│  ││   # design-review      ││     Ctrl+Q   Quit                              │
+│  ││   # feed-alert-134     ││                                                │
+│  ││   # feed-alert-8       ││                                                │
+│  ││   # feed-budget-162    ││                                                │
+│  ││   # feed-budget-33     ││                                                │
+│  ││   # feed-build-50      ││                                                │
+│  ││   # feed-cache-119     ││                                                │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ COMMAND  ▌A company › Home       │ Enter run · Esc cancel │  @37  DM 16 │ demo

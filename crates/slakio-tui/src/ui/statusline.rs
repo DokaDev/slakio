@@ -22,7 +22,7 @@ use crate::keymap::hints::{self, Place};
 use crate::keymap::{Ctx, keys};
 use crate::text::{clip, width};
 use ratatui::Frame;
-use ratatui::layout::{Position, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
@@ -63,17 +63,30 @@ fn spans_width(s: &[Span]) -> usize {
     s.iter().map(Span::width).sum()
 }
 
-pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
+/// The mode badge at the left of the status line, and a space after it.
+fn badge_spans(app: &App) -> Spans {
     let t = &app.theme;
-    let w = usize::from(area.width);
-    f.buffer_mut().set_style(area, t.surface());
     let (label, bg) = match app.mode() {
         Mode::Normal => (Label::ModeNormal, t.mode_normal),
         Mode::Insert => (Label::ModeInsert, t.mode_insert),
         Mode::Visual => (Label::ModeVisual, t.mode_visual),
         Mode::Command => (Label::ModeCommand, t.mode_command),
     };
-    let badge: Spans = vec![Span::styled(format!(" {} ", app.i18n.label(label)), t.mode(bg)), Span::raw(" ")];
+    vec![Span::styled(format!(" {} ", app.i18n.label(label)), t.mode(bg)), Span::raw(" ")]
+}
+
+/// The mode badge alone, drawn again over a dimmed screen (it stays bright under the palette).
+pub(super) fn badge(f: &mut Frame, app: &App, area: Rect) {
+    let spans = badge_spans(app);
+    let w = spans.first().map_or(0, Span::width) as u16;
+    f.render_widget(Paragraph::new(Line::from(spans)), Rect { width: w.min(area.width), ..area });
+}
+
+pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
+    let t = &app.theme;
+    let w = usize::from(area.width);
+    f.buffer_mut().set_style(area, t.surface());
+    let badge = badge_spans(app);
     let sep = || Span::styled(" │ ", t.divider());
 
     // The hints, best first.
@@ -84,7 +97,6 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .unwrap_or_default();
     let all_hints: Vec<(String, String)> =
         resolved.iter().map(|(k, l)| (k.clone(), app.i18n.label(*l).to_string())).collect();
-    let mut hints = all_hints.clone();
     let hint_spans = |hints: &[(String, String)]| -> Spans {
         let mut out = Vec::new();
         for (i, (k, l)) in hints.iter().enumerate() {
@@ -96,21 +108,6 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         }
         out
     };
-
-    if app.mode() == Mode::Command {
-        let text = format!(":{}", app.cmdline.text());
-        let left_w = spans_width(&badge) + width(&text);
-        while !hints.is_empty() && left_w + 2 + spans_width(&hint_spans(&hints)) > w {
-            hints.pop();
-        }
-        let mut line = badge;
-        line.push(Span::styled(text, t.text()));
-        f.render_widget(Paragraph::new(Line::from(line)), area);
-        draw_right(f, area, hint_spans(&hints));
-        let x = area.x + left_w as u16;
-        f.set_cursor_position(Position { x: x.min(area.right().saturating_sub(1)), y: area.y });
-        return;
-    }
 
     // Where you are.
     let ws = app.backend.and_then(|_| app.model.workspaces().get(app.shell.workspace));
@@ -324,7 +321,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         }
         ws_name = cut(over(&full_name, &place_text, &chosen, mentions, dms));
     }
-    hints = chosen.iter().map(|&j| all_hints[j].clone()).collect();
+    let hints: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
     let mut line = left(&ws_name, &place_text);
     let right_spans = right(&hints, mentions, dms);
     if let Some((m, style)) = msg {
