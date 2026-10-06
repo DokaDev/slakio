@@ -33,8 +33,11 @@ Rules:
   is up, the panes by handle and what they hold, the list panel, the rail, the help) and drive
   it by keys, the mouse and a few hidden test drivers (`select_message`, `move_list_cursor_to`);
   the sub-states are private to the crate, so their shape can change without the tests.
-- A `refactor:` commit changes no snapshot: a snapshot that changes means behavior changed
-  (`.github/scripts/refactor-snapshots.sh`, run in CI over the pushed commits).
+- A `refactor:` commit changes no snapshot: a snapshot that changes means behavior changed.
+  CI checks it over the pushed commits with their Conventional Commit subjects and the
+  file-size allowlist, which may only shrink (`.github/scripts/history-rules.sh`; without a
+  usable base it checks from the merge base with `origin/main`, or the whole history, and
+  warns).
 - Every fix ships a test that fails without it. An assertion is never weakened to make a test
   pass.
 - Test data is invented; nothing from a real workspace is ever committed (see CONTRIBUTING.md).

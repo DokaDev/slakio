@@ -68,25 +68,21 @@ jobs:
           SLAKIO_REQUIRE_PTY: "1"
 
   # No Hangul outside the values of locales/ko.toml, no old project name, no absolute home paths,
-  # and the ratchet on file sizes.
+  # the ratchet on file sizes, and the rules on the pushed commits.
   repo-rules:
     name: repository rules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          # The pushed commits, for the snapshot check of refactors.
+          # The pushed commits, for the rules on them.
           fetch-depth: 0
       - run: bash .github/scripts/repo-rules.sh
-      - name: Refactors change no snapshot
+      # Commit subjects, refactors without snapshot changes, an allowlist that only shrinks.
+      - name: Rules on the pushed commits
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            echo "no earlier commit to compare with"
-            exit 0
-          fi
-          bash .github/scripts/refactor-snapshots.sh "$BASE"
+        run: bash .github/scripts/history-rules.sh "$BASE"
 
   # tui -> core <- adapters (docs/architecture.md, "Dependency rules").
   dependency-direction:
