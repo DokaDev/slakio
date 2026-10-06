@@ -154,8 +154,9 @@ fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
 }
 
 /// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
-/// order of what is there; a missing file is created. Used for the one answer the app saves
-/// itself (`icons` after asking). A file that cannot be read or parsed is left alone.
+/// order of what is there and the comment after the old value; a missing file is created. Used
+/// for what the app saves itself (`icons` after asking, `theme` when changed while running).
+/// A file that cannot be read or parsed is left alone.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
@@ -163,7 +164,12 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
         Err(e) => return Err(Fault::io_at(&e, path)),
     };
     let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| Fault::toml_edit(&text, &e))?;
-    doc[key] = toml_edit::value(value);
+    let mut item = toml_edit::value(value);
+    // Keep what surrounds the old value, such as a comment after it on the same line.
+    if let (Some(old), Some(new)) = (doc.get(key).and_then(toml_edit::Item::as_value), item.as_value_mut()) {
+        *new.decor_mut() = old.decor().clone();
+    }
+    doc[key] = item;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| Fault::io_at(&e, dir))?;
     }

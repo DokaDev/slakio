@@ -87,3 +87,14 @@ fn an_answer_is_saved_keeping_what_the_file_holds() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "language = \n");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_saved_value_keeps_its_same_line_comment() {
+    let dir = scratch("decor");
+    let path = dir.join("config.toml");
+    std::fs::write(&path, "# mine\ntheme = \"tokyo-night\"  # owner pick\nicons = \"on\"\n").unwrap();
+    set(&path, "theme", "dark").unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(text, "# mine\ntheme = \"dark\"  # owner pick\nicons = \"on\"\n");
+    let _ = std::fs::remove_dir_all(&dir);
+}
