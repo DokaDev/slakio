@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
 │ Later                      ││       Schema production after invoice cache is should                                  │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
 │▎  # backend                ││       Suspect the DB pool 🎉                                                           │
 │   # incidents           3  ││                                                                                        │

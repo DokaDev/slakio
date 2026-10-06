@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity               @37 ││                                                │
 │ Files                      ││                                                │
 │ Later                      ││                                                │
-├────────────────────────────┤│                                                │
+├─▾──────────────────────────┤│                                                │
 │ ▾ Favorites                ││     No conversation open                       │
 │   # backend                ││     Pick one in the list and press Enter.      │
 │   # incidents           3  ││                                                │

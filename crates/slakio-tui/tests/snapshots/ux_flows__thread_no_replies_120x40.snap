@@ -8,7 +8,7 @@ expression: "demo::mask_hangul(&s)"
 │ Activity               @37 ││     Suspect the DB pool 🎉                         ││     Meeting moved to 3pm         │
 │ Files                      ││                                                    ││                                  │
 │ Later                      ││ LJ  Lily Jeon  06:19                               ││ No replies yet · i reply         │
-├────────────────────────────┤│     Dashboard schema budget draft please is now    ││                                  │
+├─▾──────────────────────────┤│     Dashboard schema budget draft please is now    ││                                  │
 │ ▾ Favorites                ││     waiting fine a lunch production someone cache  ││                                  │
 │▎  # backend                ││     release done                                   ││                                  │
 │   # incidents           3  ││                                                    ││                                  │

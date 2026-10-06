@@ -8,7 +8,7 @@ expression: mask_hangul(&d.screen())
 │ Activity               @37 ││     Staging customer again cache maybe waiting │
 │ Files                      ││     timeout draft after                        │
 │ Later                      ││     ⤷ 9 replies · last 10:30                   │
-├────────────────────────────┤│                                                │
+├─▾──────────────────────────┤│                                                │
 │ ▾ Favorites                ││ MB  Max Baek  10:26                            │
 │   # backend                ││     Broken done dashboard broken review pager  │
 │   # incidents           3  ││     🎉 5   🙏 3                                │

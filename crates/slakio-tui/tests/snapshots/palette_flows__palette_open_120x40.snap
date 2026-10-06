@@ -8,7 +8,7 @@ expression: d.snap()
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││                                                                                        │
 │ Later                      ││                                                                                        │
-├───────────────────────╭ Commands ────────────────────────────────────────────────────────────╮                       │
+├─▾─────────────────────╭ Commands ────────────────────────────────────────────────────────────╮                       │
 │ ▾ Favorites           │ : type a command or an action name                                   │                       │
 │   # backend           ├──────────────────────────────────────────────────────────────────────┤                       │
 │   # incidents         │  :workspace            Switch workspace                      Space W │                       │

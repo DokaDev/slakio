@@ -141,11 +141,17 @@ fn down_the_switcher_j_k_and_enter_show_a_view_and_run_on_into_the_list() {
 #[test]
 fn space_v_folds_the_switcher_to_the_view_shown_and_saves_it() {
     let mut d = Demo::new(120, 40);
-    d.keys("space a");
-    d.keys("space v");
+    // Unfolded, the rule has the handle that folds them, where the folded row's `▸` is.
+    let rule = d.app.list_parts().unwrap().rule.unwrap();
+    assert!(in_list(&d, usize::from(rule)).starts_with("├─▾─"), "{}", in_list(&d, usize::from(rule)));
+    click(&mut d, 2, rule);
+    assert_eq!(d.app.view_rows().len(), 1, "a click on the handle folds");
+    let folded = in_list(&d, 1);
+    assert!(folded.contains("▸ Home") && folded.contains("@24 · @37"), "the strongest other mark too: {folded}");
+    d.keys("space v space a space v");
     assert_eq!(d.app.view_rows().len(), 1, "one row");
     assert!(in_list(&d, 1).contains("▸ Activity"), "{}", in_list(&d, 1));
-    assert!(in_list(&d, 2).starts_with("├─"), "the rule right under it: {}", in_list(&d, 2));
+    assert!(in_list(&d, 2).starts_with("├──"), "folded, no handle on the rule: {}", in_list(&d, 2));
     let saved = d.app.take_effects();
     assert!(
         saved.iter().any(|e| matches!(e, Effect::Save { key: "nav_rows", value } if value == "collapsed")),

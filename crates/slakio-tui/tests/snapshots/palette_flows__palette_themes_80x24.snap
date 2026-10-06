@@ -8,7 +8,7 @@ expression: small.snap()
 │ Activity               @37 ││                                                │
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │ Later   │ : theme                                                  │         │
-├─────────├──────────────────────────────────────────────────────────┤         │
+├─▾───────├──────────────────────────────────────────────────────────┤         │
 │ ▾ Favori│  auto               Tokyo Night with 24-bit co…  current │         │
 │   # back│  terminal           Your terminal's own colors           │er.      │
 │   # inci│  dark               Dark, truecolor                      │         │

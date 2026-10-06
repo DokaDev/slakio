@@ -4,8 +4,8 @@ expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#long-threads ────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────╮
     [bdr 0..1] [mut 1..2] [ws 2..3] [mut 3..17] [mut B 17..18] [err B 18..21] [mut 21..22] [bdr 22..32] [ws 32..33] [mut 33..47] [bdr 47..84] [acc 84..86] [ws 86..87] [ B 87..112] [acc 112..120]
-│ Home                   @24 ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
-    [bdr 0..1] [/cl B 1..25] [err/cl B 25..28] [/cl B 28..29] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [acc 119..120]
+│▎Home                   @24 ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
+    [bdr 0..1] [acc B 1..2] [ B 2..25] [err B 25..28] [ B 28..29] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [acc 119..120]
 │ DMs                    ●11 ││ JL  Jiyoung Lee  07:23                             ││     merge                        │
     [bdr 0..1] [err B 25..28] [bdr 29..31] [/cl 31..32] [av/av B 32..34] [/cl 34..36] [/cl B 36..47] [/cl 47..83] [bdr 83..84] [acc 84..85] [acc 119..120]
 │ Activity               @37 ││     We waiting waiting now index a the a the       ││                                  │
@@ -14,8 +14,8 @@ expression: screen_styled(&d)
     [bdr 0..1] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..99] [dim 101..106] [acc 119..120]
 │ Later                      ││     ⤷ 1,200 replies · last 03:23                   ││     Budget should timeout        │
     [bdr 0..1] [bdr 29..31] [/cl 31..36] [acc/cl 36..64] [/cl 64..83] [bdr 83..84] [acc 84..85] [acc 119..120]
-├────────────────────────────┤│                                                    ││     timeout after tomorrow       │
-    [bdr 0..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+├─▾──────────────────────────┤│                                                    ││     timeout after tomorrow       │
+    [bdr 0..2] [dim 2..3] [bdr 3..31] [bdr 83..84] [acc 84..85] [acc 119..120]
 │ ▾ Favorites                ││ DC  Dan Cho  07:30                                 ││     budget meeting someone       │
     [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..31] [av/av B 32..34] [ B 36..43] [dim 45..50] [bdr 83..84] [acc 84..85] [acc 119..120]
 │   # backend                ││     Still index lunch index                        ││     production release           │

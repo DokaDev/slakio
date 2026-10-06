@@ -8,7 +8,7 @@ expression: s
 │ Activity│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │ Files   │ ▾ List panel                                                                                     │         │
 │ Later   │   Next row                                                                              j / Down │         │
-├─────────│   Previous row                                                                            k / Up │         │
+├─▾───────│   Previous row                                                                            k / Up │         │
 │ ▾ Favori│   First row                                                                           g g / Home │         │
 │   # back│   Last row                                                                               G / End │         │
 │   # inci│   Half a page down                                                                        Ctrl+D │         │

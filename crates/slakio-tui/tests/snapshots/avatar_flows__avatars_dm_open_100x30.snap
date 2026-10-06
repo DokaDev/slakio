@@ -8,7 +8,7 @@ expression: mask_hangul(&small.snap())
 │ Activity               @37 ││                                                                    │
 │ Files                      ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
 │ Later                      ││                  tomorrow sprint review on tracing                 │
-├────────────────────────────┤│                  production                                        │
+├─▾──────────────────────────┤│                  production                                        │
 │▎MK● Minsu Kim           3  ││                                                                    │
 │ JP● Jiho Park              ││ M  Me            Ok, monitoring                              02:16 │
 │ ＊○ ＊＊＊                 ││                                                                    │

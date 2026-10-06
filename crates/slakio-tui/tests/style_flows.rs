@@ -55,6 +55,12 @@ fn frames(theme: &Theme) -> Vec<(&'static str, Demo)> {
 }
 
 /// Three tabs, the second shown, the first with mentions (a badge on the bar).
+fn demo_icons(theme: &Theme) -> Demo {
+    let mut d = Demo::with(120, 40, Lang::En, Settings { icons: true, ..Settings::default() });
+    d.app.theme = theme.clone();
+    d
+}
+
 fn tabs(theme: &Theme) -> Demo {
     let mut d = demo(theme, 120, 40);
     d.open("incidents");
@@ -144,28 +150,57 @@ fn unfocused_text_keeps_its_color() {
     }
 }
 
-// The view switcher is a block of rows on the background, the view shown with the list's
-// selection bar: the unfocused one while the keyboard is in the list, the focused one with the
-// views' cursor on it. No row is on the status line's surface but the status line.
+// The view shown is marked, never barred: an accent `▎` in the first column, its glyph in the
+// accent, its name bold, on the background. Bars belong to cursors alone: the views' cursor
+// has the focused one, the list's cursor its own. No row is on the status line's surface but
+// the status line.
 #[test]
-fn the_view_shown_has_the_selection_bar_of_the_list() {
+fn the_view_shown_has_a_marker_and_only_cursors_have_bars() {
     for t in themes().into_iter().filter(|t| t.kind == Kind::Truecolor) {
-        let mut d = demo(&t, 120, 40);
-        let buf = d.buffer();
+        let mut d = demo_icons(&t);
         let rows = d.app.view_rows();
-        let label = |i: usize| rows[i].pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label).unwrap().x;
-        let home = &buf[(label(0), rows[0].area.y)];
-        assert_eq!((home.bg, home.modifier.contains(Modifier::BOLD)), (t.cursor_line, true), "{}: Home shown", t.name);
-        let files = &buf[(label(3), rows[3].area.y)];
-        assert_eq!((files.fg, files.bg), (t.fg, t.bg), "{}: the others plain on the background", t.name);
+        let part = |i: usize, p: slakio_tui::navbar::Part| rows[i].pieces.iter().find(|x| x.part == p).unwrap().x;
+        let (label, glyph) = (slakio_tui::navbar::Part::Label, slakio_tui::navbar::Part::Glyph);
+        let buf = d.buffer();
+        let home = &buf[(part(0, label), rows[0].area.y)];
+        assert_eq!((home.bg, home.modifier.contains(Modifier::BOLD)), (t.bg, true), "{}: no bar, bold", t.name);
+        let mark = &buf[(rows[0].area.x, rows[0].area.y)];
+        assert_eq!((mark.symbol(), mark.fg), ("▎", t.accent), "{}: the accent marker", t.name);
+        assert_eq!(buf[(part(0, glyph), rows[0].area.y)].fg, t.accent, "{}: the glyph in the accent", t.name);
+        let files = &buf[(part(3, label), rows[3].area.y)];
+        assert_eq!(
+            (files.fg, files.bg, buf[(rows[3].area.x, rows[3].area.y)].symbol()),
+            (t.fg, t.bg, " "),
+            "{}",
+            t.name
+        );
         for x in 0..120 {
             assert_ne!(buf[(x, 0)].bg, t.surface, "{}: no top bar on the surface (column {x})", t.name);
         }
         d.keys("ctrl+r j");
         let buf = d.buffer();
-        let (home, dms) = (&buf[(label(0), rows[0].area.y)], &buf[(label(1), rows[1].area.y)]);
-        assert_eq!((dms.bg, home.bg), (t.selection, t.cursor_line), "{}: the cursor's bar, the view shown's", t.name);
+        let (home, dms) = (&buf[(part(0, label), rows[0].area.y)], &buf[(part(1, label), rows[1].area.y)]);
+        assert_eq!((dms.bg, home.bg), (t.selection, t.bg), "{}: the cursor's bar alone", t.name);
+        assert_eq!(buf[(rows[0].area.x, rows[0].area.y)].symbol(), "▎", "{}: the marker stays", t.name);
+        d.keys("k");
+        let buf = d.buffer();
+        let mark = &buf[(rows[0].area.x, rows[0].area.y)];
+        assert_eq!((mark.symbol(), mark.fg, mark.bg), ("▎", t.accent, t.selection), "{}: marker on the bar", t.name);
     }
+    // Without truecolor the marker is the accent's, the list cursor's gutter mark stays grey.
+    let t = resolve("terminal", false, Background::Dark);
+    let d = demo(&t, 120, 40);
+    let buf = d.buffer();
+    let home = d.app.view_rows()[0].area;
+    assert_eq!((buf[(home.x, home.y)].symbol(), buf[(home.x, home.y)].fg), ("▎", t.accent));
+    assert_ne!(t.accent, t.fg_muted);
+    let list = d.app.list_parts().unwrap().rows;
+    let cursor_y = list.y + (d.app.list_cursor() - d.app.list_top()) as u16;
+    let mut d = d;
+    d.keys("tab");
+    let buf = d.buffer();
+    let home = d.app.view_rows()[0].area;
+    assert_ne!(buf[(home.x, home.y)].fg, buf[(list.x, cursor_y)].fg, "two marks, two colors");
 }
 
 // ④ Exactly one panel has the accent border: the one with the focus.
@@ -397,10 +432,10 @@ fn the_overflow_marks_carry_what_the_hidden_tabs_hold() {
     assert_ne!(cell.fg, t.error, "the tabs on the right mention nobody");
 }
 
-// The view shown takes the list's selection bar in every theme, focused or not as the list's
-// cursor row does; `▾` on the chip is quiet.
+// In every theme the views' cursor has the list cursor's bar, focused or not, and the view shown
+// none; `▾` on the chip is quiet.
 #[test]
-fn the_view_shown_reads_as_the_list_cursor_in_every_theme() {
+fn the_views_cursor_reads_as_the_list_cursor_in_every_theme() {
     for t in themes() {
         let mut d = demo(&t, 120, 40);
         let look = |d: &Demo, x: u16, y: u16| {
@@ -410,11 +445,12 @@ fn the_view_shown_reads_as_the_list_cursor_in_every_theme() {
         let home = d.app.view_rows()[0].area;
         let list = d.app.list_parts().unwrap().rows;
         let cursor_y = list.y + (d.app.list_cursor() - d.app.list_top()) as u16;
-        let (view_unfocused, list_focused) = (look(&d, home.x, home.y), look(&d, list.x, cursor_y));
-        d.keys("ctrl+r");
-        let (view_focused, list_unfocused) = (look(&d, home.x, home.y), look(&d, list.x, cursor_y));
-        assert_eq!((view_focused, view_unfocused), (list_focused, list_unfocused), "{}: as the list's", t.name);
-        assert_ne!(view_focused, look(&d, home.x, home.y + 3), "{}: the bar shows", t.name);
+        let plain = look(&d, home.x + 3, home.y + 3);
+        assert_eq!(look(&d, home.x + 3, home.y), plain, "{}: the view shown has no bar", t.name);
+        let list_focused = look(&d, list.x + 1, cursor_y);
+        d.keys("ctrl+r j");
+        assert_eq!(look(&d, home.x + 3, home.y + 1), list_focused, "{}: the views' cursor as the list's", t.name);
+        assert_eq!(look(&d, home.x + 3, home.y), plain, "{}: still none on the view shown", t.name);
         let chip = d.app.chip_bar().unwrap();
         let caret = chip.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Caret).unwrap();
         let name = chip.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Name).unwrap();

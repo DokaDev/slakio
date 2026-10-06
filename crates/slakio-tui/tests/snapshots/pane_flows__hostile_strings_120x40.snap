@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity               @37 ││       beforeafter                                                                      │
 │ Files                      ││       :blink: 2                                                                        │
 │ Later                      ││                                                                                        │
-├────────────────────────────┤│  JP   Jiho Park  14:04                                                                 │
+├─▾──────────────────────────┤│  JP   Jiho Park  14:04                                                                 │
 │ ▾ Favorites                ││       abc                                                                              │
 │   # backend                ││                                                                                        │
 │   # incidents           3  ││  JL   Jiyoung Lee  14:19                                                               │

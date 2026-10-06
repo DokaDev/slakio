@@ -8,7 +8,7 @@ expression: mask_hangul(&d.screen())
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││                                                                                        │
 │ Later                      ││                                                                                        │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ MK● Minsu Kim           3  ││                                                                                        │
 │ JP● Jiho Park              ││                                                                                        │
 │ ＊○ ＊＊＊                 ││                                                                                        │

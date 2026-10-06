@@ -32,13 +32,14 @@ images, and settings. This README only lists what works; it will grow with each 
     workspace (its color band, its name, `▾`, then each other workspace that wants you by its
     letter and mark, `· B @9`), its first rows the view switcher as in GUI Slack's sidebar — a
     row each for Home, DMs, Activity, Files and Later (the last three say they come in a later
-    version), an icon (icons on) and the name, the count at the right, the view shown with the
-    selection bar — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
+    version), an icon (icons on) and the name, the count at the right, the view shown marked
+    with an accent `▎` (bars are for cursors only) — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
     switcher alike (a DM's pill counts its unread messages, red when one mentions you); the
     status line repeats no count; `[` / `]` in the list show the view before or after;
     `Ctrl+R` or `Space r` (`:nav`) goes to the switcher from anywhere (and `Ctrl+R` back),
     `j` / `k` move down it and on into the list (and back up), `Enter` picks a view, `Esc`
-    leaves; `Space v` (`:navrows`) folds it to one row, the view shown (`▸`), and unfolds it; the workspace (or `Space W`, or a click on
+    leaves; `Space v` (`:navrows`, or a click on `▾` on the rule under it) folds it to one row, the view
+    shown (`▸`) with the strongest mark of the others (`@24 · @37`), and unfolds it; the workspace (or `Space W`, or a click on
     it) opens a switcher of the workspaces with their counts; when the list panel makes room
     for a thread on a narrow screen, the status line names the workspace and the view;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),

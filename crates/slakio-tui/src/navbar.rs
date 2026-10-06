@@ -7,16 +7,19 @@
 //!
 //! ```text
 //! ╭ ▌A company ▾ · B @9 ──────╮
-//! │ 󰋜 Home                @24 │    icons on
+//! │▎󰋜 Home                @24 │    icons on; the view shown: an accent `▎`, no bar
 //! │ 󰍡 DMs                 ●11 │
 //! │ 󰂚 Activity            @37 │
 //! │ 󰈙 Files                   │
 //! │ 󰃀 Later                   │
-//! ├───────────────────────────┤
+//! ├─▾─────────────────────────┤    the handle that folds them
 //!
-//! │ ▸ 󰂚 Activity          @37 │    folded (`nav_rows = "collapsed"`): the view shown alone
-//! │ Activity              @37 │    icons off: the names alone
+//! │▎▸ 󰋜 Home       @24 · @37 │    folded (`nav_rows = "collapsed"`): the view shown and the
+//! ├───────────────────────────┤    strongest mark of the others
 //! ```
+//!
+//! The handle `▾` on the rule is in the column of the folded row's `▸` ([`FOLD_X`]); icons off,
+//! the rows are the names alone.
 //!
 //! A Nerd Font glyph is drawn as one cell followed by a blank one, and both cells are its slot
 //! ([`GLYPH_SLOT`]): a terminal that draws the glyph two cells wide (Ghostty does when the next
@@ -33,6 +36,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// The cells a Nerd Font glyph takes: itself and a blank one after it.
 pub const GLYPH_SLOT: u16 = 2;
+
+/// The column of `▸` on the folded row and of `▾` on the rule, from the list panel's left edge.
+pub const FOLD_X: u16 = 2;
 
 /// The workspace chip: the name of the workspace shown, then, after `▾`, each other workspace
 /// that wants attention by its letter and its mark (` · B @9`): never a count beside the name
@@ -62,7 +68,7 @@ pub enum Part {
     Caret,
     /// Another workspace's letter, after `▾`.
     Other,
-    /// That workspace's mark (`@9`, `●`).
+    /// That workspace's mark (`@9`, `●`); on the folded views' row, a hidden view's.
     Mark,
     /// `▸`: the views are folded to the one shown.
     Fold,
@@ -191,11 +197,13 @@ pub fn chip(area: Rect, chip: &Chip) -> Bar {
     place(area, chip_parts(chip, &name, numbers))
 }
 
-/// One view's row in `row` (the row of the list panel it takes): a blank, `▸` before the view
-/// when the rows are folded to it (`fold`), its glyph's slot (icons on), its name, and its count
-/// at the right, one cell in from the edge. The count is never cut: the name is.
-fn view_row(row: Rect, item: usize, v: &Item, fold: bool) -> Bar {
+/// One view's row in `row` (the row of the list panel it takes): a blank (the view shown's
+/// marker goes there), `▸` before the view when the rows are folded to it (`fold`), its glyph's
+/// slot (icons on), its name, and its count at the right, one cell in from the edge, then
+/// `other`, another view's mark (` · @37`). The counts are never cut: the name is.
+fn view_row(row: Rect, item: usize, v: &Item, fold: bool, other: Option<&str>) -> Bar {
     let mut out = Parts::new();
+    let mut tail = Parts::new();
     let it = Some(item);
     push(&mut out, it, Part::Blank, " ".into());
     if fold {
@@ -205,34 +213,38 @@ fn view_row(row: Rect, item: usize, v: &Item, fold: bool) -> Bar {
     if let Some(g) = v.glyph {
         push(&mut out, it, Part::Glyph, g.to_string());
     }
-    let badge = v.badge.as_deref().map_or(0, width);
-    // The name, a blank before the count (when there is one) and the blank after it.
-    let room = usize::from(row.width).saturating_sub(total(&out) + badge + usize::from(badge > 0) + 1);
+    if let Some(b) = &v.badge {
+        push(&mut tail, it, Part::Badge, b.clone());
+    }
+    if let Some(m) = other {
+        let dot = if tail.is_empty() { "· " } else { " · " };
+        push(&mut tail, it, Part::Blank, dot.into());
+        push(&mut tail, it, Part::Mark, m.to_string());
+    }
+    let counts = total(&tail);
+    // The name, a blank before the counts (when there are any) and the blank after them.
+    let room = usize::from(row.width).saturating_sub(total(&out) + counts + usize::from(counts > 0) + 1);
     let label = clip(&v.label, room);
-    let fill = room.saturating_sub(width(&label)) + usize::from(badge > 0);
+    let fill = room.saturating_sub(width(&label)) + usize::from(counts > 0);
     push(&mut out, it, Part::Label, label);
     push(&mut out, it, Part::Blank, " ".repeat(fill));
-    if let Some(b) = &v.badge {
-        push(&mut out, it, Part::Badge, b.clone());
-    }
+    out.extend(tail);
     push(&mut out, it, Part::Blank, " ".into());
     place(row, out)
 }
 
 /// Lay the views out in `area` (the top of the list panel), one row each, `shown` the view the
-/// list shows; `folded`, a single row for the view shown (`▸`). A row is one view from edge to
-/// edge (a click anywhere on it is that view's); rows that do not fit in `area` are left out.
-pub fn views(area: Rect, views: &[Item], shown: usize, folded: bool) -> Vec<Bar> {
+/// list shows; `folded`, a single row for the view shown (`▸`) with `other`, the strongest mark
+/// of the views it hides. A row is one view from edge to edge (a click anywhere on it is that
+/// view's); rows that do not fit in `area` are left out.
+pub fn views(area: Rect, views: &[Item], shown: usize, folded: bool, other: Option<&str>) -> Vec<Bar> {
     let row = |i: u16| Rect { y: area.y + i, height: 1, ..area };
     if folded {
-        return views
-            .get(shown)
-            .filter(|_| area.height > 0)
-            .map(|v| view_row(row(0), shown, v, true))
-            .into_iter()
-            .collect();
+        let v = views.get(shown).filter(|_| area.height > 0);
+        return v.map(|v| view_row(row(0), shown, v, true, other)).into_iter().collect();
     }
-    views.iter().enumerate().take(usize::from(area.height)).map(|(i, v)| view_row(row(i as u16), i, v, false)).collect()
+    let rows = views.iter().enumerate().take(usize::from(area.height));
+    rows.map(|(i, v)| view_row(row(i as u16), i, v, false, None)).collect()
 }
 
 #[cfg(test)]

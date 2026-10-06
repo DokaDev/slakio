@@ -8,7 +8,7 @@ expression: d.snap()
 │ Activity               @37 ││     Thanks!                                    │
 │ Files                      ││                                                │
 │ Later                      ││ MJ  Mia Jang  02:18                            │
-├────────────────────────────┤│     Still budget build latency rollback        │
+├─▾──────────────────────────┤│     Still budget build latency rollback        │
 │ ▾ Favorites                ││     rollback retry sprint draft maybe lunch    │
 │   # backend                ││     waiting the budget                         │
 │▎  # incidents           3  ││                                                │

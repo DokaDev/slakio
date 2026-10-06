@@ -8,7 +8,7 @@ expression: mask_hangul(&small.snap())
 │ Activity               @37 ││   On waiting migration someone index can       │
 │ Files                      ││   staging should                               │
 │ Later                      ││                                                │
-├────────────────────────────┤│ Kate Nam · 06:51                               │
+├─▾──────────────────────────┤│ Kate Nam · 06:51                               │
 │ ▾ Favorites                ││   Production roadmap customer build alert now  │
 │▎  # backend                ││   latency fine review latency roadmap broken   │
 │   # incidents           3  ││   should for                                   │

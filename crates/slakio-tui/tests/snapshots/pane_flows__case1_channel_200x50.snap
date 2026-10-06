@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity                     @37 ││       PR is up                                                                                                                                                   │
 │ Files                            ││                                                                                                                                                                  │
 │ Later                            ││  MK   Minsu Kim  05:43                                                                                                                                           │
-├──────────────────────────────────┤│       For staging latency tomorrow index after staging                                                                                                           │
+├─▾────────────────────────────────┤│       For staging latency tomorrow index after staging                                                                                                           │
 │ ▾ Favorites                      ││                                                                                                                                                                  │
 │▎  # backend                      ││  DY   Dana Yoon  05:48                                                                                                                                           │
 │   # incidents                 3  ││       see https://docs.example.com/runbooks/latency                                                                                                              │

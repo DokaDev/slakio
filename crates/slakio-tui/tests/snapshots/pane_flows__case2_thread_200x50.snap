@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity                     @37 ││▎      We waiting waiting now index a the a the release                                               ││                                                          │
 │ Files                            ││▎      ⤷ 1,200 replies · last 03:23                                                                   ││  MK   Minsu Kim  03:12                                   │
 │ Later                            ││                                                                                                      ││       Build rollback done broken merge                   │
-├──────────────────────────────────┤│  DC   Dan Cho  07:30                                                                                 ││                                                          │
+├─▾────────────────────────────────┤│  DC   Dan Cho  07:30                                                                                 ││                                                          │
 │ ▾ Favorites                      ││       Still index lunch index                                                                        ││  NS   Nina Seo  03:13                                    │
 │   # backend                      ││       ⤷ 6 replies · last 07:36                                                                       ││       Latency today design draft metrics done build      │
 │   # incidents                 3  ││                                                                                                      ││       build                                              │

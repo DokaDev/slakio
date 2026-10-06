@@ -8,7 +8,7 @@ expression: d.snap()
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││  AM   Alex Morgan  23:03                                                               │
 │ Later                      ││       Check staging design                                                             │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││  ＊   ＊＊＊  23:44                                                                    │
 │   # backend                ││       Design design design draft sprint                                                │
 │▎  # incidents           3  ││                                                                                        │

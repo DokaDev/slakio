@@ -28,7 +28,7 @@ fn text(b: &Bar) -> String {
 }
 
 fn rows(w: u16, icons: bool, shown: usize, folded: bool) -> Vec<String> {
-    views(Rect::new(0, 1, w, 5), &items(icons), shown, folded).iter().map(text).collect()
+    views(Rect::new(0, 1, w, 5), &items(icons), shown, folded, None).iter().map(text).collect()
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn a_row_per_view_its_count_at_the_right() {
         ]
     );
     assert_eq!(rows(28, false, 2, false)[2], " Activity               @37 ", "icons off: the names alone");
-    let b = views(Rect::new(3, 1, 28, 5), &items(true), 0, false);
+    let b = views(Rect::new(3, 1, 28, 5), &items(true), 0, false, None);
     assert_eq!(b.iter().map(|r| r.area.y).collect::<Vec<_>>(), [1, 2, 3, 4, 5], "one row each, top down");
 }
 
@@ -52,7 +52,7 @@ fn a_row_per_view_its_count_at_the_right() {
 fn folded_the_view_shown_alone_after_a_fold_mark() {
     assert_eq!(rows(28, true, 2, true), [" ▸ G_Activity           @37 "]);
     assert_eq!(rows(28, false, 1, true), [" ▸ DMs                  ●11 "]);
-    let b = views(Rect::new(3, 1, 28, 1), &items(true), 2, true);
+    let b = views(Rect::new(3, 1, 28, 1), &items(true), 2, true, None);
     assert_eq!((b.len(), b[0].hit(3), b[0].hit(30)), (1, Some(2), Some(2)), "the whole row is the view shown's");
 }
 
@@ -62,7 +62,7 @@ fn a_count_is_never_cut_the_name_is() {
         for icons in [false, true] {
             for folded in [false, true] {
                 for shown in 0..5 {
-                    for (i, b) in views(Rect::new(3, 1, w, 5), &items(icons), shown, folded).iter().enumerate() {
+                    for (i, b) in views(Rect::new(3, 1, w, 5), &items(icons), shown, folded, None).iter().enumerate() {
                         let used: u16 = b.pieces.iter().map(|p| p.width).sum();
                         assert_eq!(used, w, "{w} {icons}: a row is the panel's width");
                         assert!(b.pieces.windows(2).all(|p| p[0].x + p[0].width == p[1].x), "{w}: contiguous");
@@ -79,14 +79,26 @@ fn a_count_is_never_cut_the_name_is() {
 }
 
 #[test]
+fn folded_the_row_adds_the_strongest_mark_of_the_hidden_views() {
+    let r = |w: u16, shown: usize| text(&views(Rect::new(0, 1, w, 1), &items(true), shown, true, Some("@37"))[0]);
+    assert_eq!(r(28, 0), " ▸ G_Home         @24 · @37 ");
+    assert_eq!(r(28, 3), " ▸ G_Files            · @37 ", "without a count of its own");
+    assert_eq!(r(18, 0), " ▸ G_H… @24 · @37 ", "the name is cut, never a mark");
+}
+
+#[test]
 fn a_glyph_takes_two_cells_and_a_click_anywhere_on_a_row_is_its_view() {
-    let b = views(Rect::new(10, 1, 28, 5), &items(true), 2, false);
+    let b = views(Rect::new(10, 1, 28, 5), &items(true), 2, false, None);
     let g = b[2].pieces.iter().find(|p| p.part == Part::Glyph).unwrap();
     assert_eq!((g.x, g.width), (11, GLYPH_SLOT));
     let label = b[2].pieces.iter().find(|p| p.part == Part::Label).unwrap();
     assert_eq!(label.x, g.x + GLYPH_SLOT, "the name starts after the slot");
     assert!((10..38).all(|x| b[2].hit(x) == Some(2)), "edge to edge");
-    assert_eq!(views(Rect::new(0, 0, 28, 3), &items(true), 0, false).len(), 3, "rows that do not fit are left out");
+    assert_eq!(
+        views(Rect::new(0, 0, 28, 3), &items(true), 0, false, None).len(),
+        3,
+        "rows that do not fit are left out"
+    );
 }
 
 #[test]

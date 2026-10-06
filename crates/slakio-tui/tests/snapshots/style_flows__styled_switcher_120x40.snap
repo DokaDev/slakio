@@ -4,8 +4,8 @@ expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
     [acc 0..1] [ B 1..2] [ws 2..3] [ B 3..12] [mut 12..14] [ B 14..17] [mut B 17..18] [err B 18..21] [ B 21..22] [acc 22..30] [bdr 30..120]
-│ ╭ Workspaces ──────────────────╮                                                                                     │
-    [acc 0..1] [/cl B 1..2] [acc/surf 2..3] [/surf B 3..15] [acc/surf 15..34] [bdr 119..120]
+│▎╭ Workspaces ──────────────────╮                                                                                     │
+    [acc 0..1] [acc B 1..2] [acc/surf 2..3] [/surf B 3..15] [acc/surf 15..34] [bdr 119..120]
 │ │ ▌A company               @28 │                                                                                     │
     [acc 0..1] [acc/surf 2..3] [/surf 3..4] [ws/surf 4..5] [acc/sel B 5..14] [/sel 14..29] [err/sel B 29..32] [/sel 32..33] [acc/surf 33..34] [bdr 119..120]
 │ │ ▌B side                   @9 │                                                                                     │
@@ -14,8 +14,8 @@ expression: screen_styled(&d)
     [acc 0..1] [acc/surf 2..7] [mut/surf 7..33] [acc/surf 33..34] [bdr 119..120]
 │ Later                      ││                                                                                        │
     [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
-├────────────────────────────┤│                                                                                        │
-    [acc 0..30] [bdr 30..31] [bdr 119..120]
+├─▾──────────────────────────┤│                                                                                        │
+    [acc 0..2] [dim 2..3] [acc 3..30] [bdr 30..31] [bdr 119..120]
 │ ▾ Favorites                ││                                                                                        │
     [acc 0..1] [dim 2..3] [mut B 4..13] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # backend                ││                                                                                        │

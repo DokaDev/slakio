@@ -3,12 +3,12 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ Home                   @24 ││                                                                                        │
+│▎Home                   @24 ││                                                                                        │
 │ DMs                    ●11 ││                                                                                        │
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││                                                                                        │
 │ Later                      ││                                                                                        │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││                                                                                        │
 │▎  # backend                ││                                                                                        │
 │   # incidents           3  ││                                                                                        │

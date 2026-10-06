@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││                                                                                        │
 │ Later                      ││                                                                                        │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ MK● Minsu Kim              ││                                                                                        │
 │ JP● Jiho Park              ││                                                                                        │
 │ ＊○ ＊＊＊                 ││                                                                                        │

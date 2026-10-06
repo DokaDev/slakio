@@ -8,7 +8,7 @@ expression: d.snap()
 │ │ ▌B side                   @9 │                                                                                     │
 │ ╰──── Enter switch · Esc close ╯                                                                                     │
 │ Later                      ││                                                                                        │
-├────────────────────────────┤│                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││                                                                                        │
 │   # backend                ││                                                                                        │
 │   # incidents           3  ││                                                                                        │

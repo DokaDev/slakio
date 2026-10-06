@@ -4,8 +4,8 @@ expression: screen_styled(&tabs(&t))
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #incidents @3 ×  2 #backend ×  3 #general ×
     [bdr 0..1] [mut 1..2] [ws 2..3] [mut 3..17] [mut B 17..18] [err B 18..21] [mut 21..22] [bdr 22..30] [mut 30..43] [err B 43..46] [mut 46..47] [dim 47..48] [mut 48..49] [acc/cl B 49..52] [/cl B 52..61] [mut/cl 61..62] [/cl B 62..63] [mut 63..75] [dim 75..76] [mut 76..77]
-│ Home                   @24 │╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
-    [bdr 0..1] [/cl B 1..25] [err/cl B 25..28] [/cl B 28..29] [bdr 29..30] [acc 30..32] [ws 32..33] [ B 33..42] [acc 42..120]
+│▎Home                   @24 │╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
+    [bdr 0..1] [acc B 1..2] [ B 2..25] [err B 25..28] [ B 28..29] [bdr 29..30] [acc 30..32] [ws 32..33] [ B 33..42] [acc 42..120]
 │ DMs                    ●11 ││       Rolling back                                                                     │
     [bdr 0..1] [err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
 │ Activity               @37 ││                                                                                        │
@@ -14,8 +14,8 @@ expression: screen_styled(&tabs(&t))
     [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..50] [dim 52..57] [acc 119..120]
 │ Later                      ││       Schema production after invoice cache is should                                  │
     [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-├────────────────────────────┤│                                                                                        │
-    [bdr 0..30] [acc 30..31] [acc 119..120]
+├─▾──────────────────────────┤│                                                                                        │
+    [bdr 0..2] [dim 2..3] [bdr 3..30] [acc 30..31] [acc 119..120]
 │ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
     [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
 │   # backend                ││       Suspect the DB pool 🎉                                                           │

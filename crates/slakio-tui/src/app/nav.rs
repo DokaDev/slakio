@@ -99,7 +99,15 @@ impl App {
             })
             .collect();
         let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
-        navbar::views(parts.views, &views, shown, self.shell.nav_folded)
+        // Folded, the strongest mark of the views it hides: a mention first, the most of them.
+        let other = View::ALL
+            .iter()
+            .filter(|v| **v != self.shell.view)
+            .map(|v| self.view_unread(self.shell.workspace, *v))
+            .filter(|u| u.badge().is_some())
+            .max_by_key(|u| (u.level(), u.mentions))
+            .and_then(|u| u.badge());
+        navbar::views(parts.views, &views, shown, self.shell.nav_folded, other.as_deref())
     }
 
     /// Fold the views to one row, the view shown (`nav_rows = "collapsed"`), or unfold them.
@@ -151,14 +159,22 @@ impl App {
         self.set_focus(Focus::List);
     }
 
-    /// A click on the list panel's title row or a view's row at `at`: the chip opens the
-    /// workspace switcher, a view shows in the list panel, which gets the keyboard; the folded
-    /// row unfolds. `false` when nothing is there.
+    /// A click on the list panel's title row, a view's row or the rule under them at `at`: the
+    /// chip opens the workspace switcher, a view shows in the list panel, which gets the
+    /// keyboard; the folded row unfolds, the rule's `▾` folds. `false` when nothing is there.
     pub(super) fn nav_click(&mut self, at: Position, now: Instant) -> bool {
         if let Some(chip) = self.chip_bar().filter(|b| b.area.y == at.y) {
             let (from, to) = chip.extent();
             if at.x >= from && at.x < to {
                 self.open_switcher();
+            }
+            return true;
+        }
+        if let Some(list) = self.areas().list
+            && self.list_parts().and_then(|p| p.rule) == Some(at.y)
+        {
+            if !self.shell.nav_folded && at.x == list.x + navbar::FOLD_X {
+                self.toggle_nav_rows(now);
             }
             return true;
         }

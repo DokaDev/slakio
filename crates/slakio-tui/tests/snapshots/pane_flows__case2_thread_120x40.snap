@@ -8,7 +8,7 @@ expression: mask_hangul(&s)
 │ Activity               @37 ││▎    We waiting waiting now index a the a the       ││                                  │
 │ Files                      ││▎    release                                        ││ JH  Jiwon Han  03:18             │
 │ Later                      ││▎    ⤷ 1,200 replies · last 03:23                   ││     Budget should timeout        │
-├────────────────────────────┤│                                                    ││     timeout after tomorrow       │
+├─▾──────────────────────────┤│                                                    ││     timeout after tomorrow       │
 │ ▾ Favorites                ││ DC  Dan Cho  07:30                                 ││     budget meeting someone       │
 │   # backend                ││     Still index lunch index                        ││     production release           │
 │   # incidents           3  ││     ⤷ 6 replies · last 07:36                       ││                                  │

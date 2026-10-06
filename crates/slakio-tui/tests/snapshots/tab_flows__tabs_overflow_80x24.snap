@@ -8,7 +8,7 @@ expression: d.snap()
 │ Activity               @37 ││     Deploy customer sprint staging can         │
 │ Files                      ││                                                │
 │ Later                      ││ MB  Max Baek  11:30                            │
-├────────────────────────────┤│     PR is up                                   │
+├─▾──────────────────────────┤│     PR is up                                   │
 │ ▾ Favorites                ││                                                │
 │   # backend                ││ AM  Alex Morgan  12:23                         │
 │   # incidents           3  ││     Meeting moved to 3pm                       │
