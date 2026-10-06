@@ -54,6 +54,13 @@ budgets (`docs/perf.md`).
   `chore: …`, with an optional scope (`fix(tui): …`).
 - Keep a pull request to one change, with tests for what it fixes or adds. Pull requests are
   squash-merged.
+- A `refactor:` commit changes no behavior, so it changes no snapshot under
+  `tests/snapshots/` (CI checks every pushed commit, `.github/scripts/history-rules.sh`).
+- The guards are changed on purpose only: a pull request that changes the size limit of
+  `.github/scripts/file-size.sh`, a script of `.github/scripts/` that checks the repository,
+  `clippy.toml` or `.github/workflows/ci.yml` names each changed file in its description and
+  says why (CI fails otherwise; a push to `main` gets a warning). The file-size allowlist may
+  only be lowered, never raised or added to, in any commit.
 - The code, comments and documentation are in English; Korean text only appears as the values
   of `locales/ko.toml` (CI checks this).
 

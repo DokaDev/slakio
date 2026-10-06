@@ -78,10 +78,13 @@ jobs:
           # The pushed commits, for the rules on them.
           fetch-depth: 0
       - run: bash .github/scripts/repo-rules.sh
-      # Commit subjects, refactors without snapshot changes, an allowlist that only shrinks.
+      # Commit subjects, refactors without snapshot changes, an allowlist that only shrinks (per
+      # commit), guard changes named in the pull request's body or flagged.
       - name: Rules on the pushed commits
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          PR: ${{ github.event_name == 'pull_request' }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: bash .github/scripts/history-rules.sh "$BASE"
 
   # tui -> core <- adapters (docs/architecture.md, "Dependency rules").
