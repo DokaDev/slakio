@@ -49,8 +49,9 @@ thread panel, which of them has the keyboard, Insert mode, back/forward history
 (`app/work.rs`) — with its panes (`app/pane.rs`: loaded messages, selection, VISUAL range) and
 their composers (`app/composer.rs`), the read model of the workspaces (`app/model.rs`), the
 keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
-(tabs and splits) joins as it is built. The geometry of the screen (`screen.rs`) is one pure
-function that drawing and the mouse both use. Rules:
+(tabs and splits) joins as it is built. The geometry of the screen (`screen.rs`) is pure:
+`screen::frame` lays out a frame once — the regions, each open pane, its messages and its
+composer — and drawing, the mouse and scrolling all read that one layout. Rules:
 
 - An `Action` is namespaced by its owner (`Action::CommandLine(CommandLineAction::Run)`), so
   dispatching one is routing, not one match over every action of the app.

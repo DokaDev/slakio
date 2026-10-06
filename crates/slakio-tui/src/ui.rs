@@ -50,11 +50,12 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
         draw_too_small(f, app, area);
         return;
     } else {
-        let a = app.areas();
+        let layout = app.frame();
+        let a = layout.areas;
         if let Some(l) = a.list {
             list::draw(f, app, l);
         }
-        work::draw(f, app, a.work);
+        work::draw(f, app, &layout);
         // An expanded rail over the list panel clears only its own cells: the list shows
         // beside it.
         rail::draw(f, app, a.rail);

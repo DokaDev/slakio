@@ -7,6 +7,7 @@ use super::dialog::Question;
 use super::pane::{Pane, Shown};
 use super::shell::Region;
 use super::work::Side;
+use crate::screen::Slot;
 use ratatui::layout::Rect;
 use slakio_core::model::Target;
 
@@ -131,11 +132,11 @@ impl App {
     /// Where the pane of kind `kind` is drawn; `None` when it is closed or left out (a narrow
     /// screen shows only the pane with the keyboard).
     pub fn pane_area(&self, kind: PaneKind) -> Option<Rect> {
-        let (main, thread) = self.panes();
-        match kind {
-            PaneKind::Conversation => main,
-            PaneKind::Thread => thread,
-        }
+        let slot = match kind {
+            PaneKind::Conversation => Slot::Main,
+            PaneKind::Thread => Slot::Thread,
+        };
+        self.frame().pane(slot).map(|p| p.rect)
     }
 
     /// Select message `index` of the focused pane, as a click does but without asking for

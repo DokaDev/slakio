@@ -82,3 +82,49 @@ fn small_screens_are_too_small_and_never_panic() {
         let _ = pane_parts(a.work, 3);
     }
 }
+
+/// One line in the main pane's composer, `thread_lines` in the thread panel's.
+fn lines(thread_lines: usize) -> impl Fn(Slot, usize) -> usize {
+    move |slot, _| if slot == Slot::Thread { thread_lines } else { 1 }
+}
+
+#[test]
+fn the_frame_lays_out_each_open_pane_with_its_composer() {
+    for (w, h) in [(80, 24), (120, 40), (200, 50)] {
+        let size = Rect::new(0, 0, w, h);
+        let shape = Shape { main: true, thread: true, ..plain() };
+        let f = frame(size, shape, lines(3));
+        assert_eq!(f.areas, areas(size, shape), "{w}x{h}");
+        let (main, thread) = work_split(f.areas.work, true, false);
+        let slots: Vec<Slot> = f.panes.iter().map(|p| p.slot).collect();
+        assert_eq!(slots, [Slot::Main, Slot::Thread], "{w}x{h}");
+        let m = f.pane(Slot::Main).unwrap();
+        let t = f.pane(Slot::Thread).unwrap();
+        assert_eq!((Some(m.rect), Some(t.rect)), (main, thread), "{w}x{h}");
+        assert_eq!(m.parts, pane_parts(m.rect, 1), "{w}x{h}");
+        assert_eq!(t.parts, pane_parts(t.rect, 3), "{w}x{h}");
+        // The panes tile the work area side by side.
+        assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x, f.areas.work.right()));
+        let inside = Position { x: t.rect.x + 1, y: t.rect.y + 1 };
+        assert_eq!(f.pane_at(inside).map(|p| p.slot), Some(Slot::Thread));
+        assert_eq!(f.pane_at(Position { x: 0, y: 0 }), None, "the rail is no pane");
+    }
+}
+
+#[test]
+fn the_frame_shows_no_pane_without_a_conversation_and_one_where_two_do_not_fit() {
+    let f = frame(SIZE, plain(), lines(1));
+    assert!(f.panes.is_empty());
+    let narrow = Rect::new(0, 0, 60, 20);
+    let shape = Shape { main: true, thread: true, list_hidden: true, ..plain() };
+    for (focused, slot) in [(false, Slot::Main), (true, Slot::Thread)] {
+        let f = frame(narrow, Shape { thread_focused: focused, ..shape }, lines(2));
+        assert_eq!(f.panes.len(), 1);
+        assert_eq!((f.panes[0].slot, f.panes[0].rect), (slot, f.areas.work));
+    }
+    let main_only = frame(SIZE, Shape { main: true, ..plain() }, lines(1));
+    assert_eq!(main_only.panes.len(), 1);
+    assert_eq!(main_only.panes[0].rect, main_only.areas.work);
+    // A screen too small to draw still lays out without panicking.
+    let _ = frame(Rect::new(0, 0, 3, 2), Shape { main: true, thread: true, ..plain() }, lines(5));
+}

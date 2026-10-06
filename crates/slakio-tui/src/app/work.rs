@@ -16,6 +16,7 @@
 
 use super::model::Model;
 use super::pane::{PAGE, Pane, Shown};
+use crate::screen::Slot;
 use slakio_core::backend::{Command, Generation, Page};
 use slakio_core::model::{Message, Target};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
@@ -28,6 +29,24 @@ const HISTORY: usize = 50;
 pub enum Side {
     Main,
     Thread,
+}
+
+impl Side {
+    /// Where the pane on this side is laid out.
+    pub fn slot(self) -> Slot {
+        match self {
+            Side::Main => Slot::Main,
+            Side::Thread => Slot::Thread,
+        }
+    }
+
+    /// The side of the pane laid out in `slot`.
+    pub fn of(slot: Slot) -> Self {
+        match slot {
+            Slot::Main => Side::Main,
+            Slot::Thread => Side::Thread,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -73,6 +92,21 @@ impl Work {
         match self.side {
             Side::Thread => self.thread.as_ref(),
             Side::Main => self.main.as_ref(),
+        }
+    }
+
+    /// The pane laid out in `slot`, when open.
+    pub fn pane(&self, slot: Slot) -> Option<&Pane> {
+        match slot {
+            Slot::Main => self.main.as_ref(),
+            Slot::Thread => self.thread.as_ref(),
+        }
+    }
+
+    pub fn pane_mut(&mut self, slot: Slot) -> Option<&mut Pane> {
+        match slot {
+            Slot::Main => self.main.as_mut(),
+            Slot::Thread => self.thread.as_mut(),
         }
     }
 

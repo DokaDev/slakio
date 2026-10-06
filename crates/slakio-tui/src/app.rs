@@ -263,27 +263,29 @@ impl App {
         }
     }
 
-    /// The screen's areas now.
-    pub fn areas(&self) -> screen::Areas {
-        screen::areas(
-            self.size,
-            screen::Shape {
-                rail_expanded: self.shell.rail_expanded(),
-                push: self.settings.rail_push,
-                list_hidden: self.shell.list_hidden,
-                thread: self.work.thread.is_some(),
-                list_focused: self.shell.focus == Region::List,
-            },
-        )
+    /// What the layout depends on now besides the size.
+    fn shape(&self) -> screen::Shape {
+        screen::Shape {
+            rail_expanded: self.shell.rail_expanded(),
+            push: self.settings.rail_push,
+            list_hidden: self.shell.list_hidden,
+            thread: self.work.thread.is_some(),
+            list_focused: self.shell.focus == Region::List,
+            main: self.work.main.is_some(),
+            thread_focused: self.work.side == Side::Thread,
+        }
     }
 
-    /// The main pane's and the thread panel's areas now (either may be left out).
-    pub fn panes(&self) -> (Option<Rect>, Option<Rect>) {
-        if self.work.main.is_none() {
-            return (None, None);
-        }
-        let thread_focused = self.work.side == Side::Thread;
-        screen::work_split(self.areas().work, self.work.thread.is_some(), thread_focused)
+    /// The screen's areas now.
+    pub fn areas(&self) -> screen::Areas {
+        screen::areas(self.size, self.shape())
+    }
+
+    /// The whole frame now: the areas and the panes with their parts, as drawn and clicked.
+    pub fn frame(&self) -> screen::FrameLayout {
+        screen::frame(self.size, self.shape(), |slot, width| {
+            self.work.pane(slot).map_or(1, |p| p.composer.view(width).lines.len())
+        })
     }
 
     /// Rows the list panel shows (or would show, while it is hidden).
@@ -295,13 +297,8 @@ impl App {
 
     /// Rows of messages the focused pane shows.
     fn pane_height(&self) -> usize {
-        let (main, thread) = self.panes();
-        let area = if self.work.side == Side::Thread { thread } else { main };
-        let lines = self
-            .work
-            .focused()
-            .map_or(1, |p| area.map_or(1, |a| p.composer.view(screen::composer_width(a)).lines.len()));
-        area.map_or(1, |a| usize::from(screen::pane_parts(a, lines).messages.height)).max(1)
+        let frame = self.frame();
+        frame.pane(self.work.side.slot()).map_or(1, |p| usize::from(p.parts.messages.height)).max(1)
     }
 
     /// The which-key popup shows at `now`.
@@ -493,15 +490,8 @@ impl App {
                     self.shell.scroll_by(&self.model, by * WHEEL_ROWS, height);
                     return true;
                 }
-                let (main, thread) = self.panes();
-                let pane = if thread.is_some_and(|t| t.contains(at)) {
-                    self.work.thread.as_mut()
-                } else if main.is_some_and(|r| r.contains(at)) {
-                    self.work.main.as_mut()
-                } else {
-                    None
-                };
-                if let Some(p) = pane {
+                let slot = self.frame().pane_at(at).map(|p| p.slot);
+                if let Some(p) = slot.and_then(|s| self.work.pane_mut(s)) {
                     p.step(by);
                 }
                 self.work.with_pane(|_| {});
@@ -540,20 +530,15 @@ impl App {
 
     /// A click in the work area at `at` (`double`: the second of a double click).
     fn click_work(&mut self, at: Position, double: bool) {
-        let (main, thread) = self.panes();
-        let (side, area) = match (main, thread) {
-            (_, Some(t)) if t.contains(at) => (Side::Thread, t),
-            (Some(m), _) if m.contains(at) => (Side::Main, m),
-            _ => return,
-        };
+        let Some(&layout) = self.frame().pane_at(at) else { return };
+        let side = Side::of(layout.slot);
         self.shell.focus = Region::Work;
         if side != self.work.side {
             self.work.side = side;
             self.work.insert = false;
         }
         let Some(pane) = self.work.focused() else { return };
-        let lines = pane.composer.view(screen::composer_width(area)).lines.len();
-        let parts = screen::pane_parts(area, lines);
+        let parts = layout.parts;
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
         self.work.insert = parts.input.contains(at);
         let Some(hit) = hit else { return };

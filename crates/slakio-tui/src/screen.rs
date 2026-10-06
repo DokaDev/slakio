@@ -14,8 +14,11 @@
 //! it aside. On a narrow screen an open thread panel takes the list panel's room (the list is
 //! left out of the layout only, and comes back when the thread closes or the list is focused);
 //! narrower still, the pane with the keyboard takes the whole work area.
+//!
+//! [`frame`] lays out a whole frame once — the regions, then each open pane with its messages
+//! and composer — and drawing and the mouse both read that one [`FrameLayout`].
 
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
+use ratatui::layout::{Constraint, Layout, Margin, Position, Rect};
 
 /// The collapsed rail: a border, the workspace stripe and one letter or icon, and a dot.
 pub const RAIL_WIDTH: u16 = 4;
@@ -53,6 +56,10 @@ pub struct Shape {
     pub thread: bool,
     /// The list panel has the focus (it is never left out then).
     pub list_focused: bool,
+    /// A conversation is open in the work area.
+    pub main: bool,
+    /// The thread panel has the keyboard (on a screen too narrow for both panes, it is shown).
+    pub thread_focused: bool,
 }
 
 /// The width of the list panel on a screen `width` wide: a fifth or so, 26 to 36 cells.
@@ -128,6 +135,60 @@ pub fn pane_parts(area: Rect, lines: usize) -> PaneParts {
     let divider = input.y - 1;
     let messages = Rect { height: divider - inner.y, ..inner };
     PaneParts { messages, divider: Some(divider), input }
+}
+
+/// A pane's place in the work area.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Slot {
+    /// The conversation open in the work area.
+    Main,
+    /// The auto thread panel beside it.
+    Thread,
+}
+
+/// A pane as laid out: its place, its area and its parts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PaneLayout {
+    pub slot: Slot,
+    pub rect: Rect,
+    pub parts: PaneParts,
+}
+
+/// A whole frame: the regions and the panes shown in the work area.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FrameLayout {
+    pub areas: Areas,
+    /// The panes shown, the main pane first; a pane left out has none.
+    pub panes: Vec<PaneLayout>,
+}
+
+impl FrameLayout {
+    /// The pane in `slot`, when it is shown.
+    pub fn pane(&self, slot: Slot) -> Option<&PaneLayout> {
+        self.panes.iter().find(|p| p.slot == slot)
+    }
+
+    /// The pane under `at`.
+    pub fn pane_at(&self, at: Position) -> Option<&PaneLayout> {
+        self.panes.iter().find(|p| p.rect.contains(at))
+    }
+}
+
+/// The frame for a screen of `size`. `composer_lines(slot, width)` is how many lines the
+/// composer of the pane in `slot` takes when it wraps at `width`.
+pub fn frame(size: Rect, s: Shape, composer_lines: impl Fn(Slot, usize) -> usize) -> FrameLayout {
+    let areas = areas(size, s);
+    let mut panes = Vec::new();
+    if s.main {
+        let (main, thread) = work_split(areas.work, s.thread, s.thread_focused);
+        for (slot, rect) in [(Slot::Main, main), (Slot::Thread, thread)] {
+            if let Some(rect) = rect {
+                let parts = pane_parts(rect, composer_lines(slot, composer_width(rect)));
+                panes.push(PaneLayout { slot, rect, parts });
+            }
+        }
+    }
+    FrameLayout { areas, panes }
 }
 
 /// The most entries the command palette lists at once (the list scrolls).

@@ -18,7 +18,7 @@ use crate::app::pane::Pane;
 use crate::app::shell::Region;
 use crate::app::work::Side;
 use crate::keymap::Ctx;
-use crate::screen;
+use crate::screen::{self, FrameLayout, PaneLayout};
 use crate::text::{clip, width};
 use ratatui::Frame;
 use ratatui::layout::{Position, Rect};
@@ -27,26 +27,24 @@ use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::{Conversation, ConversationKind, Presence};
 
-pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
-    let Some(main) = app.work.main.as_ref() else {
+pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout) {
+    if app.work.main.is_none() {
+        let area = layout.areas.work;
         f.render_widget(frame(app, Region::Work, ""), area);
         super::empty::work(f, app, screen::inner(area));
         return;
-    };
-    let (m, thread) = app.panes();
-    if let Some(r) = m {
-        draw_pane(f, app, main, r, Side::Main);
-    } else {
-        main.hits.borrow_mut().clear();
     }
-    if let (Some(p), Some(r)) = (app.work.thread.as_ref(), thread) {
-        draw_pane(f, app, p, r, Side::Thread);
-    } else if let Some(p) = app.work.thread.as_ref() {
-        p.hits.borrow_mut().clear();
+    for side in [Side::Main, Side::Thread] {
+        let Some(pane) = app.work.pane(side.slot()) else { continue };
+        match layout.pane(side.slot()) {
+            Some(l) => draw_pane(f, app, pane, l, side),
+            None => pane.hits.borrow_mut().clear(),
+        }
     }
 }
 
-fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
+fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, layout: &PaneLayout, side: Side) {
+    let area = layout.rect;
     let t = &app.theme;
     let focused = app.shell.focus == Region::Work && app.work.side == side;
     let conversation = app.model.target(&pane.target);
@@ -84,7 +82,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && app.work.insert;
     let view = pane.composer.view(screen::composer_width(area));
-    let parts = screen::pane_parts(area, view.lines.len());
+    let parts = layout.parts;
     timeline::draw(f, app, pane, parts.messages, focused);
     let Some(divider) = parts.divider else { return };
     // The divider is joined to the pane's border: `├─ Message #backend ───┤`.
