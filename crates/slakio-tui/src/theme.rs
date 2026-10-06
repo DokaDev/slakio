@@ -327,6 +327,50 @@ impl Theme {
         self.accent().add_modifier(Modifier::BOLD)
     }
 
+    /// The tab bar's row, under the tabs.
+    pub fn tab_bar(&self) -> Style {
+        self.base()
+    }
+
+    /// A tab's title (and the spaces of its label): the tab shown on the raised surface, in
+    /// bold; the others muted.
+    pub fn tab(&self, shown: bool) -> Style {
+        match (self.plain(), shown) {
+            (true, true) => Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD),
+            (true, false) => Style::new(),
+            (false, true) => self.bold().bg(self.surface_alt),
+            (false, false) => self.muted().bg(self.bg),
+        }
+    }
+
+    /// A tab's number: the accent on the tab shown.
+    pub fn tab_number(&self, shown: bool) -> Style {
+        if shown && !self.plain() { self.tab(true).fg(self.accent) } else { self.tab(shown) }
+    }
+
+    /// A tab's close button: quiet, a little less on the tab shown.
+    pub fn tab_close(&self, shown: bool) -> Style {
+        match (self.plain(), shown) {
+            (true, _) => self.tab(shown),
+            (false, true) => self.tab(true).fg(self.fg_muted).remove_modifier(Modifier::BOLD),
+            (false, false) => self.tab(false).fg(self.fg_dim),
+        }
+    }
+
+    /// A tab's unread count (`●3`): a mention's color when one mentions the user.
+    pub fn tab_badge(&self, shown: bool, mention: bool) -> Style {
+        let dot = self.dot(mention);
+        match self.tab(shown).bg {
+            Some(bg) => dot.bg(bg),
+            None => dot,
+        }
+    }
+
+    /// The `‹` / `›` marks of tabs left out of the bar.
+    pub fn tab_more(&self) -> Style {
+        self.key()
+    }
+
     /// The "N replies" row of a message with a thread.
     pub fn link(&self) -> Style {
         self.accent()

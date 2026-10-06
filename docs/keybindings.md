@@ -53,6 +53,33 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Ctrl+I` | Forward again | `history.forward` |
 | `Alt+Right` | Forward again | `history.forward` |
 | `Space ]` | Forward again | `history.forward` |
+| `g t` | Next tab | `tab.next` |
+| `g T` | Previous tab | `tab.prev` |
+| `Ctrl+PageDown` | Next tab | `tab.next` |
+| `Ctrl+PageUp` | Previous tab | `tab.prev` |
+| `Space 1` | Tab 1 | `tab.go.1` |
+| `Space 2` | Tab 2 | `tab.go.2` |
+| `Space 3` | Tab 3 | `tab.go.3` |
+| `Space 4` | Tab 4 | `tab.go.4` |
+| `Space 5` | Tab 5 | `tab.go.5` |
+| `Space 6` | Tab 6 | `tab.go.6` |
+| `Space 7` | Tab 7 | `tab.go.7` |
+| `Space 8` | Tab 8 | `tab.go.8` |
+| `Space 9` | Tab 9 | `tab.go.9` |
+| `Alt+1` | Tab 1 | `tab.go.1` |
+| `Alt+2` | Tab 2 | `tab.go.2` |
+| `Alt+3` | Tab 3 | `tab.go.3` |
+| `Alt+4` | Tab 4 | `tab.go.4` |
+| `Alt+5` | Tab 5 | `tab.go.5` |
+| `Alt+6` | Tab 6 | `tab.go.6` |
+| `Alt+7` | Tab 7 | `tab.go.7` |
+| `Alt+8` | Tab 8 | `tab.go.8` |
+| `Alt+9` | Tab 9 | `tab.go.9` |
+| `Space t c` | Close the tab | `tab.close` |
+| `Space t u` | Reopen the tab closed last | `tab.reopen` |
+| `Space t r` | Rename the tab | `tab.rename` |
+| `Space t h` | Move the tab left | `tab.move_left` |
+| `Space t l` | Move the tab right | `tab.move_right` |
 | `Space ?` | Keyboard help | `help.open` |
 | `Space /` | Open the command line | `cmdline.open` |
 | `Space q` | Quit | `app.quit` |
@@ -97,6 +124,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Left` | To the section header, fold it, then the rail | `list.fold` |
 | `{` | Previous section | `list.section_prev` |
 | `}` | Next section | `list.section_next` |
+| `t` | Open in a new tab (a message: its thread) | `tab.open` |
 
 ## Work area (Normal mode) (`pane.normal`)
 
@@ -119,6 +147,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `a` | Write in the composer | `pane.insert` |
 | `y` | Copy the selected messages | `pane.copy` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
+| `t` | Open in a new tab (a message: its thread) | `tab.open` |
 | `Esc` | One step out (VISUAL, selection, thread, list) | `pane.escape` |
 | `h` | The panel to the left | `pane.left` |
 | `Left` | The panel to the left | `pane.left` |
@@ -224,6 +253,11 @@ Type `:` and the command, then `Enter`.
 | `:close` |  | Close the pane |
 | `:back` |  | Back to the conversation before |
 | `:forward` |  | Forward again |
+| `:tabnext` | `:tabn` | Next tab |
+| `:tabprevious` | `:tabp` | Previous tab |
+| `:tabclose` | `:tabc` | Close the tab |
+| `:reopen` |  | Reopen the tab closed last |
+| `:rename` |  | Rename the tab |
 
 ## Keys that need the kitty keyboard protocol or Option as Alt
 
@@ -235,4 +269,13 @@ Without the kitty keyboard protocol a terminal sends `Ctrl+I` as `Tab`, `Ctrl+M`
 | `Alt+Left` | Back to the conversation before | `Ctrl+O` `Space [` |
 | `Ctrl+I` (bound only with the kitty keyboard protocol) | Forward again | `Space ]` |
 | `Alt+Right` | Forward again | `Space ]` |
+| `Alt+1` | Tab 1 | `Space 1` |
+| `Alt+2` | Tab 2 | `Space 2` |
+| `Alt+3` | Tab 3 | `Space 3` |
+| `Alt+4` | Tab 4 | `Space 4` |
+| `Alt+5` | Tab 5 | `Space 5` |
+| `Alt+6` | Tab 6 | `Space 6` |
+| `Alt+7` | Tab 7 | `Space 7` |
+| `Alt+8` | Tab 8 | `Space 8` |
+| `Alt+9` | Tab 9 | `Space 9` |
 | `Alt+Enter` | New line | `Ctrl+J` `Shift+Enter` |

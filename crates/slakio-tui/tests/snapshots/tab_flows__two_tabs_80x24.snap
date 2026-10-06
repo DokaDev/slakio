@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/tab_flows.rs
+expression: d.snap()
+---
+╭──╮╭ Home ──────────────────╮ 1 #backend ×  2 #incidents ×
+│▌A││ ▾ Favorites            │╭ ▌#incidents ───────────────────────────────────╮
+│▌B││   # backend            ││ G  Grafana · 00:46                             │
+│──││▎  # incidents       3  ││    Suspect the DB pool 🎉                      │
+│H ││                        ││ JL Jordan Lee · 00:51                          │
+│D●││ ▾ Ops                  ││    Thanks! (edited)                            │
+│A●││   # deploys            ││ RC Robin Choi · 01:49                          │
+│F ││   # alerts             ││    Thanks!                                     │
+│L ││   # partner-shared ext ││ MJ Mia Jang · 02:18                            │
+│  ││   # hostile-strings    ││    Still budget build latency rollback         │
+│  ││   # big-history        ││    rollback retry sprint draft maybe lunch     │
+│  ││   # long-threads       ││    waiting the budget                          │
+│  ││                        ││ DY Dana Yoon · 02:38                           │
+│  ││ ▾ Channels             ││    Tomorrow ticket should merge waiting        │
+│  ││   # announcements      ││ MK Minsu Kim · 02:52                           │
+│  ││   # design-review      ││    After check fine check branch metrics       │
+│  ││   # feed-alert-134     ││    latency check                               │
+│  ││   # feed-alert-8       ││ MJ Mia Jang · 03:33                            │
+│  ││   # feed-budget-162    ││    Budget invoice on is schema can on deploy   │
+│  ││   # feed-budget-33     ││    check now release tracing on invoice        │
+│  ││   # feed-build-50      │├─ Message #incidents ───────────────────────────┤
+│  ││   # feed-cache-119     ││ › Press i to write                             │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #incidents        │ i write · ? help │  @37  DM 16 │ demo

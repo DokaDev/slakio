@@ -79,7 +79,8 @@ fn which_key_and_the_help_list_the_rail_key() {
     d.keys("space");
     d.now += Duration::from_millis(400);
     d.app.on_tick(d.now);
-    assert!(d.screen().contains("r  Rail"), "{}", d.screen());
+    let s = d.screen();
+    assert!(s.lines().any(|l| l.starts_with("│ r ") && l.contains("Rail: workspaces and views")), "{s}");
     d.keys("esc ?");
     d.type_text("/rail");
     let s = d.screen();

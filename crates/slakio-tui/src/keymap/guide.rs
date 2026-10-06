@@ -2,7 +2,7 @@
 //! content, read from the key map so it always lists what the keys do now.
 
 use super::{Ctx, KeyChord, Keymap, keys, parse_keys};
-use crate::action::{self, Action};
+use crate::action::{self, Action, TabAction};
 use slakio_core::i18n::Label;
 
 /// One key that may come next.
@@ -19,11 +19,17 @@ pub enum What {
     Action(Action),
     /// More keys follow (`Space w` → `+Window`): the group's name, if it has one.
     Group(Option<Label>),
+    /// Keys that show a tab by its number, listed as one entry (`1…9`).
+    TabNumbers,
 }
 
 /// Names of the groups of keys (the sequence typed so far, in config notation).
-pub const GROUPS: &[(&str, Label)] =
-    &[("space", Label::GuideLeader), ("space w", Label::GuideWindow), ("g", Label::GuideGo)];
+pub const GROUPS: &[(&str, Label)] = &[
+    ("space", Label::GuideLeader),
+    ("space w", Label::GuideWindow),
+    ("space t", Label::GuideTab),
+    ("g", Label::GuideGo),
+];
 
 /// The name of the group `pending` opens, if it has one.
 pub fn group(pending: &[KeyChord]) -> Option<Label> {
@@ -53,6 +59,14 @@ pub fn next(km: &Keymap, ctx: Ctx, pending: &[KeyChord]) -> Vec<Next> {
             out.push((key, Next { key: keys::label(&[key]), what }));
         }
     }
+    // The tab numbers are one entry, `1…9`, where the first of them is.
+    let number = |n: &Next| matches!(n.what, What::Action(Action::Tab(TabAction::Go(_))));
+    let numbers: Vec<String> = out.iter().filter(|(_, n)| number(n)).map(|(_, n)| n.key.clone()).collect();
+    if let [first, .., last] = &numbers[..] {
+        let at = out.iter().position(|(_, n)| number(n)).unwrap_or(0);
+        out[at].1 = Next { key: format!("{first}…{last}"), what: What::TabNumbers };
+        out.retain(|(_, n)| !number(n));
+    }
     // Groups after the keys that run something.
     let (groups, actions): (Vec<Next>, Vec<Next>) =
         out.into_iter().map(|(_, n)| n).partition(|n| matches!(n.what, What::Group(_)));
@@ -65,6 +79,7 @@ pub fn label(n: &Next) -> Label {
         What::Action(a) => action::spec(a).label,
         What::Group(Some(l)) => l,
         What::Group(None) => Label::GuideMore,
+        What::TabNumbers => Label::GuideTabNumbers,
     }
 }
 
@@ -89,5 +104,10 @@ mod tests {
         assert!(["h", "j", "k", "l", "c"].iter().all(|k| window.iter().any(|n| n.key == *k)), "{window:?}");
         assert_eq!(group(&space), Some(Label::GuideLeader));
         assert!(next(&km, Ctx::ComposerInsert, &space).is_empty(), "nothing follows Space while typing");
+        let numbers: Vec<&Next> = n.iter().filter(|n| n.key.starts_with('1')).collect();
+        assert_eq!(numbers.len(), 1, "the tab numbers are one entry: {n:?}");
+        assert_eq!((numbers[0].key.as_str(), numbers[0].what), ("1…9", What::TabNumbers));
+        assert!(!n.iter().any(|n| n.key == "5"));
+        assert!(n.iter().any(|n| n.key == "t" && n.what == What::Group(Some(Label::GuideTab))));
     }
 }

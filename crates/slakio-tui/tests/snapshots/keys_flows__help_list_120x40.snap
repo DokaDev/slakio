@@ -20,6 +20,7 @@ expression: s
 │  ││   # │   To the section header, fold it, then the rail                                         h / Left │         │
 │  ││   # │   Previous section                                                                             { │         │
 │  ││   # │   Next section                                                                                 } │         │
+│  ││   # │   Open in a new tab (a message: its thread)                                                    t │         │
 │  ││   # │ ▾ Main screen                                                                                    │         │
 │  ││   # │   Next panel                                                                            Tab / F6 │         │
 │  ││   # │   Previous panel                                                            Shift+Tab / Shift+F6 │         │
@@ -38,7 +39,6 @@ expression: s
 │  ││   # │   Switch workspace                                                                       Space W │         │
 │  ││   # │   Back to the conversation before                                    Ctrl+O / Alt+Left / Space [ │         │
 │  ││   # │   Forward again                                                              Alt+Right / Space ] │         │
-│  ││   # │   Keyboard help                                                                          Space ? │         │
 │  ││   # ╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo

@@ -13,6 +13,7 @@ use ratatui::style::{Color, Modifier};
 use slakio_core::i18n::Lang;
 use slakio_tui::app::{Focus, PaneKind, Settings};
 use slakio_tui::screen;
+use slakio_tui::tabbar::Part;
 use slakio_tui::theme::{BUILTINS, Background, Kind, Theme, resolve};
 
 /// Every built-in theme (the terminal's colors on a dark background), and none.
@@ -48,7 +49,47 @@ fn frames(theme: &Theme) -> Vec<(&'static str, Demo)> {
     let mut d = demo(theme, 120, 40);
     d.keys("ctrl+h");
     out.push(("rail", d));
+    out.push(("tabs", tabs(theme)));
     out
+}
+
+/// Three tabs, the second shown, the first with unread messages (a badge on the bar).
+fn tabs(theme: &Theme) -> Demo {
+    let mut d = demo(theme, 120, 40);
+    d.open("incidents");
+    d.open_in_tab("backend");
+    d.open_in_tab("general");
+    d.keys("space 2");
+    d
+}
+
+// The tab bar: the tab shown raised and bold, the others muted, `×` quiet; never underlined.
+#[test]
+fn the_tab_shown_stands_out_on_the_bar() {
+    for t in themes() {
+        let d = tabs(&t);
+        let bar = d.app.tab_bar().expect("three tabs: the bar shows");
+        let buf = d.buffer();
+        let cell = |tab: usize, part: Part| {
+            let p = bar.pieces.iter().find(|p| p.tab == tab && p.part == part).expect("drawn");
+            buf[(p.x, bar.area.y)].clone()
+        };
+        let (shown, other) = (cell(1, Part::Title), cell(2, Part::Title));
+        assert!(shown.modifier.contains(Modifier::BOLD) && !other.modifier.contains(Modifier::BOLD), "{}", t.name);
+        match t.kind {
+            Kind::NoColor => assert!(shown.modifier.contains(Modifier::REVERSED), "{}", t.name),
+            Kind::Truecolor => {
+                assert_eq!((shown.fg, shown.bg), (t.fg, t.surface_alt), "{}", t.name);
+                assert_eq!(other.fg, t.fg_muted, "{}", t.name);
+                assert_eq!(cell(1, Part::Number).fg, t.accent, "{}", t.name);
+                assert_eq!(cell(2, Part::Close).fg, t.fg_dim, "{}", t.name);
+            }
+            Kind::Ansi => assert_eq!(other.fg, t.fg_muted, "{}", t.name),
+        }
+        let p = bar.pieces.iter().find(|p| p.tab == 0 && p.part == Part::Badge).expect("a badge");
+        let badge = &buf[(p.x + 1, bar.area.y)];
+        assert!(badge.symbol() == "●" && badge.modifier.contains(Modifier::BOLD), "{}: {badge:?}", t.name);
+    }
 }
 
 // ① No selection is ever drawn underlined (only the own name of NO_COLOR is, by design).
@@ -269,4 +310,5 @@ fn styled_snapshots_in_tokyo_night() {
     let mut d = demo(&resolve("terminal", false, Background::Dark), 80, 24);
     d.keys("ctrl+h");
     insta::assert_snapshot!("styled_rail_overlay_focus_terminal_80x24", screen_styled(&d));
+    insta::assert_snapshot!("styled_tabs_120x40", screen_styled(&tabs(&t)));
 }

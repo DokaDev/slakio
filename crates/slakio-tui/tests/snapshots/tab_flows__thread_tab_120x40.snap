@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/tab_flows.rs
+expression: "demo::mask_hangul(&d.screen())"
+---
+╭──╮╭ Home ──────────────────╮ 1 #long-threads ×  2 ⤷ For cache timeout tic… ×
+│▌A││ ▾ Favorites            │╭ ▌⤷ Thread · #long-threads ─────────────────────────────────────────────────────────────╮
+│▌B││   # backend            ││ ───────────────────────────────────── 2026-01-06 ───────────────────────────────────── │
+│──││   # incidents       3  ││ H  Hana          For cache timeout ticket migration pager rollback branch        08:35 │
+│H ││                        ││                  tracing after a done on tomorrow broken schema                        │
+│D●││ ▾ Ops                  ││                  :+1: 3                                                                │
+│A●││   # deploys            ││ ────────────────────────────────────── 1 reply ─────────────────────────────────────── │
+│F ││   # alerts             ││ TK Tom Ko        Metrics tracing again release invoice for meeting staging       08:36 │
+│L ││   # partner-shared ext ││                                                                                        │
+│  ││   # hostile-strings    ││                                                                                        │
+│  ││   # big-history        ││                                                                                        │
+│  ││▎  # long-threads       ││                                                                                        │
+│  ││                        ││                                                                                        │
+│  ││ ▾ Channels             ││                                                                                        │
+│  ││   # announcements      ││                                                                                        │
+│  ││   # design-review      ││                                                                                        │
+│  ││   # feed-alert-134     ││                                                                                        │
+│  ││   # feed-alert-8       ││                                                                                        │
+│  ││   # feed-budget-162    ││                                                                                        │
+│  ││   # feed-budget-33     ││                                                                                        │
+│  ││   # feed-build-50      ││                                                                                        │
+│  ││   # feed-cache-119     ││                                                                                        │
+│  ││   # feed-customer-161  ││                                                                                        │
+│  ││   # feed-customer…  1  ││                                                                                        │
+│  ││   # feed-dashboard-22  ││                                                                                        │
+│  ││   # feed-dashboard-41  ││                                                                                        │
+│  ││   # feed-design-34     ││                                                                                        │
+│  ││   # feed-design-83     ││                                                                                        │
+│  ││   # feed-draft-142     ││                                                                                        │
+│  ││   # feed-draft-58      ││                                                                                        │
+│  ││   # feed-draft-84      ││                                                                                        │
+│  ││   # feed-index-199  2  ││                                                                                        │
+│  ││   # feed-index-39      ││                                                                                        │
+│  ││   # feed-index-5    1  ││                                                                                        │
+│  ││   # feed-invoice-16    ││                                                                                        │
+│  ││   # feed-invoice-168   ││                                                                                        │
+│  ││   # feed-latency-144   │├─ Reply ────────────────────────────────────────────────────────────────────────────────┤
+│  ││   # feed-meeting-82    ││ › Press i to reply                                                                     │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #long-threads › ⤷ Thread      │ i reply · k messages · Ctrl+W close · ? help │  @37  DM 16 │ demo

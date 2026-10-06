@@ -273,6 +273,17 @@ impl Shell {
         }
     }
 
+    /// The conversation under the cursor, if the cursor is on one.
+    pub fn target_at_cursor(&self, model: &Model) -> Option<Target> {
+        match self.rows(model).get(self.list_cursor) {
+            Some(Row::Conversation(i)) => {
+                let c = model.conversation(*i);
+                Some(Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() })
+            }
+            _ => None,
+        }
+    }
+
     /// Put the list cursor on the first conversation (a view just shown starts there, not on a
     /// section header).
     pub fn home_cursor(&mut self, model: &Model) {

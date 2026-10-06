@@ -38,7 +38,7 @@ pub use check::{Conflict, ConflictKind, check};
 pub use keys::{KeyChord, KeyError, parse_keys};
 
 use crate::action::{
-    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
+    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction, TabAction,
 };
 use crate::app::shell::View;
 use slakio_core::i18n::Label;
@@ -188,6 +188,10 @@ const fn pane(ctx: Ctx, keys: &'static str, action: PaneAction) -> Binding {
     bind(ctx, keys, Action::Pane(action))
 }
 
+const fn tab(ctx: Ctx, keys: &'static str, action: TabAction) -> Binding {
+    bind(ctx, keys, Action::Tab(action))
+}
+
 const fn composer(keys: &'static str, action: ComposerAction) -> Binding {
     bind(Ctx::ComposerInsert, keys, Action::Composer(action))
 }
@@ -251,6 +255,34 @@ pub const DEFAULTS: &[Binding] = &[
     Binding { kitty: true, ..pane(Ctx::Shell, "ctrl+i", PaneAction::Forward) },
     pane(Ctx::Shell, "alt+right", PaneAction::Forward),
     pane(Ctx::Shell, "space ]", PaneAction::Forward),
+    // Tabs. `Alt+1..9` needs Option-as-Alt on macOS; `Space 1..9` works everywhere.
+    tab(Ctx::Shell, "g t", TabAction::Next),
+    tab(Ctx::Shell, "g T", TabAction::Prev),
+    tab(Ctx::Shell, "ctrl+pagedown", TabAction::Next),
+    tab(Ctx::Shell, "ctrl+pageup", TabAction::Prev),
+    tab(Ctx::Shell, "space 1", TabAction::Go(1)),
+    tab(Ctx::Shell, "space 2", TabAction::Go(2)),
+    tab(Ctx::Shell, "space 3", TabAction::Go(3)),
+    tab(Ctx::Shell, "space 4", TabAction::Go(4)),
+    tab(Ctx::Shell, "space 5", TabAction::Go(5)),
+    tab(Ctx::Shell, "space 6", TabAction::Go(6)),
+    tab(Ctx::Shell, "space 7", TabAction::Go(7)),
+    tab(Ctx::Shell, "space 8", TabAction::Go(8)),
+    tab(Ctx::Shell, "space 9", TabAction::Go(9)),
+    tab(Ctx::Shell, "alt+1", TabAction::Go(1)),
+    tab(Ctx::Shell, "alt+2", TabAction::Go(2)),
+    tab(Ctx::Shell, "alt+3", TabAction::Go(3)),
+    tab(Ctx::Shell, "alt+4", TabAction::Go(4)),
+    tab(Ctx::Shell, "alt+5", TabAction::Go(5)),
+    tab(Ctx::Shell, "alt+6", TabAction::Go(6)),
+    tab(Ctx::Shell, "alt+7", TabAction::Go(7)),
+    tab(Ctx::Shell, "alt+8", TabAction::Go(8)),
+    tab(Ctx::Shell, "alt+9", TabAction::Go(9)),
+    tab(Ctx::Shell, "space t c", TabAction::Close),
+    tab(Ctx::Shell, "space t u", TabAction::Reopen),
+    tab(Ctx::Shell, "space t r", TabAction::Rename),
+    tab(Ctx::Shell, "space t h", TabAction::MoveLeft),
+    tab(Ctx::Shell, "space t l", TabAction::MoveRight),
     help(Ctx::Shell, "space ?", HelpAction::Open),
     cmdline(Ctx::Shell, "space /", CommandLineAction::Open),
     app(Ctx::Shell, "space q", AppAction::Quit),
@@ -285,6 +317,7 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::List, "left", ShellAction::ListLeft),
     shell(Ctx::List, "{", ShellAction::ListSectionPrev),
     shell(Ctx::List, "}", ShellAction::ListSectionNext),
+    tab(Ctx::List, "t", TabAction::Open),
     pane(Ctx::PaneNormal, "j", PaneAction::Next),
     pane(Ctx::PaneNormal, "down", PaneAction::Next),
     pane(Ctx::PaneNormal, "k", PaneAction::Prev),
@@ -302,6 +335,7 @@ pub const DEFAULTS: &[Binding] = &[
     pane(Ctx::PaneNormal, "a", PaneAction::Insert),
     pane(Ctx::PaneNormal, "y", PaneAction::Copy),
     pane(Ctx::PaneNormal, "V", PaneAction::Visual),
+    tab(Ctx::PaneNormal, "t", TabAction::Open),
     // VISUAL, the selection, the thread panel and the main pane are left one `Esc` at a time;
     // nothing is closed by it (only `Ctrl+W` closes).
     pane(Ctx::PaneNormal, "esc", PaneAction::Escape),

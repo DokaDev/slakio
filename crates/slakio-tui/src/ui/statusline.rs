@@ -45,13 +45,17 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         },
         Ctx::ComposerInsert => Place::Insert,
         Ctx::PaneVisual => Place::Visual,
-        _ => match app.work.focused() {
-            None => Place::WorkEmpty,
-            Some(p) if p.selected.is_some() && !p.is_thread() => Place::PaneSelected,
-            Some(p) if p.is_thread() && p.selected.is_some() => Place::ThreadSelected,
-            Some(p) if p.is_thread() => Place::Thread,
-            Some(_) => Place::Pane,
-        },
+        _ => {
+            let panel = app.work.active().is_some_and(|id| app.work.owner(id).is_some());
+            match app.work.focused() {
+                None => Place::WorkEmpty,
+                Some(p) if p.selected.is_some() && !p.is_thread() => Place::PaneSelected,
+                Some(p) if p.is_thread() && p.selected.is_some() => Place::ThreadSelected,
+                Some(p) if p.is_thread() && panel => Place::Thread,
+                Some(p) if p.is_thread() => Place::ThreadPane,
+                Some(_) => Place::Pane,
+            }
+        }
     };
     Some((place, ctx))
 }

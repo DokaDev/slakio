@@ -33,12 +33,12 @@ expression: s
 │  ││   # feed-draft-142     ││                                                                                        │
 │  ││   # feed-draft-58      ││                                                                                        │
 │  ││   # feed-draft-84      ││                                                                                        │
-│  ││   # feed-index-199  2  ││                                                                                        │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ r  Rail: workspaces and views          l  Show Later                          ?  Keyboard help                       │
-│ h  Show Home                           e  Show or hide the list panel         /  Open the command line               │
-│ d  Show DMs                            W  Switch workspace                    q  Quit                                │
-│ a  Show Activity                       [  Back to the conversation before     w  +Window                             │
-│ f  Show Files                          ]  Forward again                                                              │
+│ r    Rail: workspaces and views        e    Show or hide the list panel       /    Open the command line             │
+│ h    Show Home                         W    Switch workspace                  q    Quit                              │
+│ d    Show DMs                          [    Back to the conversation before   w    +Window                           │
+│ a    Show Activity                     ]    Forward again                     t    +Tab                              │
+│ f    Show Files                        1…9  Show tab 1 to 9                                                          │
+│ l    Show Later                        ?    Keyboard help                                                            │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo

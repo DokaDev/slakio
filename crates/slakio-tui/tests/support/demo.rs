@@ -147,6 +147,18 @@ impl Demo {
 
     /// Open the conversation of the shown workspace named `name` from the list panel (Home).
     pub fn open(&mut self, name: &str) {
+        self.list_cursor_on(name);
+        self.keys("enter");
+    }
+
+    /// Open the conversation named `name` from the list panel in a new tab (`t`).
+    pub fn open_in_tab(&mut self, name: &str) {
+        self.list_cursor_on(name);
+        self.keys("t");
+    }
+
+    /// The list panel (Home, unfolded) gets the keyboard, its cursor on the conversation `name`.
+    pub fn list_cursor_on(&mut self, name: &str) {
         use slakio_tui::app::model::Row;
         use slakio_tui::app::shell::View;
         self.app.show_unfolded(View::Home);
@@ -156,7 +168,6 @@ impl Demo {
             .position(|r| matches!(r, Row::Conversation(i) if self.app.model.conversation(*i).name == name))
             .unwrap_or_else(|| panic!("no conversation {name}"));
         self.app.focus_list_row(at);
-        self.keys("enter");
     }
 
     /// Type text as key presses (what an IME's commits arrive as).

@@ -2,7 +2,7 @@
 //! listed under it, generated from the action registry with the keys of each. With nothing
 //! typed it lists every command and every action that works where the keyboard is; a word
 //! lists the commands it starts (an exact name first), then the actions its letters find
-//! ([`crate::action::search`]); `:theme ` lists the themes. `Enter` runs the selected entry (a
+//! ([`crate::action::search`]); `:theme ` lists the themes; `:rename <name>` names the tab shown. `Enter` runs the selected entry (a
 //! command that needs its argument is completed into the input instead); an empty line, or
 //! text that matches nothing, runs nothing: the first closes, the second says why under the
 //! list and the palette stays.
@@ -18,6 +18,7 @@
 //! ```
 
 use super::{AVATAR_VALUES, App, avatars_arg, theme_arg};
+use crate::action::TabAction;
 use crate::action::{self, Action, AppAction, HelpAction, REGISTRY};
 use crate::keymap::keys;
 use crate::screen::{self, PaletteBox};
@@ -50,6 +51,8 @@ pub enum Item {
     Theme(usize),
     /// A value for `:avatars <value>` (index into [`AVATAR_VALUES`]).
     Avatars(usize),
+    /// `:rename <name>`: name the tab shown that (nothing: after what it shows).
+    Rename,
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
@@ -68,9 +71,10 @@ pub struct Row {
 fn offered(a: Action, backend: bool) -> bool {
     match a {
         Action::App(AppAction::Quit) => true,
-        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars) | Action::Shell(_) | Action::Pane(_) => {
-            backend
-        }
+        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars)
+        | Action::Shell(_)
+        | Action::Pane(_)
+        | Action::Tab(_) => backend,
         Action::Help(h) => h == HelpAction::Open,
         Action::App(_) | Action::CommandLine(_) | Action::Composer(_) | Action::Dialog(_) => false,
     }
@@ -106,6 +110,12 @@ fn theme_label(name: &str) -> Label {
     }
 }
 
+/// The name of `:rename <name>` (empty: `:rename ` with nothing after it).
+fn rename_arg(line: &str) -> Option<&str> {
+    let rest = line.trim_start().strip_prefix("rename")?;
+    rest.starts_with(char::is_whitespace).then(|| rest.trim())
+}
+
 impl App {
     /// The palette's entries for the text typed so far: every one [`action::rank`] matches,
     /// the better match first; on a tie, commands in the registry's order (`:theme` after
@@ -113,6 +123,9 @@ impl App {
     /// nothing typed it is last and never the entry `Enter` or a stray click would run.
     pub fn palette_items(&self) -> Vec<Item> {
         let line = self.cmdline.text().trim_start();
+        if rename_arg(line).is_some() && self.backend.is_some() {
+            return vec![Item::Rename];
+        }
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
         }
@@ -198,6 +211,16 @@ impl App {
                 Item::Action(i) => {
                     Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
                 }
+                Item::Rename => {
+                    let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
+                    let what = if name.is_empty() {
+                        label(Label::PaletteRenameAuto)
+                    } else {
+                        self.i18n.msg(&Msg::PaletteRenameTo { name: name.clone() }).to_string()
+                    };
+                    let arg = if name.is_empty() { label(Label::PaletteRenameArg) } else { name };
+                    Row { name: format!(":rename {arg}"), label: what, keys: keys_of(Action::Tab(TabAction::Rename)) }
+                }
             })
             .collect()
     }
@@ -252,6 +275,13 @@ impl App {
                 self.cmdline.close();
                 if let Err(msg) = self.set_avatars(AVATAR_VALUES[i], now) {
                     self.warn(msg, now);
+                }
+            }
+            Some(Item::Rename) => {
+                let name = rename_arg(&text).unwrap_or_default().to_string();
+                self.cmdline.close();
+                if !self.work.rename(&name) {
+                    self.info(Msg::Label(Label::StatusNoTab), now);
                 }
             }
             None => {

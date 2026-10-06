@@ -28,6 +28,8 @@ pub enum Place {
     Thread,
     /// The thread panel with a reply selected (it has no thread of its own).
     ThreadSelected,
+    /// A thread in a pane of its own (a tab), no message selected.
+    ThreadPane,
     Visual,
     Insert,
     CommandLine,
@@ -121,6 +123,13 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(Action::Pane(PaneAction::Close), Label::HintClose),
             One(HELP, Label::HintHelp),
         ],
+        Place::ThreadPane => &[
+            One(WRITE, Label::HintReply),
+            One(PREV_MSG, Label::HintMessages),
+            One(ESCAPE, Label::HintList),
+            One(Action::Pane(PaneAction::Close), Label::HintClose),
+            One(HELP, Label::HintHelp),
+        ],
         Place::ThreadSelected => &[
             One(WRITE, Label::HintReply),
             One(Action::Pane(PaneAction::Copy), Label::HintCopy),
@@ -187,6 +196,7 @@ mod tests {
             (Place::PaneSelected, Ctx::PaneNormal),
             (Place::Thread, Ctx::PaneNormal),
             (Place::ThreadSelected, Ctx::PaneNormal),
+            (Place::ThreadPane, Ctx::PaneNormal),
             (Place::Visual, Ctx::PaneVisual),
             (Place::Insert, Ctx::ComposerInsert),
             (Place::CommandLine, Ctx::CommandLine),

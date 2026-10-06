@@ -50,17 +50,19 @@ CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 `App` (`crates/slakio-tui/src/app.rs`) is a thin router. Each part of the state is a sub-state
 that owns its data and its update: the command line (`app/cmdline.rs`), the status line's
 notices (`app/status.rs`), the shell — focus between rail, list panel and work area, the rail
-and list cursors, folded sections (`app/shell.rs`) —, the work area — its panes by id, placed by a layout
-tree of `slakio-core` (`layout.rs`: the conversation, or split with the auto thread panel), the
-active pane, the history of the pane closed last
-(`app/work.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
+and list cursors, folded sections (`app/shell.rs`) —, the work area — its panes by id, placed by
+tabs of `slakio-core` (`layout/tabs.rs`: tabs in the user's order, never reordered by the app,
+each a layout tree of `layout.rs` — the conversation, or split with the auto thread panel — and
+its active pane), the tabs closed to open again
+(`app/work.rs`, `app/work/tabs.rs`; the app's side of tabs, their titles and the tab bar's mouse
+in `app/tabs.rs`, the bar's geometry in `tabbar.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
 rows drawn, the thread panel it opened: a pane's role is this relation, never its place in the tree; its own
 back/forward history), the messages of each target a pane shows, held once however many panes show it
 (`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the
-keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
-(tabs and splits) joins as it is built. Where the keyboard is is one field of the app — the rail, the list panel or the work area,
+keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); splits of a
+tab join as they are built. Where the keyboard is is one field of the app — the rail, the list panel or the work area,
 whose active pane has it (`app/focus.rs`; the pane is never kept twice, so the focus cannot name
 a closed pane; the shell and the work area hand back where it should go) — and the
 popups come in one order (`app/overlay.rs`); the key map, the mouse and drawing all read

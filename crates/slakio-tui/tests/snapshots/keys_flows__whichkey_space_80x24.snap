@@ -15,14 +15,14 @@ expression: d.snap()
 │  ││   # big-history        ││     Enter    Open                              │
 │  ││   # long-threads       ││     Space h  Home                              │
 │  ││                        ││     Space d  DMs                               │
-│  ││ ▾ Channels             ││     Ctrl+O   Back to the last one              │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────╮
-│ r  Rail: workspaces and views          W  Switch workspace                   │
-│ h  Show Home                           [  Back to the conversation before    │
-│ d  Show DMs                            ]  Forward again                      │
-│ a  Show Activity                       ?  Keyboard help                      │
-│ f  Show Files                          /  Open the command line              │
-│ l  Show Later                          q  Quit                               │
-│ e  Show or hide the list panel         w  +Window                            │
+│ r    Rail: workspaces and views        [    Back to the conversation before  │
+│ h    Show Home                         ]    Forward again                    │
+│ d    Show DMs                          1…9  Show tab 1 to 9                  │
+│ a    Show Activity                     ?    Keyboard help                    │
+│ f    Show Files                        /    Open the command line            │
+│ l    Show Later                        q    Quit                             │
+│ e    Show or hide the list panel       w    +Window                          │
+│ W    Switch workspace                  t    +Tab                             │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                 │  @37  DM 16 │ demo

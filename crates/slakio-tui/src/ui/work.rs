@@ -26,7 +26,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
-use slakio_core::model::{Conversation, ConversationKind, Presence};
+use slakio_core::model::{ConversationKind, Presence};
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)]) {
     if app.work.ids().is_empty() {
@@ -132,8 +132,4 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     debug_assert!(view.lines.iter().all(|l| width(l) <= usize::from(text_area.width.max(2))));
 }
 
-/// How a conversation is named in titles and the status line: `#backend`, `@Minsu`.
-pub(super) fn breadcrumb(c: &Conversation) -> String {
-    let name = c.name.line();
-    if c.is_dm() { format!("@{name}") } else { format!("#{name}") }
-}
+pub(super) use crate::app::model::breadcrumb;

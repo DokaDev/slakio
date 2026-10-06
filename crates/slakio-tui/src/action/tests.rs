@@ -59,6 +59,13 @@ fn every_action_is_registered() {
         ]
         .map(Action::Pane)
     };
+    let tab = {
+        use TabAction::*;
+        [Open, Next, Prev, Close, Reopen, Rename, MoveLeft, MoveRight]
+            .into_iter()
+            .chain((1..=9).map(Go))
+            .map(Action::Tab)
+    };
     let composer = {
         use ComposerAction::*;
         [Send, Newline, Leave, DeleteWord, DeleteLine, DeleteToEnd].map(Action::Composer)
@@ -105,6 +112,7 @@ fn every_action_is_registered() {
         )
         .chain(shell)
         .chain(pane)
+        .chain(tab)
         .chain(composer)
         .chain(help)
         .chain(dialog);

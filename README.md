@@ -41,8 +41,17 @@ images, and settings. This README only lists what works; it will grow with each 
     `G` jump to the oldest / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
     wheel too), `Enter` opens the selected message's thread in a panel on the right (another
     thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
-    the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between
-    conversations;
+    the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between the
+    conversations a pane showed;
+  - tabs: `t` opens the conversation under the list's cursor, or the selected message's thread,
+    in a new tab (what is open already, in any tab, is focused instead, also by `Enter`); the
+    tab bar shows from two tabs on, with the unread count of the tabs not shown; `g t` / `g T`,
+    `Ctrl+PageDown` / `Ctrl+PageUp`, `Space 1`…`9` (`Alt+1`…`9`) or a click switch tabs;
+    `Ctrl+W` on a tab's last pane, `Space t c`, its `×` or a middle click close a tab (the last
+    one leaves an empty work area, nothing quits) and `Space t u` opens the tabs closed this
+    session again where they were; `Space t r`, `:rename <name>` or a double click rename one;
+    `Space t h` / `Space t l` or a drag move one. The app never reorders tabs. Tabs and their
+    names are not kept across restarts yet;
   - `V` selects a range of messages and `y` copies it (or the selected message) to the
     clipboard through the terminal (OSC 52);
   - `i` writes in the pane's composer (multiline: `Ctrl+J` or `Alt+Enter` for a new line,

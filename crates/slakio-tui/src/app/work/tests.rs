@@ -273,7 +273,7 @@ fn a_panes_role_comes_from_its_relation_not_its_place_in_the_tree() {
     let panel = w.open_thread().unwrap();
     let owner = w.owner(panel).unwrap();
     // The thread panel placed first: it is still the panel, and the conversation its owner.
-    w.layout = Some(Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(panel), Node::Leaf(owner)));
+    w.tabs.current_tab_mut().unwrap().root = Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(panel), Node::Leaf(owner));
     assert_eq!(w.ids(), vec![panel, owner]);
     assert_eq!((w.owner(panel), w.owner(owner)), (Some(owner), None));
     assert_eq!(w.home_id(), Some(owner), "the list opens into the conversation, not the panel");

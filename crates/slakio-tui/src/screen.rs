@@ -10,6 +10,8 @@
 //!  status line
 //! ```
 //!
+//! With two tabs or more, the work area's first row is the tab bar ([`crate::tabbar`]).
+//!
 //! The focused (or hovered) rail widens to show labels, either over the list panel or pushing
 //! it aside. On a narrow screen an open thread panel takes the list panel's room (the list is
 //! left out of the layout only, and comes back when the thread closes or the list is focused);
@@ -37,6 +39,8 @@ pub const MAIN_MIN: u16 = 40;
 pub struct Areas {
     pub rail: Rect,
     pub list: Option<Rect>,
+    /// The tab bar, the work area's first row, while there are two tabs or more.
+    pub tabs: Option<Rect>,
     pub work: Rect,
     pub status: Rect,
 }
@@ -57,6 +61,8 @@ pub struct Shape {
     pub thread: bool,
     /// The list panel has the focus (it is never left out then).
     pub list_focused: bool,
+    /// There are two tabs or more: the tab bar shows.
+    pub tabs: bool,
 }
 
 /// The width of the list panel on a screen `width` wide: a fifth or so, 26 to 36 cells.
@@ -78,7 +84,11 @@ pub fn areas(size: Rect, s: Shape) -> Areas {
         Layout::horizontal([Constraint::Length(rail_w), Constraint::Length(list_w), Constraint::Min(0)]).areas(body);
     let rail =
         if s.rail_expanded && !s.push { Rect { width: RAIL_EXPANDED_WIDTH.min(body.width), ..rail } } else { rail };
-    Areas { rail, list: (list_w > 0).then_some(list), work, status }
+    let (tabs, work) = match s.tabs && work.height > 1 {
+        true => (Some(Rect { height: 1, ..work }), Rect { y: work.y + 1, height: work.height - 1, ..work }),
+        false => (None, work),
+    };
+    Areas { rail, list: (list_w > 0).then_some(list), tabs, work, status }
 }
 
 /// The most lines a composer shows before it scrolls.

@@ -16,6 +16,7 @@ pub enum Action {
     CommandLine(CommandLineAction),
     Shell(ShellAction),
     Pane(PaneAction),
+    Tab(TabAction),
     Composer(ComposerAction),
     Help(HelpAction),
     Dialog(DialogAction),
@@ -125,6 +126,26 @@ pub enum PaneAction {
     Forward,
 }
 
+/// Actions on the tabs of the work area. The app never reorders tabs; only these moves do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TabAction {
+    /// `t`: what is under the list's cursor, or the selected message's thread, in a new tab
+    /// (focused instead when it is open already).
+    Open,
+    Next,
+    Prev,
+    /// Show tab `n` (1 to 9).
+    Go(u8),
+    /// Close the tab shown and its panes.
+    Close,
+    /// Open the tab closed last again, where it was.
+    Reopen,
+    /// Name the tab shown (`:rename <name>`; an empty name: named after what it shows).
+    Rename,
+    MoveLeft,
+    MoveRight,
+}
+
 /// Actions of a composer in Insert mode. Other keys type text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ComposerAction {
@@ -195,6 +216,10 @@ const fn shell(a: ShellAction, id: &'static str, label: Label, commands: &'stati
 
 const fn pane(a: PaneAction, id: &'static str, label: Label, commands: &'static [&'static str]) -> ActionSpec {
     spec_of(Action::Pane(a), id, label, commands)
+}
+
+const fn tab(a: TabAction, id: &'static str, label: Label, commands: &'static [&'static str]) -> ActionSpec {
+    spec_of(Action::Tab(a), id, label, commands)
 }
 
 const fn composer(a: ComposerAction, id: &'static str, label: Label) -> ActionSpec {
@@ -272,6 +297,23 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Close, "pane.close", Label::ActionPaneClose, &["close"]),
     pane(PaneAction::Back, "history.back", Label::ActionHistoryBack, &["back"]),
     pane(PaneAction::Forward, "history.forward", Label::ActionHistoryForward, &["forward"]),
+    tab(TabAction::Open, "tab.open", Label::ActionTabOpen, &[]),
+    tab(TabAction::Next, "tab.next", Label::ActionTabNext, &["tabnext", "tabn"]),
+    tab(TabAction::Prev, "tab.prev", Label::ActionTabPrev, &["tabprevious", "tabp"]),
+    tab(TabAction::Go(1), "tab.go.1", Label::ActionTabGo1, &[]),
+    tab(TabAction::Go(2), "tab.go.2", Label::ActionTabGo2, &[]),
+    tab(TabAction::Go(3), "tab.go.3", Label::ActionTabGo3, &[]),
+    tab(TabAction::Go(4), "tab.go.4", Label::ActionTabGo4, &[]),
+    tab(TabAction::Go(5), "tab.go.5", Label::ActionTabGo5, &[]),
+    tab(TabAction::Go(6), "tab.go.6", Label::ActionTabGo6, &[]),
+    tab(TabAction::Go(7), "tab.go.7", Label::ActionTabGo7, &[]),
+    tab(TabAction::Go(8), "tab.go.8", Label::ActionTabGo8, &[]),
+    tab(TabAction::Go(9), "tab.go.9", Label::ActionTabGo9, &[]),
+    tab(TabAction::Close, "tab.close", Label::ActionTabClose, &["tabclose", "tabc"]),
+    tab(TabAction::Reopen, "tab.reopen", Label::ActionTabReopen, &["reopen"]),
+    tab(TabAction::Rename, "tab.rename", Label::ActionTabRename, &["rename"]),
+    tab(TabAction::MoveLeft, "tab.move_left", Label::ActionTabMoveLeft, &[]),
+    tab(TabAction::MoveRight, "tab.move_right", Label::ActionTabMoveRight, &[]),
     composer(ComposerAction::Send, "composer.send", Label::ActionComposerSend),
     composer(ComposerAction::Newline, "composer.newline", Label::ActionComposerNewline),
     composer(ComposerAction::Leave, "composer.leave", Label::ActionComposerLeave),

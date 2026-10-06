@@ -159,6 +159,21 @@ impl App {
         self.work.home().map(|p| &p.target)
     }
 
+    /// The tabs' titles, in their order.
+    pub fn tab_titles(&self) -> Vec<String> {
+        self.work.tabs().all().iter().map(|t| self.tab_title(t)).collect()
+    }
+
+    /// The index of the tab shown; `None` with no tab open.
+    pub fn current_tab(&self) -> Option<usize> {
+        self.work.tabs().current()
+    }
+
+    /// The tabs closed this session that can be opened again.
+    pub fn closed_tabs(&self) -> usize {
+        self.work.closed_tabs()
+    }
+
     /// The rows of the list panel, top down.
     pub fn list_rows(&self) -> Vec<Row> {
         self.shell.rows(&self.model)

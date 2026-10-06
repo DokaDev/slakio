@@ -7,6 +7,12 @@ use slakio_core::backend::Snapshot;
 use slakio_core::model::{Conversation, Section, SectionId, Target, User, UserId, Workspace, WorkspaceId};
 use std::collections::{HashMap, HashSet};
 
+/// How a conversation is named in titles, tabs and the status line: `#backend`, `@Minsu`.
+pub fn breadcrumb(c: &Conversation) -> String {
+    let name = c.name.line();
+    if c.is_dm() { format!("@{name}") } else { format!("#{name}") }
+}
+
 /// One row of the list panel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Row {

@@ -19,12 +19,13 @@
 //! | VISUAL | Normal, the selection stays | |
 //! | a selected message | no selection (back to the newest) | |
 //! | the thread panel | the main pane | closes it; the main pane selects its message |
-//! | the main pane | the list, on its conversation | closes it; the list, on its conversation |
+//! | the main pane | the list, on its conversation | closes it, and its tab with its last pane: the tab shown next, else the list, on its conversation |
 //! | the rail | the list | |
+//! | the list | nothing | |
 //!
 //! The rail is reached from anywhere outside text with `Ctrl+R` or `Space r`, and is a stop of
-//! the `Tab` round (left of the list).
-//! | the list | nothing | |
+//! the `Tab` round (left of the list). Tabs ([`tabs`]) keep their own panes; the mouse is
+//! [`mouse`]'s.
 
 pub mod cmdline;
 pub mod composer;
@@ -34,6 +35,7 @@ mod focus;
 pub mod help;
 mod layout;
 pub mod model;
+mod mouse;
 mod overlay;
 pub mod palette;
 pub mod pane;
@@ -41,6 +43,7 @@ pub mod query;
 pub(crate) mod requests;
 pub mod shell;
 pub mod status;
+mod tabs;
 pub(crate) mod timelines;
 pub(crate) mod work;
 
@@ -55,9 +58,9 @@ use help::Help;
 use model::Model;
 pub(crate) use overlay::Layer;
 pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
-use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Position, Rect};
-use shell::{Shell, rail_items};
+use shell::Shell;
 use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEvent, Generation};
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
@@ -147,6 +150,8 @@ pub struct App {
     effects: Vec<Effect>,
     /// The last click (for a double click): when, and where.
     last_click: Option<(Instant, Position)>,
+    /// The tab being dragged along the tab bar (its index now).
+    tab_drag: Option<usize>,
     /// The terminal's size, for the mouse and scrolling.
     pub size: Rect,
     /// Set once the user asked to quit; the binary's loop ends.
@@ -176,6 +181,7 @@ impl App {
             boot: Generation::default(),
             effects: Vec::new(),
             last_click: None,
+            tab_drag: None,
             size: Rect::default(),
             quit: false,
         }
@@ -429,102 +435,6 @@ impl App {
         }
     }
 
-    /// The mouse: hovering the rail expands it; a click on a rail item shows it, on a list row
-    /// opens it, on a message selects it (twice: its thread), on a reply link opens the thread,
-    /// on a composer writes in it; the wheel scrolls what is under it. `true` when the screen
-    /// changed.
-    fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
-        match self.overlay() {
-            Some(Overlay::Dialog(_)) => return false,
-            Some(Overlay::Palette) => return self.palette_mouse(m, now),
-            _ => {}
-        }
-        if self.backend.is_none() || screen::too_small(self.size) {
-            return false;
-        }
-        let at = Position { x: m.column, y: m.row };
-        if let Some(h) = self.help.as_mut() {
-            let by = match m.kind {
-                MouseEventKind::ScrollDown => 1,
-                MouseEventKind::ScrollUp => -1,
-                _ => return false,
-            };
-            let n = h.rows(&self.keymap, &self.i18n).len();
-            h.step(by, n);
-            return true;
-        }
-        let a = self.areas();
-        match m.kind {
-            MouseEventKind::Moved => {
-                let hover = a.rail.contains(at);
-                let n = self.model.workspaces().len();
-                let item = hover.then(|| screen::rail_item_at(a.rail, n, rail_items(n).len(), at.y)).flatten();
-                let changed = hover != self.shell.hover_rail || item != self.shell.hover_item;
-                self.shell.hover_rail = hover;
-                self.shell.hover_item = item;
-                changed
-            }
-            MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
-                let by = if m.kind == MouseEventKind::ScrollDown { 1 } else { -1 };
-                if a.list.is_some_and(|l| l.contains(at)) {
-                    let height = self.list_height();
-                    self.shell.scroll_by(&self.model, by * WHEEL_ROWS, height);
-                    return true;
-                }
-                let id = self.frame().pane_at(at).map(|p| p.id);
-                self.work.step_in(id, by);
-                true
-            }
-            MouseEventKind::Down(MouseButton::Left) => {
-                self.keys.clear();
-                self.guide = Guide::default();
-                let double = self.last_click.is_some_and(|(t, p)| p == at && now.duration_since(t) <= DOUBLE_CLICK);
-                self.last_click = Some((now, at));
-                if a.rail.contains(at) {
-                    let items = rail_items(self.model.workspaces().len());
-                    if let Some(i) = screen::rail_item_at(a.rail, self.model.workspaces().len(), items.len(), at.y) {
-                        self.shell.select(items[i], &items, &self.model);
-                        self.set_focus(Focus::List);
-                    }
-                } else if let Some(list) = a.list.filter(|l| l.contains(at)) {
-                    let inner = screen::inner(list);
-                    if inner.contains(at) {
-                        let row = self.shell.list_top + usize::from(at.y - inner.y);
-                        if self.shell.rows(&self.model).get(row).is_some_and(|r| r.is_selectable()) {
-                            self.set_focus(Focus::List);
-                            self.shell.list_cursor = row;
-                            if let Some(t) = self.shell.open_row(&self.model) {
-                                self.open(t, true);
-                            }
-                        }
-                    }
-                } else if a.work.contains(at) {
-                    self.click_work(at, double);
-                }
-                true
-            }
-            _ => false,
-        }
-    }
-
-    /// A click in the work area at `at` (`double`: the second of a double click).
-    fn click_work(&mut self, at: Position, double: bool) {
-        let Some(&layout) = self.frame().pane_at(at) else { return };
-        self.set_focus(Focus::on(layout.id));
-        let Some(pane) = self.work.focused() else { return };
-        let parts = layout.parts;
-        let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
-        self.work.set_insert(parts.input.contains(at));
-        let Some(hit) = hit else { return };
-        self.work.with_pane(|p, tl| {
-            p.select_index(hit.message, tl);
-            p.visual = None;
-        });
-        if hit.link || double {
-            self.open_thread();
-        }
-    }
-
     /// Route `action` to the sub-state that owns it.
     pub fn dispatch(&mut self, action: Action, now: Instant) {
         match action {
@@ -532,6 +442,7 @@ impl App {
             Action::CommandLine(a) => self.command_line(a, now),
             Action::Shell(a) => self.shell(a, now),
             Action::Pane(a) => self.pane(a, now),
+            Action::Tab(a) => self.tab(a, now),
             Action::Composer(a) => self.composer(a, now),
             Action::Help(a) => self.help(a, now),
             Action::Dialog(a) => self.answer(a),

@@ -4,7 +4,8 @@
 //! go on top: the which-key popup above the status line, the keyboard help, the command palette
 //! and a question over the dimmed screen.
 //!
-//! * [`rail`], [`list`], [`work`] — the three regions; [`timeline`] — a pane's messages;
+//! * [`rail`], [`list`], [`work`] — the three regions; [`tabbar`] — the work area's tabs, when
+//!   there are two or more; [`timeline`] — a pane's messages;
 //!   [`statusline`] — the bottom line with its hints; [`empty`] — empty states that list keys;
 //!   [`guide`], [`help`], [`palette`], [`dialog`] — the popups.
 //!
@@ -20,6 +21,7 @@ mod list;
 mod palette;
 mod rail;
 mod statusline;
+mod tabbar;
 pub mod timeline;
 mod work;
 
@@ -57,6 +59,9 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
             list::draw(f, app, l);
         }
         work::draw(f, app, &layout, &views);
+        if let Some(bar) = app.tab_bar() {
+            tabbar::draw(f, app, &bar);
+        }
         // An expanded rail over the list panel clears only its own cells: the list shows
         // beside it.
         rail::draw(f, app, a.rail);

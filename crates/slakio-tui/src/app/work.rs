@@ -1,7 +1,9 @@
-//! The work area in the default (GUI Slack) mode: the conversation open in the main pane, the
-//! auto thread panel beside it, which of the two has the keyboard and whether its composer is
-//! being written in. Each pane keeps its own back/forward history; the history of the pane closed
-//! last stays, so `Ctrl+O` in an empty work area opens it again.
+//! The work area: tabs ([`slakio_core::layout::tabs`]), each a layout of panes; the one shown
+//! is the default GUI Slack mode while it is the only one — the conversation open in the main
+//! pane, the auto thread panel beside it, which of the two has the keyboard and whether its
+//! composer is being written in. Each pane keeps its own back/forward history. Closed tabs are
+//! kept (the last [`tabs::REOPEN`]) to be opened again where they were ([`tabs`]), so `Ctrl+O` in an
+//! empty work area opens the tab closed last.
 //!
 //! ```text
 //! ╭ #backend ───────────────╮╭ ⤷ Thread ─────────╮
@@ -10,8 +12,8 @@
 //! │╭ Message #backend ─────╮││╭ Reply ─────────╮ │
 //! ```
 //!
-//! `Enter` on a message opens its thread in the panel, replacing what it showed. Opening a
-//! conversation that is already open focuses it instead of loading it again.
+//! `Enter` on a message opens its thread in the panel, replacing what it showed. Opening what is
+//! open already, in any tab, focuses it instead of opening it twice.
 //!
 //! The panes are kept by id in a registry and placed by a layout tree
 //! ([`slakio_core::layout`]): the conversation alone, or split with the thread panel beside it.
@@ -37,6 +39,7 @@ use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
 use crate::screen::THREAD_SHARE;
 use slakio_core::backend::{Command, Generation, Page};
+use slakio_core::layout::tabs::{Tab, Tabs};
 use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
@@ -45,14 +48,12 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default)]
 pub struct Work {
     panes: HashMap<PaneId, Pane>,
-    /// Where the panes go; `None`: no pane open.
-    layout: Option<Node>,
-    /// The pane the keyboard goes to in the work area.
-    active: Option<PaneId>,
+    /// Where the panes go, by tab; each tab's active pane is the one the keyboard goes to there.
+    tabs: Tabs,
     /// The last pane id handed out.
     last: u64,
-    /// The pane closed last, while the work area is empty: what it showed and its history.
-    closed: Option<(Target, History)>,
+    /// The tabs closed, to open again; the newest last.
+    closed: Vec<ClosedTab>,
     /// The messages of the targets the panes show.
     pub timelines: TimelineStore,
     /// What is being written to the targets the panes show.
@@ -74,14 +75,24 @@ fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
 }
 
 impl Work {
-    /// The layout of the panes, when one is open.
+    /// The layout of the tab shown, when there is one.
     pub fn layout(&self) -> Option<&Node> {
-        self.layout.as_ref()
+        self.tabs.current_tab().map(|t| &t.root)
     }
 
-    /// The open panes, in reading order.
+    /// The tabs.
+    pub fn tabs(&self) -> &Tabs {
+        &self.tabs
+    }
+
+    /// The panes of the tab shown, in reading order.
     pub fn ids(&self) -> Vec<PaneId> {
-        self.layout.as_ref().map(Node::leaves).unwrap_or_default()
+        self.layout().map(Node::leaves).unwrap_or_default()
+    }
+
+    /// The panes of the tab shown that some pane names as its thread panel.
+    fn panel_shown(&self) -> bool {
+        self.ids().into_iter().any(|id| self.owner(id).is_some())
     }
 
     /// The pane that opened the thread panel `id`; `None` when `id` is no pane's thread panel.
@@ -89,15 +100,22 @@ impl Work {
         self.panes.iter().find(|(_, p)| p.thread == Some(id)).map(|(owner, _)| *owner)
     }
 
-    /// An open pane is some pane's auto thread panel.
+    /// A pane of the tab shown is some pane's auto thread panel.
     pub fn has_panel(&self) -> bool {
-        self.panes.values().any(|p| p.thread.is_some_and(|t| self.panes.contains_key(&t)))
+        self.panel_shown()
     }
 
     /// The pane what the list opens goes to: the active pane, or the pane that opened it when it
     /// is a thread panel.
     pub fn home_id(&self) -> Option<PaneId> {
-        self.active.map(|a| self.owner(a).unwrap_or(a))
+        self.active().map(|a| self.owner(a).unwrap_or(a))
+    }
+
+    /// The open pane that shows `target`, in any tab (the tab shown first).
+    pub fn showing(&self, target: &Target) -> Option<PaneId> {
+        let shown = self.ids();
+        let all = shown.iter().copied().chain(self.tabs.panes().into_iter().filter(|id| !shown.contains(id)));
+        all.into_iter().find(|id| self.panes.get(id).is_some_and(|p| &p.target == target))
     }
 
     pub fn pane(&self, id: PaneId) -> Option<&Pane> {
@@ -109,44 +127,60 @@ impl Work {
         self.home_id().and_then(|id| self.panes.get(&id))
     }
 
-    /// The active pane: the one the keyboard goes to in the work area.
+    /// The active pane of the tab shown: the one the keyboard goes to in the work area.
     pub fn active(&self) -> Option<PaneId> {
-        self.active
+        self.tabs.current_tab().map(|t| t.active)
     }
 
     /// The active pane.
     pub fn focused(&self) -> Option<&Pane> {
-        self.active.and_then(|id| self.panes.get(&id))
+        self.active().and_then(|id| self.panes.get(&id))
     }
 
     pub fn focused_mut(&mut self) -> Option<&mut Pane> {
-        self.active.and_then(|id| self.panes.get_mut(&id))
+        self.active().and_then(|id| self.panes.get_mut(&id))
     }
 
-    /// Make pane `id` the active one (the app does, as it moves the focus); Insert mode goes
-    /// along. A pane that is not open is not made active.
+    /// Make pane `id` the active one, showing its tab (the app does, as it moves the focus);
+    /// Insert mode goes along. A pane that is not open is not made active.
     pub fn activate(&mut self, id: PaneId) {
-        if !self.panes.contains_key(&id) {
-            return;
-        }
         let insert = self.insert();
-        self.active = Some(id);
+        self.point(id);
         self.set_insert(insert);
         self.check();
     }
 
-    /// What always holds, checked after every change in debug builds: a pane is active while one
-    /// is open, and it is open; the panes open are those the layout places; a thread panel a
-    /// pane names is open.
+    /// Show the tab of pane `id` with `id` its active pane.
+    fn point(&mut self, id: PaneId) {
+        let Some(i) = self.tabs.find(id) else { return };
+        self.show_tab(i);
+        if let Some(t) = self.tabs.current_tab_mut() {
+            t.active = id;
+        }
+    }
+
+    /// Show tab `i` (its panes ask for the pages they want).
+    fn show_tab(&mut self, i: usize) {
+        if self.tabs.current() != Some(i) && self.tabs.select(i) {
+            self.set_insert(false);
+            self.fill();
+        }
+    }
+
+    /// What always holds, checked after every change in debug builds: the tabs hold
+    /// ([`Tabs::holds`]); the panes open are those the tabs place, each once; a thread panel a
+    /// pane names is open, in the same tab.
     fn check(&self) {
-        let ids = self.ids();
-        debug_assert_eq!(self.active.is_some(), !ids.is_empty(), "an active pane while one is open");
-        debug_assert!(self.active.is_none_or(|a| ids.contains(&a)), "the active pane is placed");
-        debug_assert_eq!(ids.len(), self.panes.len(), "every pane open is placed, once");
-        debug_assert!(ids.iter().all(|id| self.panes.contains_key(id)), "every pane placed is open");
+        let placed = self.tabs.panes();
+        debug_assert!(self.tabs.holds(), "the tabs hold: {:?}", self.tabs);
+        debug_assert_eq!(placed.len(), self.panes.len(), "every pane open is placed, once");
+        debug_assert!(placed.iter().all(|id| self.panes.contains_key(id)), "every pane placed is open");
         debug_assert!(
-            self.panes.values().filter_map(|p| p.thread).all(|t| self.panes.contains_key(&t)),
-            "a thread panel named is open"
+            self.panes
+                .iter()
+                .filter_map(|(id, p)| p.thread.map(|t| (*id, t)))
+                .all(|(id, t)| self.panes.contains_key(&t) && self.tabs.find(t) == self.tabs.find(id)),
+            "a thread panel named is open, beside its pane"
         );
     }
 
@@ -194,12 +228,10 @@ impl Work {
         id
     }
 
-    /// Take pane `id` out of the registry and the layout.
-    fn remove(&mut self, id: PaneId) -> Option<Pane> {
-        self.layout = self.layout.as_ref().and_then(|t| t.without(id));
-        if self.active == Some(id) {
-            self.active = None;
-        }
+    /// Take pane `id` out of the registry and its tab (a tab left empty closes, unrecorded);
+    /// where it was its tab's active pane, `next` is (or the tab's first pane).
+    fn remove(&mut self, id: PaneId, next: Option<PaneId>) -> Option<Pane> {
+        self.tabs.close_pane(id, next);
         self.panes.remove(&id)
     }
 
@@ -223,24 +255,27 @@ impl Work {
         self.drafts.retain(|t, c| shown.contains(t) || !c.is_empty());
     }
 
-    /// Open the conversation `target` (or find it open already) in the pane the list opens into,
-    /// which remembers what it showed; the pane to focus.
+    /// Open the conversation `target` in the pane the list opens into, which remembers what it
+    /// showed (with no tab open, in a new tab); what is open already, in any tab, is focused
+    /// instead. The pane to focus.
     pub fn open(&mut self, target: Target) -> Option<PaneId> {
-        let Some(id) = self.home_id() else { return Some(self.first(target, History::default())) };
-        let pane = self.panes.get_mut(&id)?;
-        if pane.target != target {
-            pane.history.left(pane.target.clone());
-            self.retarget(id, target);
+        if let Some(id) = self.showing(&target) {
+            self.activate(id);
+            return Some(id);
         }
+        let Some(id) = self.home_id() else { return Some(self.new_tab(target, History::default())) };
+        let pane = self.panes.get_mut(&id)?;
+        pane.history.left(pane.target.clone());
+        self.retarget(id, target);
         Some(id)
     }
 
-    /// The first pane of an empty work area, showing `target` with `history`.
-    fn first(&mut self, target: Target, history: History) -> PaneId {
-        self.closed = None;
+    /// A new tab, right after the one shown, of one pane showing `target` with `history`; the
+    /// pane.
+    fn new_tab(&mut self, target: Target, history: History) -> PaneId {
+        self.set_insert(false);
         let id = self.add(Pane { history, ..Pane::new(target) });
-        self.layout = Some(Node::Leaf(id));
-        self.active = Some(id);
+        self.tabs.open(Tab::new(id));
         self.prune();
         self.fill();
         self.check();
@@ -250,24 +285,21 @@ impl Work {
     /// Pane `id` shows `target` instead of what it showed, from scratch; its thread panel closes.
     fn retarget(&mut self, id: PaneId, target: Target) {
         if let Some(panel) = self.panes.get_mut(&id).and_then(|p| p.thread.take()) {
-            self.remove(panel);
+            self.remove(panel, Some(id));
         }
         if let Some(p) = self.panes.get_mut(&id) {
             p.show(target);
         }
-        self.active = Some(id);
+        self.point(id);
         self.prune();
         self.fill();
         self.check();
     }
 
     /// Back to what the pane the list opens into showed before (`Ctrl+O`); in an empty work area,
-    /// the pane closed last again. The pane, `None` when there is nothing back.
+    /// the tab closed last again. The pane, `None` when there is nothing back.
     pub fn back(&mut self) -> Option<PaneId> {
-        let Some(id) = self.home_id() else {
-            let (target, history) = self.closed.take()?;
-            return Some(self.first(target, history));
-        };
+        let Some(id) = self.home_id() else { return self.reopen() };
         let pane = self.panes.get_mut(&id)?;
         let to = pane.history.back(&pane.target)?;
         self.retarget(id, to);
@@ -287,15 +319,21 @@ impl Work {
     /// thread panel (replacing what it showed, or found there already); the pane to focus. A
     /// thread has no threads of its own.
     pub fn open_thread(&mut self) -> Option<PaneId> {
-        let id = self.active?;
-        let pane = self.panes.get(&id).filter(|p| !p.is_thread())?;
-        let tl = self.timeline(pane);
-        let m = pane.selected_index(tl).and_then(|i| tl.items.get(i))?;
-        let target = pane.thread_target(m.ts);
-        if let Some(panel) = pane.thread.filter(|t| self.panes.get(t).is_some_and(|t| t.target == target)) {
-            return Some(panel);
+        let target = self.selected_thread()?;
+        if let Some(id) = self.showing(&target) {
+            self.activate(id);
+            return Some(id);
         }
         self.show_beside(target)
+    }
+
+    /// The thread of the active pane's selected message (a conversation's; a thread has no
+    /// threads of its own).
+    pub fn selected_thread(&self) -> Option<Target> {
+        let pane = self.focused().filter(|p| !p.is_thread())?;
+        let tl = self.timeline(pane);
+        let m = pane.selected_index(tl).and_then(|i| tl.items.get(i))?;
+        Some(pane.thread_target(m.ts))
     }
 
     /// Show `target` in the thread panel of the pane what the list opens goes to (what the panel
@@ -305,29 +343,31 @@ impl Work {
         let insert = self.insert();
         self.set_insert(false);
         if let Some(old) = self.panes.get_mut(&owner).and_then(|p| p.thread.take()) {
-            self.remove(old);
+            self.remove(old, Some(owner));
         }
         self.prune();
         let id = self.add(Pane { insert, ..Pane::new(target) });
         let beside = Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(owner), Node::Leaf(id));
-        self.layout = self.layout.as_ref().map(|t| t.replace(owner, &beside));
+        let tab = self.tabs.current_tab_mut()?;
+        tab.root = tab.root.replace(owner, &beside);
+        tab.active = id;
         if let Some(p) = self.panes.get_mut(&owner) {
             p.thread = Some(id);
         }
-        self.active = Some(id);
         self.fill();
         self.check();
         Some(id)
     }
 
-    /// Close the active pane (`Ctrl+W`), and the thread panel it opened. A thread panel hands
-    /// the keyboard back to the pane that opened it, which selects the thread's message. The
-    /// pane to focus next, else (nothing left open) the target of the pane closed.
+    /// Close the active pane (`Ctrl+W`), and the thread panel it opened; closing the last pane
+    /// of a tab closes the tab ([`Self::close_tab`]). A thread panel hands the keyboard back to
+    /// the pane that opened it, which selects the thread's message. The pane to focus next, else
+    /// (no tab left) the target of the pane closed.
     pub fn close(&mut self) -> (Option<Target>, Option<PaneId>) {
         self.set_insert(false);
-        let Some(active) = self.active else { return (None, None) };
+        let Some(active) = self.active() else { return (None, None) };
         if let Some(owner) = self.owner(active) {
-            let closed = self.remove(active);
+            let closed = self.remove(active, Some(owner));
             if let (Some(t), Some(pane)) = (closed, self.panes.get_mut(&owner)) {
                 pane.thread = None;
                 if let Target::Thread { thread, .. } = t.target
@@ -336,30 +376,30 @@ impl Work {
                     pane.selected = Some(thread);
                 }
             }
-            self.active = Some(owner);
             self.prune();
             self.check();
             return (None, Some(owner));
         }
-        let closed = self.close_pane(active);
-        self.active = self.ids().first().copied();
+        let panel = self.panes.get(&active).and_then(|p| p.thread);
+        let alone = self.ids().iter().all(|id| *id == active || Some(*id) == panel);
+        if alone && let Some(i) = self.tabs.current() {
+            let closed = self.close_tab(i);
+            return match self.active() {
+                Some(next) => (None, Some(next)),
+                None => (closed, None),
+            };
+        }
+        self.close_pane(active);
         self.prune();
         self.check();
-        match (self.active, closed) {
-            (Some(next), _) => (None, Some(next)),
-            (None, Some(p)) => {
-                self.closed = Some((p.target.clone(), p.history));
-                (Some(p.target), None)
-            }
-            (None, None) => (None, None),
-        }
+        (None, self.active())
     }
 
-    /// Take pane `id` and the thread panel it opened out.
+    /// Take pane `id` and the thread panel it opened out (a tab left empty closes, unrecorded).
     fn close_pane(&mut self, id: PaneId) -> Option<Pane> {
-        let pane = self.remove(id)?;
+        let pane = self.remove(id, None)?;
         if let Some(panel) = pane.thread {
-            self.remove(panel);
+            self.remove(panel, None);
         }
         if let Some(owner) = self.owner(id).and_then(|o| self.panes.get_mut(&o)) {
             owner.thread = None;
@@ -376,7 +416,7 @@ impl Work {
     /// that way (the shell moves the focus out of the work area then).
     pub fn beside(&self, step: i8) -> Option<PaneId> {
         let ids = self.ids();
-        let at = ids.iter().position(|id| Some(*id) == self.active)?;
+        let at = ids.iter().position(|id| Some(*id) == self.active())?;
         let to = at.checked_add_signed(isize::from(step))?;
         ids.get(to).copied()
     }
@@ -399,7 +439,7 @@ impl Work {
 
     /// Run `f` on the active pane and its timeline, then ask for the pages it now wants.
     pub fn with_pane(&mut self, f: impl FnOnce(&mut Pane, &Timeline)) {
-        if let Some(p) = self.active.and_then(|id| self.panes.get_mut(&id)) {
+        if let Some(p) = self.active().and_then(|id| self.panes.get_mut(&id)) {
             f(p, self.timelines.get(&p.target).unwrap_or(&EMPTY));
         }
         self.fill();
@@ -450,15 +490,13 @@ impl Work {
     /// gone close. `true` when a pane was closed.
     pub fn clamp(&mut self, model: &Model) -> bool {
         let gone: Vec<PaneId> = self
-            .ids()
+            .tabs
+            .panes()
             .into_iter()
             .filter(|id| self.panes.get(id).is_some_and(|p| model.target(&p.target).is_none()))
             .collect();
         for id in &gone {
             self.close_pane(*id);
-        }
-        if self.active.is_none_or(|a| !self.panes.contains_key(&a)) {
-            self.active = self.ids().first().copied();
         }
         self.prune();
         self.check();
@@ -467,17 +505,15 @@ impl Work {
         for p in self.panes.values_mut() {
             p.history.retain(exists);
         }
-        if let Some((target, history)) = &mut self.closed {
-            history.retain(exists);
-            if !exists(target) {
-                self.closed = None;
-            }
-        }
+        self.closed.retain_mut(|c| c.retain(exists));
         // A draft of a conversation that is gone stays (quitting still asks about it): text the
         // user wrote is never dropped silently.
         gone
     }
 }
+
+mod tabs;
+use tabs::ClosedTab;
 
 #[cfg(test)]
 mod tests;
