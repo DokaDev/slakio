@@ -325,3 +325,24 @@ fn switching_tabs_by_any_path_leaves_insert_mode() {
     click(&mut d, MouseButton::Left, x, y);
     assert_eq!(d.app.mode(), Mode::Insert, "a click on the tab shown changes nothing");
 }
+
+#[test]
+fn reopening_a_tab_never_opens_twice_what_is_open_already() {
+    let mut d = two_tabs(120, 40);
+    d.keys("space t c");
+    d.open_in_tab("incidents");
+    d.keys("space 1 space t u");
+    assert_eq!(titles(&d), ["#backend", "#incidents"], "no second #incidents");
+    assert_eq!((d.app.current_tab(), focused_name(&d)), (Some(1), "incidents".to_string()), "it is focused");
+    assert_eq!(d.app.closed_tabs(), 0, "the closed tab is used up");
+    // A closed tab with a thread panel: what is open elsewhere stays out, the rest comes back.
+    d.keys("k enter");
+    let thread = d.app.focused_pane().unwrap().target().clone();
+    d.keys("space t c");
+    d.open_in_tab("incidents");
+    d.keys("space t u");
+    assert_eq!(titles(&d).len(), 3);
+    assert_eq!(d.app.focused_pane().map(|p| p.target().clone()), Some(thread), "the thread, in a pane of its own");
+    assert_eq!(d.app.open_panes().len(), 1);
+    assert_eq!(d.app.open_panes().iter().filter(|p| p.kind() == PaneKind::Conversation).count(), 0);
+}

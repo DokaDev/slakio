@@ -105,23 +105,32 @@ impl Work {
         target
     }
 
-    /// Open the tab closed last again, where it was, with new panes; its active pane. `None`
-    /// when no closed tab is kept.
+    /// Open the tab closed last again, where it was, with new panes; its active pane. What is
+    /// open already, in any tab, stays out of it (never open twice): a tab with nothing else
+    /// focuses that pane instead. `None` when no closed tab is kept.
     pub fn reopen(&mut self) -> Option<PaneId> {
         let c = self.closed.pop()?;
         self.set_insert(false);
+        let (open, kept): (Vec<_>, Vec<_>) = c.panes.iter().partition(|(_, t, ..)| self.showing(t).is_some());
+        let Some(root) = open.iter().try_fold(c.root.clone(), |root, (old, ..)| root.without(*old)) else {
+            let target = c.panes.iter().find(|(id, ..)| *id == c.active).or(c.panes.first()).map(|(_, t, ..)| t)?;
+            let id = self.showing(target)?;
+            self.activate(id);
+            return Some(id);
+        };
         let mut ids = Vec::new();
-        for (old, target, history, _) in &c.panes {
+        for (old, target, history, _) in &kept {
             ids.push((*old, self.add(Pane { history: history.clone(), ..Pane::new(target.clone()) })));
         }
-        let new = |old: PaneId| ids.iter().find(|(o, _)| *o == old).map_or(old, |(_, n)| *n);
-        for (old, _, _, thread) in &c.panes {
-            if let Some(p) = self.panes.get_mut(&new(*old)) {
-                p.thread = thread.map(new);
+        let new = |old: PaneId| ids.iter().find(|(o, _)| *o == old).map(|(_, n)| *n);
+        for (old, _, _, thread) in &kept {
+            if let Some(p) = new(*old).and_then(|id| self.panes.get_mut(&id)) {
+                p.thread = thread.and_then(new);
             }
         }
-        let active = new(c.active);
-        self.tabs.insert(c.index, Tab { root: c.root.map(&new), active, name: c.name });
+        let root = root.map(&|old| new(old).unwrap_or(old));
+        let active = new(c.active).unwrap_or_else(|| root.leaves()[0]);
+        self.tabs.insert(c.index, Tab { root, active, name: c.name });
         self.prune();
         self.fill();
         self.check();
