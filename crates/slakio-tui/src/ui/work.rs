@@ -29,7 +29,7 @@ use slakio_core::layout::PaneId;
 use slakio_core::model::{Conversation, ConversationKind, Presence};
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)]) {
-    if app.work.main().is_none() {
+    if app.work.ids().is_empty() {
         let area = layout.areas.work;
         f.render_widget(frame(app, Region::Work, ""), area);
         super::empty::work(f, app, screen::inner(area));

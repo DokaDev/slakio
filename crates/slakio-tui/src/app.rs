@@ -520,7 +520,7 @@ impl App {
             p.select_index(hit.message, tl);
             p.visual = None;
         });
-        if (hit.link || double) && Some(layout.id) == self.work.main_id() {
+        if hit.link || double {
             self.open_thread();
         }
     }
@@ -597,7 +597,7 @@ impl App {
             ShellAction::FocusDown => return self.info(Msg::Label(Label::StatusNoPaneBelow), now),
             ShellAction::FocusLeft if self.focus().is_pane() => return self.pane(PaneAction::Left, now),
             // Never onto an empty work area: nothing there takes a key.
-            ShellAction::FocusRight if self.focus() == Focus::List && self.work.main().is_none() => return,
+            ShellAction::FocusRight if self.focus() == Focus::List && self.work.ids().is_empty() => return,
             ShellAction::FocusRight if self.focus().is_pane() => return self.pane(PaneAction::Right, now),
             _ => {}
         }
@@ -634,7 +634,7 @@ impl App {
             return;
         }
         let page = self.pane_height() as isize;
-        let main_target = self.work.main().map(|p| p.target.clone());
+        let main_target = self.work.home().map(|p| p.target.clone());
         match a {
             PaneAction::Back | PaneAction::Forward => {
                 let moved = if a == PaneAction::Back { self.work.back() } else { self.work.forward() };
@@ -655,7 +655,7 @@ impl App {
             PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl)),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
-                Some(p) if p.selected.is_none() || self.work.active() == self.work.thread_id() => {
+                Some(p) if p.selected.is_none() || p.is_thread() => {
                     self.work.set_insert(true);
                 }
                 Some(_) => self.open_thread(),

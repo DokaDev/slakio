@@ -13,7 +13,7 @@ impl App {
             rail_expanded: self.shell.rail_expanded(self.focus() == Focus::Rail),
             push: self.settings.rail_push,
             list_hidden: self.shell.list_hidden,
-            thread: self.work.thread_id().is_some(),
+            thread: self.work.has_panel(),
             list_focused: self.focus() == Focus::List,
         }
     }

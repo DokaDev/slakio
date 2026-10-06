@@ -65,42 +65,24 @@ impl App {
         }
     }
 
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: rail, list, main pane, thread
-    /// panel, round again. A hidden list or a closed pane is skipped. The rail is expanded only
-    /// while it has the focus, so passing it never leaves it open.
+    /// Move the focus to the next (`1`) or previous (`-1`) panel: rail, list, the panes in
+    /// reading order (the conversation, the thread panel beside it), round again. A hidden list
+    /// or a closed pane is skipped. The rail is expanded only while it has the focus, so passing
+    /// it never leaves it open.
     pub(super) fn cycle(&mut self, step: isize) {
-        #[derive(Clone, Copy, PartialEq, Eq)]
-        enum Stop {
-            Rail,
-            List,
-            Main,
-            Thread,
-        }
-        let mut stops = vec![Stop::Rail];
+        let mut stops = vec![Focus::Rail];
         if !self.shell.list_hidden {
-            stops.push(Stop::List);
+            stops.push(Focus::List);
         }
-        let (main, thread) = (self.work.main_id(), self.work.thread_id());
-        stops.extend(main.map(|_| Stop::Main).into_iter().chain(thread.map(|_| Stop::Thread)));
-        let here = match self.focus() {
-            Focus::Rail => Stop::Rail,
-            Focus::List => Stop::List,
-            Focus::Pane(h) if Some(h.id()) == thread => Stop::Thread,
-            Focus::Pane(_) => Stop::Main,
-        };
-        let at = stops.iter().position(|s| *s == here);
+        stops.extend(self.work.ids().into_iter().map(Focus::on));
+        let at = stops.iter().position(|s| *s == self.focus());
         let n = stops.len() as isize;
         let to = match at {
             Some(i) => stops[(i as isize + step).rem_euclid(n) as usize],
             None => stops[0],
         };
         self.work.set_insert(false);
-        self.set_focus(match to {
-            Stop::Rail => Focus::Rail,
-            Stop::List => Focus::List,
-            Stop::Main => Focus::on(main.unwrap_or(NO_PANE)),
-            Stop::Thread => Focus::on(thread.unwrap_or(NO_PANE)),
-        });
+        self.set_focus(to);
     }
 
     /// The list panel gets the keyboard, its cursor on the conversation `target` names.
@@ -126,8 +108,8 @@ impl App {
             p.bottom.set(None);
             return;
         }
-        if let (Some(main), true) = (self.work.main_id(), self.work.active() == self.work.thread_id()) {
-            return self.set_focus(Focus::on(main));
+        if let Some(owner) = self.work.active().and_then(|a| self.work.owner(a)) {
+            return self.set_focus(Focus::on(owner));
         }
         if !self.shell.list_hidden {
             self.focus_list(main);

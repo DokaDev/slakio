@@ -14,9 +14,12 @@
 //!
 //! The panes are kept by id in a registry and placed by a layout tree
 //! ([`slakio_core::layout`]): the conversation alone, or split with the thread panel beside it.
-//! The conversation is the tree's first pane, the thread panel its second. The work area also
-//! keeps which pane is active (the one the keyboard goes to in the work area); it never moves
-//! the keyboard itself: what it opens or closes it hands back, and the app moves the focus.
+//! What a pane is does not come from its place in the tree: a pane that opened the auto thread
+//! panel names it ([`Pane::thread`]); the panel is the pane some other pane names, and closing
+//! that relation (closing either pane) is all it takes to make it an ordinary pane or none. The
+//! work area also keeps which pane is active (the one the keyboard goes to in the work area); it
+//! never moves the keyboard itself: what it opens or closes it hands back, and the app moves the
+//! focus.
 //!
 //! The panes are views. What they show is held once per target, outside them: the messages in
 //! the [`TimelineStore`], what is being written in the [`DraftStore`]. The messages of a target no
@@ -83,22 +86,29 @@ impl Work {
         self.layout.as_ref().map(Node::leaves).unwrap_or_default()
     }
 
-    /// The conversation's pane (the layout's first).
-    pub fn main_id(&self) -> Option<PaneId> {
-        self.ids().first().copied()
+    /// The pane that opened the thread panel `id`; `None` when `id` is no pane's thread panel.
+    pub fn owner(&self, id: PaneId) -> Option<PaneId> {
+        self.panes.iter().find(|(_, p)| p.thread == Some(id)).map(|(owner, _)| *owner)
     }
 
-    /// The thread panel (the layout's second pane).
-    pub fn thread_id(&self) -> Option<PaneId> {
-        self.ids().get(1).copied()
+    /// An open pane is some pane's auto thread panel.
+    pub fn has_panel(&self) -> bool {
+        self.panes.values().any(|p| p.thread.is_some_and(|t| self.panes.contains_key(&t)))
+    }
+
+    /// The pane what the list opens goes to: the active pane, or the pane that opened it when it
+    /// is a thread panel.
+    pub fn home_id(&self) -> Option<PaneId> {
+        self.active.map(|a| self.owner(a).unwrap_or(a))
     }
 
     pub fn pane(&self, id: PaneId) -> Option<&Pane> {
         self.panes.get(&id)
     }
 
-    pub fn main(&self) -> Option<&Pane> {
-        self.main_id().and_then(|id| self.panes.get(&id))
+    /// The pane what the list opens goes to ([`Self::home_id`]).
+    pub fn home(&self) -> Option<&Pane> {
+        self.home_id().and_then(|id| self.panes.get(&id))
     }
 
     /// The active pane: the one the keyboard goes to in the work area.
@@ -198,9 +208,9 @@ impl Work {
 
     /// Open the conversation `target` (or find it open already); the pane to focus.
     pub fn open(&mut self, target: Target) -> Option<PaneId> {
-        if let Some(current) = self.main().map(|p| p.target.clone()) {
+        if let Some(current) = self.home().map(|p| p.target.clone()) {
             if current == target {
-                return self.main_id();
+                return self.home_id();
             }
             self.back.push(current);
             if self.back.len() > HISTORY {
@@ -226,7 +236,7 @@ impl Work {
     /// Back to the conversation before (`Ctrl+O`); its pane, `None` when there is none.
     pub fn back(&mut self) -> Option<PaneId> {
         let to = self.back.pop()?;
-        if let Some(p) = self.main() {
+        if let Some(p) = self.home() {
             self.forward.push(p.target.clone());
         }
         Some(self.show(to))
@@ -235,69 +245,85 @@ impl Work {
     /// Forward again (`Ctrl+I`); its pane, `None` when there is none.
     pub fn forward(&mut self) -> Option<PaneId> {
         let to = self.forward.pop()?;
-        if let Some(p) = self.main() {
+        if let Some(p) = self.home() {
             self.back.push(p.target.clone());
         }
         Some(self.show(to))
     }
 
-    /// The thread of the selected message of the conversation, in the thread panel (replacing
-    /// what it showed, or found there already); the pane to focus.
+    /// The thread of the selected message of the active pane's conversation, in the pane's
+    /// thread panel (replacing what it showed, or found there already); the pane to focus. A
+    /// thread has no threads of its own.
     pub fn open_thread(&mut self) -> Option<PaneId> {
-        if self.active != self.main_id() {
-            return None;
-        }
-        let main = self.main()?;
-        let tl = self.timeline(main);
-        let m = main.selected_index(tl).and_then(|i| tl.items.get(i))?;
-        let target = main.thread_target(m.ts);
-        if let Some(id) = self.thread_id().filter(|id| self.panes.get(id).is_some_and(|t| t.target == target)) {
-            return Some(id);
+        let id = self.active?;
+        let pane = self.panes.get(&id).filter(|p| !p.is_thread())?;
+        let tl = self.timeline(pane);
+        let m = pane.selected_index(tl).and_then(|i| tl.items.get(i))?;
+        let target = pane.thread_target(m.ts);
+        if let Some(panel) = pane.thread.filter(|t| self.panes.get(t).is_some_and(|t| t.target == target)) {
+            return Some(panel);
         }
         self.show_beside(target)
     }
 
-    /// Show `target` in the thread panel beside the conversation (what it showed is closed);
-    /// the pane to focus, which takes Insert mode along.
+    /// Show `target` in the thread panel of the pane what the list opens goes to (what the panel
+    /// showed is closed); the pane to focus, which takes Insert mode along.
     pub fn show_beside(&mut self, target: Target) -> Option<PaneId> {
-        let main = self.main_id()?;
+        let owner = self.home_id()?;
         let insert = self.insert();
         self.set_insert(false);
-        if let Some(old) = self.thread_id() {
+        if let Some(old) = self.panes.get_mut(&owner).and_then(|p| p.thread.take()) {
             self.remove(old);
         }
         self.prune();
         let id = self.add(Pane { insert, ..Pane::new(target) });
-        self.layout = Some(Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(main), Node::Leaf(id)));
+        let beside = Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(owner), Node::Leaf(id));
+        self.layout = self.layout.as_ref().map(|t| t.replace(owner, &beside));
+        if let Some(p) = self.panes.get_mut(&owner) {
+            p.thread = Some(id);
+        }
         self.active = Some(id);
         self.fill();
         Some(id)
     }
 
-    /// Close the active pane (`Ctrl+W`): the thread panel (the conversation then selects the
-    /// thread's message, and is the pane to focus), else the conversation, whose target is handed
-    /// back.
+    /// Close the active pane (`Ctrl+W`), and the thread panel it opened. A thread panel hands
+    /// the keyboard back to the pane that opened it, which selects the thread's message. The
+    /// pane to focus next, else (nothing left open) the target of the pane closed.
     pub fn close(&mut self) -> (Option<Target>, Option<PaneId>) {
         self.set_insert(false);
         let Some(active) = self.active else { return (None, None) };
-        if Some(active) == self.thread_id() {
+        if let Some(owner) = self.owner(active) {
             let closed = self.remove(active);
-            let main = self.main_id();
-            if let (Some(t), Some(main)) = (closed, main.and_then(|id| self.panes.get_mut(&id)))
-                && let Target::Thread { thread, .. } = t.target
-                && self.timelines.get(&main.target).is_some_and(|tl| tl.position(thread).is_some())
-            {
-                main.selected = Some(thread);
+            if let (Some(t), Some(pane)) = (closed, self.panes.get_mut(&owner)) {
+                pane.thread = None;
+                if let Target::Thread { thread, .. } = t.target
+                    && self.timelines.get(&pane.target).is_some_and(|tl| tl.position(thread).is_some())
+                {
+                    pane.selected = Some(thread);
+                }
             }
             self.prune();
-            return (None, main);
+            return (None, Some(owner));
         }
-        let closed = self.panes.get(&active).map(|p| p.target.clone());
-        self.panes.clear();
-        self.layout = None;
-        self.active = None;
+        let closed = self.close_pane(active).map(|p| p.target);
         self.prune();
-        (closed, None)
+        match self.ids().first().copied() {
+            Some(next) => (None, Some(next)),
+            None => (closed, None),
+        }
+    }
+
+    /// Take pane `id` and the thread panel it opened out.
+    fn close_pane(&mut self, id: PaneId) -> Option<Pane> {
+        let pane = self.remove(id)?;
+        if let Some(panel) = pane.thread {
+            self.remove(panel);
+        }
+        if let Some(owner) = self.owner(id).and_then(|o| self.panes.get_mut(&o)) {
+            owner.thread = None;
+        }
+        Some(pane)
     }
 
     /// Any draft holds text that was not sent, open in a pane or not.
@@ -379,15 +405,22 @@ impl Work {
         true
     }
 
-    /// Drop what no longer exists after a new boot answer. `true` when the panes were closed.
+    /// Drop what no longer exists after a new boot answer: the panes of a conversation that is
+    /// gone close. `true` when a pane was closed.
     pub fn clamp(&mut self, model: &Model) -> bool {
-        let gone = self.main().is_some_and(|p| model.target(&p.target).is_none());
-        if gone {
-            self.panes.clear();
-            self.layout = None;
-            self.active = None;
-            self.prune();
+        let gone: Vec<PaneId> = self
+            .ids()
+            .into_iter()
+            .filter(|id| self.panes.get(id).is_some_and(|p| model.target(&p.target).is_none()))
+            .collect();
+        for id in &gone {
+            self.close_pane(*id);
         }
+        if self.active.is_some_and(|a| !self.panes.contains_key(&a)) {
+            self.active = self.ids().first().copied();
+        }
+        self.prune();
+        let gone = !gone.is_empty();
         self.back.retain(|t| model.target(t).is_some());
         self.forward.retain(|t| model.target(t).is_some());
         // A draft of a conversation that is gone stays (quitting still asks about it): text the

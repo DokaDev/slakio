@@ -3,8 +3,8 @@
 //! how much room the second one gets. [`Node::solve`] turns the tree into one rectangle per pane
 //! shown; the UI draws them and the mouse finds panes in them.
 //!
-//! Today's work area is a leaf (the conversation) or a split of the conversation and the thread
-//! panel beside it; more shapes (user splits, tabs) build on the same tree.
+//! Which pane is what (a conversation, the thread panel a pane opened beside it) is not the
+//! tree's business: the tree only places panes.
 
 /// A pane, for as long as it is open (ids are never reused).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -81,6 +81,17 @@ impl Node {
                 (Some(a), Some(b)) => Some(Self::split(*dir, *share, a, b)),
                 (a, b) => a.or(b),
             },
+        }
+    }
+
+    /// The tree with the leaf of pane `id` replaced by `with` (unchanged when `id` is not in it).
+    pub fn replace(&self, id: PaneId, with: &Node) -> Node {
+        match self {
+            Self::Leaf(l) if *l == id => with.clone(),
+            Self::Leaf(_) => self.clone(),
+            Self::Split { dir, share, first, second } => {
+                Self::split(*dir, *share, first.replace(id, with), second.replace(id, with))
+            }
         }
     }
 

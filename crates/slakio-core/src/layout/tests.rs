@@ -38,6 +38,16 @@ fn a_pane_taken_out_collapses_its_split() {
     assert!(t.contains(PaneId(2)) && !t.contains(PaneId(3)));
 }
 
+#[test]
+fn a_leaf_replaced_by_a_split_keeps_the_rest_of_the_tree() {
+    let t = beside();
+    let inner = Node::split(Dir::Column, THREAD, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3)));
+    let got = t.replace(PaneId(2), &inner);
+    assert_eq!(got.leaves(), vec![PaneId(1), PaneId(2), PaneId(3)]);
+    assert_eq!(got.without(PaneId(3)), Some(t.clone()));
+    assert_eq!(t.replace(PaneId(9), &inner), t, "a pane not in the tree changes nothing");
+}
+
 /// A tree of up to three panes, splits of either direction.
 fn tree() -> impl Strategy<Value = Node> {
     let share = (1u16..5, 2u16..6, 0u16..40, 0u16..80, 0u16..60).prop_map(|(num, den, min, max, keep)| Share {

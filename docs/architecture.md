@@ -54,7 +54,7 @@ and list cursors, folded sections (`app/shell.rs`) —, the work area — its pa
 tree of `slakio-core` (`layout.rs`: the conversation, or split with the auto thread panel), the
 active pane, back/forward history
 (`app/work.rs`) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
-rows drawn), the messages of each target a pane shows, held once however many panes show it
+rows drawn, the thread panel it opened: a pane's role is this relation, never its place in the tree), the messages of each target a pane shows, held once however many panes show it
 (`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the

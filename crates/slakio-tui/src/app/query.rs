@@ -154,7 +154,7 @@ impl App {
 
     /// The conversation open in the work area.
     pub fn open_target(&self) -> Option<&Target> {
-        self.work.main().map(|p| &p.target)
+        self.work.home().map(|p| &p.target)
     }
 
     /// The rows of the list panel, top down.

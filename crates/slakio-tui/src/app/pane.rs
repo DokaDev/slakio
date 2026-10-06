@@ -1,5 +1,5 @@
 //! A pane: a view of one conversation or thread — the selection, a VISUAL range, Insert mode,
-//! where the view is anchored and the rows drawn last. The messages are not the pane's: they are the
+//! where the view is anchored, the rows drawn last and the thread panel it opened. The messages are not the pane's: they are the
 //! target's [`Timeline`], shared by every pane that shows it, and what is being written is the
 //! target's draft ([`super::drafts`]). A pane asks for older messages as its selection nears
 //! the top; drawing lays out only the rows on screen.
@@ -14,6 +14,7 @@
 //! ones below `bottom` fill what is left; a history that fits whole sits at the bottom.
 
 use super::timelines::Timeline;
+use slakio_core::layout::PaneId;
 use slakio_core::model::{Message, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Safe;
 use std::cell::{Cell, RefCell};
@@ -87,6 +88,8 @@ pub struct Pane {
     pub to_oldest: bool,
     /// Its composer is being written in (Insert mode); only the pane with the keyboard is.
     pub insert: bool,
+    /// The auto thread panel this pane opened beside it, while open.
+    pub thread: Option<PaneId>,
     /// The rows drawn last, by drawing (only it knows the rows' heights).
     pub hits: RefCell<Vec<Hit>>,
 }
@@ -100,6 +103,7 @@ impl Pane {
             bottom: Cell::new(None),
             to_oldest: false,
             insert: false,
+            thread: None,
             hits: RefCell::new(Vec::new()),
         }
     }
