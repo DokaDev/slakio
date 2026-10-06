@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││                        ││                                                                                        │
 │  ││                        ││                                                                                        │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › DMs    │ Enter open · l peek · Tab next pane · Ctrl+R rail · ? help · Space more │  @37  DM 1 │ demo
+ NORMAL  ▌B side › DMs │ Enter open · t new tab · Tab next pane · Ctrl+R rail · ? help · Space more │  @37  DM 1 │ demo

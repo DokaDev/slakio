@@ -346,3 +346,22 @@ fn reopening_a_tab_never_opens_twice_what_is_open_already() {
     assert_eq!(d.app.open_panes().len(), 1);
     assert_eq!(d.app.open_panes().iter().filter(|p| p.kind() == PaneKind::Conversation).count(), 0);
 }
+
+#[test]
+fn the_hint_line_and_which_key_teach_the_new_tab_key() {
+    let mut d = Demo::new(120, 40);
+    d.list_cursor_on("backend");
+    let s = d.status_line();
+    assert!(s.contains("l peek · t new tab"), "on a conversation of the list: {s}");
+    d.keys("enter");
+    d.keys("k");
+    let s = d.status_line();
+    let (t, v) = (s.find("t new tab"), s.find("V select"));
+    assert!(t.is_some() && (v.is_none() || t < v), "a selected message, before V select: {s}");
+    d.keys("space t");
+    d.now += std::time::Duration::from_millis(400);
+    d.app.on_tick(d.now);
+    assert!(d.screen().lines().any(|l| l.contains("n  Open in a new tab")), "{}", d.screen());
+    d.keys("n");
+    assert_eq!(titles(&d).len(), 2, "Space t n opens the selected message's thread in a tab");
+}

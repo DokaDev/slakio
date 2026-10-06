@@ -388,7 +388,9 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     let mut d = Demo::new(160, 40);
     let hints = |d: &Demo| d.status_line();
     assert!(
-        hints(&d).contains("Enter open · l peek · Tab next pane · : commands · Ctrl+R rail · ? help · Space more"),
+        hints(&d).contains(
+            "Enter open · l peek · t new tab · Tab next pane · : commands · Ctrl+R rail · ? help · Space more"
+        ),
         "{}",
         hints(&d)
     );
@@ -400,7 +402,11 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     d.open("long-threads");
     assert!(hints(&d).contains("i write · k messages · Esc list · Ctrl+R rail"), "{}", hints(&d));
     d.keys("k");
-    assert!(hints(&d).contains("Enter thread · y copy · V select · i write · Esc deselect"), "{}", hints(&d));
+    assert!(
+        hints(&d).contains("Enter thread · t new tab · y copy · V select · i write · Esc deselect"),
+        "{}",
+        hints(&d)
+    );
     d.keys("V");
     assert!(hints(&d).contains("y copy · j/k extend · Esc cancel"), "{}", hints(&d));
     d.keys("esc enter");

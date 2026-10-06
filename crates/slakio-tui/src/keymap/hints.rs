@@ -3,7 +3,9 @@
 //! rebound shows as bound, and an action nothing is bound to is left out.
 
 use super::{Ctx, Keymap, LEADER, check, keys, parse_keys};
-use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, HelpAction, PaneAction, ShellAction};
+use crate::action::{
+    Action, AppAction, CommandLineAction, ComposerAction, HelpAction, PaneAction, ShellAction, TabAction,
+};
 use slakio_core::i18n::Label;
 
 /// Where the keyboard is, as far as the hints care.
@@ -57,6 +59,7 @@ const WRITE: Action = Action::Pane(PaneAction::Insert);
 const ESCAPE: Action = Action::Pane(PaneAction::Escape);
 const PREV_MSG: Action = Action::Pane(PaneAction::Prev);
 const NEXT_MSG: Action = Action::Pane(PaneAction::Next);
+const NEW_TAB: Action = Action::Tab(TabAction::Open);
 
 /// The entries for `place`, best first (the line drops them from the end when it is short).
 #[expect(clippy::too_many_lines, reason = "a table of hints per place")]
@@ -66,6 +69,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
         Place::ListConversation => &[
             One(OPEN, Label::HintOpen),
             One(Action::Shell(ShellAction::ListPeek), Label::HintPeek),
+            One(NEW_TAB, Label::HintNewTab),
             One(NEXT_PANE, Label::HintNextPane),
             One(COMMANDS, Label::HintCommands),
             One(RAIL, Label::HintRail),
@@ -110,6 +114,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
         ],
         Place::PaneSelected => &[
             One(Action::Pane(PaneAction::OpenThread), Label::HintThread),
+            One(NEW_TAB, Label::HintNewTab),
             One(Action::Pane(PaneAction::Copy), Label::HintCopy),
             One(Action::Pane(PaneAction::Visual), Label::HintSelect),
             One(WRITE, Label::HintWrite),

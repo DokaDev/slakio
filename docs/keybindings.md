@@ -75,6 +75,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Alt+7` | Tab 7 | `tab.go.7` |
 | `Alt+8` | Tab 8 | `tab.go.8` |
 | `Alt+9` | Tab 9 | `tab.go.9` |
+| `Space t n` | Open in a new tab (a message: its thread) | `tab.open` |
 | `Space t c` | Close the tab | `tab.close` |
 | `Space t u` | Reopen the tab closed last | `tab.reopen` |
 | `Space t r` | Rename the tab | `tab.rename` |

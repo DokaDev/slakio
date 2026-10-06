@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-latency-144   ││                                                                                        │
 │  ││   # feed-meeting-82    ││                                                                                        │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home  │ Enter open · l peek · : commands · Ctrl+R rail · ? help · Space more │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home   │ Enter open · l peek · t new tab · Ctrl+R rail · ? help · Space more │  @37  DM 16 │ demo

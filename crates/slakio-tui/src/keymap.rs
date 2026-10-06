@@ -278,6 +278,7 @@ pub const DEFAULTS: &[Binding] = &[
     tab(Ctx::Shell, "alt+7", TabAction::Go(7)),
     tab(Ctx::Shell, "alt+8", TabAction::Go(8)),
     tab(Ctx::Shell, "alt+9", TabAction::Go(9)),
+    tab(Ctx::Shell, "space t n", TabAction::Open),
     tab(Ctx::Shell, "space t c", TabAction::Close),
     tab(Ctx::Shell, "space t u", TabAction::Reopen),
     tab(Ctx::Shell, "space t r", TabAction::Rename),

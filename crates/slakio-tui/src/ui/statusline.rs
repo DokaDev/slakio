@@ -235,12 +235,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .iter()
         .filter_map(|l| resolved.iter().position(|(_, x)| x == l))
         .collect();
-    // A hint's worth: help most, then the place's first key (what to press now), the leader key,
-    // the others, those of least worth.
+    // A hint's worth: help most, then the place's first key (what to press now), the leader key
+    // and the new tab key (the way to tabs), the others, those of least worth.
     let worth = |i: usize| match resolved[i].1 {
         Label::HintHelp => 5,
         _ if i == 0 => 4,
-        Label::HintMore => 3,
+        Label::HintMore | Label::HintNewTab => 3,
         l if low(l) => 1,
         _ => 2,
     };
@@ -309,8 +309,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             // Help comes before any other hint, and the place's first key before the rest.
             let needs = |k: usize| (0..n).any(|j| worth(j) == k && !with.contains(&j));
             // A hint of least worth only comes with the others of its place.
+            // The new tab key comes before the other hints but a peek (the way to tabs is taught;
+            // a peek is the row's other way to open).
+            let left_out = |l: Label| (0..n).any(|j| resolved[j].1 == l && !with.contains(&j));
+            let tab_left_out = left_out(Label::HintNewTab);
+            // The way to the rail comes before the next pane, which leads there too.
+            let has = |l: Label| with.iter().any(|&j| resolved[j].1 == l);
             let broken = (!with.is_empty() && needs(5))
                 || (with.iter().any(|&i| worth(i) < 4) && needs(4))
+                || (with.iter().any(|&i| worth(i) <= 2 && resolved[i].1 != Label::HintPeek) && tab_left_out)
+                || (has(Label::HintNextPane) && left_out(Label::HintRail))
                 || (with.iter().any(|&i| worth(i) == 1) && needs(2));
             if broken {
                 continue;

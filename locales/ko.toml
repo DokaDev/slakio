@@ -271,3 +271,4 @@
 "palette.rename_to" = "탭 이름: {name}"
 "palette.rename_auto" = "보이는 것을 따라 탭 이름 짓기"
 "guide.tab_numbers" = "1~9번 탭 보기"
+"hint.new_tab" = "새 탭"

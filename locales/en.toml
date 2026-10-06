@@ -292,3 +292,4 @@
 "palette.rename_to" = "Name the tab {name}"
 "palette.rename_auto" = "Name the tab after what it shows"
 "guide.tab_numbers" = "Show tab 1 to 9"
+"hint.new_tab" = "new tab"

@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││   # feed-latency-144   │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────┤
 │  ││   # feed-meeting-82    ││ › Press i to write                                                                     │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #hostile-strings │ Enter thread · V select · i write · Esc deselect · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A compa… › #hostile-strings │ Enter thread · t new tab · i write · Esc deselect · ? help │  @37  DM 16 │ demo
