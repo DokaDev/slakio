@@ -8,7 +8,10 @@
 use super::App;
 use super::query::{Focus, PaneHandle};
 use super::shell::Region;
+use crate::action::{PaneAction, ShellAction};
+use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
+use std::time::Instant;
 
 impl Focus {
     /// The focus on pane `id`.
@@ -120,6 +123,39 @@ impl App {
         }
         if !self.shell.list_hidden {
             self.focus_list(main);
+        }
+    }
+
+    /// A shell action: the focus between the regions, the top bar, the list panel (what the
+    /// shell opens, the work area opens).
+    pub(super) fn shell(&mut self, a: ShellAction, now: Instant) {
+        if self.backend.is_none() {
+            return;
+        }
+        match a {
+            ShellAction::FocusNext => return self.cycle(1),
+            ShellAction::FocusPrev => return self.cycle(-1),
+            ShellAction::FocusUp => return self.info(Msg::Label(Label::StatusNoPaneAbove), now),
+            ShellAction::FocusDown => return self.info(Msg::Label(Label::StatusNoPaneBelow), now),
+            ShellAction::FocusLeft if self.focus().is_pane() => return self.pane(PaneAction::Left, now),
+            // Never onto an empty work area: nothing there takes a key.
+            ShellAction::FocusRight if self.focus() == Focus::List && self.work.ids().is_empty() => return,
+            ShellAction::FocusRight if self.focus().is_pane() => return self.pane(PaneAction::Right, now),
+            ShellAction::SwitcherNext
+            | ShellAction::SwitcherPrev
+            | ShellAction::SwitcherChoose
+            | ShellAction::SwitcherClose => return self.switcher_key(a),
+            ShellAction::NavSelect if self.nav_select() => return,
+            _ => {}
+        }
+        let height = self.list_height();
+        let mut here = self.region();
+        let open = self.shell.update(a, &self.model, height, &mut here);
+        if here != self.region() {
+            self.focus_region(here);
+        }
+        if let Some(open) = open {
+            self.open(open.target, open.focus);
         }
     }
 }
