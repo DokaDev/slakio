@@ -30,6 +30,7 @@ pub mod cmdline;
 pub mod composer;
 pub mod dialog;
 pub mod help;
+mod layout;
 pub mod model;
 pub mod palette;
 pub mod pane;
@@ -261,31 +262,6 @@ impl App {
             Region::Work if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
             Region::Work => Ctx::PaneNormal,
         }
-    }
-
-    /// What the layout depends on now besides the size.
-    fn shape(&self) -> screen::Shape {
-        screen::Shape {
-            rail_expanded: self.shell.rail_expanded(),
-            push: self.settings.rail_push,
-            list_hidden: self.shell.list_hidden,
-            thread: self.work.thread.is_some(),
-            list_focused: self.shell.focus == Region::List,
-            main: self.work.main.is_some(),
-            thread_focused: self.work.side == Side::Thread,
-        }
-    }
-
-    /// The screen's areas now.
-    pub fn areas(&self) -> screen::Areas {
-        screen::areas(self.size, self.shape())
-    }
-
-    /// The whole frame now: the areas and the panes with their parts, as drawn and clicked.
-    pub fn frame(&self) -> screen::FrameLayout {
-        screen::frame(self.size, self.shape(), |slot, width| {
-            self.work.pane(slot).map_or(1, |p| p.composer.view(width).lines.len())
-        })
     }
 
     /// Rows the list panel shows (or would show, while it is hidden).

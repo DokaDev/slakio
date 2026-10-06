@@ -138,7 +138,7 @@ pub fn pane_parts(area: Rect, lines: usize) -> PaneParts {
 }
 
 /// A pane's place in the work area.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Slot {
     /// The conversation open in the work area.
     Main,
@@ -176,7 +176,7 @@ impl FrameLayout {
 
 /// The frame for a screen of `size`. `composer_lines(slot, width)` is how many lines the
 /// composer of the pane in `slot` takes when it wraps at `width`.
-pub fn frame(size: Rect, s: Shape, composer_lines: impl Fn(Slot, usize) -> usize) -> FrameLayout {
+pub fn frame(size: Rect, s: Shape, mut composer_lines: impl FnMut(Slot, usize) -> usize) -> FrameLayout {
     let areas = areas(size, s);
     let mut panes = Vec::new();
     if s.main {
