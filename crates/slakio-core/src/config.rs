@@ -7,12 +7,17 @@
 //!                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
 //!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
+//! avatars = "initials"     # a person's initials on a colored chip, or "off"
 //! rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
 //! terminal's own colors. A family takes its light or its dark variant by the terminal's
 //! background. `:theme <name>` changes it while the app runs and saves it here (comments kept).
+//!
+//! `avatars = "image"` is kept for profile photos, which come in a later version; until then it
+//! draws initials, as it will where a terminal cannot show images. `:avatars` changes the
+//! setting while the app runs and saves it here too.
 //!
 //! `rail_expand` is temporary: both ways exist until one is chosen, then the setting goes.
 //!
@@ -35,6 +40,8 @@ pub struct Config {
     pub icons: String,
     /// How the rail expands: `overlay` or `push` ([`RAIL_EXPAND`]).
     pub rail_expand: String,
+    /// How a person is pictured: `initials`, `off`, or `image` (initials for now) ([`AVATARS`]).
+    pub avatars: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
 }
@@ -46,6 +53,7 @@ impl Default for Config {
             theme: "auto".to_string(),
             icons: "ask".to_string(),
             rail_expand: "overlay".to_string(),
+            avatars: "initials".to_string(),
             path: None,
         }
     }
@@ -76,6 +84,9 @@ pub const THEMES: &[&str] = &[
 
 /// The values `icons` takes (`true` and `false` are `on` and `off`).
 pub const ICONS: &[&str] = &["on", "off", "ask"];
+
+/// The values `avatars` takes.
+pub const AVATARS: &[&str] = &["initials", "off", "image"];
 
 /// The values `rail_expand` takes.
 pub const RAIL_EXPAND: &[&str] = &["overlay", "push"];
@@ -134,6 +145,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
         match key {
             "language" => cfg.language = one_of(item, LANGUAGES).ok_or_else(|| bad(LANGUAGES.join(", ")))?,
             "rail_expand" => cfg.rail_expand = one_of(item, RAIL_EXPAND).ok_or_else(|| bad(RAIL_EXPAND.join(", ")))?,
+            "avatars" => cfg.avatars = one_of(item, AVATARS).ok_or_else(|| bad(AVATARS.join(", ")))?,
             "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
             "icons" => {
                 cfg.icons = match item.as_bool() {
@@ -155,7 +167,7 @@ fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
 
 /// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
 /// order of what is there and the comment after the old value; a missing file is created. Used
-/// for what the app saves itself (`icons` after asking, `theme` when changed while running).
+/// for what the app saves itself (`icons` after asking, `theme` and `avatars` when changed while running).
 /// A file that cannot be read or parsed is left alone.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
     let text = match std::fs::read_to_string(path) {

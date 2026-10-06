@@ -28,6 +28,17 @@ fn the_settings_are_read() {
     assert_eq!((cfg.icons.as_str(), cfg.theme.as_str()), ("on", "tokyo-night"));
     assert_eq!(cfg.rail_expand, "push");
     assert_eq!(parse("icons = false").unwrap().icons, "off");
+    assert_eq!(parse("avatars = \"off\"").unwrap().avatars, "off");
+    assert_eq!(parse("avatars = \"Image\"").unwrap().avatars, "image", "kept for photos, later");
+    assert_eq!(Config::default().avatars, "initials");
+    assert_eq!(
+        parse("avatars = \"photo\""),
+        Err(ConfigError::Value {
+            key: "avatars".into(),
+            value: "\"photo\"".into(),
+            allowed: "initials, off, image".into()
+        })
+    );
     assert_eq!(parse("icons = \"ask\"").unwrap().icons, "ask");
     assert_eq!(parse("").unwrap(), Config::default());
     let d = Config::default();
