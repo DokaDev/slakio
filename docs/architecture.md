@@ -138,9 +138,11 @@ whose light or dark variant follows the terminal's background, asked once with O
 takes `tokyo-night` on a terminal that says it shows 24-bit color. `:theme <name>` resolves a
 name again with what was found at startup (`theme::Look`) and saves it to the config file. Every
 truecolor theme passes WCAG contrast checks (`theme/tests.rs`): body text 4.5:1 on every surface,
-muted text and marks 3:1, pills, mode badges and the initials on avatar chips 4.5:1. An avatar
-chip (`avatar.rs`: initials and a color slot hashed from the person's id) is drawn in the
-theme's avatar colors, none of which is a pill's, a badge's or a mark's color. Two rules hold in every theme and are
+muted text and marks 3:1, pills, mode badges and the initials on avatar chips 4.5:1 (4.3:1 on
+a dark theme's tinted chip). An avatar chip (`avatar.rs`: initials and a color slot hashed
+from the person's id) takes one of the theme's avatar hues, none in the red family (red is the
+mention pills'); a dark theme draws it as a tint of the hue on the background with the hue as
+the initials, never brighter than the selection bar or the accent. Two rules hold in every theme and are
 tested cell by cell (`tests/style_flows.rs`): the focus shows on a panel's border and title
 only, and a selection is a background (or a bar in the left gutter), never an underline.
 

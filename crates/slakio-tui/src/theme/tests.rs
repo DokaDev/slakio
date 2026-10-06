@@ -212,43 +212,78 @@ fn dimming_blends_truecolor_and_marks_ansi() {
     assert!(buf[(1, 0)].modifier.contains(Modifier::DIM));
 }
 
-/// Initials on an avatar chip read like the badges' text (4.5:1 on every chip color), the chips
-/// differ from each other, and a selection bar keeps them.
-#[test]
-fn every_avatar_chip_keeps_its_initials_readable() {
-    for t in truecolor() {
-        assert!(t.avatars.len() >= 6, "{}", t.name);
-        for &c in t.avatars {
-            assert!(contrast(t.mode_fg, c) >= 4.5, "{}: initials on {c:?} {:.2}", t.name, contrast(t.mode_fg, c));
-            assert!(!t.workspaces.contains(&c) || t.workspaces.len() == 1, "{}: {c:?} is a workspace's", t.name);
-            // A chip never reads as a pill, a mode badge or a mark.
-            for (k, token) in [
-                ("error", t.error),
-                ("warning", t.warning),
-                ("success", t.success),
-                ("accent", t.accent),
-                ("accent_warm", t.accent_warm),
-                ("normal", t.mode_normal),
-                ("insert", t.mode_insert),
-                ("visual", t.mode_visual),
-                ("command", t.mode_command),
-            ] {
-                assert_ne!(c, token, "{}: an avatar color is the {k} color", t.name);
-            }
-        }
-        let mut seen = t.avatars.to_vec();
-        seen.dedup();
-        assert_eq!(seen.len(), t.avatars.len(), "{}", t.name);
+/// The hue of an RGB color in degrees, and its saturation (0 to 1).
+fn hue(c: Color) -> (f64, f64) {
+    let Color::Rgb(r, g, b) = c else { panic!("{c:?} is not RGB") };
+    let (r, g, b) = (f64::from(r) / 255.0, f64::from(g) / 255.0, f64::from(b) / 255.0);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    let d = max - min;
+    if d == 0.0 {
+        return (0.0, 0.0);
     }
-    // The 16-color theme: bright colors under black.
-    assert_eq!(TERMINAL.mode_fg, Color::Black);
-    assert!(TERMINAL.avatars.iter().all(|c| !matches!(c, Color::Black | Color::DarkGray | Color::Reset)));
+    let h = if max == r {
+        60.0 * ((g - b) / d).rem_euclid(6.0)
+    } else if max == g {
+        60.0 * ((b - r) / d + 2.0)
+    } else {
+        60.0 * ((r - g) / d + 4.0)
+    };
+    (h, d / max)
+}
+
+/// Initials on an avatar chip are readable, the chips differ from each other, none is in the
+/// red family (red is for mentions only: the pills), a chip on a dark theme is a quiet tint
+/// (never brighter than the selection bar or the accent), and a selection bar keeps them.
+#[test]
+fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
+    for t in truecolor() {
+        let n = t.name;
+        assert!(t.avatars.len() >= 6, "{n}");
+        let mut bgs = Vec::new();
+        for slot in 0..t.avatars.len() {
+            let chip = t.avatar(slot);
+            let (fg, bg) = (chip.fg.unwrap(), chip.bg.unwrap());
+            let min = if dark(t) { 4.3 } else { 4.5 };
+            assert!(contrast(fg, bg) >= min, "{n}: initials on chip {slot} {:.2}", contrast(fg, bg));
+            assert!(!t.workspaces.contains(&bg), "{n}: chip {slot} is a workspace's color");
+            for (k, token) in [("error", t.error), ("accent", t.accent), ("normal", t.mode_normal)] {
+                assert_ne!(bg, token, "{n}: chip {slot} is the {k} color");
+            }
+            // Not red, pink or salmon, and far from the pills' red.
+            let (h, sat) = hue(t.avatars[slot]);
+            let (e, _) = hue(t.error);
+            let apart = (h - e).abs().min(360.0 - (h - e).abs());
+            if sat > 0.15 {
+                assert!((35.0..=290.0).contains(&h), "{n}: chip {slot} hue {h:.0} is in the red family");
+                assert!(apart >= 40.0, "{n}: chip {slot} hue {h:.0} is near the pills' {e:.0}");
+            }
+            if dark(t) {
+                // A tint: no louder than the selection bar, far below the accent.
+                assert!(luminance(bg) <= luminance(t.selection), "{n}: chip {slot} brighter than the selection bar");
+                assert!(luminance(bg) < luminance(t.accent), "{n}: chip {slot} brighter than the accent");
+            }
+            bgs.push(bg);
+        }
+        bgs.sort_by_key(|c| format!("{c:?}"));
+        bgs.dedup();
+        assert_eq!(bgs.len(), t.avatars.len(), "{n}: chips differ");
+        // The group DM chip: a visible chip, not a stray number on the background.
+        let group = t.avatar_group();
+        let gbg = group.bg.unwrap();
+        assert!(contrast(gbg, t.bg) >= 1.15, "{n}: group chip on the background {:.2}", contrast(gbg, t.bg));
+        assert!(contrast(group.fg.unwrap(), gbg) >= 4.5, "{n}: group chip text");
+    }
+    // The 16-color theme: bright colors under black, no red; the group chip has a background.
+    assert!(TERMINAL.avatars.iter().all(|c| !matches!(c, Color::Black | Color::DarkGray | Color::Reset | Color::Red)));
+    assert!(!matches!(TERMINAL.avatar_group().bg, None | Some(Color::Reset)));
     for t in BUILTINS {
         let mut buf = Buffer::empty(Rect::new(0, 0, 4, 1));
         buf[(1, 0)].set_style(t.avatar(3));
+        buf[(2, 0)].set_style(t.avatar_group());
         t.paint_selection(&mut buf, Rect::new(0, 0, 4, 1), Selection::Focused);
         if t.kind != Kind::NoColor {
-            assert_eq!(buf[(1, 0)].bg, t.avatars[3 % t.avatars.len()], "{}: the chip keeps its color", t.name);
+            assert_eq!(Some(buf[(1, 0)].bg), t.avatar(3).bg, "{}: the chip keeps its color", t.name);
+            assert_eq!(Some(buf[(2, 0)].bg), t.avatar_group().bg, "{}: the group chip too", t.name);
         }
     }
     let plain = Theme::no_color().avatar(0);

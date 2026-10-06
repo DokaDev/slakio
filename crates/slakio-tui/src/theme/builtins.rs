@@ -24,30 +24,33 @@ pub const WORKSPACE_COLORS: [Color; 12] = [
 pub const ANSI_WORKSPACE_COLORS: [Color; 6] =
     [Color::Green, Color::Magenta, Color::Cyan, Color::Yellow, Color::Blue, Color::Red];
 
-/// Avatar chips of the themes whose badge text ([`Theme::mode_fg`]) is dark: soft light colors,
-/// each 4.5:1 with that text, none a theme's red, yellow or green, so a chip never reads as a
-/// pill or a mark.
+/// Avatar hues of the dark themes and of `catppuccin-latte`: soft light colors. A dark theme
+/// draws a chip as a tint of its hue on the background with the hue as the initials
+/// ([`Theme::avatar_tint`]), so it stays quieter than the selection bar and the accent;
+/// `catppuccin-latte` draws them solid under its dark badge text. No red, pink or salmon: red
+/// is the mention pills' alone.
 pub const AVATARS_BRIGHT: [Color; 8] = [
-    rgb(0xE8A87C),
-    rgb(0xD9C38A),
-    rgb(0xA3C99A),
+    rgb(0xCCC77E),
+    rgb(0xB5CC7A),
+    rgb(0x8FCB9B),
     rgb(0x7CC7C0),
     rgb(0x8EC5F0),
     rgb(0x9DA9F2),
     rgb(0xC3A6EE),
-    rgb(0xEFA3C8),
+    rgb(0xA8B8C8),
 ];
 
-/// Avatar chips of the themes whose badge text is light: deep colors, each 4.5:1 with it.
+/// Avatar chips of the light themes whose badge text is light: deep colors, each 4.5:1 with
+/// it, none red.
 pub const AVATARS_DEEP: [Color; 8] = [
-    rgb(0x9A3B5A),
-    rgb(0x8A4B1C),
     rgb(0x6B5E00),
     rgb(0x2F6A3A),
     rgb(0x0E6660),
     rgb(0x1F5F8B),
     rgb(0x4A4FB5),
     rgb(0x7542A0),
+    rgb(0x4E5A6B),
+    rgb(0x556B2F),
 ];
 
 /// Avatar chips of the ANSI theme: bright colors under black text, red left to the pills.
@@ -81,6 +84,7 @@ pub const TERMINAL: Theme = Theme {
     mode_fg: Color::Black,
     workspaces: &ANSI_WORKSPACE_COLORS,
     avatars: &ANSI_AVATARS,
+    avatar_tint: 0,
     dim: Dim::Modifier,
 };
 
@@ -110,6 +114,7 @@ pub const DARK: Theme = Theme {
     mode_fg: rgb(0x14161B),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x0B0C10), keep: 55 },
 };
 
@@ -140,6 +145,7 @@ pub const TOKYO_NIGHT_NIGHT: Theme = Theme {
     mode_fg: rgb(0x15161E),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x0E0F15), keep: 60 },
 };
 
@@ -170,6 +176,7 @@ pub const TOKYO_NIGHT_DAY: Theme = Theme {
     mode_fg: rgb(0xE1E2E7),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
+    avatar_tint: 0,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 79 },
 };
 
@@ -199,6 +206,7 @@ pub const LIGHT: Theme = Theme {
     mode_fg: rgb(0xFFFFFF),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
+    avatar_tint: 0,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 55 },
 };
 
@@ -228,6 +236,7 @@ pub const HIGH_CONTRAST: Theme = Theme {
     mode_fg: rgb(0x000000),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x000000), keep: 55 },
 };
 
@@ -258,6 +267,7 @@ pub const CATPPUCCIN_MOCHA: Theme = Theme {
     mode_fg: rgb(0x11111B),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x101019), keep: 57 },
 };
 
@@ -289,6 +299,7 @@ pub const CATPPUCCIN_LATTE: Theme = Theme {
     mode_fg: rgb(0x11111B),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 0,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 78 },
 };
 
@@ -320,6 +331,7 @@ pub const GRUVBOX_DARK: Theme = Theme {
     mode_fg: rgb(0x282828),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x161616), keep: 57 },
 };
 
@@ -350,6 +362,7 @@ pub const GRUVBOX_LIGHT: Theme = Theme {
     mode_fg: rgb(0xFBF1C7),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_DEEP,
+    avatar_tint: 0,
     dim: Dim::Blend { toward: rgb(0x606060), keep: 60 },
 };
 
@@ -381,6 +394,7 @@ pub const NORD: Theme = Theme {
     mode_fg: rgb(0x22262F),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 14,
     dim: Dim::Blend { toward: rgb(0x191D23), keep: 61 },
 };
 
@@ -411,6 +425,7 @@ pub const DRACULA: Theme = Theme {
     mode_fg: rgb(0x282A36),
     workspaces: &WORKSPACE_COLORS,
     avatars: &AVATARS_BRIGHT,
+    avatar_tint: 18,
     dim: Dim::Blend { toward: rgb(0x16171E), keep: 55 },
 };
 

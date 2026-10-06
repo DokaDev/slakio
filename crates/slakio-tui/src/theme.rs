@@ -128,6 +128,9 @@ pub struct Theme {
     /// Avatar chips, a person's by a slot of their id ([`crate::avatar::slot`]), under
     /// [`Self::mode_fg`] text.
     pub avatars: &'static [Color],
+    /// Percent of an avatar hue mixed into the background for its chip, the hue drawing the
+    /// initials (a dark theme: a quiet chip); `0` draws the hue solid under [`Self::mode_fg`].
+    pub avatar_tint: u16,
     pub dim: Dim,
 }
 
@@ -153,6 +156,7 @@ impl Theme {
             kind: Kind::NoColor,
             workspaces: &[Color::Reset],
             avatars: &[Color::Reset],
+            avatar_tint: 0,
             dim: Dim::Modifier,
             ..TERMINAL
         }
@@ -349,29 +353,58 @@ impl Theme {
         Style::new().fg(self.mode_fg).bg(bg).add_modifier(Modifier::BOLD)
     }
 
-    /// A person's avatar chip, of color slot `slot`: their initials bold on the color, or
-    /// reversed without colors.
+    /// A person's avatar chip, of color slot `slot`: their initials bold on their color (a tint
+    /// of it with the initials in it on a dark theme), or reversed without colors.
     pub fn avatar(&self, slot: usize) -> Style {
         if self.plain() {
             return Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD);
         }
-        Style::new().fg(self.mode_fg).bg(self.avatars[slot % self.avatars.len()]).add_modifier(Modifier::BOLD)
-    }
-
-    /// The chip of a muted conversation: faint initials on the reactions' surface.
-    pub fn avatar_muted(&self) -> Style {
-        if self.plain() {
-            return self.faint();
+        let hue = self.avatars[slot % self.avatars.len()];
+        let style = Style::new().add_modifier(Modifier::BOLD);
+        match self.tint(hue, self.avatar_tint) {
+            Some(bg) => style.fg(hue).bg(bg),
+            None => style.fg(self.mode_fg).bg(hue),
         }
-        self.faint().bg(self.surface_alt)
     }
 
-    /// The chip of a group DM (how many people are in it): body text on the reactions' surface.
+    /// The chip of a group DM (how many people are in it): body text on a tint of the muted
+    /// color, visible on the background.
     pub fn avatar_group(&self) -> Style {
-        if self.plain() {
-            return self.bold();
+        match self.kind {
+            Kind::NoColor => self.bold(),
+            Kind::Ansi => Style::new().fg(self.fg).bg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            Kind::Truecolor => self.text().bg(self.neutral_chip()).add_modifier(Modifier::BOLD),
         }
-        Style::new().fg(self.fg).bg(self.surface_alt).add_modifier(Modifier::BOLD)
+    }
+
+    /// The chip of a muted conversation: muted initials on the group chip's background.
+    pub fn avatar_muted(&self) -> Style {
+        match self.kind {
+            Kind::NoColor => self.faint(),
+            _ => self.muted().bg(self.avatar_group().bg.unwrap_or(self.bg)),
+        }
+    }
+
+    /// The background of a neutral chip: the muted color mixed into the background.
+    fn neutral_chip(&self) -> Color {
+        self.tint(self.fg_muted, self.avatar_tint.max(25)).unwrap_or(self.surface_alt)
+    }
+
+    /// `percent` of `c` mixed into the background (`None`: no tint, or not RGB).
+    fn tint(&self, c: Color, percent: u16) -> Option<Color> {
+        let (Color::Rgb(r, g, b), Color::Rgb(br, bgc, bb)) = (c, self.bg) else { return None };
+        if percent == 0 {
+            return None;
+        }
+        let mix = |a: u8, z: u8| ((u16::from(a) * percent + u16::from(z) * (100 - percent)) / 100) as u8;
+        Some(Color::Rgb(mix(r, br), mix(g, bgc), mix(b, bb)))
+    }
+
+    /// `c` is the background of an avatar chip (kept under a selection bar), and of nothing
+    /// else a bar paints over: a surface that happens to be a chip's color is still a surface.
+    fn chip_bg(&self, c: Color) -> bool {
+        ![Color::Reset, self.bg, self.surface, self.surface_alt, self.selection].contains(&c)
+            && ((0..self.avatars.len()).any(|i| self.avatar(i).bg == Some(c)) || self.avatar_group().bg == Some(c))
     }
 
     /// The style of workspace color `c`.
@@ -406,7 +439,7 @@ impl Theme {
             for x in row.left()..row.right() {
                 let cell = &mut buf[(x, row.y)];
                 // A pill and an avatar chip keep their background.
-                if cell.bg != Color::Reset && (cell.bg == self.error || self.avatars.contains(&cell.bg)) {
+                if (cell.bg == self.error && self.error != Color::Reset) || self.chip_bg(cell.bg) {
                     continue;
                 }
                 cell.bg = bg;

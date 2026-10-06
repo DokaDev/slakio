@@ -195,8 +195,13 @@ fn token(t: &Theme, c: Color, fg: bool) -> Option<&'static str> {
     if c == t.fg && fg || c == t.bg && !fg || c == Color::Reset {
         return None;
     }
-    if !fg && t.avatars.contains(&c) {
+    // An avatar chip: its hue (the initials on a tint) or its background.
+    let chip = (0..t.avatars.len()).any(|i| t.avatar(i).bg == Some(c));
+    if !fg && (chip || t.avatars.contains(&c)) || fg && t.avatars.contains(&c) {
         return Some("av");
+    }
+    if !fg && t.avatar_group().bg == Some(c) {
+        return Some("chip");
     }
     let workspace = t.workspaces.contains(&c).then_some("ws");
     Some(named.iter().find(|(x, _)| *x == c).map(|(_, n)| *n).or(workspace).unwrap_or(if fg { "fg?" } else { "bg?" }))

@@ -3,25 +3,25 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────╮
-│▌A││ ▾ Favorites            ││   Check a customer should maybe                │
+│▌A││ ▾ Favorites            ││    Check a customer should maybe               │
 │▌B││▎  # backend            ││ MJ Mia Jang · 06:35                            │
-│──││   # incidents       3  ││   Budget metrics merge design rollback alert   │
-│H ││                        ││   alert should draft after alert on staging    │
-│D●││ ▾ Ops                  ││   tomorrow                                     │
+│──││   # incidents       3  ││    Budget metrics merge design rollback alert  │
+│H ││                        ││    alert should draft after alert on staging   │
+│D●││ ▾ Ops                  ││    tomorrow                                    │
 │A●││   # deploys            ││ TK Tom Ko · 06:41                              │
-│F ││   # alerts             ││   On waiting migration someone index can       │
+│F ││   # alerts             ││    On waiting migration someone index can      │
 │L ││   # ╭ Quit slakio? ────────────────────────────────────────────╮         │
 │  ││   # │ A message you wrote has not been sent; quitting loses    │         │
-│  ││   # │ it.                                                      │ert now  │
-│  ││   # │                                                          │broken   │
+│  ││   # │ it.                                                      │lert now │
+│  ││   # │                                                          │ broken  │
 │  ││     │                    [ Stay ]   [ Quit ]                   │         │
 │  ││ ▾ Ch╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
-│  ││   # announcements      ││   Confirmed                                    │
+│  ││   # announcements      ││    Confirmed                                   │
 │  ││   # design-review      ││ KN Kate Nam · 07:05                            │
-│  ││   # feed-alert-134     ││   Ticket review pager pager production on      │
-│  ││   # feed-alert-8       ││   build alert the on draft                     │
+│  ││   # feed-alert-134     ││    Ticket review pager pager production on     │
+│  ││   # feed-alert-8       ││    build alert the on draft                    │
 │  ││   # feed-budget-162    ││ SR Sam Rivera · 07:14                          │
-│  ││   # feed-budget-33     ││   Meeting moved to 3pm                         │
+│  ││   # feed-budget-33     ││    Meeting moved to 3pm                        │
 │  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › half written                                 │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────╯

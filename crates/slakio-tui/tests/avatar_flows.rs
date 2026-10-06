@@ -22,6 +22,11 @@ fn tokyo() -> Theme {
     resolve("tokyo-night", true, Background::Dark)
 }
 
+/// `c` is the background of a person's chip in `theme`.
+fn is_chip(theme: &Theme, c: ratatui::style::Color) -> bool {
+    (0..theme.avatars.len()).any(|i| theme.avatar(i).bg == Some(c))
+}
+
 /// The text of cells `x..x + w` of row `y` (a wide character's second cell adds nothing).
 fn text(buf: &Buffer, x: u16, y: u16, w: u16) -> String {
     let mut out = String::new();
@@ -71,7 +76,7 @@ fn a_message_group_starts_with_its_senders_chip_and_the_text_column_stays_put() 
         let m = &pane.items[i];
         let starts_group = i == 0 || pane.items[i - 1].user != m.user;
         let chip = &buf[(x0, y)];
-        let has_chip = theme.avatars.contains(&chip.bg);
+        let has_chip = is_chip(&theme, chip.bg);
         if starts_group {
             assert!(has_chip, "message {i} by {} starts a group: a chip", m.author);
         }
@@ -84,7 +89,8 @@ fn a_message_group_starts_with_its_senders_chip_and_the_text_column_stays_put() 
             let cells = if slakio_tui::text::width(&want) == 2 && want.chars().count() == 1 { 1 } else { 2 };
             for x in (x0..).take(cells) {
                 let c = &buf[(x, y)];
-                assert_eq!((c.fg, c.bg), (theme.mode_fg, theme.avatars[slot]), "message {i}");
+                let want = theme.avatar(slot);
+                assert_eq!((Some(c.fg), Some(c.bg)), (want.fg, want.bg), "message {i}");
                 assert!(c.modifier.contains(Modifier::BOLD));
             }
             assert_eq!(buf[(x0 + 2, y)].bg, theme.bg, "one plain space after the chip");
@@ -108,7 +114,7 @@ fn with_avatars_off_the_name_starts_the_row_as_before() {
     let x0 = screen::inner(main.unwrap()).x + 1;
     let pane = d.app.work.main.as_ref().unwrap();
     for (i, y) in first_rows(&d) {
-        assert!(!theme.avatars.contains(&buf[(x0, y)].bg), "message {i}");
+        assert!(!is_chip(&theme, buf[(x0, y)].bg), "message {i}");
         if i == 0 || pane.items[i - 1].user != pane.items[i].user {
             let first = pane.items[i].author.as_str().chars().next();
             assert_eq!(text(&buf, x0, y, 3).chars().next(), first, "message {i}");
@@ -145,8 +151,9 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
             ConversationKind::Dm { user } => {
                 let u = d.app.model.user(user).unwrap();
                 let slot = avatar::slot(user) % theme.avatars.len();
-                // A muted DM's chip is faint, on the reactions' surface.
-                let bg = if c.muted { theme.surface_alt } else { theme.avatars[slot] };
+                // A muted DM's chip is muted, on the group chip's background.
+                let bg = if c.muted { theme.avatar_muted().bg } else { theme.avatar(slot).bg };
+                let bg = bg.unwrap();
                 if k != d.app.shell.list_cursor || !c.muted {
                     assert_eq!(buf[(x, y)].bg, bg, "{}", c.name.line());
                 }
@@ -161,7 +168,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
             ConversationKind::GroupDm { users } => {
                 seen_group = true;
                 assert_eq!(text(&buf, x, y, 2), format!("{:<2}", users.len()));
-                assert_eq!(buf[(x, y)].bg, theme.surface_alt, "a neutral chip");
+                assert_eq!(Some(buf[(x, y)].bg), theme.avatar_group().bg, "a neutral chip");
             }
             ConversationKind::Channel { .. } => panic!("DMs lists no channels"),
         }
@@ -170,7 +177,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
     // The selected row keeps the chip's color and the mark's.
     let selected = list.y + d.app.shell.list_cursor as u16;
     assert_eq!(buf[(list.x + 5, selected)].bg, theme.selection);
-    assert!(theme.avatars.contains(&buf[(list.x + 1, selected)].bg), "the chip stays on the bar");
+    assert!(is_chip(&theme, buf[(list.x + 1, selected)].bg), "the chip stays on the bar");
     assert_eq!(buf[(list.x + 3, selected)].fg, theme.success, "Minsu Kim is active");
     insta::assert_snapshot!("avatars_dms_tokyo_120x40", mask_hangul(&d.screen()));
 }
@@ -210,7 +217,7 @@ fn a_dm_title_starts_with_the_peers_chip() {
     assert!(line.contains("▌MK @Minsu Kim ● active"), "{line}");
     let x = line[..line.find("▌MK").unwrap()].chars().count() as u16 + 1;
     let me = UserId::new("UDEMOA001");
-    assert_eq!(buf[(x, top)].bg, theme.avatars[avatar::slot(&me) % theme.avatars.len()]);
+    assert_eq!(Some(buf[(x, top)].bg), theme.avatar(avatar::slot(&me)).bg);
     let mut small = dms(Theme::terminal(), true);
     small.app.resize(100, 30);
     small.keys("enter");
@@ -261,4 +268,36 @@ fn colon_avatars_turns_them_off_and_on_and_asks_to_save_it() {
     assert!(s.contains("Unknown avatars setting photo") && s.contains("initials, off"), "{s}");
     assert!(d.app.settings.avatars);
     assert_eq!(saved(&mut d), ["initials"]);
+}
+
+#[test]
+fn a_stacked_message_indents_its_text_under_the_name() {
+    // 80x24 stacks the main pane: name and time, then the text below the name (after the chip).
+    for (avatars, indent) in [(true, 3u16), (false, 2)] {
+        let d = backend(80, 24, Theme::terminal(), avatars);
+        let buf = d.buffer();
+        let (main, _) = d.app.panes();
+        let x0 = screen::inner(main.unwrap()).x + 1;
+        let pane = d.app.work.main.as_ref().unwrap();
+        let hits: Vec<(usize, u16)> = pane.hits.borrow().iter().map(|h| (h.message, h.y)).collect();
+        let mut checked = 0;
+        for i in hits.iter().map(|h| h.0).collect::<std::collections::BTreeSet<_>>() {
+            // The message's rows, a date rule left out: a header (from the first cell) when it
+            // starts a group, then its text.
+            let rows: Vec<u16> =
+                hits.iter().filter(|h| h.0 == i && buf[(x0, h.1)].symbol() != "─").map(|h| h.1).collect();
+            let text_row = match rows.first() {
+                Some(&y) if buf[(x0, y)].symbol() != " " => rows.get(1).copied(),
+                first => first.copied(),
+            };
+            let Some(y) = text_row else { continue };
+            if pane.items[i].text.as_str().trim().is_empty() {
+                continue;
+            }
+            assert_eq!(text(&buf, x0, y, indent).trim(), "", "message {i}: indent {indent}");
+            assert_ne!(buf[(x0 + indent, y)].symbol(), " ", "message {i}: text at {indent}");
+            checked += 1;
+        }
+        assert!(checked >= 3, "{checked}");
+    }
 }

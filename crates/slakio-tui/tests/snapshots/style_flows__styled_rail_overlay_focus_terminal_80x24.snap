@@ -5,7 +5,7 @@ expression: screen_styled(&d)
 ╭───────────────────╮────────╮╭────────────────────────────────────────────────╮
     [acc 0..21] [bdr 21..80]
 │▌A company     28  │        ││                                                │
-    [acc 0..1] [ws 1..2] [acc/bdr B 2..11] [/bdr 11..15] [on/err B 15..19] [/bdr 19..20] [acc 20..21] [bdr 29..31] [bdr 79..80]
+    [acc 0..1] [ws 1..2] [acc/chip B 2..11] [/chip 11..15] [on/err B 15..19] [/chip 19..20] [acc 20..21] [bdr 29..31] [bdr 79..80]
 │▌B side         9  │        ││                                                │
     [acc 0..1] [warm 1..2] [on/err B 16..19] [acc 20..21] [bdr 29..31] [bdr 79..80]
 │───────────────────│     3  ││                                                │
@@ -19,7 +19,7 @@ expression: screen_styled(&d)
 │ F  Files          │        ││     No conversation open                       │
     [acc 0..1] [acc B 1..2] [acc 20..21] [bdr 29..31] [ B 36..56] [bdr 79..80]
 │ L  Later          │red ext ││     Pick one in the list and press Enter.      │
-    [acc 0..1] [acc B 1..2] [acc 20..21] [bdr 24..28] [bdr 29..31] [mut 36..73] [bdr 79..80]
+    [acc 0..1] [acc B 1..2] [acc 20..21] [bdr 24..28] [bdr 29..31] [av 36..73] [bdr 79..80]
 │                   │ings    ││                                                │
     [acc 0..1] [acc 20..21] [ B 21..25] [bdr 29..31] [bdr 79..80]
 │                   │        ││     Enter    Open                              │
@@ -49,4 +49,4 @@ expression: screen_styled(&d)
 ╰───────────────────╯────────╯╰────────────────────────────────────────────────╯
     [acc 0..21] [bdr 21..80]
  NORMAL  ▌A compa… › Home │ Enter show · j/k move · ? help │  @37  DM 16 │ demo
-    [on/normal B 0..8] [ws 9..10] [bdr 18..21] [bdr 25..28] [ B 28..33] [mut 33..38] [bdr 38..41] [ B 41..44] [mut 44..49] [bdr 49..52] [ B 52..53] [mut 53..58] [bdr 58..61] [on/err B 61..66] [ B 67..72] [bdr 72..75] [warm 75..79]
+    [on/normal B 0..8] [ws 9..10] [bdr 18..21] [bdr 25..28] [ B 28..33] [av 33..38] [bdr 38..41] [ B 41..44] [av 44..49] [bdr 49..52] [ B 52..53] [av 53..58] [bdr 58..61] [on/err B 61..66] [ B 67..72] [bdr 72..75] [warm 75..79]

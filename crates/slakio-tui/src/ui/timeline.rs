@@ -7,11 +7,11 @@
 //!
 //! ```text
 //! ─────────────────── 2026-01-05 ───────────────────     MK Minsu Kim · 10:02
-//! MK Minsu Kim     Starting deploy             10:02       Starting deploy
-//!                  ⤷ 4 replies · last 10:15                ⤷ 4 replies · last 10:15
-//!                  Rolled back                 10:04       Rolled back
+//! MK Minsu Kim     Starting deploy             10:02        Starting deploy
+//!                  ⤷ 4 replies · last 10:15                 ⤷ 4 replies · last 10:15
+//!                  Rolled back                 10:04        Rolled back
 //! JP Jiho Park     PR is up (edited)           10:20     JP Jiho Park · 10:20
-//!                  :eyes: 2  :+1: 1                        PR is up (edited)
+//!                  :eyes: 2  :+1: 1                         PR is up (edited)
 //! ```
 //!
 //! `MK` is the sender's avatar chip ([`crate::avatar`]), on the first message of a group only;
@@ -98,8 +98,12 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
     // starts at the same place on every row.
     let chip = if group { None } else { avatar_chip(app, &m.user, m.author.as_str()) };
     let chip_w = if app.settings.avatars { AVATAR_COLUMN } else { 0 };
+    // Stacked, the chip leads the header when there is room for it, and the text goes under
+    // the name.
+    let stacked_chip = stacked && chip_w > 0 && w.saturating_sub(TIME_WIDTH + 2) > AVATAR_COLUMN + 4;
     let (indent_w, text_w) = if stacked {
-        (2, w.saturating_sub(2).max(4))
+        let indent = if stacked_chip { AVATAR_COLUMN } else { 2 };
+        (indent, w.saturating_sub(indent).max(4))
     } else {
         let author_w = AUTHOR_WIDTH.min(w / 4).max(4) + chip_w;
         (author_w, w.saturating_sub(author_w + TIME_WIDTH).max(4))
@@ -108,7 +112,7 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
     if stacked && !group {
         let mut spans = Vec::new();
         let mut room = w.saturating_sub(TIME_WIDTH + 2);
-        if let Some(chip) = chip.clone().filter(|_| room > AVATAR_COLUMN + 4) {
+        if let Some(chip) = chip.clone().filter(|_| stacked_chip) {
             spans.extend([chip, Span::raw(" ")]);
             room -= AVATAR_COLUMN;
         }
