@@ -94,6 +94,23 @@ printf '[workspace]\nmembers = ["a"]\n\n[workspace.lints.clippy]\ntodo = "warn"\
 commit "$d" -m "build: a member"
 expect pass "Cargo.toml changed outside the lints" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
 
+d=$(repo crate-lints 700 700)
+mkdir -p "$d/crates/a"
+printf '[package]\nname = "a"\n\n[lints]\nworkspace = true\n' >"$d/crates/a/Cargo.toml"
+commit "$d" -m "build: a crate" -m "Guard-change: a new crate with the workspace's lints"
+base=$(git -C "$d" rev-parse HEAD)
+printf '[package]\nname = "a"\n' >"$d/crates/a/Cargo.toml"
+commit "$d" -m "build: the crate's own lints"
+expect fail "a crate that drops the workspace's lints without a Guard-change trailer" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+git -C "$d" reset -q --hard "$base"
+printf '[package]\nname = "a"\n\n[lints.clippy]\ntodo = "allow"\n' >"$d/crates/a/Cargo.toml"
+commit "$d" -m "build: a looser crate lint"
+expect fail "a crate's lint levels changed without a Guard-change trailer" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+git -C "$d" reset -q --hard "$base"
+printf '[package]\nname = "a"\nversion = "1.0.0"\n\n[lints]\nworkspace = true\n' >"$d/crates/a/Cargo.toml"
+commit "$d" -m "build: a version"
+expect pass "a crate's Cargo.toml changed outside its lints" in_repo "$d" bash .github/scripts/history-rules.sh "$base"
+
 if ((failed)); then
     exit 1
 fi

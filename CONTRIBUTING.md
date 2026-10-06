@@ -58,7 +58,8 @@ budgets (`docs/perf.md`).
   `tests/snapshots/` (CI checks every pushed commit, `.github/scripts/history-rules.sh`).
 - The guards are changed on purpose only. A commit that changes the size limit of
   `.github/scripts/file-size.sh`, a script of `.github/scripts/` that checks the repository,
-  `clippy.toml`, the lint levels of `Cargo.toml` (`[workspace.lints]`) or
+  `clippy.toml`, the lint levels of a `Cargo.toml` (the workspace's `[workspace.lints]`, a
+  crate's `[lints]`) or
   `.github/workflows/ci.yml` says why in a trailer,
   `Guard-change: <reason>` (CI fails without it), and a pull request that does names each
   changed file in its description. The file-size allowlist holds a path and a whole number of

@@ -6,7 +6,8 @@
 #   3. a commit that touches the file-size allowlist adds no entry and raises none against its
 #      parent (and the same holds over the whole range);
 #   4. a commit that changes a guard (the limit of file-size.sh, these scripts and their tests,
-#      clippy.toml, the lint levels of Cargo.toml, the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
+#      clippy.toml, the lint levels of every Cargo.toml — the workspace's `[workspace.lints…]` and
+#      each crate's `[lints…]` — the CI workflow) says why in a `Guard-change: <reason>` trailer, and a pull request
 #      (PR=true) also names each changed guard in its body (PR_BODY). Commits up to
 #      GUARD_TRAILER_SINCE, from before the rule, are exempt.
 # Without a usable BASE (a new branch, a force push, a shallow clone) the range falls back to
@@ -53,8 +54,15 @@ loosened() {
 since=${GUARD_TRAILER_SINCE:-1a64ad3b62676a55f11fe6daee95d5b86e77f068}
 guards=(.github/scripts/file-size.sh .github/scripts/history-rules.sh .github/scripts/test-guards.sh
     .github/scripts/repo-rules.sh .github/scripts/dependency-direction.sh clippy.toml .github/workflows/ci.yml)
-# The workspace's lint levels (`[workspace.lints…]` of Cargo.toml) at commit $1, if any.
-lints() { git show "$1:Cargo.toml" 2>/dev/null | awk '/^\[/ { on = ($0 ~ /^\[workspace\.lints/) } on' || true; }
+# The lint levels at commit $1: the `[workspace.lints…]` and `[lints…]` tables of every
+# Cargo.toml, each under its path (a crate that drops `[lints] workspace = true` changes them).
+lints() {
+    local manifest
+    for manifest in $(git ls-tree -r --name-only "$1" 2>/dev/null | grep -E '(^|/)Cargo\.toml$' || true); do
+        echo "== $manifest"
+        git show "$1:$manifest" | awk '/^\[/ { on = ($0 ~ /^\[(workspace\.)?lints/) } on'
+    done
+}
 usable() { [[ -n "$1" && ! "$1" =~ ^0+$ ]] && git cat-file -e "$1^{commit}" 2>/dev/null; }
 
 if ! usable "$base"; then
@@ -83,7 +91,7 @@ for commit in $(git rev-list --no-merges "$range"); do
     fi
     touched=$(git diff-tree --no-commit-id --root --name-only -r "$commit" -- "${guards[@]}")
     if [[ -n "$parent" && "$(lints "$parent")" != "$(lints "$commit")" ]]; then
-        touched="${touched:+$touched$'\n'}Cargo.toml [workspace.lints]"
+        touched="${touched:+$touched$'\n'}lint levels of Cargo.toml"
     fi
     if [[ -n "$touched" ]] && ! git merge-base --is-ancestor "$commit" "$since" 2>/dev/null; then
         reason=$(git log -1 --format='%(trailers:key=Guard-change,valueonly)' "$commit" | tr -d '[:space:]')

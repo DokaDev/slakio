@@ -20,8 +20,6 @@
 //!   a plain string for a plural entry (a language without plural forms, like Korean) or both
 //!   forms; it may not give forms to an entry that is not plural in the source.
 
-#![allow(dead_code)] // `build.rs` and `tests/catalog.rs` each use a different part.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 
@@ -458,7 +456,7 @@ pub fn generate(locales: &[Locale]) -> String {
         o.push_str(&doc(key, text));
         let _ = writeln!(o, "    {},", variant_name(key));
     }
-    o.push_str("}\n\n#[allow(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Label {\n    /// Every label, in key order.\n    pub const ALL: &'static [Label] = &[\n");
+    o.push_str("}\n\n#[expect(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Label {\n    /// Every label, in key order.\n    pub const ALL: &'static [Label] = &[\n");
     for (key, _) in &labels {
         let _ = writeln!(o, "        Label::{},", variant_name(key));
     }
@@ -498,7 +496,7 @@ pub fn generate(locales: &[Locale]) -> String {
         let _ = writeln!(o, "    {} {{ {} }},", variant_name(key), fs.join(", "));
     }
     o.push_str("}\n\nimpl From<Label> for Msg {\n    fn from(l: Label) -> Self {\n        Msg::Label(l)\n    }\n}\n\n");
-    o.push_str("#[allow(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Msg {\n    /// The catalog key.\n    pub fn key(&self) -> &'static str {\n        match self {\n            Msg::Label(l) => l.key(),\n");
+    o.push_str("#[expect(clippy::too_many_lines, reason = \"one match arm per catalog entry\")]\nimpl Msg {\n    /// The catalog key.\n    pub fn key(&self) -> &'static str {\n        match self {\n            Msg::Label(l) => l.key(),\n");
     for (key, _) in &msgs {
         let _ = writeln!(o, "            Msg::{} {{ .. }} => {},", variant_name(key), lit(key));
     }

@@ -2,7 +2,7 @@
 //! way the binary's loop does it, keys in config notation, frames as text. Shared by the flow
 //! test files (`#[path]`), each of which uses part of it.
 
-#![allow(dead_code)]
+#![expect(dead_code, reason = "each flow test file uses a part of the harness")]
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

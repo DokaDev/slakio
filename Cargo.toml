@@ -56,6 +56,10 @@ unicode-width = "0.2"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
+# A lint is silenced only with `#[expect(…, reason = "…")]`, which fails once the lint no longer
+# fires; `#[allow]` is refused, so nothing is silenced for good without a word.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
 dbg_macro = "warn"
 todo = "warn"
 too_many_lines = "warn"
