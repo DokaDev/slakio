@@ -29,7 +29,10 @@ images, and settings. This README only lists what works; it will grow with each 
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
   - the rail (workspaces, Home, DMs; Activity, Files and Later say they come in a later
-    version) expands when focused or hovered;
+    version) expands when focused or hovered; `Ctrl+R` or `Space r` goes there from anywhere
+    (and `Ctrl+R` back), `j` / `k` and `Enter` pick a workspace or a view, `Esc` leaves;
+  - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
+    in the list and in the conversation's title;
   - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
     with mention counts; `Enter` or a click opens the conversation in the work area and moves
     there, `l` opens it and stays in the list;
@@ -52,25 +55,30 @@ images, and settings. This README only lists what works; it will grow with each 
   - every name and message from the (invented) remote side is shown through a sanitiser that
     removes terminal escape sequences, control and bidi characters; the demo has a channel of
     hostile strings and a few hostile names to show it;
-  - `Tab` / `Shift+Tab` go round the list, the main pane and the thread panel; `Ctrl+h` /
+  - `Tab` / `Shift+Tab` go round the rail, the list, the main pane and the thread panel; `Ctrl+h` /
     `Ctrl+l` (or `Space w h` / `Space w l`) move left and right, the rail included; `Space h` /
     `Space d` show Home / DMs; `Space e` hides the list panel;
   - the status line shows the keys worth knowing where you are, and every key is listed in
     [docs/keybindings.md](docs/keybindings.md).
 - `Ctrl+Q` quits from anywhere (it asks first when a message you wrote was not sent); so do
   `Space q` and `:q` / `:qa`.
-- Themes: the terminal's own colors, `dark`, and `tokyo-night` (its day variant on a light
-  background); `NO_COLOR=1` draws without colors.
+- `Ctrl+P` (or `:`) opens the command palette: every command and action that works where you
+  are, with its keys; type to filter, `Tab` / arrows to select, `Enter` to run, or click.
+- Themes: the terminal's own colors, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
+  `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
+  background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
+  colors.
 
 ## Keys
 
-Five keys get you everywhere:
+Six keys get you everywhere:
 
 | Key | What it does |
 |---|---|
 | `?` (or `F1`) | The keyboard help for where you are: every key, searchable, and `Enter` runs one |
 | `Space` | Wait a moment: a popup lists what may follow (`Space h` Home, `Space d` DMs, …) |
-| `Tab` | The next panel (`Shift+Tab` the previous one) |
+| `Tab` | The next panel, the rail included (`Shift+Tab` the previous one) |
+| `Ctrl+P` | The command palette: every command and action by name, with its keys |
 | `Esc` | One step out; never closes anything |
 | `Ctrl+Q` | Quit |
 - English and Korean interface text (`language = "auto" | "en" | "ko"` in the config file).
@@ -95,13 +103,17 @@ slakio on them yet.
 
 ```toml
 language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
-theme = "auto"           # "auto", "terminal", "dark", "tokyo-night" (-night / -day)
+theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast", "nord",
+                         # "dracula", or a family: "catppuccin" (-latte / -mocha),
+                         # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
 rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
-is `truecolor` or `24bit`), else the terminal's own colors. With `icons = "ask"`, `slakio
+is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also
+`:colorscheme`, or `:set theme=<name>`) switches the theme while slakio runs and saves it here,
+keeping your comments. With `icons = "ask"`, `slakio
 --demo` asks once whether your font shows the icons (the rail previews the answer) and saves
 the answer in the config file. `rail_expand` is temporary: both ways exist until one is chosen.
 

@@ -118,15 +118,25 @@ terminal cannot tell apart without the kitty keyboard protocol (`Ctrl+I`/`Tab`,
 `Ctrl+M`/`Enter`, `Ctrl+[`/`Esc`, `Ctrl+H`/`Backspace`) bound to different actions, actions
 reachable only by such keys or `Alt` keys, and a context taking a global key. `Ctrl+I` is bound
 only when the terminal has the protocol on. The hint line (`keymap/hints.rs`), the keyboard help,
-the empty states and `docs/keybindings.md` all show keys looked up in the key map, so a key is
-shown as bound.
+the empty states, the command palette and `docs/keybindings.md` all show keys looked up in the
+key map, so a key is shown as bound.
+
+The command palette (`app/palette.rs`, drawn by `ui/palette.rs`) is the `:` command line with a
+list: `Ctrl+P` and `:` open it, and its entries are generated from the action registry — the
+commands a typed word starts, then the actions its letters find (`action::search`, fuzzy from
+word starts), each with its keys from the context under the palette; `:theme ` lists the themes.
+Its geometry (`screen::palette`) is shared by drawing and the mouse.
 
 ## The look
 
 `crates/slakio-tui/src/theme.rs` holds the color tokens and the styles made of them; widgets
-name roles, never colors. The built-ins are the terminal's own 16 colors, `dark` and
-`tokyo-night` (night or day by the terminal's background, asked once with OSC 11); `auto` takes
-`tokyo-night` on a terminal that says it shows 24-bit color. Two rules hold in every theme and are
+name roles, never colors. The built-ins are the terminal's own 16 colors, `dark`, `light`,
+`high-contrast`, `nord`, `dracula` and three families (`catppuccin`, `tokyo-night`, `gruvbox`)
+whose light or dark variant follows the terminal's background, asked once with OSC 11; `auto`
+takes `tokyo-night` on a terminal that says it shows 24-bit color. `:theme <name>` resolves a
+name again with what was found at startup (`theme::Look`) and saves it to the config file. Every
+truecolor theme passes WCAG contrast checks (`theme/tests.rs`): body text 4.5:1 on every surface,
+muted text and marks 3:1, pills and mode badges 4.5:1. Two rules hold in every theme and are
 tested cell by cell (`tests/style_flows.rs`): the focus shows on a panel's border and title
 only, and a selection is a background (or a bar in the left gutter), never an underline.
 
