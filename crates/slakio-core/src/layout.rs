@@ -4,7 +4,7 @@
 //! shown; the UI draws them and the mouse finds panes in them.
 //!
 //! Which pane is what (a conversation, the thread panel a pane opened beside it) is not the
-//! tree's business: the tree only places panes.
+//! tree's business: the tree only places panes. A tab is a tree with a name ([`tabs`]).
 
 /// A pane, for as long as it is open (ids are never reused).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -84,6 +84,14 @@ impl Node {
         }
     }
 
+    /// The same tree with each pane `f` names instead (a tab reopened gets new panes).
+    pub fn map(&self, f: &impl Fn(PaneId) -> PaneId) -> Node {
+        match self {
+            Self::Leaf(id) => Self::Leaf(f(*id)),
+            Self::Split { dir, share, first, second } => Self::split(*dir, *share, first.map(f), second.map(f)),
+        }
+    }
+
     /// The tree with the leaf of pane `id` replaced by `with` (unchanged when `id` is not in it).
     pub fn replace(&self, id: PaneId, with: &Node) -> Node {
         match self {
@@ -132,6 +140,8 @@ impl Node {
         }
     }
 }
+
+pub mod tabs;
 
 #[cfg(test)]
 mod tests;

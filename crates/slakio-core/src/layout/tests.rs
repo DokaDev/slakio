@@ -48,6 +48,12 @@ fn a_leaf_replaced_by_a_split_keeps_the_rest_of_the_tree() {
     assert_eq!(t.replace(PaneId(9), &inner), t, "a pane not in the tree changes nothing");
 }
 
+#[test]
+fn a_tree_mapped_to_new_panes_keeps_its_shape() {
+    let got = beside().map(&|id| PaneId(id.0 + 10));
+    assert_eq!(got, Node::split(Dir::Row, THREAD, Node::Leaf(PaneId(11)), Node::Leaf(PaneId(12))));
+}
+
 /// A tree of up to three panes, splits of either direction.
 fn tree() -> impl Strategy<Value = Node> {
     let share = (1u16..5, 2u16..6, 0u16..40, 0u16..80, 0u16..60).prop_map(|(num, den, min, max, keep)| Share {
