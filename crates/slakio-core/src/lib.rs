@@ -3,6 +3,7 @@
 //!
 //! * [`model`] — the domain model: workspaces, people, sections, conversations, messages.
 //! * [`backend`] — the command/event protocol between the UI and a backend.
+//! * [`layout`] — the work area's panes as a tree, and where each one goes.
 //! * [`paths`] — the config, data, state and cache directories; [`fsutil`] — atomic file writes.
 //! * [`config`] — the config file.
 //! * [`secret`] — the secret store interface, its in-memory implementation and the
@@ -20,6 +21,7 @@ pub mod config;
 pub mod fault;
 pub mod fsutil;
 pub mod i18n;
+pub mod layout;
 pub mod model;
 pub mod paths;
 pub mod sanitize;

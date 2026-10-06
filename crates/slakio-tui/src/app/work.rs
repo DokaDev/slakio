@@ -12,6 +12,12 @@
 //! `Enter` on a message opens its thread in the panel, replacing what it showed. Opening a
 //! conversation that is already open focuses it instead of loading it again.
 //!
+//! The panes are kept by id in a registry and placed by a layout tree
+//! ([`slakio_core::layout`]): the conversation alone, or split with the thread panel beside it.
+//! The conversation is the tree's first pane, the thread panel its second. The work area also
+//! keeps which pane is active (the one the keyboard goes to in the work area); it never moves
+//! the keyboard itself: what it opens or closes it hands back, and the app moves the focus.
+//!
 //! The panes are views. What they show is held once per target, outside them: the messages in
 //! the [`TimelineStore`], what is being written in the [`DraftStore`]. The messages of a target no
 //! pane shows any more are dropped, so opening it again loads it afresh; its draft stays, and is
@@ -25,46 +31,25 @@ use super::model::Model;
 use super::pane::{PAGE, Pane, Shown, echo};
 use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
-use crate::screen::Slot;
+use crate::screen::THREAD_SHARE;
 use slakio_core::backend::{Command, Generation, Page};
+use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
+use std::collections::HashMap;
 
 /// Targets the back history keeps.
 const HISTORY: usize = 50;
 
-/// One of the two panes of the work area.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Side {
-    Main,
-    Thread,
-}
-
-impl Side {
-    /// Where the pane on this side is laid out.
-    pub fn slot(self) -> Slot {
-        match self {
-            Side::Main => Slot::Main,
-            Side::Thread => Slot::Thread,
-        }
-    }
-
-    /// The side of the pane laid out in `slot`.
-    pub fn of(slot: Slot) -> Self {
-        match slot {
-            Slot::Main => Side::Main,
-            Slot::Thread => Side::Thread,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Work {
-    pub main: Option<Pane>,
-    /// The auto thread panel.
-    pub thread: Option<Pane>,
-    /// Which pane has the keyboard when the work area has the focus.
-    pub side: Side,
+    panes: HashMap<PaneId, Pane>,
+    /// Where the panes go; `None`: no pane open.
+    layout: Option<Node>,
+    /// The pane the keyboard goes to in the work area.
+    active: Option<PaneId>,
+    /// The last pane id handed out.
+    last: u64,
     back: Vec<Target>,
     forward: Vec<Target>,
     /// The messages of the targets the panes show.
@@ -73,21 +58,6 @@ pub struct Work {
     pub drafts: DraftStore,
     /// The app's requests to the backend (the boot request too).
     pub requests: Requests,
-}
-
-impl Default for Work {
-    fn default() -> Self {
-        Self {
-            main: None,
-            thread: None,
-            side: Side::Main,
-            back: Vec::new(),
-            forward: Vec::new(),
-            timelines: TimelineStore::default(),
-            drafts: DraftStore::default(),
-            requests: Requests::default(),
-        }
-    }
 }
 
 /// The draft of a target that has none yet.
@@ -103,49 +73,69 @@ fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
 }
 
 impl Work {
-    /// The pane with the keyboard.
-    pub fn focused(&self) -> Option<&Pane> {
-        match self.side {
-            Side::Thread => self.thread.as_ref(),
-            Side::Main => self.main.as_ref(),
-        }
+    /// The layout of the panes, when one is open.
+    pub fn layout(&self) -> Option<&Node> {
+        self.layout.as_ref()
     }
 
-    /// The pane laid out in `slot`, when open.
-    pub fn pane(&self, slot: Slot) -> Option<&Pane> {
-        match slot {
-            Slot::Main => self.main.as_ref(),
-            Slot::Thread => self.thread.as_ref(),
-        }
+    /// The open panes, in reading order.
+    pub fn ids(&self) -> Vec<PaneId> {
+        self.layout.as_ref().map(Node::leaves).unwrap_or_default()
+    }
+
+    /// The conversation's pane (the layout's first).
+    pub fn main_id(&self) -> Option<PaneId> {
+        self.ids().first().copied()
+    }
+
+    /// The thread panel (the layout's second pane).
+    pub fn thread_id(&self) -> Option<PaneId> {
+        self.ids().get(1).copied()
+    }
+
+    pub fn pane(&self, id: PaneId) -> Option<&Pane> {
+        self.panes.get(&id)
+    }
+
+    pub fn main(&self) -> Option<&Pane> {
+        self.main_id().and_then(|id| self.panes.get(&id))
+    }
+
+    /// The active pane: the one the keyboard goes to in the work area.
+    pub fn active(&self) -> Option<PaneId> {
+        self.active
+    }
+
+    /// The active pane.
+    pub fn focused(&self) -> Option<&Pane> {
+        self.active.and_then(|id| self.panes.get(&id))
     }
 
     pub fn focused_mut(&mut self) -> Option<&mut Pane> {
-        match self.side {
-            Side::Thread => self.thread.as_mut(),
-            Side::Main => self.main.as_mut(),
-        }
+        self.active.and_then(|id| self.panes.get_mut(&id))
     }
 
-    /// The focused pane is in Insert mode.
+    /// Make pane `id` the active one (the app does, as it moves the focus); Insert mode goes
+    /// along.
+    pub fn activate(&mut self, id: PaneId) {
+        let insert = self.insert();
+        self.active = Some(id);
+        self.set_insert(insert);
+    }
+
+    /// The active pane is in Insert mode.
     pub fn insert(&self) -> bool {
         self.focused().is_some_and(|p| p.insert)
     }
 
-    /// Insert mode on or off for the focused pane; no other pane is in it.
+    /// Insert mode on or off for the active pane; no other pane is in it.
     pub fn set_insert(&mut self, on: bool) {
-        for p in [self.main.as_mut(), self.thread.as_mut()].into_iter().flatten() {
+        for p in self.panes.values_mut() {
             p.insert = false;
         }
         if let Some(p) = self.focused_mut() {
             p.insert = on;
         }
-    }
-
-    /// Give the keyboard to the pane on `side`; Insert mode goes along.
-    pub fn turn(&mut self, side: Side) {
-        let insert = self.insert();
-        self.side = side;
-        self.set_insert(insert);
     }
 
     /// The messages pane `p` shows.
@@ -158,7 +148,7 @@ impl Work {
         self.drafts.get(&p.target).unwrap_or(&NO_DRAFT)
     }
 
-    /// The draft of the focused pane, to write in.
+    /// The draft of the active pane, to write in.
     pub fn draft_mut(&mut self) -> Option<&mut Composer> {
         let target = self.focused()?.target.clone();
         Some(self.drafts.entry(&target))
@@ -169,9 +159,27 @@ impl Work {
         self.requests.take()
     }
 
+    /// Put `pane` in the registry; its new id.
+    fn add(&mut self, pane: Pane) -> PaneId {
+        self.last += 1;
+        let id = PaneId(self.last);
+        self.panes.insert(id, pane);
+        id
+    }
+
+    /// Take pane `id` out of the registry and the layout.
+    fn remove(&mut self, id: PaneId) -> Option<Pane> {
+        self.layout = self.layout.as_ref().and_then(|t| t.without(id));
+        if self.active == Some(id) {
+            self.active = None;
+        }
+        self.panes.remove(&id)
+    }
+
     /// Ask for the pages the panes want; one request for a target however many panes show it.
     fn fill(&mut self) {
-        for pane in [self.main.as_ref(), self.thread.as_ref()].into_iter().flatten() {
+        for id in self.ids() {
+            let Some(pane) = self.panes.get(&id) else { continue };
             let tl = self.timelines.entry(&pane.target);
             if let Some(before) = pane.wants(tl) {
                 let command = Command::History { target: pane.target.clone(), before, limit: PAGE };
@@ -183,17 +191,16 @@ impl Work {
     /// Drop the messages of the targets no pane shows, and the empty drafts. A draft with text
     /// stays for when its target is opened again.
     fn prune(&mut self) {
-        let shown: Vec<Target> = [&self.main, &self.thread].into_iter().flatten().map(|p| p.target.clone()).collect();
+        let shown: Vec<Target> = self.panes.values().map(|p| p.target.clone()).collect();
         self.timelines.retain(|t| shown.contains(t));
         self.drafts.retain(|t, c| shown.contains(t) || !c.is_empty());
     }
 
-    /// Open the conversation `target` in the main pane (focusing it if it is open already).
-    pub fn open(&mut self, target: Target) {
-        if let Some(current) = self.main.as_ref().map(|p| p.target.clone()) {
+    /// Open the conversation `target` (or find it open already); the pane to focus.
+    pub fn open(&mut self, target: Target) -> Option<PaneId> {
+        if let Some(current) = self.main().map(|p| p.target.clone()) {
             if current == target {
-                self.turn(Side::Main);
-                return;
+                return self.main_id();
             }
             self.back.push(current);
             if self.back.len() > HISTORY {
@@ -201,89 +208,96 @@ impl Work {
             }
         }
         self.forward.clear();
-        self.show(target);
+        Some(self.show(target))
     }
 
-    fn show(&mut self, target: Target) {
-        self.main = None;
-        self.thread = None;
+    fn show(&mut self, target: Target) -> PaneId {
+        self.panes.clear();
+        self.layout = None;
+        self.active = None;
         self.prune();
-        self.main = Some(Pane::new(target));
-        self.side = Side::Main;
+        let id = self.add(Pane::new(target));
+        self.layout = Some(Node::Leaf(id));
+        self.active = Some(id);
         self.fill();
+        id
     }
 
-    /// Back to the conversation before (`Ctrl+O`). `false` when there is none.
-    pub fn back(&mut self) -> bool {
-        let Some(to) = self.back.pop() else { return false };
-        if let Some(p) = self.main.as_ref() {
+    /// Back to the conversation before (`Ctrl+O`); its pane, `None` when there is none.
+    pub fn back(&mut self) -> Option<PaneId> {
+        let to = self.back.pop()?;
+        if let Some(p) = self.main() {
             self.forward.push(p.target.clone());
         }
-        self.show(to);
-        true
+        Some(self.show(to))
     }
 
-    /// Forward again (`Ctrl+I`). `false` when there is none.
-    pub fn forward(&mut self) -> bool {
-        let Some(to) = self.forward.pop() else { return false };
-        if let Some(p) = self.main.as_ref() {
+    /// Forward again (`Ctrl+I`); its pane, `None` when there is none.
+    pub fn forward(&mut self) -> Option<PaneId> {
+        let to = self.forward.pop()?;
+        if let Some(p) = self.main() {
             self.back.push(p.target.clone());
         }
-        self.show(to);
-        true
+        Some(self.show(to))
     }
 
-    /// Open the thread of the selected message of the main pane in the thread panel (replacing
-    /// what it showed; focusing it when it shows that thread already).
-    pub fn open_thread(&mut self) {
-        if self.side != Side::Main {
-            return;
+    /// The thread of the selected message of the conversation, in the thread panel (replacing
+    /// what it showed, or found there already); the pane to focus.
+    pub fn open_thread(&mut self) -> Option<PaneId> {
+        if self.active != self.main_id() {
+            return None;
         }
-        let Some(main) = self.main.as_ref() else { return };
+        let main = self.main()?;
         let tl = self.timeline(main);
-        let Some(m) = main.selected_index(tl).and_then(|i| tl.items.get(i)) else { return };
+        let m = main.selected_index(tl).and_then(|i| tl.items.get(i))?;
         let target = main.thread_target(m.ts);
-        if self.thread.as_ref().is_some_and(|t| t.target == target) {
-            self.turn(Side::Thread);
-            return;
+        if let Some(id) = self.thread_id().filter(|id| self.panes.get(id).is_some_and(|t| t.target == target)) {
+            return Some(id);
         }
-        self.show_beside(target);
+        self.show_beside(target)
     }
 
-    /// Show `target` in the thread panel, with the keyboard (what it showed is closed).
-    pub fn show_beside(&mut self, target: Target) {
+    /// Show `target` in the thread panel beside the conversation (what it showed is closed);
+    /// the pane to focus, which takes Insert mode along.
+    pub fn show_beside(&mut self, target: Target) -> Option<PaneId> {
+        let main = self.main_id()?;
         let insert = self.insert();
         self.set_insert(false);
-        self.thread = None;
+        if let Some(old) = self.thread_id() {
+            self.remove(old);
+        }
         self.prune();
-        self.thread = Some(Pane { insert, ..Pane::new(target) });
-        self.side = Side::Thread;
+        let id = self.add(Pane { insert, ..Pane::new(target) });
+        self.layout = Some(Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(main), Node::Leaf(id)));
+        self.active = Some(id);
         self.fill();
+        Some(id)
     }
 
-    /// Close the focused pane (`Ctrl+W`): the thread panel (the main pane then selects the
-    /// thread's message), else the conversation, which is handed back.
-    pub fn close(&mut self) -> Option<Target> {
+    /// Close the active pane (`Ctrl+W`): the thread panel (the conversation then selects the
+    /// thread's message, and is the pane to focus), else the conversation, whose target is handed
+    /// back.
+    pub fn close(&mut self) -> (Option<Target>, Option<PaneId>) {
         self.set_insert(false);
-        let closed = match self.side {
-            Side::Thread => {
-                let closed = self.thread.take();
-                self.side = Side::Main;
-                if let (Some(t), Some(main)) = (closed, self.main.as_mut())
-                    && let Target::Thread { thread, .. } = t.target
-                    && self.timelines.get(&main.target).is_some_and(|tl| tl.position(thread).is_some())
-                {
-                    main.selected = Some(thread);
-                }
-                None
+        let Some(active) = self.active else { return (None, None) };
+        if Some(active) == self.thread_id() {
+            let closed = self.remove(active);
+            let main = self.main_id();
+            if let (Some(t), Some(main)) = (closed, main.and_then(|id| self.panes.get_mut(&id)))
+                && let Target::Thread { thread, .. } = t.target
+                && self.timelines.get(&main.target).is_some_and(|tl| tl.position(thread).is_some())
+            {
+                main.selected = Some(thread);
             }
-            Side::Main => {
-                self.thread = None;
-                self.main.take().map(|p| p.target)
-            }
-        };
+            self.prune();
+            return (None, main);
+        }
+        let closed = self.panes.get(&active).map(|p| p.target.clone());
+        self.panes.clear();
+        self.layout = None;
+        self.active = None;
         self.prune();
-        closed
+        (closed, None)
     }
 
     /// Any draft holds text that was not sent, open in a pane or not.
@@ -291,16 +305,13 @@ impl Work {
         self.drafts.unsent()
     }
 
-    /// Move the keyboard to the pane on the left (`-1`) or right (`1`). `false` when there is
-    /// none that way (the shell moves the focus out of the work area then).
-    pub fn focus_side(&mut self, step: i8) -> bool {
-        match (self.side, step) {
-            (Side::Main, 1) if self.thread.is_some() => self.side = Side::Thread,
-            (Side::Thread, -1) => self.side = Side::Main,
-            _ => return false,
-        }
-        self.set_insert(false);
-        true
+    /// The pane on the left (`-1`) or right (`1`) of the active one; `None` when there is none
+    /// that way (the shell moves the focus out of the work area then).
+    pub fn beside(&self, step: i8) -> Option<PaneId> {
+        let ids = self.ids();
+        let at = ids.iter().position(|id| Some(*id) == self.active)?;
+        let to = at.checked_add_signed(isize::from(step))?;
+        ids.get(to).copied()
     }
 
     /// A page of messages arrived. `true` when a timeline took it; an answer to an older
@@ -310,7 +321,7 @@ impl Work {
         let Some(tl) = self.timelines.awaiting(&page.target, generation) else { return false };
         let shown = page.messages.iter().map(|m| shown(model, &page.target, m)).collect();
         tl.add_page(page, shown);
-        for pane in [self.main.as_mut(), self.thread.as_mut()].into_iter().flatten() {
+        for pane in self.panes.values_mut() {
             if pane.target == page.target {
                 pane.arrived(tl);
             }
@@ -319,37 +330,28 @@ impl Work {
         true
     }
 
-    /// Run `f` on the focused pane and its timeline, then ask for the pages it now wants.
+    /// Run `f` on the active pane and its timeline, then ask for the pages it now wants.
     pub fn with_pane(&mut self, f: impl FnOnce(&mut Pane, &Timeline)) {
-        let pane = match self.side {
-            Side::Thread => self.thread.as_mut(),
-            Side::Main => self.main.as_mut(),
-        };
-        if let Some(p) = pane {
+        if let Some(p) = self.active.and_then(|id| self.panes.get_mut(&id)) {
             f(p, self.timelines.get(&p.target).unwrap_or(&EMPTY));
         }
         self.fill();
     }
 
-    /// Move the focused pane's selection by `by` messages.
+    /// Move the active pane's selection by `by` messages.
     pub fn step(&mut self, by: isize) {
         self.with_pane(|p, tl| p.step(by, tl));
     }
 
-    /// Move the selection of the pane in `slot`, if any, by `by` messages (the mouse wheel).
-    pub fn step_in(&mut self, slot: Option<Slot>, by: isize) {
-        let pane = match slot {
-            Some(Slot::Thread) => self.thread.as_mut(),
-            Some(Slot::Main) => self.main.as_mut(),
-            None => None,
-        };
-        if let Some(p) = pane {
+    /// Move the selection of pane `id`, if any, by `by` messages (the mouse wheel).
+    pub fn step_in(&mut self, id: Option<PaneId>, by: isize) {
+        if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
             p.step(by, self.timelines.get(&p.target).unwrap_or(&EMPTY));
         }
         self.fill();
     }
 
-    /// Run `f` on the focused pane's draft, then ask for the pages the panes want.
+    /// Run `f` on the active pane's draft, then ask for the pages the panes want.
     pub fn with_draft(&mut self, f: impl FnOnce(&mut Composer)) {
         if let Some(c) = self.draft_mut() {
             f(c);
@@ -357,7 +359,7 @@ impl Work {
         self.fill();
     }
 
-    /// Send what the focused pane's composer holds. The demo only echoes it locally: it is
+    /// Send what the active pane's composer holds. The demo only echoes it locally: it is
     /// shown as the user's message and goes nowhere. `false` when there was nothing to send, or
     /// it could not be sent (the composer keeps it then).
     pub fn send(&mut self, model: &Model) -> bool {
@@ -377,18 +379,20 @@ impl Work {
         true
     }
 
-    /// Drop what no longer exists after a new boot answer.
-    pub fn clamp(&mut self, model: &Model) {
-        if self.main.as_ref().is_some_and(|p| model.target(&p.target).is_none()) {
-            self.main = None;
-            self.thread = None;
-            self.side = Side::Main;
+    /// Drop what no longer exists after a new boot answer. `true` when the panes were closed.
+    pub fn clamp(&mut self, model: &Model) -> bool {
+        let gone = self.main().is_some_and(|p| model.target(&p.target).is_none());
+        if gone {
+            self.panes.clear();
+            self.layout = None;
+            self.active = None;
             self.prune();
         }
         self.back.retain(|t| model.target(t).is_some());
         self.forward.retain(|t| model.target(t).is_some());
         // A draft of a conversation that is gone stays (quitting still asks about it): text the
         // user wrote is never dropped silently.
+        gone
     }
 }
 

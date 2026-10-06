@@ -1,4 +1,4 @@
-//! The shell: which region has the focus (rail, list panel, work area), the rail's cursor, the
+//! The shell: the regions the focus moves between (rail, list panel, work area), the rail's cursor, the
 //! view the list panel shows, the list's cursor and scroll, and folded sections. It owns its
 //! update ([`Shell::update`]), which hands back a conversation to open (the work area opens
 //! it); the rows come from the read model.
@@ -67,7 +67,6 @@ pub fn rail_items(workspaces: usize) -> Vec<RailItem> {
 
 #[derive(Clone, Debug)]
 pub struct Shell {
-    pub focus: Region,
     /// Index into [`rail_items`].
     pub rail_cursor: usize,
     /// The workspace the list panel shows.
@@ -90,7 +89,6 @@ pub struct Shell {
 impl Default for Shell {
     fn default() -> Self {
         Self {
-            focus: Region::List,
             rail_cursor: 0,
             workspace: 0,
             view: View::Home,
@@ -106,9 +104,9 @@ impl Default for Shell {
 }
 
 impl Shell {
-    /// The rail shows labels: it has the focus or the mouse.
-    pub fn rail_expanded(&self) -> bool {
-        self.focus == Region::Rail || self.hover_rail
+    /// The rail shows labels: it has the focus (`rail_focused`) or the mouse.
+    pub fn rail_expanded(&self, rail_focused: bool) -> bool {
+        rail_focused || self.hover_rail
     }
 
     pub fn rows(&self, model: &Model) -> Vec<Row> {
@@ -116,8 +114,15 @@ impl Shell {
     }
 
     /// Apply `action`. `list_height` is the number of rows the list panel shows (for scrolling
-    /// and paging). The conversation to open, when the action opens one.
-    pub fn update(&mut self, action: ShellAction, model: &Model, list_height: usize) -> Option<Open> {
+    /// and paging); `here` is the region with the focus, which the action may move (the app
+    /// moves the focus there). The conversation to open, when the action opens one.
+    pub fn update(
+        &mut self,
+        action: ShellAction,
+        model: &Model,
+        list_height: usize,
+        here: &mut Region,
+    ) -> Option<Open> {
         let mut open = None;
         let items = rail_items(model.workspaces().len());
         let list = self.rows(model);
@@ -125,12 +130,12 @@ impl Shell {
         let last_item = items.len().saturating_sub(1);
         let page = list_height.max(1) as isize;
         match action {
-            ShellAction::FocusLeft => self.focus = self.neighbour(-1),
-            ShellAction::FocusRight => self.focus = self.neighbour(1),
+            ShellAction::FocusLeft => *here = self.neighbour(*here, -1),
+            ShellAction::FocusRight => *here = self.neighbour(*here, 1),
             // Up, down, next and previous need the work area: the app moves those.
             ShellAction::FocusUp | ShellAction::FocusDown | ShellAction::FocusNext | ShellAction::FocusPrev => {}
-            ShellAction::FocusRail if self.focus == Region::Rail => self.focus = self.leave_rail(),
-            ShellAction::FocusRail => self.focus = Region::Rail,
+            ShellAction::FocusRail if *here == Region::Rail => *here = self.leave_rail(),
+            ShellAction::FocusRail => *here = Region::Rail,
             ShellAction::RailNext => self.rail_cursor = (self.rail_cursor + 1).min(last_item),
             ShellAction::RailPrev => self.rail_cursor = self.rail_cursor.saturating_sub(1),
             ShellAction::RailFirst => self.rail_cursor = 0,
@@ -138,9 +143,10 @@ impl Shell {
             ShellAction::RailSelect => {
                 if let Some(item) = items.get(self.rail_cursor).copied() {
                     self.select(item, &items, model);
+                    *here = Region::List;
                 }
             }
-            ShellAction::RailLeave => self.focus = self.leave_rail(),
+            ShellAction::RailLeave => *here = self.leave_rail(),
             ShellAction::ListNext => self.list_cursor = step(&list, self.list_cursor, 1),
             ShellAction::ListPrev => self.list_cursor = step(&list, self.list_cursor, -1),
             ShellAction::ListHalfDown => self.list_cursor = step(&list, self.list_cursor, (page / 2).max(1)),
@@ -163,16 +169,16 @@ impl Shell {
                 Some(Row::Conversation(_)) => {
                     match list[..self.list_cursor].iter().rposition(|r| matches!(r, Row::Section(_))) {
                         Some(header) => self.list_cursor = header,
-                        None => self.focus = Region::Rail,
+                        None => *here = Region::Rail,
                     }
                 }
                 Some(Row::Section(i)) => {
                     let id = model.section(*i).id.clone();
                     if !self.collapsed.insert(id) {
-                        self.focus = Region::Rail;
+                        *here = Region::Rail;
                     }
                 }
-                _ => self.focus = Region::Rail,
+                _ => *here = Region::Rail,
             },
             ShellAction::ListSectionPrev | ShellAction::ListSectionNext => {
                 let header = |r: &Row| matches!(r, Row::Section(_));
@@ -187,11 +193,14 @@ impl Shell {
             }
             ShellAction::ToggleList => {
                 self.list_hidden = !self.list_hidden;
-                if self.list_hidden && self.focus == Region::List {
-                    self.focus = Region::Work;
+                if self.list_hidden && *here == Region::List {
+                    *here = Region::Work;
                 }
             }
-            ShellAction::Show(view) => self.select(RailItem::View(view), &items, model),
+            ShellAction::Show(view) => {
+                self.select(RailItem::View(view), &items, model);
+                *here = Region::List;
+            }
         }
         self.scroll(list_height);
         open
@@ -231,7 +240,8 @@ impl Shell {
         }
     }
 
-    /// Show `item` (one of `items`, the rail) in the list panel and move the focus there.
+    /// Show `item` (one of `items`, the rail) in the list panel (the focus goes there: the app
+    /// moves it).
     pub fn select(&mut self, item: RailItem, items: &[RailItem], model: &Model) {
         match item {
             RailItem::Workspace(ws) => {
@@ -243,7 +253,6 @@ impl Shell {
         self.rail_cursor = items.iter().position(|i| *i == item).unwrap_or(self.rail_cursor);
         self.home_cursor(model);
         self.list_hidden = false;
-        self.focus = Region::List;
     }
 
     /// The conversation under the cursor (to open), or fold or unfold its section.
@@ -300,13 +309,14 @@ impl Shell {
         if self.list_hidden { Region::Work } else { Region::List }
     }
 
-    /// The region `step` places to the left (-1) or right (1), skipping a hidden list panel.
-    fn neighbour(&self, step: i8) -> Region {
+    /// The region `step` places to the left (-1) or right (1) of `here`, skipping a hidden list
+    /// panel.
+    fn neighbour(&self, here: Region, step: i8) -> Region {
         let order: Vec<Region> = [Region::Rail, Region::List, Region::Work]
             .into_iter()
             .filter(|r| *r != Region::List || !self.list_hidden)
             .collect();
-        let at = order.iter().position(|r| *r == self.focus).unwrap_or(0);
+        let at = order.iter().position(|r| *r == here).unwrap_or(0);
         let to = (at as i8 + step).clamp(0, order.len() as i8 - 1);
         order[to as usize]
     }

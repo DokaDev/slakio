@@ -33,16 +33,16 @@ fn a_narrow_screen_gives_the_list_room_to_the_thread_panel() {
     let small = Rect::new(0, 0, 80, 24);
     let a = areas(small, Shape { thread: true, ..plain() });
     assert_eq!(a.list, None, "the list is left out while the thread panel is open");
-    let (main, thread) = work_split(a.work, true, false);
-    assert!(main.unwrap().width >= MAIN_MIN && thread.unwrap().width >= 34);
+    let panes = work_panes(a.work, &beside(), None);
+    assert!(panes[0].1.width >= MAIN_MIN && panes[1].1.width >= 34);
     let focused = areas(small, Shape { thread: true, list_focused: true, ..plain() });
     assert!(focused.list.is_some(), "a focused list is never left out");
     // Wide enough: the list stays.
     assert!(areas(SIZE, Shape { thread: true, ..plain() }).list.is_some());
     // Too narrow for both panes: the one with the keyboard takes the work area.
     let narrow = Rect::new(0, 0, 60, 20);
-    assert_eq!(work_split(narrow, true, true), (None, Some(narrow)));
-    assert_eq!(work_split(narrow, true, false), (Some(narrow), None));
+    assert_eq!(work_panes(narrow, &beside(), Some(THREAD)), vec![(THREAD, narrow)]);
+    assert_eq!(work_panes(narrow, &beside(), Some(MAIN)), vec![(MAIN, narrow)]);
 }
 
 #[test]
@@ -78,53 +78,82 @@ fn small_screens_are_too_small_and_never_panic() {
     assert!(!too_small(Rect::new(0, 0, MIN_WIDTH, MIN_HEIGHT)));
     for (w, h) in [(0, 0), (1, 1), (3, 2)] {
         let a = areas(Rect::new(0, 0, w, h), Shape { rail_expanded: true, thread: true, ..plain() });
-        let _ = work_split(a.work, true, true);
+        let _ = work_panes(a.work, &beside(), Some(THREAD));
         let _ = pane_parts(a.work, 3);
     }
 }
 
-/// One line in the main pane's composer, `thread_lines` in the thread panel's.
-fn lines(thread_lines: usize) -> impl Fn(Slot, usize) -> usize {
-    move |slot, _| if slot == Slot::Thread { thread_lines } else { 1 }
+const MAIN: PaneId = PaneId(1);
+const THREAD: PaneId = PaneId(2);
+
+/// The conversation with the thread panel beside it.
+fn beside() -> Node {
+    Node::split(slakio_core::layout::Dir::Row, THREAD_SHARE, Node::Leaf(MAIN), Node::Leaf(THREAD))
+}
+
+/// One line in the conversation's composer, `thread_lines` in the thread panel's.
+fn lines(thread_lines: usize) -> impl Fn(PaneId, usize) -> usize {
+    move |id, _| if id == THREAD { thread_lines } else { 1 }
+}
+
+/// The split of the work area as it was worked out before the layout tree, kept to check the
+/// tree gives every width the same rectangles.
+fn split_before(work: Rect, thread_focused: bool) -> Vec<(PaneId, Rect)> {
+    let w = (work.width * 2 / 5).clamp(34, 60);
+    if work.width < w + MAIN_MIN {
+        return vec![if thread_focused { (THREAD, work) } else { (MAIN, work) }];
+    }
+    let [main, side] = Layout::horizontal([Constraint::Min(0), Constraint::Length(w)]).areas(work);
+    vec![(MAIN, main), (THREAD, side)]
+}
+
+#[test]
+fn the_layout_tree_splits_the_work_area_as_before_at_every_width() {
+    for width in 0..=400 {
+        for focused in [MAIN, THREAD] {
+            let work = Rect::new(30, 0, width, 40);
+            let want = split_before(work, focused == THREAD);
+            assert_eq!(work_panes(work, &beside(), Some(focused)), want, "{width} wide");
+        }
+    }
 }
 
 #[test]
 fn the_frame_lays_out_each_open_pane_with_its_composer() {
     for (w, h) in [(80, 24), (120, 40), (200, 50)] {
         let size = Rect::new(0, 0, w, h);
-        let shape = Shape { main: true, thread: true, ..plain() };
-        let f = frame(size, shape, lines(3));
+        let shape = Shape { thread: true, ..plain() };
+        let f = frame(size, shape, Some(&beside()), Some(MAIN), lines(3));
         assert_eq!(f.areas, areas(size, shape), "{w}x{h}");
-        let (main, thread) = work_split(f.areas.work, true, false);
-        let slots: Vec<Slot> = f.panes.iter().map(|p| p.slot).collect();
-        assert_eq!(slots, [Slot::Main, Slot::Thread], "{w}x{h}");
-        let m = f.pane(Slot::Main).unwrap();
-        let t = f.pane(Slot::Thread).unwrap();
-        assert_eq!((Some(m.rect), Some(t.rect)), (main, thread), "{w}x{h}");
+        let ids: Vec<PaneId> = f.panes.iter().map(|p| p.id).collect();
+        assert_eq!(ids, [MAIN, THREAD], "{w}x{h}");
+        let m = f.pane(MAIN).unwrap();
+        let t = f.pane(THREAD).unwrap();
+        assert_eq!(vec![(MAIN, m.rect), (THREAD, t.rect)], work_panes(f.areas.work, &beside(), None), "{w}x{h}");
         assert_eq!(m.parts, pane_parts(m.rect, 1), "{w}x{h}");
         assert_eq!(t.parts, pane_parts(t.rect, 3), "{w}x{h}");
         // The panes tile the work area side by side.
         assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x, f.areas.work.right()));
         let inside = Position { x: t.rect.x + 1, y: t.rect.y + 1 };
-        assert_eq!(f.pane_at(inside).map(|p| p.slot), Some(Slot::Thread));
+        assert_eq!(f.pane_at(inside).map(|p| p.id), Some(THREAD));
         assert_eq!(f.pane_at(Position { x: 0, y: 0 }), None, "the rail is no pane");
     }
 }
 
 #[test]
 fn the_frame_shows_no_pane_without_a_conversation_and_one_where_two_do_not_fit() {
-    let f = frame(SIZE, plain(), lines(1));
+    let f = frame(SIZE, plain(), None, None, lines(1));
     assert!(f.panes.is_empty());
     let narrow = Rect::new(0, 0, 60, 20);
-    let shape = Shape { main: true, thread: true, list_hidden: true, ..plain() };
-    for (focused, slot) in [(false, Slot::Main), (true, Slot::Thread)] {
-        let f = frame(narrow, Shape { thread_focused: focused, ..shape }, lines(2));
+    let shape = Shape { thread: true, list_hidden: true, ..plain() };
+    for focused in [MAIN, THREAD] {
+        let f = frame(narrow, shape, Some(&beside()), Some(focused), lines(2));
         assert_eq!(f.panes.len(), 1);
-        assert_eq!((f.panes[0].slot, f.panes[0].rect), (slot, f.areas.work));
+        assert_eq!((f.panes[0].id, f.panes[0].rect), (focused, f.areas.work));
     }
-    let main_only = frame(SIZE, Shape { main: true, ..plain() }, lines(1));
+    let main_only = frame(SIZE, plain(), Some(&Node::Leaf(MAIN)), Some(MAIN), lines(1));
     assert_eq!(main_only.panes.len(), 1);
     assert_eq!(main_only.panes[0].rect, main_only.areas.work);
     // A screen too small to draw still lays out without panicking.
-    let _ = frame(Rect::new(0, 0, 3, 2), Shape { main: true, thread: true, ..plain() }, lines(5));
+    let _ = frame(Rect::new(0, 0, 3, 2), Shape { thread: true, ..plain() }, Some(&beside()), Some(THREAD), lines(5));
 }

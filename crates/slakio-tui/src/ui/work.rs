@@ -16,39 +16,39 @@ use crate::action::{Action, PaneAction};
 use crate::app::composer::View;
 use crate::app::pane::Pane;
 use crate::app::shell::Region;
-use crate::app::work::Side;
 use crate::app::{App, Focus, PaneHandle};
 use crate::keymap::Ctx;
-use crate::screen::{self, FrameLayout, PaneLayout, Slot};
+use crate::screen::{self, FrameLayout, PaneLayout};
 use crate::text::{clip, width};
 use ratatui::Frame;
 use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::layout::PaneId;
 use slakio_core::model::{Conversation, ConversationKind, Presence};
 
-pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Slot, View)]) {
-    if app.work.main.is_none() {
+pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)]) {
+    if app.work.main().is_none() {
         let area = layout.areas.work;
         f.render_widget(frame(app, Region::Work, ""), area);
         super::empty::work(f, app, screen::inner(area));
         return;
     }
-    for side in [Side::Main, Side::Thread] {
-        let Some(pane) = app.work.pane(side.slot()) else { continue };
-        let view = views.iter().find(|(s, _)| *s == side.slot()).map(|(_, v)| v);
-        match (layout.pane(side.slot()), view) {
-            (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view), side),
+    for id in app.work.ids() {
+        let Some(pane) = app.work.pane(id) else { continue };
+        let view = views.iter().find(|(v, _)| *v == id).map(|(_, v)| v);
+        match (layout.pane(id), view) {
+            (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view)),
             _ => pane.hits.borrow_mut().clear(),
         }
     }
 }
 
-fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View), side: Side) {
+fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View)) {
     let area = layout.rect;
     let t = &app.theme;
-    let focused = app.focus() == Focus::Pane(PaneHandle::of(side.slot()));
+    let focused = app.focus() == Focus::Pane(PaneHandle::of(layout.id));
     let thread = pane.is_thread();
     let conversation = app.model.target(&pane.target);
     let name = conversation.map(breadcrumb).unwrap_or_default();

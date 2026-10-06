@@ -16,21 +16,21 @@ use super::pane::{Pane, Shown};
 use super::shell::View;
 use super::timelines::Timeline;
 use crate::keymap::Ctx;
-use crate::screen::Slot;
 use ratatui::layout::Rect;
+use slakio_core::layout::PaneId;
 use slakio_core::model::Target;
 
 /// An open pane, as long as it stays open.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PaneHandle(Slot);
+pub struct PaneHandle(PaneId);
 
 impl PaneHandle {
-    /// The handle of the pane laid out in `slot`.
-    pub(crate) fn of(slot: Slot) -> Self {
-        Self(slot)
+    /// The handle of pane `id`.
+    pub(crate) fn of(id: PaneId) -> Self {
+        Self(id)
     }
 
-    pub(crate) fn slot(self) -> Slot {
+    pub(crate) fn id(self) -> PaneId {
         self.0
     }
 }
@@ -112,10 +112,10 @@ impl<'a> PaneRef<'a> {
 }
 
 impl App {
-    fn pane_ref(&self, slot: Slot) -> Option<PaneRef<'_>> {
-        let pane = self.work.pane(slot)?;
+    fn pane_ref(&self, id: PaneId) -> Option<PaneRef<'_>> {
+        let pane = self.work.pane(id)?;
         let (timeline, draft) = (self.work.timeline(pane), self.work.draft(pane));
-        Some(PaneRef { pane, handle: PaneHandle(slot), timeline, draft })
+        Some(PaneRef { pane, handle: PaneHandle(id), timeline, draft })
     }
 
     /// The pane `handle` names, while it is open.
@@ -133,13 +133,13 @@ impl App {
 
     /// Every open pane, shown or not, in reading order.
     pub fn open_panes(&self) -> Vec<PaneRef<'_>> {
-        [Slot::Main, Slot::Thread].into_iter().filter_map(|s| self.pane_ref(s)).collect()
+        self.work.ids().into_iter().filter_map(|id| self.pane_ref(id)).collect()
     }
 
     /// The panes on screen and where each is drawn (a narrow screen leaves some out).
     pub fn panes_on_screen(&self) -> Vec<(PaneRef<'_>, Rect)> {
         let frame = self.frame();
-        frame.panes.iter().filter_map(|l| self.pane_ref(l.slot).map(|p| (p, l.rect))).collect()
+        frame.panes.iter().filter_map(|l| self.pane_ref(l.id).map(|p| (p, l.rect))).collect()
     }
 
     /// Where the messages of pane `handle` are drawn, while it is on screen.
@@ -154,7 +154,7 @@ impl App {
 
     /// The conversation open in the work area.
     pub fn open_target(&self) -> Option<&Target> {
-        self.pane_ref(Slot::Main).map(PaneRef::target)
+        self.work.main().map(|p| &p.target)
     }
 
     /// The rows of the list panel, top down.
@@ -194,7 +194,7 @@ impl App {
 
     /// The rail is drawn wide, with labels.
     pub fn rail_expanded(&self) -> bool {
-        self.shell.rail_expanded()
+        self.shell.rail_expanded(self.focus == Focus::Rail)
     }
 
     /// The rows of the keyboard help, while it is open (else none).
@@ -231,8 +231,9 @@ impl App {
     /// (the work area offers no such split yet; two panes on one target share its messages).
     #[doc(hidden)]
     pub fn open_beside(&mut self, target: Target) {
-        self.work.show_beside(target);
-        self.set_focus(Focus::Pane(PaneHandle(Slot::Thread)));
+        if let Some(id) = self.work.show_beside(target) {
+            self.set_focus(Focus::on(id));
+        }
     }
 
     /// Test driver: put the list panel's cursor on row `row` (the last one if past it).

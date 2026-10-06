@@ -19,6 +19,7 @@
 //! and composer — and drawing and the mouse both read that one [`FrameLayout`].
 
 use ratatui::layout::{Constraint, Layout, Margin, Position, Rect};
+use slakio_core::layout::{Area, Node, PaneId, Share};
 
 /// The collapsed rail: a border, the workspace stripe and one letter or icon, and a dot.
 pub const RAIL_WIDTH: u16 = 4;
@@ -56,10 +57,6 @@ pub struct Shape {
     pub thread: bool,
     /// The list panel has the focus (it is never left out then).
     pub list_focused: bool,
-    /// A conversation is open in the work area.
-    pub main: bool,
-    /// The thread panel has the keyboard (on a screen too narrow for both panes, it is shown).
-    pub thread_focused: bool,
 }
 
 /// The width of the list panel on a screen `width` wide: a fifth or so, 26 to 36 cells.
@@ -87,19 +84,15 @@ pub fn areas(size: Rect, s: Shape) -> Areas {
 /// The most lines a composer shows before it scrolls.
 pub const COMPOSER_MAX_LINES: u16 = 5;
 
-/// The work area split into the main pane and, when open, the thread panel on its right (two
-/// fifths, 34 to 60 cells, while the main pane keeps [`MAIN_MIN`]). Where both do not fit, the
-/// pane with the keyboard (`thread_focused`) takes the whole area.
-pub fn work_split(work: Rect, thread: bool, thread_focused: bool) -> (Option<Rect>, Option<Rect>) {
-    if !thread {
-        return (Some(work), None);
-    }
-    let w = (work.width * 2 / 5).clamp(34, 60);
-    if work.width < w + MAIN_MIN {
-        return if thread_focused { (None, Some(work)) } else { (Some(work), None) };
-    }
-    let [main, side] = Layout::horizontal([Constraint::Min(0), Constraint::Length(w)]).areas(work);
-    (Some(main), Some(side))
+/// How the auto thread panel shares the work area with the conversation: two fifths, 34 to 60
+/// cells, while the conversation keeps [`MAIN_MIN`]; where both do not fit, the pane with the
+/// keyboard takes the whole area.
+pub const THREAD_SHARE: Share = Share { num: 2, den: 5, min: 34, max: 60, keep: MAIN_MIN };
+
+/// The panes of `tree` shown in `work`, and where (`focused` stays where two do not fit).
+pub fn work_panes(work: Rect, tree: &Node, focused: Option<PaneId>) -> Vec<(PaneId, Rect)> {
+    let area = Area { x: work.x, y: work.y, width: work.width, height: work.height };
+    tree.solve(area, focused).into_iter().map(|(id, a)| (id, Rect::new(a.x, a.y, a.width, a.height))).collect()
 }
 
 /// Inside a bordered area.
@@ -137,19 +130,10 @@ pub fn pane_parts(area: Rect, lines: usize) -> PaneParts {
     PaneParts { messages, divider: Some(divider), input }
 }
 
-/// A pane's place in the work area.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Slot {
-    /// The conversation open in the work area.
-    Main,
-    /// The auto thread panel beside it.
-    Thread,
-}
-
-/// A pane as laid out: its place, its area and its parts.
+/// A pane as laid out: which, its area and its parts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PaneLayout {
-    pub slot: Slot,
+    pub id: PaneId,
     pub rect: Rect,
     pub parts: PaneParts,
 }
@@ -158,14 +142,14 @@ pub struct PaneLayout {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameLayout {
     pub areas: Areas,
-    /// The panes shown, the main pane first; a pane left out has none.
+    /// The panes shown, in reading order; a pane left out has none.
     pub panes: Vec<PaneLayout>,
 }
 
 impl FrameLayout {
-    /// The pane in `slot`, when it is shown.
-    pub fn pane(&self, slot: Slot) -> Option<&PaneLayout> {
-        self.panes.iter().find(|p| p.slot == slot)
+    /// Pane `id`, when it is shown.
+    pub fn pane(&self, id: PaneId) -> Option<&PaneLayout> {
+        self.panes.iter().find(|p| p.id == id)
     }
 
     /// The pane under `at`.
@@ -174,20 +158,22 @@ impl FrameLayout {
     }
 }
 
-/// The frame for a screen of `size`. `composer_lines(slot, width)` is how many lines the
-/// composer of the pane in `slot` takes when it wraps at `width`.
-pub fn frame(size: Rect, s: Shape, mut composer_lines: impl FnMut(Slot, usize) -> usize) -> FrameLayout {
+/// The frame for a screen of `size` whose work area holds `tree` (none: no pane), `focused`
+/// the pane with the keyboard. `composer_lines(id, width)` is how many lines the composer of
+/// pane `id` takes when it wraps at `width`.
+pub fn frame(
+    size: Rect,
+    s: Shape,
+    tree: Option<&Node>,
+    focused: Option<PaneId>,
+    mut composer_lines: impl FnMut(PaneId, usize) -> usize,
+) -> FrameLayout {
     let areas = areas(size, s);
-    let mut panes = Vec::new();
-    if s.main {
-        let (main, thread) = work_split(areas.work, s.thread, s.thread_focused);
-        for (slot, rect) in [(Slot::Main, main), (Slot::Thread, thread)] {
-            if let Some(rect) = rect {
-                let parts = pane_parts(rect, composer_lines(slot, composer_width(rect)));
-                panes.push(PaneLayout { slot, rect, parts });
-            }
-        }
-    }
+    let shown = tree.map(|t| work_panes(areas.work, t, focused)).unwrap_or_default();
+    let panes = shown
+        .into_iter()
+        .map(|(id, rect)| PaneLayout { id, rect, parts: pane_parts(rect, composer_lines(id, composer_width(rect))) })
+        .collect();
     FrameLayout { areas, panes }
 }
 

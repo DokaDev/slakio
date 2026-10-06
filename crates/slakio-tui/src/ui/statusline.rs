@@ -116,7 +116,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let ws = app.backend.and_then(|_| app.model.workspaces().get(app.shell.workspace));
     let mut ws_name = ws.map(|w| w.name.line().into_string());
     let stripe = ws.map(|w| Span::styled("▌", t.workspace(w.color)));
-    let main = app.work.main.as_ref().and_then(|p| app.model.target(&p.target));
+    let main = app.work.main().and_then(|p| app.model.target(&p.target));
     let mut place_text = app.backend.map(|_| match main {
         Some(c) if app.work.focused().is_some_and(|p| p.is_thread()) => {
             format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))

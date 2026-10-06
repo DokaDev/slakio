@@ -47,7 +47,7 @@ pub(crate) mod work;
 use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, DialogAction, PaneAction, ShellAction};
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
-use crate::screen::{self, Slot};
+use crate::screen;
 use crate::theme::{self, Look, Theme};
 use composer::Composer;
 use dialog::{Dialog, Question};
@@ -62,7 +62,7 @@ use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEven
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
 use std::time::{Duration, Instant};
-use work::{Side, Work};
+use work::Work;
 
 /// How long an unfinished key sequence waits before the which-key popup lists what may follow
 /// (typed quickly, the popup never shows).
@@ -132,6 +132,8 @@ pub struct App {
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
     pub(crate) shell: Shell,
+    /// Where the keyboard is ([`focus`]).
+    focus: Focus,
     pub(crate) work: Work,
     pub model: Model,
     /// The keyboard help, while open.
@@ -165,6 +167,7 @@ impl App {
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),
             shell: Shell::default(),
+            focus: Focus::List,
             work: Work::default(),
             model: Model::default(),
             help: None,
@@ -274,7 +277,7 @@ impl App {
     /// Rows of messages the focused pane shows.
     fn pane_height(&self) -> usize {
         let frame = self.frame();
-        frame.pane(self.work.side.slot()).map_or(1, |p| usize::from(p.parts.messages.height)).max(1)
+        self.work.active().and_then(|id| frame.pane(id)).map_or(1, |p| usize::from(p.parts.messages.height)).max(1)
     }
 
     /// The which-key popup shows at `now`.
@@ -468,8 +471,8 @@ impl App {
                     self.shell.scroll_by(&self.model, by * WHEEL_ROWS, height);
                     return true;
                 }
-                let slot = self.frame().pane_at(at).map(|p| p.slot);
-                self.work.step_in(slot, by);
+                let id = self.frame().pane_at(at).map(|p| p.id);
+                self.work.step_in(id, by);
                 true
             }
             MouseEventKind::Down(MouseButton::Left) => {
@@ -481,6 +484,7 @@ impl App {
                     let items = rail_items(self.model.workspaces().len());
                     if let Some(i) = screen::rail_item_at(a.rail, self.model.workspaces().len(), items.len(), at.y) {
                         self.shell.select(items[i], &items, &self.model);
+                        self.set_focus(Focus::List);
                     }
                 } else if let Some(list) = a.list.filter(|l| l.contains(at)) {
                     let inner = screen::inner(list);
@@ -506,8 +510,7 @@ impl App {
     /// A click in the work area at `at` (`double`: the second of a double click).
     fn click_work(&mut self, at: Position, double: bool) {
         let Some(&layout) = self.frame().pane_at(at) else { return };
-        let side = Side::of(layout.slot);
-        self.set_focus(Focus::on(layout.slot));
+        self.set_focus(Focus::on(layout.id));
         let Some(pane) = self.work.focused() else { return };
         let parts = layout.parts;
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
@@ -517,8 +520,8 @@ impl App {
             p.select_index(hit.message, tl);
             p.visual = None;
         });
-        if (hit.link || double) && side == Side::Main {
-            self.work.open_thread();
+        if (hit.link || double) && Some(layout.id) == self.work.main_id() {
+            self.open_thread();
         }
     }
 
@@ -594,75 +597,35 @@ impl App {
             ShellAction::FocusDown => return self.info(Msg::Label(Label::StatusNoPaneBelow), now),
             ShellAction::FocusLeft if self.focus().is_pane() => return self.pane(PaneAction::Left, now),
             // Never onto an empty work area: nothing there takes a key.
-            ShellAction::FocusRight if self.focus() == Focus::List && self.work.main.is_none() => return,
+            ShellAction::FocusRight if self.focus() == Focus::List && self.work.main().is_none() => return,
             ShellAction::FocusRight if self.focus().is_pane() => return self.pane(PaneAction::Right, now),
             _ => {}
         }
         let height = self.list_height();
-        if let Some(open) = self.shell.update(a, &self.model, height) {
+        let mut here = self.region();
+        let open = self.shell.update(a, &self.model, height, &mut here);
+        if here != self.region() {
+            self.focus_region(here);
+        }
+        if let Some(open) = open {
             self.open(open.target, open.focus);
         }
-    }
-
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: rail, list, main pane, thread
-    /// panel, round again. A hidden list or a closed pane is skipped. The rail is expanded only
-    /// while it has the focus, so passing it never leaves it open.
-    fn cycle(&mut self, step: isize) {
-        #[derive(Clone, Copy, PartialEq, Eq)]
-        enum Stop {
-            Rail,
-            List,
-            Main,
-            Thread,
-        }
-        let mut stops = vec![Stop::Rail];
-        if !self.shell.list_hidden {
-            stops.push(Stop::List);
-        }
-        if self.work.main.is_some() {
-            stops.push(Stop::Main);
-        }
-        if self.work.thread.is_some() {
-            stops.push(Stop::Thread);
-        }
-        let here = match self.focus() {
-            Focus::Rail => Stop::Rail,
-            Focus::List => Stop::List,
-            f if f == Focus::on(Slot::Thread) => Stop::Thread,
-            Focus::Pane(_) => Stop::Main,
-        };
-        let at = stops.iter().position(|s| *s == here);
-        let n = stops.len() as isize;
-        let to = match at {
-            Some(i) => stops[(i as isize + step).rem_euclid(n) as usize],
-            None => stops[0],
-        };
-        self.work.set_insert(false);
-        self.set_focus(match to {
-            Stop::Rail => Focus::Rail,
-            Stop::List => Focus::List,
-            Stop::Main => Focus::on(Slot::Main),
-            Stop::Thread => Focus::on(Slot::Thread),
-        });
     }
 
     /// Open a conversation in the main pane; `focus`: give it the keyboard, as GUI Slack does
     /// (the next `j`/`k` moves through its messages).
     fn open(&mut self, target: slakio_core::model::Target, focus: bool) {
-        self.work.open(target);
+        let Some(id) = self.work.open(target) else { return };
+        self.work.activate(id);
         if focus {
-            self.focus_work();
+            self.set_focus(Focus::on(id));
         }
     }
 
-    /// The list panel gets the keyboard, its cursor on the conversation `target` names.
-    fn focus_list(&mut self, target: Option<slakio_core::model::Target>) {
-        self.work.set_insert(false);
-        self.shell.list_hidden = false;
-        self.set_focus(Focus::List);
-        if let Some(t) = target {
-            let height = self.list_height();
-            self.shell.reveal(&self.model, &t, height);
+    /// The thread of the selected message in the thread panel, with the keyboard.
+    fn open_thread(&mut self) {
+        if let Some(id) = self.work.open_thread() {
+            self.set_focus(Focus::on(id));
         }
     }
 
@@ -671,12 +634,12 @@ impl App {
             return;
         }
         let page = self.pane_height() as isize;
-        let main_target = self.work.main.as_ref().map(|p| p.target.clone());
+        let main_target = self.work.main().map(|p| p.target.clone());
         match a {
             PaneAction::Back | PaneAction::Forward => {
                 let moved = if a == PaneAction::Back { self.work.back() } else { self.work.forward() };
-                if moved {
-                    self.focus_work();
+                if let Some(id) = moved {
+                    self.set_focus(Focus::on(id));
                 } else {
                     let l = if a == PaneAction::Back { Label::StatusNoEarlier } else { Label::StatusNoLater };
                     self.info(Msg::Label(l), now);
@@ -692,8 +655,10 @@ impl App {
             PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl)),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
-                Some(p) if p.selected.is_none() || self.work.side == Side::Thread => self.work.set_insert(true),
-                Some(_) => self.work.open_thread(),
+                Some(p) if p.selected.is_none() || self.work.active() == self.work.thread_id() => {
+                    self.work.set_insert(true);
+                }
+                Some(_) => self.open_thread(),
                 None => {}
             },
             PaneAction::Visual => self.work.with_pane(|p, tl| {
@@ -712,8 +677,10 @@ impl App {
                 }
             }
             PaneAction::Left => {
-                if self.focus().is_pane() && self.work.focus_side(-1) {
-                    return;
+                if self.focus().is_pane()
+                    && let Some(id) = self.work.beside(-1)
+                {
+                    return self.set_focus(Focus::on(id));
                 }
                 if self.shell.list_hidden {
                     self.set_focus(Focus::Rail);
@@ -722,39 +689,24 @@ impl App {
                 }
             }
             PaneAction::Right => {
-                if self.focus().is_pane() {
-                    self.work.focus_side(1);
+                if self.focus().is_pane()
+                    && let Some(id) = self.work.beside(1)
+                {
+                    self.set_focus(Focus::on(id));
                 }
             }
             PaneAction::Close => {
                 if !self.focus().is_pane() {
                     return;
                 }
-                if let Some(closed) = self.work.close() {
+                let (closed, next) = self.work.close();
+                if let Some(id) = next {
+                    self.set_focus(Focus::on(id));
+                }
+                if let Some(closed) = closed {
                     self.focus_list(Some(closed));
                 }
             }
-        }
-    }
-
-    /// `Esc` in a pane: one step out (see the table at the top).
-    fn escape(&mut self, main: Option<slakio_core::model::Target>) {
-        let Some(p) = self.work.focused_mut() else {
-            return self.focus_list(None);
-        };
-        if p.visual.take().is_some() {
-            return;
-        }
-        if p.selected.take().is_some() {
-            p.bottom.set(None);
-            return;
-        }
-        if self.work.side == Side::Thread {
-            self.work.turn(Side::Main);
-            return;
-        }
-        if !self.shell.list_hidden {
-            self.focus_list(main);
         }
     }
 

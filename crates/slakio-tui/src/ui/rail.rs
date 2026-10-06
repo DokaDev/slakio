@@ -28,7 +28,7 @@ use ratatui::widgets::{Clear, Paragraph};
 #[expect(clippy::too_many_lines, reason = "to be split")]
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
-    let expanded = app.shell.rail_expanded();
+    let expanded = app.rail_expanded();
     let focused = app.focus() == Focus::Rail;
     // Over the list panel only its own cells are cleared: the list shows beside it.
     f.render_widget(Clear, area);

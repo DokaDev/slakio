@@ -13,6 +13,11 @@ fn conversation(m: &Model, name: &str) -> Target {
     Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() }
 }
 
+/// The thread panel.
+fn thread_pane(w: &Work) -> Option<&Pane> {
+    w.thread_id().and_then(|id| w.pane(id))
+}
+
 /// Answer the requests `asked` from the demo world.
 fn answer(w: &mut Work, m: &Model, backend: &mut crate::demo::DemoBackend, asked: Vec<(Generation, Command)>) {
     use slakio_core::backend::Backend;
@@ -50,7 +55,7 @@ fn opening_loads_the_newest_page_and_reopening_focuses_instead() {
     assert!(w.take_requests().is_empty(), "already open: no second load");
     answer(&mut w, &m, &mut b, asked);
     pump(&mut w, &m, &mut b);
-    let tl = w.timeline(w.main.as_ref().unwrap());
+    let tl = w.timeline(w.main().unwrap());
     assert!(!tl.items.is_empty() && tl.complete, "a short channel loads in one page");
 }
 
@@ -78,38 +83,42 @@ fn enter_opens_the_thread_panel_and_another_thread_replaces_it() {
     w.with_pane(|p, tl| p.select_index(0, tl));
     w.open_thread();
     pump(&mut w, &m, &mut b);
-    assert_eq!(w.side, Side::Thread);
-    let thread = w.thread.as_ref().unwrap();
+    assert_eq!(w.active(), w.thread_id());
+    let thread = thread_pane(&w).unwrap();
     assert!(thread.is_thread() && w.timeline(thread).items.len() >= 200);
     let first = thread.target.clone();
-    assert!(w.focus_side(-1));
+    let main = w.beside(-1).unwrap();
+    assert_eq!(Some(main), w.main_id());
+    w.activate(main);
     w.with_pane(|p, tl| p.select_index(1, tl));
-    w.open_thread();
-    assert_ne!(w.thread.as_ref().unwrap().target, first, "replaced");
+    let second = w.open_thread();
+    assert_eq!(second, w.thread_id());
+    assert_ne!(thread_pane(&w).unwrap().target, first, "replaced");
+    assert_eq!(w.close(), (None, Some(main)), "the conversation takes the keyboard");
+    w.activate(main);
+    assert!(w.thread_id().is_none() && w.main().is_some());
     w.close();
-    assert_eq!((w.side, w.thread.is_none(), w.main.is_some()), (Side::Main, true, true));
-    w.close();
-    assert!(w.main.is_none(), "closing the conversation empties the work area");
+    assert!(w.main().is_none() && w.ids().is_empty(), "closing the conversation empties the work area");
 }
 
 #[test]
 fn back_and_forward_walk_the_main_panes_history() {
     let m = model();
     let mut w = Work::default();
-    assert!(!w.back() && !w.forward());
+    assert!(w.back().is_none() && w.forward().is_none());
     for name in ["backend", "incidents", "general"] {
         w.open(conversation(&m, name));
     }
-    let at = |w: &Work| w.main.as_ref().unwrap().target.clone();
-    assert!(w.back());
+    let at = |w: &Work| w.main().unwrap().target.clone();
+    assert!(w.back().is_some());
     assert_eq!(at(&w), conversation(&m, "incidents"));
-    assert!(w.back());
+    assert!(w.back().is_some());
     assert_eq!(at(&w), conversation(&m, "backend"));
-    assert!(!w.back());
-    assert!(w.forward());
+    assert!(w.back().is_none());
+    assert!(w.forward().is_some());
     assert_eq!(at(&w), conversation(&m, "incidents"));
     w.open(conversation(&m, "random"));
-    assert!(!w.forward(), "opening something new clears forward");
+    assert!(w.forward().is_none(), "opening something new clears forward");
 }
 
 #[test]
@@ -122,7 +131,7 @@ fn send_echoes_the_composer_as_the_users_message_and_empties_it() {
     assert!(!w.send(&m), "nothing to send");
     w.with_draft(|c| c.insert("  hello\x1b[2J  "));
     assert!(w.send(&m));
-    let main = w.main.as_ref().unwrap();
+    let main = w.main().unwrap();
     let last = w.timeline(main).items.last().unwrap();
     assert!(last.own && last.text.as_str() == "  hello  ");
     assert_eq!(last.author.as_str(), "Me");
@@ -135,7 +144,7 @@ fn clamping_drops_a_conversation_that_is_gone() {
     let mut w = Work::default();
     w.open(Target::Conversation { workspace: WorkspaceId::new("TDEMOA"), conversation: ConversationId::new("CNOPE") });
     w.clamp(&m);
-    assert!(w.main.is_none());
+    assert!(w.main().is_none());
 }
 
 #[test]
@@ -148,29 +157,32 @@ fn two_panes_on_one_target_share_its_messages_and_load_them_once() {
     pump(&mut w, &m, &mut b);
     w.show_beside(target.clone());
     assert!(w.take_requests().is_empty(), "the second pane loads nothing");
-    let n = w.timeline(w.main.as_ref().unwrap()).items.len();
-    assert_eq!(w.timeline(w.thread.as_ref().unwrap()).items.len(), n);
+    let n = w.timeline(w.main().unwrap()).items.len();
+    assert_eq!(w.timeline(thread_pane(&w).unwrap()).items.len(), n);
     // Both panes select messages near the top; one older page comes, both keep their messages.
     w.with_pane(|p, tl| p.select_index(3, tl));
     let (ts3, ts5) = {
-        let tl = w.timeline(w.main.as_ref().unwrap());
+        let tl = w.timeline(w.main().unwrap());
         (tl.items[3].ts, tl.items[5].ts)
     };
-    w.main.as_mut().unwrap().selected = Some(ts5);
+    w.activate(w.main_id().unwrap());
+    w.with_pane(|p, _| p.selected = Some(ts5));
     let asked = w.take_requests();
     assert_eq!(asked.len(), 1, "one request for the target");
     answer(&mut w, &m, &mut b, asked);
-    let tl = w.timeline(w.main.as_ref().unwrap());
-    let (main, thread) = (w.main.as_ref().unwrap(), w.thread.as_ref().unwrap());
+    let tl = w.timeline(w.main().unwrap());
+    let (main, thread) = (w.main().unwrap(), thread_pane(&w).unwrap());
     assert!(tl.items.len() > n, "older messages arrived");
     assert_eq!(tl.items[thread.selected_index(tl).unwrap()].ts, ts3);
     assert_eq!(tl.items[main.selected_index(tl).unwrap()].ts, ts5);
     // One draft for the target: written in one pane, it is there in the other.
     w.with_draft(|c| c.insert("hi"));
-    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "hi");
+    assert_eq!(w.draft(w.main().unwrap()).text(), "hi");
     // Closing one pane keeps the messages for the other; closing both drops them.
+    w.activate(w.thread_id().unwrap());
     w.close();
     assert!(w.timelines.get(&target).is_some());
+    w.activate(w.main_id().unwrap());
     w.close();
     assert!(w.timelines.get(&target).is_none());
 }
@@ -207,7 +219,7 @@ fn a_draft_outlives_its_pane_and_is_there_when_its_target_opens_again() {
     w.close();
     assert!(w.drafts.get(&incidents).is_none(), "an empty draft is not kept");
     w.open(backend.clone());
-    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "half written");
+    assert_eq!(w.draft(w.main().unwrap()).text(), "half written");
     w.clamp(&m);
     assert!(w.drafts.get(&backend).is_some(), "kept while its conversation exists");
 }
@@ -220,7 +232,7 @@ fn a_draft_that_cannot_be_sent_stays_in_the_composer() {
     w.open(Target::Conversation { workspace: WorkspaceId::new("TNOPE"), conversation: ConversationId::new("C") });
     w.with_draft(|c| c.insert("keep me"));
     assert!(!w.send(&m));
-    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "keep me", "nothing sent, nothing lost");
+    assert_eq!(w.draft(w.main().unwrap()).text(), "keep me", "nothing sent, nothing lost");
 }
 
 #[test]
@@ -232,7 +244,7 @@ fn a_draft_of_a_conversation_that_is_gone_is_kept_until_quitting_asks() {
     w.open(gone.clone());
     w.with_draft(|c| c.insert("unsent"));
     w.clamp(&m);
-    assert!(w.main.is_none(), "the conversation is closed");
+    assert!(w.main().is_none(), "the conversation is closed");
     assert_eq!(w.drafts.get(&gone).map(Composer::text), Some("unsent"), "its draft is not dropped silently");
     assert!(w.unsent());
 }
