@@ -126,11 +126,30 @@ impl Work {
     }
 
     /// Make pane `id` the active one (the app does, as it moves the focus); Insert mode goes
-    /// along.
+    /// along. A pane that is not open is not made active.
     pub fn activate(&mut self, id: PaneId) {
+        if !self.panes.contains_key(&id) {
+            return;
+        }
         let insert = self.insert();
         self.active = Some(id);
         self.set_insert(insert);
+        self.check();
+    }
+
+    /// What always holds, checked after every change in debug builds: a pane is active while one
+    /// is open, and it is open; the panes open are those the layout places; a thread panel a
+    /// pane names is open.
+    fn check(&self) {
+        let ids = self.ids();
+        debug_assert_eq!(self.active.is_some(), !ids.is_empty(), "an active pane while one is open");
+        debug_assert!(self.active.is_none_or(|a| ids.contains(&a)), "the active pane is placed");
+        debug_assert_eq!(ids.len(), self.panes.len(), "every pane open is placed, once");
+        debug_assert!(ids.iter().all(|id| self.panes.contains_key(id)), "every pane placed is open");
+        debug_assert!(
+            self.panes.values().filter_map(|p| p.thread).all(|t| self.panes.contains_key(&t)),
+            "a thread panel named is open"
+        );
     }
 
     /// The active pane is in Insert mode.
@@ -230,6 +249,7 @@ impl Work {
         self.layout = Some(Node::Leaf(id));
         self.active = Some(id);
         self.fill();
+        self.check();
         id
     }
 
@@ -284,6 +304,7 @@ impl Work {
         }
         self.active = Some(id);
         self.fill();
+        self.check();
         Some(id)
     }
 
@@ -303,12 +324,16 @@ impl Work {
                     pane.selected = Some(thread);
                 }
             }
+            self.active = Some(owner);
             self.prune();
+            self.check();
             return (None, Some(owner));
         }
         let closed = self.close_pane(active).map(|p| p.target);
+        self.active = self.ids().first().copied();
         self.prune();
-        match self.ids().first().copied() {
+        self.check();
+        match self.active {
             Some(next) => (None, Some(next)),
             None => (closed, None),
         }
@@ -416,10 +441,11 @@ impl Work {
         for id in &gone {
             self.close_pane(*id);
         }
-        if self.active.is_some_and(|a| !self.panes.contains_key(&a)) {
+        if self.active.is_none_or(|a| !self.panes.contains_key(&a)) {
             self.active = self.ids().first().copied();
         }
         self.prune();
+        self.check();
         let gone = !gone.is_empty();
         self.back.retain(|t| model.target(t).is_some());
         self.forward.retain(|t| model.target(t).is_some());

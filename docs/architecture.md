@@ -59,8 +59,9 @@ rows drawn, the thread panel it opened: a pane's role is this relation, never it
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the
 keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); the layout
-(tabs and splits) joins as it is built. Where the keyboard is is one `Focus` field of the app — rail, list panel or a pane by id
-(`app/focus.rs`; the shell and the work area hand back where it should go) — and the
+(tabs and splits) joins as it is built. Where the keyboard is is one field of the app — the rail, the list panel or the work area,
+whose active pane has it (`app/focus.rs`; the pane is never kept twice, so the focus cannot name
+a closed pane; the shell and the work area hand back where it should go) — and the
 popups come in one order (`app/overlay.rs`); the key map, the mouse and drawing all read
 those two. The geometry of the screen (`screen.rs`) is pure:
 `screen::frame` lays out a frame once — the regions, each open pane, its messages and its

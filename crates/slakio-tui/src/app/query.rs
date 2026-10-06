@@ -41,6 +41,8 @@ pub enum Focus {
     Rail,
     List,
     Pane(PaneHandle),
+    /// The work area with no pane open.
+    Work,
 }
 
 /// What a pane shows.
@@ -194,7 +196,7 @@ impl App {
 
     /// The rail is drawn wide, with labels.
     pub fn rail_expanded(&self) -> bool {
-        self.shell.rail_expanded(self.focus == Focus::Rail)
+        self.shell.rail_expanded(self.focus() == Focus::Rail)
     }
 
     /// The rows of the keyboard help, while it is open (else none).

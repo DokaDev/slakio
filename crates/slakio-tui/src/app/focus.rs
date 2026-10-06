@@ -1,16 +1,14 @@
-//! Where the keyboard is: one [`Focus`] field of the app — the rail, the list panel or a pane —
-//! read by the key map, drawing and the mouse alike, and changed in one place
-//! ([`App::set_focus`]). The shell and the work area never move it: they hand back where it
-//! should go. The work area keeps its active pane (where the keyboard goes back to); a pane
-//! with the focus is always the active one.
+//! Where the keyboard is: the rail, the list panel or the work area — one [`Region`] field of
+//! the app, changed in one place ([`App::set_focus`]) and read by the key map, drawing and the
+//! mouse alike ([`App::focus`]). Which pane of the work area has it is not kept twice: it is the
+//! work area's active pane (the one the keyboard goes back to there), so the focus can never
+//! name a pane that is closed. The shell and the work area never move the focus: they hand back
+//! where it should go.
 
 use super::App;
 use super::query::{Focus, PaneHandle};
 use super::shell::Region;
 use slakio_core::layout::PaneId;
-
-/// The work area with no pane open: what the focus names when it is there.
-pub(crate) const NO_PANE: PaneId = PaneId(0);
 
 impl Focus {
     /// The focus on pane `id`.
@@ -25,35 +23,45 @@ impl Focus {
 }
 
 impl App {
-    /// Where the keyboard is, under any popup.
+    /// Where the keyboard is, under any popup: in the work area, its active pane (or the work
+    /// area itself, with no pane open).
     pub fn focus(&self) -> Focus {
-        self.focus
-    }
-
-    /// Give the keyboard to `focus`. Moving to another pane leaves Insert mode.
-    pub(crate) fn set_focus(&mut self, focus: Focus) {
-        if let Focus::Pane(h) = focus
-            && self.work.pane(h.id()).is_some()
-            && self.work.active() != Some(h.id())
-        {
-            self.work.set_insert(false);
-            self.work.activate(h.id());
+        match self.region {
+            Region::Rail => Focus::Rail,
+            Region::List => Focus::List,
+            Region::Work => self.work.active().map_or(Focus::Work, Focus::on),
         }
-        self.focus = focus;
     }
 
-    /// The keyboard goes to the work area's active pane.
+    /// Give the keyboard to `focus`. Moving to another pane leaves Insert mode; a pane that is
+    /// not open takes nothing.
+    pub(crate) fn set_focus(&mut self, focus: Focus) {
+        self.region = match focus {
+            Focus::Rail => Region::Rail,
+            Focus::List => Region::List,
+            Focus::Work => Region::Work,
+            Focus::Pane(h) if self.work.pane(h.id()).is_some() => {
+                if self.work.active() != Some(h.id()) {
+                    self.work.set_insert(false);
+                    self.work.activate(h.id());
+                }
+                Region::Work
+            }
+            Focus::Pane(_) => {
+                debug_assert!(false, "focus on a pane that is not open: {focus:?}");
+                return;
+            }
+        };
+    }
+
+    /// The keyboard goes to the work area (its active pane).
     pub(crate) fn focus_work(&mut self) {
-        self.set_focus(Focus::on(self.work.active().unwrap_or(NO_PANE)));
+        self.set_focus(Focus::Work);
     }
 
     /// The region the focus is in, as the shell knows them.
     pub(crate) fn region(&self) -> Region {
-        match self.focus {
-            Focus::Rail => Region::Rail,
-            Focus::List => Region::List,
-            Focus::Pane(_) => Region::Work,
-        }
+        self.region
     }
 
     /// The focus goes to `region` (the work area: its active pane).

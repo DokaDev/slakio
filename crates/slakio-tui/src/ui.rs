@@ -144,7 +144,7 @@ fn draw_too_small(f: &mut Frame, app: &App, area: Rect) {
 fn frame<'a>(app: &App, region: Region, title: &str) -> Block<'a> {
     let focused = matches!(
         (region, app.focus()),
-        (Region::Rail, Focus::Rail) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_))
+        (Region::Rail, Focus::Rail) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_) | Focus::Work)
     );
     panel(app, focused, Line::from(title_span(app, title, focused)))
 }

@@ -132,8 +132,8 @@ pub struct App {
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
     pub(crate) shell: Shell,
-    /// Where the keyboard is ([`focus`]).
-    focus: Focus,
+    /// The region with the keyboard ([`focus`]); in the work area, its active pane has it.
+    region: shell::Region,
     pub(crate) work: Work,
     pub model: Model,
     /// The keyboard help, while open.
@@ -167,7 +167,7 @@ impl App {
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),
             shell: Shell::default(),
-            focus: Focus::List,
+            region: shell::Region::List,
             work: Work::default(),
             model: Model::default(),
             help: None,
@@ -263,7 +263,7 @@ impl App {
             Focus::List => Ctx::List,
             Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
             Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
-            Focus::Pane(_) => Ctx::PaneNormal,
+            Focus::Pane(_) | Focus::Work => Ctx::PaneNormal,
         }
     }
 

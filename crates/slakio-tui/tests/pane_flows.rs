@@ -375,3 +375,24 @@ fn a_draft_is_kept_when_its_conversation_closes_and_quitting_asks_about_it() {
     assert!(!d.app.quit);
     assert_eq!(d.app.overlay(), Some(Overlay::Dialog(Question::Quit)), "a draft of a closed pane is not sent");
 }
+
+#[test]
+fn the_focus_never_names_a_closed_pane() {
+    let mut d = Demo::new(120, 40);
+    d.open("long-threads");
+    d.keys("k enter");
+    let thread = d.app.focused_pane().map(PaneRef::handle).expect("the thread panel has the keyboard");
+    d.keys("ctrl+w");
+    assert!(d.app.pane_for(thread).is_none(), "closed");
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation), "back to the pane that opened it");
+    let main = d.app.focused_pane().unwrap().handle();
+    d.keys("ctrl+w");
+    assert!(d.app.pane_for(main).is_none());
+    assert_eq!(d.app.focus(), Focus::List, "nothing open: the list");
+    // The list hidden: the keyboard is in the empty work area, which is no pane.
+    d.keys("space e");
+    assert_eq!(d.app.focus(), Focus::Work);
+    assert!(d.app.focused_pane().is_none());
+    d.keys("esc");
+    assert_eq!(d.app.focus(), Focus::List, "Esc brings the list back");
+}
