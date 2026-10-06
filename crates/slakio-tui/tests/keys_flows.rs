@@ -10,9 +10,8 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use slakio_core::i18n::Lang;
 use slakio_tui::app::dialog::Question;
 use slakio_tui::app::model::Row;
-use slakio_tui::app::shell::{Region, View};
-use slakio_tui::app::work::Side;
-use slakio_tui::app::{App, Effect, Mode, Settings, WHICH_KEY_DELAY};
+use slakio_tui::app::shell::View;
+use slakio_tui::app::{App, Effect, Focus, Mode, Overlay, PaneKind, Settings, WHICH_KEY_DELAY};
 use slakio_tui::theme::Theme;
 use std::time::{Duration, Instant};
 
@@ -26,7 +25,7 @@ fn list_row_of(d: &Demo, name: &str) -> usize {
 }
 
 fn selected(d: &Demo) -> Option<usize> {
-    d.app.work.focused().and_then(|p| p.selected)
+    d.app.focused_pane().and_then(|p| p.selected())
 }
 
 // --- Esc, one step at a time --------------------------------------------------------------
@@ -36,21 +35,21 @@ fn esc_steps_out_one_level_at_a_time_and_never_closes_anything() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!(d.app.work.side, Side::Thread);
+    assert_eq!(d.app.focus(), Focus::Thread);
     // 1. A popup closes first.
     d.keys("?");
-    assert!(d.app.help.is_some());
+    assert!(d.app.overlay() == Some(Overlay::Help));
     d.keys("esc");
-    assert!(d.app.help.is_none());
+    assert!(d.app.overlay().is_none());
     // 2. A pending sequence is dropped.
     d.keys("space esc");
-    assert!(d.app.keys.pending().is_empty() && d.app.work.side == Side::Thread);
+    assert!(d.app.keys.pending().is_empty() && d.app.focus() == Focus::Thread);
     // 3. Insert → Normal, the text stays.
     d.keys("i");
     d.type_text("draft");
     d.keys("esc");
     assert_eq!(d.app.mode(), Mode::Normal);
-    assert_eq!(d.app.work.focused().unwrap().composer.text(), "draft");
+    assert_eq!(d.app.focused_pane().unwrap().composer_text(), "draft");
     // 4. VISUAL → Normal, the selection stays.
     d.keys("V k esc");
     assert_eq!(d.app.mode(), Mode::Normal);
@@ -60,18 +59,18 @@ fn esc_steps_out_one_level_at_a_time_and_never_closes_anything() {
     assert_eq!(selected(&d), None);
     // 6. The thread panel → the main pane; the thread stays open.
     d.keys("esc");
-    assert_eq!((d.app.work.side, d.app.work.thread.is_some()), (Side::Main, true));
+    assert_eq!((d.app.focus(), d.app.pane_of(PaneKind::Thread).is_some()), (Focus::Conversation, true));
     // 5 again on the main pane, then 7: the main pane → the list, on its conversation.
     d.keys("esc esc");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     assert_eq!(d.app.shell.list_cursor, list_row_of(&d, "long-threads"));
-    assert!(d.app.work.main.is_some(), "nothing was closed");
+    assert!(d.app.open_target().is_some(), "nothing was closed");
     // 9. The list is the outermost: Esc does nothing.
     d.keys("esc");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     // 8. The rail → the list.
     d.keys("ctrl+h esc");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
 }
 
 // --- Where the focus lands ------------------------------------------------------------------
@@ -82,11 +81,11 @@ fn enter_opens_and_moves_l_peeks_and_stays() {
     let at = list_row_of(&d, "incidents");
     d.app.shell.list_cursor = at;
     d.keys("l");
-    assert_eq!(d.app.shell.focus, Region::List, "a peek keeps the list");
-    assert!(d.app.work.main.is_some());
+    assert_eq!(d.app.focus(), Focus::List, "a peek keeps the list");
+    assert!(d.app.open_target().is_some());
     d.keys("right k enter");
-    assert_eq!(d.app.shell.focus, Region::Work);
-    let open = d.app.model.target(&d.app.work.main.as_ref().unwrap().target).unwrap().name.clone();
+    assert_eq!(d.app.focus(), Focus::Conversation);
+    let open = d.app.model.target(d.app.open_target().unwrap()).unwrap().name.clone();
     assert_eq!(open, "backend");
     assert_eq!(selected(&d), None, "no message selected yet; the hints say what to press");
     assert!(d.status_line().contains("i write") && d.status_line().contains("k messages"), "{}", d.status_line());
@@ -97,12 +96,12 @@ fn enter_on_a_message_moves_to_its_thread_and_the_rail_returns_to_the_first_conv
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("k k enter");
-    assert_eq!((d.app.work.side, d.app.shell.focus), (Side::Thread, Region::Work));
+    assert_eq!(d.app.focus(), Focus::Thread);
     assert_eq!(selected(&d), None, "the thread starts with nothing selected");
     d.keys("ctrl+h ctrl+h ctrl+h");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     d.keys("j enter");
-    assert_eq!((d.app.shell.workspace, d.app.shell.focus), (1, Region::List));
+    assert_eq!((d.app.shell.workspace, d.app.focus()), (1, Focus::List));
     let rows = d.app.shell.rows(&d.app.model);
     assert!(matches!(rows[d.app.shell.list_cursor], Row::Conversation(_)), "the first conversation, not a header");
 }
@@ -113,20 +112,20 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
     d.open("long-threads");
     d.keys("g g enter");
     d.keys("h");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Main));
+    assert_eq!(d.app.focus(), Focus::Conversation);
     d.keys("right");
-    assert_eq!(d.app.work.side, Side::Thread);
+    assert_eq!(d.app.focus(), Focus::Thread);
     d.keys("left left");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     // In the list: h goes to the section's header, folds it, then the rail.
     d.keys("h");
     assert!(matches!(d.app.shell.rows(&d.app.model)[d.app.shell.list_cursor], Row::Section(_)));
     d.keys("h");
     assert!(d.screen().contains("▸ Ops"), "folded");
     d.keys("h");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     d.keys("l");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     d.keys("l");
     assert!(d.screen().contains("▾ Ops"), "l unfolds");
     // { and } jump between section headers.
@@ -142,22 +141,22 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
 fn tab_and_f6_go_round_the_open_panels_skipping_a_hidden_list() {
     let mut d = Demo::new(120, 40);
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::Rail, "nothing open: the rail and the list are the stops");
+    assert_eq!(d.app.focus(), Focus::Rail, "nothing open: the rail and the list are the stops");
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     d.open("long-threads");
     d.keys("g g enter f6");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     d.keys("f6");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     d.keys("shift+f6");
-    assert_eq!(d.app.shell.focus, Region::Rail, "backwards, the rail is before the list");
+    assert_eq!(d.app.focus(), Focus::Rail, "backwards, the rail is before the list");
     d.keys("shift+f6");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Thread));
+    assert_eq!(d.app.focus(), Focus::Thread);
     d.keys("space e tab");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     d.keys("tab");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Main), "the hidden list is skipped");
+    assert_eq!(d.app.focus(), Focus::Conversation, "the hidden list is skipped");
 }
 
 #[test]
@@ -175,24 +174,24 @@ fn space_w_c_closes_like_ctrl_w_and_space_brackets_go_back_and_forward() {
     d.open("backend");
     d.open("incidents");
     d.keys("space [");
-    let name = |d: &Demo| d.app.model.target(&d.app.work.main.as_ref().unwrap().target).unwrap().name.clone();
+    let name = |d: &Demo| d.app.model.target(d.app.open_target().unwrap()).unwrap().name.clone();
     assert_eq!(name(&d), "backend");
     d.keys("space ]");
     assert_eq!(name(&d), "incidents");
     d.keys("space w c");
-    assert!(d.app.work.main.is_none());
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert!(d.app.open_target().is_none());
+    assert_eq!(d.app.focus(), Focus::List);
 }
 
 #[test]
 fn space_capital_w_picks_a_workspace_on_the_rail() {
     let mut d = Demo::new(120, 40);
     d.keys("space W");
-    assert_eq!((d.app.shell.focus, d.app.shell.rail_cursor), (Region::Rail, 0));
+    assert_eq!((d.app.focus(), d.app.shell.rail_cursor), (Focus::Rail, 0));
     d.keys("j enter");
     assert_eq!(d.app.shell.workspace, 1);
     d.command("workspace");
-    assert_eq!((d.app.shell.focus, d.app.shell.rail_cursor), (Region::Rail, 1));
+    assert_eq!((d.app.focus(), d.app.shell.rail_cursor), (Focus::Rail, 1));
 }
 
 // --- Arrows, pages, Home and End wherever j and k work --------------------------------------
@@ -216,7 +215,7 @@ fn arrows_pages_home_and_end_work_wherever_j_and_k_do() {
     // A pane.
     d.open("big-history");
     d.keys("end");
-    let n = d.app.work.main.as_ref().unwrap().items.len();
+    let n = d.app.pane_of(PaneKind::Conversation).unwrap().messages().len();
     assert_eq!(selected(&d), Some(n - 1));
     d.keys("pageup");
     let page = n - 1 - selected(&d).unwrap();
@@ -252,15 +251,15 @@ fn quitting_with_a_message_not_sent_asks_first_and_enter_stays() {
     d.type_text("half written");
     d.keys("ctrl+q");
     assert!(!d.app.quit);
-    assert_eq!(d.app.dialog.map(|q| q.question), Some(Question::Quit));
+    assert_eq!(d.app.overlay(), Some(Overlay::Dialog(Question::Quit)));
     let s = d.snap();
     assert!(s.contains("Quit slakio?") && s.contains("[ Stay ]"), "{s}");
     insta::assert_snapshot!("quit_confirm_80x24", s);
     d.keys("ctrl+q");
     assert!(!d.app.quit, "asked already: the question stays");
     d.keys("enter");
-    assert!(!d.app.quit && d.app.dialog.is_none(), "Enter keeps the safe answer");
-    assert_eq!(d.app.work.main.as_ref().unwrap().composer.text(), "half written");
+    assert!(!d.app.quit && d.app.overlay().is_none(), "Enter keeps the safe answer");
+    assert_eq!(d.app.pane_of(PaneKind::Conversation).unwrap().composer_text(), "half written");
     d.keys("ctrl+q n");
     assert!(!d.app.quit);
     d.keys("esc space q y");
@@ -325,7 +324,7 @@ fn the_which_key_popup_fits_an_80x24_terminal_and_question_mark_opens_the_help()
     d.app.on_tick(d.now);
     insta::assert_snapshot!("whichkey_space_80x24", d.snap());
     d.keys("w ?");
-    assert!(d.app.help.is_some(), "? after a group shows every key");
+    assert!(d.app.overlay() == Some(Overlay::Help), "? after a group shows every key");
 }
 
 // --- The keyboard help ----------------------------------------------------------------------
@@ -338,7 +337,7 @@ fn question_mark_f1_and_space_question_mark_open_the_help_where_the_keyboard_is(
         let h = d.app.help.as_ref().expect(keys);
         assert_eq!(h.origin, slakio_tui::keymap::Ctx::List);
         d.keys("esc");
-        assert!(d.app.help.is_none(), "{keys}");
+        assert!(d.app.overlay().is_none(), "{keys}");
     }
     d.keys("?");
     let s = d.snap();
@@ -355,7 +354,7 @@ fn question_mark_f1_and_space_question_mark_open_the_help_where_the_keyboard_is(
     d.keys("i f1");
     assert!(d.app.help.as_ref().is_some_and(|h| h.origin == slakio_tui::keymap::Ctx::ComposerInsert));
     d.keys("f1");
-    assert!(d.app.help.is_none());
+    assert!(d.app.overlay().is_none());
     assert_eq!(d.app.mode(), Mode::Insert, "back to typing");
 }
 
@@ -370,7 +369,7 @@ fn the_help_moves_searches_and_runs_the_key_under_the_cursor() {
     assert!(!d.app.help.as_ref().unwrap().typing, "Enter ends typing");
     // The rows: the section, then Show DMs. Enter runs it and closes the help.
     d.keys("j enter");
-    assert!(d.app.help.is_none());
+    assert!(d.app.overlay().is_none());
     assert_eq!(d.app.shell.view, View::Dms);
     // A section opens and closes with Enter, h and l.
     d.keys("? G");
@@ -381,7 +380,7 @@ fn the_help_moves_searches_and_runs_the_key_under_the_cursor() {
     d.keys("h");
     assert_eq!(d.app.help.as_ref().unwrap().rows(&d.app.keymap, &d.app.i18n).len(), rows);
     d.keys("q");
-    assert!(d.app.help.is_none());
+    assert!(d.app.overlay().is_none());
 }
 
 // --- The hint line --------------------------------------------------------------------------
@@ -470,7 +469,7 @@ fn a_key_event_with_shift_tab_from_a_terminal_is_the_previous_panel() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
     d.app.handle_event(Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT)), d.now);
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
 }
 
 #[test]

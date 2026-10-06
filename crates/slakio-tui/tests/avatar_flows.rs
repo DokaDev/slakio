@@ -13,7 +13,7 @@ use slakio_core::i18n::Lang;
 use slakio_core::model::{ConversationKind, UserId};
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
-use slakio_tui::app::{Effect, Mode, Settings};
+use slakio_tui::app::{Effect, Mode, PaneKind, Settings};
 use slakio_tui::avatar;
 use slakio_tui::screen;
 use slakio_tui::theme::{Background, Theme, resolve};
@@ -52,11 +52,11 @@ fn backend(w: u16, h: u16, theme: Theme, avatars: bool) -> Demo {
 /// The first row drawn of each message of the main pane on screen: (message, y).
 fn first_rows(d: &Demo) -> Vec<(usize, u16)> {
     let _ = d.buffer();
-    let pane = d.app.work.main.as_ref().unwrap();
+    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
     let mut out: Vec<(usize, u16)> = Vec::new();
-    for h in pane.hits.borrow().iter() {
-        if !out.iter().any(|(m, _)| *m == h.message) {
-            out.push((h.message, h.y));
+    for (message, y) in pane.drawn_rows() {
+        if !out.iter().any(|(m, _)| *m == message) {
+            out.push((message, y));
         }
     }
     out
@@ -67,14 +67,14 @@ fn a_message_group_starts_with_its_senders_chip_and_the_text_column_stays_put() 
     let theme = tokyo();
     let d = backend(200, 50, theme.clone(), true);
     let buf = d.buffer();
-    let pane = d.app.work.main.as_ref().unwrap();
-    let (main, _) = d.app.panes();
+    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let main = d.app.pane_area(PaneKind::Conversation);
     // The pane's text starts one cell in (the gutter); the chip is first.
     let x0 = screen::inner(main.unwrap()).x + 1;
     let mut chips = 0;
     for (i, y) in first_rows(&d) {
-        let m = &pane.items[i];
-        let starts_group = i == 0 || pane.items[i - 1].user != m.user;
+        let m = &pane.messages()[i];
+        let starts_group = i == 0 || pane.messages()[i - 1].user != m.user;
         let chip = &buf[(x0, y)];
         let has_chip = is_chip(&theme, chip.bg);
         if starts_group {
@@ -110,13 +110,13 @@ fn with_avatars_off_the_name_starts_the_row_as_before() {
     let theme = tokyo();
     let d = backend(200, 50, theme.clone(), false);
     let buf = d.buffer();
-    let (main, _) = d.app.panes();
+    let main = d.app.pane_area(PaneKind::Conversation);
     let x0 = screen::inner(main.unwrap()).x + 1;
-    let pane = d.app.work.main.as_ref().unwrap();
+    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
     for (i, y) in first_rows(&d) {
         assert!(!is_chip(&theme, buf[(x0, y)].bg), "message {i}");
-        if i == 0 || pane.items[i - 1].user != pane.items[i].user {
-            let first = pane.items[i].author.as_str().chars().next();
+        if i == 0 || pane.messages()[i - 1].user != pane.messages()[i].user {
+            let first = pane.messages()[i].author.as_str().chars().next();
             assert_eq!(text(&buf, x0, y, 3).chars().next(), first, "message {i}");
         }
         assert_ne!(buf[(x0 + 14, y)].symbol(), " ", "message {i}: the text at column 14");
@@ -211,7 +211,7 @@ fn a_dm_title_starts_with_the_peers_chip() {
     let mut d = dms(theme.clone(), true);
     d.keys("enter");
     let buf = d.buffer();
-    let (main, _) = d.app.panes();
+    let main = d.app.pane_area(PaneKind::Conversation);
     let top = main.unwrap().y;
     let line: String = (0..d.app.size.width).map(|x| buf[(x, top)].symbol().to_string()).collect();
     assert!(line.contains("▌MK @Minsu Kim ● active"), "{line}");
@@ -276,10 +276,10 @@ fn a_stacked_message_indents_its_text_under_the_name() {
     for (avatars, indent) in [(true, 3u16), (false, 2)] {
         let d = backend(80, 24, Theme::terminal(), avatars);
         let buf = d.buffer();
-        let (main, _) = d.app.panes();
+        let main = d.app.pane_area(PaneKind::Conversation);
         let x0 = screen::inner(main.unwrap()).x + 1;
-        let pane = d.app.work.main.as_ref().unwrap();
-        let hits: Vec<(usize, u16)> = pane.hits.borrow().iter().map(|h| (h.message, h.y)).collect();
+        let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
+        let hits: Vec<(usize, u16)> = pane.drawn_rows();
         let mut checked = 0;
         for i in hits.iter().map(|h| h.0).collect::<std::collections::BTreeSet<_>>() {
             // The message's rows, a date rule left out: a header (from the first cell) when it
@@ -291,7 +291,7 @@ fn a_stacked_message_indents_its_text_under_the_name() {
                 first => first.copied(),
             };
             let Some(y) = text_row else { continue };
-            if pane.items[i].text.as_str().trim().is_empty() {
+            if pane.messages()[i].text.as_str().trim().is_empty() {
                 continue;
             }
             assert_eq!(text(&buf, x0, y, indent).trim(), "", "message {i}: indent {indent}");

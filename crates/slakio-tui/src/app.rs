@@ -36,7 +36,7 @@ pub mod pane;
 pub mod query;
 pub mod shell;
 pub mod status;
-pub mod work;
+pub(crate) mod work;
 
 use crate::action::{
     Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
@@ -126,7 +126,7 @@ pub struct App {
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
     pub shell: Shell,
-    pub work: Work,
+    pub(crate) work: Work,
     pub model: Model,
     /// The keyboard help, while open.
     pub help: Option<Help>,

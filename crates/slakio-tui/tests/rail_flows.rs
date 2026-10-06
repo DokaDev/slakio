@@ -7,24 +7,24 @@
 mod demo;
 
 use demo::Demo;
-use slakio_tui::app::shell::{Region, View};
-use slakio_tui::app::work::Side;
+use slakio_tui::app::Focus;
+use slakio_tui::app::shell::View;
 use std::time::Duration;
 
 #[test]
 fn ctrl_r_and_space_r_reach_the_rail_from_the_list_and_a_pane() {
     let mut d = Demo::new(120, 40);
     d.keys("ctrl+r");
-    assert_eq!(d.app.shell.focus, Region::Rail, "from the list");
+    assert_eq!(d.app.focus(), Focus::Rail, "from the list");
     assert!(d.app.shell.rail_expanded());
     d.keys("ctrl+r");
-    assert_eq!(d.app.shell.focus, Region::List, "the same key leaves it");
+    assert_eq!(d.app.focus(), Focus::List, "the same key leaves it");
     d.open("backend");
-    assert_eq!(d.app.shell.focus, Region::Work);
+    assert_eq!(d.app.focus(), Focus::Conversation);
     d.keys("space r");
-    assert_eq!(d.app.shell.focus, Region::Rail, "from a pane, by the leader key");
+    assert_eq!(d.app.focus(), Focus::Rail, "from a pane, by the leader key");
     d.keys("esc");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     assert!(!d.app.shell.rail_expanded(), "it folds as soon as it loses the focus");
 }
 
@@ -32,19 +32,19 @@ fn ctrl_r_and_space_r_reach_the_rail_from_the_list_and_a_pane() {
 fn shift_tab_from_the_list_and_tab_from_the_last_panel_land_on_the_rail() {
     let mut d = Demo::new(120, 40);
     d.keys("shift+tab");
-    assert_eq!(d.app.shell.focus, Region::Rail, "the rail is left of the list");
+    assert_eq!(d.app.focus(), Focus::Rail, "the rail is left of the list");
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     assert!(!d.app.shell.rail_expanded(), "expanded only while focused: no flash left behind");
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Thread));
+    assert_eq!(d.app.focus(), Focus::Thread);
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::Rail, "after the thread panel comes the rail");
+    assert_eq!(d.app.focus(), Focus::Rail, "after the thread panel comes the rail");
     d.keys("tab tab tab");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Thread), "and round again");
+    assert_eq!(d.app.focus(), Focus::Thread, "and round again");
     d.keys("f6");
-    assert_eq!(d.app.shell.focus, Region::Rail, "F6 is Tab");
+    assert_eq!(d.app.focus(), Focus::Rail, "F6 is Tab");
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn inside_the_rail_arrows_and_enter_pick_a_workspace_and_a_view() {
     d.keys("ctrl+r");
     // From the first item, workspace B is one down.
     d.keys("home down enter");
-    assert_eq!((d.app.shell.workspace, d.app.shell.focus), (1, Region::List), "workspace B, then the list");
+    assert_eq!((d.app.shell.workspace, d.app.focus()), (1, Focus::List), "workspace B, then the list");
     // The cursor is on workspace B now: two down is DMs.
     d.keys("ctrl+r j j enter");
     assert_eq!(d.app.shell.view, View::Dms);

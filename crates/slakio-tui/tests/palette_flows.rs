@@ -10,8 +10,8 @@ use demo::Demo;
 use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use slakio_core::i18n::Lang;
 use slakio_tui::app::dialog::Question;
-use slakio_tui::app::shell::{Region, View};
-use slakio_tui::app::{Mode, Settings};
+use slakio_tui::app::shell::View;
+use slakio_tui::app::{Focus, Mode, Overlay, Settings};
 use slakio_tui::theme::{Background, resolve};
 
 /// The palette's lines (the box) of the screen.
@@ -79,7 +79,7 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     assert_eq!(rows[0].name, ":rail");
     assert_eq!(rows[0].keys, "Ctrl+R / Space r", "the keys from where the keyboard is");
     d.keys("enter");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     // An action without a command: found by its label.
     d.keys("esc ctrl+p");
     d.type_text("next panel");
@@ -88,7 +88,7 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.type_text("nextpan");
     assert_eq!(d.app.palette_rows()[0].label, "Next panel");
     d.keys("enter");
-    assert_eq!(d.app.shell.focus, Region::Rail, "Tab's action ran: nothing is open, the rail is next");
+    assert_eq!(d.app.focus(), Focus::Rail, "Tab's action ran: nothing is open, the rail is next");
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
     let s = d.screen();
     assert!(s.contains("Quit slakio?") && s.contains("No message is waiting to be sent."), "{s}");
     d.keys("enter");
-    assert!(!d.app.quit && d.app.dialog.is_none(), "Stay has the focus");
+    assert!(!d.app.quit && d.app.overlay().is_none(), "Stay has the focus");
     // With text not sent, the same question as Ctrl+Q; y quits.
     d.open("backend");
     d.keys("i");
@@ -240,7 +240,7 @@ fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
     d.keys("esc ctrl+p");
     d.type_text("qui");
     assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y));
-    assert_eq!(d.app.dialog.map(|q| q.question), Some(Question::Quit));
+    assert_eq!(d.app.overlay(), Some(Overlay::Dialog(Question::Quit)));
     d.keys("y");
     assert!(d.app.quit, "y quits");
     // Typed, `:q` Enter is asked for by name: it quits as in vim.

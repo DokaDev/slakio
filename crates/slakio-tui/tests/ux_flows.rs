@@ -9,10 +9,8 @@ mod demo;
 use demo::Demo;
 use ratatui::crossterm::event::MouseEventKind;
 use ratatui::style::Modifier;
-use slakio_tui::app::Mode;
 use slakio_tui::app::model::Row;
-use slakio_tui::app::shell::Region;
-use slakio_tui::app::work::Side;
+use slakio_tui::app::{Focus, Mode, PaneKind};
 
 fn list_row_of(d: &Demo, name: &str) -> usize {
     d.app
@@ -28,8 +26,8 @@ fn ctrl_w_on_the_main_pane_hands_the_focus_to_the_list_on_its_row() {
     let mut d = Demo::new(120, 40);
     d.open("incidents");
     d.keys("ctrl+w");
-    assert!(d.app.work.main.is_none());
-    assert_eq!(d.app.shell.focus, Region::List, "the focus never stays on an empty work area");
+    assert!(d.app.open_target().is_none());
+    assert_eq!(d.app.focus(), Focus::List, "the focus never stays on an empty work area");
     assert_eq!(d.app.shell.list_cursor, list_row_of(&d, "incidents"));
     // j now moves the list again.
     let at = d.app.shell.list_cursor;
@@ -42,10 +40,10 @@ fn closing_the_thread_panel_focuses_the_main_pane_on_its_message() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!(d.app.work.side, Side::Thread);
+    assert_eq!(d.app.focus(), Focus::Thread);
     d.keys("ctrl+w");
-    let main = d.app.work.main.as_ref().unwrap();
-    assert_eq!((d.app.work.side, main.selected), (Side::Main, Some(0)));
+    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    assert_eq!((d.app.focus(), main.selected()), (Focus::Conversation, Some(0)));
 }
 
 #[test]
@@ -53,7 +51,7 @@ fn enter_without_a_selected_message_starts_writing() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
     d.keys("enter");
-    assert!(d.app.work.thread.is_none(), "no thread opens by surprise");
+    assert!(d.app.pane_of(PaneKind::Thread).is_none(), "no thread opens by surprise");
     assert_eq!(d.app.mode(), Mode::Insert);
 }
 
@@ -117,12 +115,12 @@ fn the_composer_has_no_box_of_its_own() {
 fn the_thread_panel_starts_with_its_message_at_the_top() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
-    let main = d.app.work.main.as_ref().unwrap();
-    let i = main.items.iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).expect("a short thread");
-    d.app.work.main.as_mut().unwrap().selected = Some(i);
+    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let i = main.messages().iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).expect("a short thread");
+    d.app.select_message(i);
     d.keys("enter");
-    assert_eq!(d.app.work.side, Side::Thread);
-    let (_, thread) = d.app.panes();
+    assert_eq!(d.app.focus(), Focus::Thread);
+    let thread = d.app.pane_area(PaneKind::Thread);
     let thread = thread.expect("the thread panel");
     let buf = d.buffer();
     let text = |y: u16| (thread.x + 1..thread.right() - 1).map(|x| buf[(x, y)].symbol()).collect::<String>();
@@ -137,7 +135,7 @@ fn a_thread_on_an_80x24_terminal_leaves_the_main_pane_forty_columns() {
     let mut d = Demo::new(80, 24);
     d.open("long-threads");
     d.keys("g g enter");
-    let (main, thread) = d.app.panes();
+    let (main, thread) = (d.app.pane_area(PaneKind::Conversation), d.app.pane_area(PaneKind::Thread));
     let main = main.expect("the main pane");
     assert!(main.width >= 40, "main pane {} columns", main.width);
     assert!(thread.is_some_and(|t| t.width >= 34));
@@ -149,13 +147,13 @@ fn tab_moves_the_focus_to_the_next_pane_and_back() {
     d.open("long-threads");
     d.keys("g g enter");
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::Rail, "after the thread panel comes the rail");
+    assert_eq!(d.app.focus(), Focus::Rail, "after the thread panel comes the rail");
     d.keys("tab");
-    assert_eq!(d.app.shell.focus, Region::List, "then the list");
+    assert_eq!(d.app.focus(), Focus::List, "then the list");
     d.keys("tab");
-    assert_eq!((d.app.shell.focus, d.app.work.side), (Region::Work, Side::Main));
+    assert_eq!(d.app.focus(), Focus::Conversation);
     d.keys("shift+tab");
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
 }
 
 #[test]
@@ -184,7 +182,10 @@ fn the_mouse_wheel_scrolls_the_list_and_the_messages() {
     d.open("backend");
     let work = d.app.areas().work;
     d.mouse(MouseEventKind::ScrollUp, work.x + 10, 10);
-    assert!(d.app.work.main.as_ref().unwrap().selected.is_some(), "the wheel moves through the messages");
+    assert!(
+        d.app.pane_of(PaneKind::Conversation).unwrap().selected().is_some(),
+        "the wheel moves through the messages"
+    );
 }
 
 #[test]
@@ -199,9 +200,9 @@ fn going_back_with_no_history_says_which_way() {
 fn a_thread_without_replies_says_so_under_its_message() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
-    let main = d.app.work.main.as_ref().unwrap();
-    let i = main.items.iter().rposition(|m| m.thread.is_none()).expect("a message without a thread");
-    d.app.work.main.as_mut().unwrap().selected = Some(i);
+    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let i = main.messages().iter().rposition(|m| m.thread.is_none()).expect("a message without a thread");
+    d.app.select_message(i);
     d.keys("enter");
     let s = d.screen();
     assert!(s.contains("No replies yet · i reply"), "{s}");

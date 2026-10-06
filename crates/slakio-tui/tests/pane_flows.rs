@@ -7,10 +7,13 @@
 mod demo;
 
 use demo::{Demo, assert_harmless, mask_hangul};
-use slakio_tui::app::shell::Region;
-use slakio_tui::app::work::Side;
-use slakio_tui::app::{Effect, Mode};
+use slakio_tui::app::{Effect, Focus, Mode, PaneKind, PaneRef};
 use slakio_tui::ui::timeline;
+
+/// The conversation pane (open).
+fn conversation(d: &Demo) -> PaneRef<'_> {
+    d.app.pane_of(PaneKind::Conversation).expect("a conversation is open")
+}
 
 /// "Hello" in Korean, as an IME commits it.
 const HELLO: &str = "\u{C548}\u{B155}\u{D558}\u{C138}\u{C694}";
@@ -19,18 +22,18 @@ const HELLO: &str = "\u{C548}\u{B155}\u{D558}\u{C138}\u{C694}";
 fn a_channel_opens_in_place_with_its_messages_and_j_k_move_through_them() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
-    let main = d.app.work.main.as_ref().expect("open");
-    assert!(!main.items.is_empty() && main.complete);
-    assert_eq!((d.app.shell.focus, main.selected), (Region::Work, None));
-    let n = main.items.len();
+    let main = d.app.pane_of(PaneKind::Conversation).expect("open");
+    assert!(!main.messages().is_empty() && main.complete());
+    assert_eq!((d.app.focus(), main.selected()), (Focus::Conversation, None));
+    let n = main.messages().len();
     d.keys("k");
-    assert_eq!(d.app.work.main.as_ref().unwrap().selected, Some(n - 1), "the first move selects the newest");
+    assert_eq!(conversation(&d).selected(), Some(n - 1), "the first move selects the newest");
     d.keys("k k j");
-    assert_eq!(d.app.work.main.as_ref().unwrap().selected, Some(n - 2));
+    assert_eq!(conversation(&d).selected(), Some(n - 2));
     d.keys("g g");
-    assert_eq!(d.app.work.main.as_ref().unwrap().selected, Some(0));
+    assert_eq!(conversation(&d).selected(), Some(0));
     d.keys("G");
-    assert_eq!(d.app.work.main.as_ref().unwrap().selected, Some(n - 1));
+    assert_eq!(conversation(&d).selected(), Some(n - 1));
     d.keys("g g");
     let s = d.screen();
     assert!(s.contains("── 2026-01-0"), "a date separator above the first message: {s}");
@@ -90,8 +93,8 @@ fn gg_puts_the_oldest_message_on_the_first_row_and_a_short_history_sits_at_the_b
     // A history that fits whole sits at the bottom, by the composer, before and after `gg`.
     let mut d = Demo::new(120, 40);
     d.open("feed-ticket-104");
-    let main = d.app.work.main.as_ref().unwrap();
-    assert!(main.complete && main.items.len() == 20, "a short channel: {}", main.items.len());
+    let main = conversation(&d);
+    assert!(main.complete() && main.messages().len() == 20, "a short channel: {}", main.messages().len());
     let gap = rows_above_the_history(&d, "feed-ticket-104");
     assert!(gap > 0, "it fits with rows to spare");
     d.keys("g g");
@@ -104,21 +107,21 @@ fn enter_on_a_message_opens_its_thread_and_another_one_replaces_it() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!(d.app.work.side, Side::Thread);
-    let first = d.app.work.thread.as_ref().unwrap();
-    assert!(first.items.len() > 100, "the 1,200-reply thread, newest page first");
-    let first = first.target.clone();
+    assert_eq!(d.app.focus(), Focus::Thread);
+    let first = d.app.pane_of(PaneKind::Thread).unwrap();
+    assert!(first.messages().len() > 100, "the 1,200-reply thread, newest page first");
+    let first = first.target().clone();
     // Back to the channel, one message down, Enter: the panel shows that thread instead.
     d.keys("ctrl+h j enter");
-    let second = d.app.work.thread.as_ref().unwrap().target.clone();
+    let second = d.app.pane_of(PaneKind::Thread).unwrap().target().clone();
     assert_ne!(first, second);
-    assert_eq!(d.app.work.side, Side::Thread);
+    assert_eq!(d.app.focus(), Focus::Thread);
     // Ctrl+W closes the panel, then the conversation.
     d.keys("ctrl+w");
-    assert!(d.app.work.thread.is_none() && d.app.work.side == Side::Main);
+    assert!(d.app.pane_of(PaneKind::Thread).is_none() && d.app.focus() == Focus::Conversation);
     d.keys("ctrl+w");
-    assert!(d.app.work.main.is_none());
-    assert_eq!(d.app.shell.focus, Region::List, "the list has the keyboard again");
+    assert!(d.app.open_target().is_none());
+    assert_eq!(d.app.focus(), Focus::List, "the list has the keyboard again");
     assert!(d.screen().contains("No conversation open"));
 }
 
@@ -126,7 +129,7 @@ fn enter_on_a_message_opens_its_thread_and_another_one_replaces_it() {
 fn messages_show_threads_reactions_and_edits() {
     let mut d = Demo::new(200, 50);
     d.open("general");
-    let items = d.app.work.main.as_ref().unwrap().items.clone();
+    let items = conversation(&d).messages().to_vec();
     let find = |p: &dyn Fn(&slakio_tui::app::pane::Shown) -> bool| items.iter().position(p).expect("one exists");
     // (message, any of these shows it)
     let reactions: &[&str] = &[":+1: ", ":eyes: ", ":tada: ", ":fire: ", ":pray: ", ":white_check_mark: "];
@@ -136,7 +139,7 @@ fn messages_show_threads_reactions_and_edits() {
         (find(&|m| m.edited), &["(edited)"]),
     ];
     for (i, any) in cases {
-        d.app.work.main.as_mut().unwrap().selected = Some(i);
+        d.app.select_message(i);
         let s = d.screen();
         assert!(any.iter().any(|x| s.contains(x)), "message {i}: {s}");
     }
@@ -186,10 +189,10 @@ fn the_composer_takes_korean_ime_text_and_enter_echoes_it_locally() {
     d.type_text(" jk");
     d.keys("ctrl+w");
     d.keys("enter");
-    let main = d.app.work.main.as_ref().unwrap();
-    let last = main.items.last().unwrap();
+    let main = conversation(&d);
+    let last = main.messages().last().unwrap();
     assert!(last.own && last.text.as_str() == format!("{HELLO} "), "{:?}", last.text);
-    assert!(main.composer.is_empty());
+    assert!(main.composer_text().is_empty());
     assert!(d.status_line().contains("not sent anywhere"), "{}", d.status_line());
     let s = d.screen();
     assert!(s.contains(&format!("Me            {HELLO}")), "the echo is in view: {s}");
@@ -209,12 +212,11 @@ fn the_composer_is_multiline_and_a_paste_is_sanitised() {
     d.type_text("three");
     let paste = ratatui::crossterm::event::Event::Paste("\x1b]0;evil\x07 four\u{202E}".into());
     d.app.handle_event(paste, d.now);
-    let c = &d.app.work.main.as_ref().unwrap().composer;
-    assert_eq!(c.text(), "one\ntwo\nthree four");
+    assert_eq!(conversation(&d).composer_text(), "one\ntwo\nthree four");
     let s = d.screen();
     assert!(s.contains("│ › one") && s.contains("│   two") && s.contains("│   three four"), "{s}");
     d.keys("enter");
-    let last = d.app.work.main.as_ref().unwrap().items.last().unwrap().text.clone();
+    let last = conversation(&d).messages().last().unwrap().text.clone();
     assert_eq!(last.as_str(), "one\ntwo\nthree four");
 }
 
@@ -225,19 +227,19 @@ fn a_reply_in_the_thread_panel_is_echoed_there() {
     d.keys("g g enter i");
     d.type_text("ack");
     d.keys("enter esc");
-    let thread = d.app.work.thread.as_ref().unwrap();
-    assert_eq!(thread.items.last().unwrap().text.as_str(), "ack");
-    assert_ne!(d.app.work.main.as_ref().unwrap().items.last().unwrap().text.as_str(), "ack");
+    let thread = d.app.pane_of(PaneKind::Thread).unwrap();
+    assert_eq!(thread.messages().last().unwrap().text.as_str(), "ack");
+    assert_ne!(conversation(&d).messages().last().unwrap().text.as_str(), "ack");
 }
 
 #[test]
 fn hangul_typed_in_normal_mode_moves_like_the_keys_under_it() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
-    let n = d.app.work.main.as_ref().unwrap().items.len();
+    let n = conversation(&d).messages().len();
     // The jamo on the `k` and `j` keys of the 2-set layout.
     d.type_text("\u{314F}\u{314F}\u{314F}\u{3153}");
-    assert_eq!(d.app.work.main.as_ref().unwrap().selected, Some(n - 2));
+    assert_eq!(conversation(&d).selected(), Some(n - 2));
     assert_eq!(d.app.mode(), Mode::Normal);
     // A syllable is the keys that typed it: U+D558 is `g k`: not a binding, nothing breaks.
     d.type_text("\u{D558}");
@@ -252,7 +254,7 @@ fn visual_selects_a_range_and_y_copies_it_through_the_terminal() {
     assert_eq!(d.app.mode(), Mode::Visual);
     assert!(d.status_line().contains("VISUAL"));
     d.keys("k k");
-    assert_eq!(d.app.work.main.as_ref().unwrap().range().map(|(a, b)| b - a), Some(2));
+    assert_eq!(conversation(&d).range().map(|(a, b)| b - a), Some(2));
     d.keys("y");
     assert_eq!(d.app.mode(), Mode::Normal, "copying ends VISUAL");
     let effects = d.app.take_effects();
@@ -263,8 +265,8 @@ fn visual_selects_a_range_and_y_copies_it_through_the_terminal() {
     d.keys("y");
     let effects = d.app.take_effects();
     let [Effect::Copy(one)] = &effects[..] else { panic!("{effects:?}") };
-    let main = d.app.work.main.as_ref().unwrap();
-    assert_eq!(one, main.items[main.selected.unwrap()].text.as_str());
+    let main = conversation(&d);
+    assert_eq!(one, main.messages()[main.selected().unwrap()].text.as_str());
     // Esc leaves VISUAL without copying.
     d.keys("V esc");
     assert_eq!(d.app.mode(), Mode::Normal);
@@ -276,7 +278,7 @@ fn back_and_forward_return_to_the_conversations_before() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
     d.open("incidents");
-    let at = |d: &Demo| d.app.model.target(&d.app.work.main.as_ref().unwrap().target).unwrap().name.clone();
+    let at = |d: &Demo| d.app.model.target(d.app.open_target().unwrap()).unwrap().name.clone();
     d.keys("ctrl+o");
     assert_eq!(at(&d), "backend");
     d.keys("space ]");
@@ -305,7 +307,7 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
     // The rows of messages on screen: each open pane's height inside its border, less the
     // composer (three rows when empty).
     let check = |d: &mut Demo, what: &str| {
-        let panes = 1 + u64::from(d.app.work.thread.is_some());
+        let panes = 1 + u64::from(d.app.pane_of(PaneKind::Thread).is_some());
         let visible = panes * u64::from(d.app.areas().work.height - 2 - 3);
         timeline::reset_rows_laid_out();
         let _ = d.screen();
@@ -320,8 +322,8 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
         check(&mut d, "k");
     }
     d.keys("g g");
-    let main = d.app.work.main.as_ref().unwrap();
-    assert!(main.complete && main.items.len() == 10_000 && main.selected == Some(0), "gg loads to the oldest");
+    let main = conversation(&d);
+    assert!(main.complete() && main.messages().len() == 10_000 && main.selected() == Some(0), "gg loads to the oldest");
     check(&mut d, "gg");
     d.keys("G");
     check(&mut d, "G");
@@ -329,6 +331,10 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
     d.keys("g g enter");
     check(&mut d, "thread");
     d.keys("g g");
-    assert_eq!(d.app.work.thread.as_ref().unwrap().items.len(), 1_201, "the thread's message and its replies");
+    assert_eq!(
+        d.app.pane_of(PaneKind::Thread).unwrap().messages().len(),
+        1_201,
+        "the thread's message and its replies"
+    );
     check(&mut d, "thread gg");
 }

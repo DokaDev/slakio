@@ -9,8 +9,8 @@ use demo::{Demo, assert_harmless, mask_hangul};
 use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use slakio_core::backend::{Backend, Envelope, Event as BackendEvent, Generation};
 use slakio_core::i18n::Lang;
-use slakio_tui::app::shell::{Region, View};
-use slakio_tui::app::{App, Settings};
+use slakio_tui::app::shell::View;
+use slakio_tui::app::{App, Focus, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::theme::Theme;
 use slakio_world::World;
@@ -62,7 +62,7 @@ fn an_answer_to_an_older_boot_request_is_dropped() {
 fn the_focused_rail_expands_over_the_list_or_pushes_it_aside() {
     let mut d = Demo::new(120, 40);
     d.keys("ctrl+h");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     let s = d.screen();
     assert!(s.contains("A company") && s.contains("Home") && s.contains("Activity"), "{s}");
     insta::assert_snapshot!("demo_rail_overlay_120x40", mask_hangul(&s));
@@ -75,7 +75,7 @@ fn the_focused_rail_expands_over_the_list_or_pushes_it_aside() {
 fn the_rail_switches_workspace_and_view() {
     let mut d = Demo::new(120, 40);
     d.keys("ctrl+h j enter");
-    assert_eq!((d.app.shell.workspace, d.app.shell.focus), (1, Region::List));
+    assert_eq!((d.app.shell.workspace, d.app.focus()), (1, Focus::List));
     assert!(d.status_line().contains("B side"), "{}", d.status_line());
     d.keys("space d");
     assert_eq!(d.app.shell.view, View::Dms);
@@ -107,7 +107,7 @@ fn enter_opens_a_conversation_in_the_work_area_and_the_breadcrumb() {
     d.keys("enter");
     let s = d.screen();
     assert!(s.contains("▌#backend") && s.contains("├─ Message #backend") && s.contains("› Press i to write"), "{s}");
-    assert_eq!(d.app.shell.focus, Region::Work, "the opened conversation has the keyboard");
+    assert_eq!(d.app.focus(), Focus::Conversation, "the opened conversation has the keyboard");
     assert!(d.status_line().contains("#backend"), "{}", d.status_line());
     insta::assert_snapshot!("demo_open_120x40", mask_hangul(&s));
 }
@@ -134,17 +134,17 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
     let mut d = Demo::new(120, 40);
     d.keys("space w");
     assert!(d.status_line().contains("Space w"), "{}", d.status_line());
-    assert_eq!(d.app.shell.focus, Region::List);
+    assert_eq!(d.app.focus(), Focus::List);
     d.keys("h");
-    assert_eq!(d.app.shell.focus, Region::Rail);
+    assert_eq!(d.app.focus(), Focus::Rail);
     assert!(!d.status_line().contains("Space w"));
     d.keys("space w l ctrl+l");
-    assert_eq!(d.app.shell.focus, Region::List, "never onto an empty work area");
+    assert_eq!(d.app.focus(), Focus::List, "never onto an empty work area");
     d.keys("enter ctrl+h ctrl+l");
-    assert_eq!(d.app.shell.focus, Region::Work);
+    assert_eq!(d.app.focus(), Focus::Conversation);
     // A sequence nothing is bound to is dropped without doing anything.
     d.keys("space x");
-    assert_eq!(d.app.shell.focus, Region::Work);
+    assert_eq!(d.app.focus(), Focus::Conversation);
     assert!(d.app.keys.pending().is_empty());
 }
 
@@ -176,10 +176,10 @@ fn hovering_the_rail_expands_it_and_clicks_select_and_open() {
     // A list row opens it: row 2 is the first channel under the first section.
     let list = d.app.areas().list.unwrap();
     d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 2);
-    let open = d.app.work.main.as_ref().expect("opened").target.clone();
+    let open = d.app.open_target().expect("opened").clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);
-    assert_eq!(d.app.shell.focus, Region::Work);
+    assert_eq!(d.app.focus(), Focus::Conversation);
 }
 
 #[test]

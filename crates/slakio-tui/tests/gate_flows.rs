@@ -9,7 +9,7 @@ mod demo;
 use demo::Demo;
 use ratatui::style::Color;
 use slakio_core::i18n::Lang;
-use slakio_tui::app::{Settings, WHICH_KEY_DELAY};
+use slakio_tui::app::{PaneKind, Settings, WHICH_KEY_DELAY};
 use slakio_tui::screen;
 use slakio_tui::theme::{Background, resolve};
 
@@ -123,11 +123,11 @@ fn the_which_key_popup_dims_the_screen_and_hides_the_hints() {
 fn dividers_span_the_pane_and_use_one_color() {
     let mut d = tokyo(120, 40);
     d.open("long-threads");
-    let main = d.app.work.main.as_ref().unwrap();
-    let i = main.items.iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).unwrap();
-    d.app.work.main.as_mut().unwrap().selected = Some(i);
+    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let i = main.messages().iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).unwrap();
+    d.app.select_message(i);
     d.keys("enter");
-    let (_, thread) = d.app.panes();
+    let thread = d.app.pane_area(PaneKind::Thread);
     let thread = thread.unwrap();
     let buf = d.buffer();
     let inner = screen::inner(thread);

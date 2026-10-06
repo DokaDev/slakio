@@ -11,8 +11,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use slakio_core::i18n::Lang;
-use slakio_tui::app::Settings;
-use slakio_tui::app::shell::Region;
+use slakio_tui::app::{Focus, Settings};
 use slakio_tui::screen;
 use slakio_tui::theme::{BUILTINS, Background, Kind, Theme, resolve};
 
@@ -89,10 +88,10 @@ fn unfocused_text_keeps_its_color() {
         d.keys("l");
         let list = d.app.areas().list.unwrap();
         let cursor_y = list.y + 1 + (d.app.shell.list_cursor - d.app.shell.list_top) as u16;
-        assert_eq!(d.app.shell.focus, Region::List);
+        assert_eq!(d.app.focus(), Focus::List);
         let focused = inside(&d.buffer(), list, Some(cursor_y));
         d.keys("tab");
-        assert_eq!(d.app.shell.focus, Region::Work);
+        assert_eq!(d.app.focus(), Focus::Conversation);
         let unfocused = inside(&d.buffer(), list, Some(cursor_y));
         assert_eq!(focused, unfocused, "{}: the list's text changed with the focus", t.name);
     }
