@@ -1,6 +1,6 @@
 //! What is being written to each conversation and thread: one composer per [`Target`], shared
 //! by the panes that show it and kept when they close, so a draft is there again when its
-//! target is opened again (for as long as the app runs).
+//! target is opened again (for as long as the app runs). A draft with text is never dropped.
 
 use super::composer::Composer;
 use slakio_core::model::Target;

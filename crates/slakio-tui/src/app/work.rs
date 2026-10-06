@@ -337,15 +337,17 @@ impl Work {
     }
 
     /// Send what the focused pane's composer holds. The demo only echoes it locally: it is
-    /// shown as the user's message and goes nowhere. `false` when there was nothing to send.
+    /// shown as the user's message and goes nowhere. `false` when there was nothing to send, or
+    /// it could not be sent (the composer keeps it then).
     pub fn send(&mut self, model: &Model) -> bool {
         let Some(target) = self.focused().map(|p| p.target.clone()) else { return false };
+        // Everything that can stop the send is checked before the text leaves the composer.
+        let Some(me) = model.me(target.workspace()).cloned() else { return false };
         let draft = self.drafts.entry(&target);
         if draft.text().trim().is_empty() {
             return false;
         }
         let text = draft.take();
-        let Some(me) = model.me(target.workspace()).cloned() else { return false };
         let author = model.user(&me).map_or_else(Safe::default, |u| u.display_name.line());
         echo(&mut self.timelines.entry(&target).items, me, author, sanitize_block(&text));
         if let Some(p) = self.focused_mut() {
@@ -365,7 +367,8 @@ impl Work {
         }
         self.back.retain(|t| model.target(t).is_some());
         self.forward.retain(|t| model.target(t).is_some());
-        self.drafts.retain(|t, _| model.target(t).is_some());
+        // A draft of a conversation that is gone stays (quitting still asks about it): text the
+        // user wrote is never dropped silently.
     }
 }
 

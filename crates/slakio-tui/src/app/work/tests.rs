@@ -210,3 +210,28 @@ fn a_draft_outlives_its_pane_and_is_there_when_its_target_opens_again() {
     w.clamp(&m);
     assert!(w.drafts.get(&backend).is_some(), "kept while its conversation exists");
 }
+
+#[test]
+fn a_draft_that_cannot_be_sent_stays_in_the_composer() {
+    let m = model();
+    let mut w = Work::default();
+    // A workspace the model does not know: no user to send as.
+    w.open(Target::Conversation { workspace: WorkspaceId::new("TNOPE"), conversation: ConversationId::new("C") });
+    w.with_draft(|c| c.insert("keep me"));
+    assert!(!w.send(&m));
+    assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "keep me", "nothing sent, nothing lost");
+}
+
+#[test]
+fn a_draft_of_a_conversation_that_is_gone_is_kept_until_quitting_asks() {
+    let m = model();
+    let mut w = Work::default();
+    let gone =
+        Target::Conversation { workspace: WorkspaceId::new("TDEMOA"), conversation: ConversationId::new("CNOPE") };
+    w.open(gone.clone());
+    w.with_draft(|c| c.insert("unsent"));
+    w.clamp(&m);
+    assert!(w.main.is_none(), "the conversation is closed");
+    assert_eq!(w.drafts.get(&gone).map(Composer::text), Some("unsent"), "its draft is not dropped silently");
+    assert!(w.unsent());
+}
