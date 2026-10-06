@@ -1,4 +1,5 @@
-//! The mouse over the main screen: the top bar (click), the list (click, wheel), the tab
+//! The mouse over the main screen: the list panel's chip and view switcher (click), the list
+//! (click, wheel), the tab
 //! bar ([`super::tabs`]) and the panes (click, double click, the reply link, the composer,
 //! wheel). Popups take the mouse first ([`super::overlay`]). Where things are comes from the
 //! frame's one layout ([`crate::screen`]), as drawn.
@@ -10,7 +11,7 @@ use ratatui::layout::Position;
 use std::time::Instant;
 
 impl App {
-    /// The mouse: a click on the top bar shows its view (or opens the workspace switcher), on a list row
+    /// The mouse: a click on a view shows it, on the workspace chip opens the switcher, on a list row
     /// opens it, on the tab bar goes there ([`super::tabs`]), on a message selects it (twice: its
     /// thread), on a reply link opens the thread, on a composer writes in it; the wheel scrolls
     /// what is under it. `true` when the screen changed.
@@ -58,12 +59,10 @@ impl App {
                 self.guide = Guide::default();
                 let double = self.last_click.is_some_and(|(t, p)| p == at && now.duration_since(t) <= DOUBLE_CLICK);
                 self.last_click = Some((now, at));
-                if a.nav.contains(at) {
-                    self.nav_click(at.x);
-                } else if let Some(list) = a.list.filter(|l| l.contains(at)) {
-                    let inner = screen::inner(list);
-                    if inner.contains(at) {
-                        let row = self.shell.list_top + usize::from(at.y - inner.y);
+                if let Some(list) = a.list.filter(|l| l.contains(at)) {
+                    let rows = screen::list_parts(list).rows;
+                    if !self.nav_click(at) && rows.contains(at) {
+                        let row = self.shell.list_top + usize::from(at.y - rows.y);
                         if self.shell.rows(&self.model).get(row).is_some_and(|r| r.is_selectable()) {
                             self.set_focus(Focus::List);
                             self.shell.list_cursor = row;

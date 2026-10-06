@@ -2,43 +2,43 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ▾ Favorites            ││                                                                                            │
-│   # backend            ││                                                                                            │
-│   # incidents       3  ││                                                                                            │
-│                        ││                                                                                            │
-│ ▾ Ops                  ││                                                                                            │
-│   # deploys            ││                                                                                            │
-│   # alerts             ││                                                                                            │
-│   # partner-shared ext ││                                                                                            │
-│   # hostile-strings    ││                                                                                            │
-│   # big-history        ││                                                                                            │
-│   # long-threads       ││                                                                                            │
-│                        ││                                                                                            │
-│ ▾ Channels             ││                                                                                            │
-│   # announcements      ││                           No conversation open                                             │
-│   # design-review      ││                           Pick one in the list and press Enter.                            │
-│   # feed-alert-134     ││                                                                                            │
-│   # feed-alert-8       ││                           Enter    Open                                                    │
-│   # feed-budget-162    ││                           Space h  Home                                                    │
-│   # feed-budget-33     ││                           Space d  DMs                                                     │
-│   # feed-build-50      ││                           Ctrl+O   Back to the last one                                    │
-│   # feed-cache-119     ││                           ?        Keyboard help                                           │
-│   # feed-customer-161  ││                           Ctrl+Q   Quit                                                    │
-│   # feed-customer…  1  ││                                                                                            │
-│   # feed-dashboard-22  ││                                                                                            │
-│   # feed-dashboard-41  ││                                                                                            │
-│   # feed-design-34     ││                                                                                            │
-│   # feed-design-83     ││                                                                                            │
-│   # feed-draft-142     ││                                                                                            │
-│   # feed-draft-58      ││                                                                                            │
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│ Home @24  D●11  A@37  F  L ││                                                                                        │
+├────────────────────────────┤│                                                                                        │
+│ ▾ Favorites                ││                                                                                        │
+│   # backend                ││                                                                                        │
+│   # incidents           3  ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Ops                      ││                                                                                        │
+│   # deploys                ││                                                                                        │
+│   # alerts                 ││                                                                                        │
+│   # partner-shared ext     ││                                                                                        │
+│   # hostile-strings        ││                                                                                        │
+│   # big-history            ││                                                                                        │
+│   # long-threads           ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Channels                 ││                         No conversation open                                           │
+│   # announcements          ││                         Pick one in the list and press Enter.                          │
+│   # design-review          ││                                                                                        │
+│   # feed-alert-134         ││                         Enter    Open                                                  │
+│   # feed-alert-8           ││                         Space h  Home                                                  │
+│   # feed-budget-162        ││                         Space d  DMs                                                   │
+│   # feed-budget-33         ││                         Ctrl+O   Back to the last one                                  │
+│   # feed-build-50          ││                         ?        Keyboard help                                         │
+│   # feed-cache-119         ││                         Ctrl+Q   Quit                                                  │
+│   # feed-customer-161      ││                                                                                        │
+│   # feed-customer-167   1  ││                                                                                        │
+│   # feed-dashboard-22      ││                                                                                        │
+│   # feed-dashboard-41      ││                                                                                        │
+│   # feed-design-34         ││                                                                                        │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ r    Top bar: workspace, views         e    Show or hide the list panel       /    Open the command line             │
-│ h    Show Home                         W    Switch workspace                  q    Quit                              │
-│ d    Show DMs                          [    Back to the conversation before   w    +Window                           │
-│ a    Show Activity                     ]    Forward again                     t    +Tab                              │
-│ f    Show Files                        1…9  Show tab 1 to 9                                                          │
-│ l    Show Later                        ?    Keyboard help                                                            │
+│ r    View switcher (in the list panel)                     [    Back to the conversation before                      │
+│ h    Show Home                                             ]    Forward again                                        │
+│ d    Show DMs                                              1…9  Show tab 1 to 9                                      │
+│ a    Show Activity                                         ?    Keyboard help                                        │
+│ f    Show Files                                            /    Open the command line                                │
+│ l    Show Later                                            q    Quit                                                 │
+│ e    Show or hide the list panel                           w    +Window                                              │
+│ W    Switch workspace                                      t    +Tab                                                 │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

@@ -2,8 +2,9 @@
 source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭ ▌A company ▾ · B @9 ─────────────╮╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Home @24  D●11  A@37  F  L       ││                                                                                                                                                                  │
+├──────────────────────────────────┤│                                                                                                                                                                  │
 │ ▾ Favorites                      ││                                                                                                                                                                  │
 │   # backend                      ││                                                                                                                                                                  │
 │   # incidents                 3  ││                                                                                                                                                                  │
@@ -21,16 +22,16 @@ expression: mask_hangul(&s)
 │   # design-review                ││                                                                                                                                                                  │
 │   # feed-alert-134               ││                                                                                                                                                                  │
 │   # feed-alert-8                 ││                                                                                                                                                                  │
-│   # feed-budget-162              ││                                                                                                                                                                  │
-│   # feed-budget-33               ││                                                              No conversation open                                                                                │
-│   # feed-build-50                ││                                                              Pick one in the list and press Enter.                                                               │
-│   # feed-cache-119               ││                                                                                                                                                                  │
-│   # feed-customer-161            ││                                                              Enter    Open                                                                                       │
-│   # feed-customer-167         1  ││                                                              Space h  Home                                                                                       │
-│   # feed-dashboard-22            ││                                                              Space d  DMs                                                                                        │
-│   # feed-dashboard-41            ││                                                              Ctrl+O   Back to the last one                                                                       │
-│   # feed-design-34               ││                                                              ?        Keyboard help                                                                              │
-│   # feed-design-83               ││                                                              Ctrl+Q   Quit                                                                                       │
+│   # feed-budget-162              ││                                                              No conversation open                                                                                │
+│   # feed-budget-33               ││                                                              Pick one in the list and press Enter.                                                               │
+│   # feed-build-50                ││                                                                                                                                                                  │
+│   # feed-cache-119               ││                                                              Enter    Open                                                                                       │
+│   # feed-customer-161            ││                                                              Space h  Home                                                                                       │
+│   # feed-customer-167         1  ││                                                              Space d  DMs                                                                                        │
+│   # feed-dashboard-22            ││                                                              Ctrl+O   Back to the last one                                                                       │
+│   # feed-dashboard-41            ││                                                              ?        Keyboard help                                                                              │
+│   # feed-design-34               ││                                                              Ctrl+Q   Quit                                                                                       │
+│   # feed-design-83               ││                                                                                                                                                                  │
 │   # feed-draft-142               ││                                                                                                                                                                  │
 │   # feed-draft-58                ││                                                                                                                                                                  │
 │   # feed-draft-84                ││                                                                                                                                                                  │
@@ -49,6 +50,5 @@ expression: mask_hangul(&s)
 │   # feed-production-111          ││                                                                                                                                                                  │
 │   # feed-production-44           ││                                                                                                                                                                  │
 │   # feed-queue-224               ││                                                                                                                                                                  │
-│   # feed-retry-63                ││                                                                                                                                                                  │
 ╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home                                                                 │ Enter open · l peek · t new tab · Tab next pane · : commands · Ctrl+R top bar · ? help · Space more │ demo
+ NORMAL  ▌A company › Home                                                                      │ Enter open · l peek · t new tab · Tab next pane · : commands · [/] views · ? help · Space more │ demo

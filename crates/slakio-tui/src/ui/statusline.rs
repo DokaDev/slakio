@@ -1,6 +1,6 @@
 //! The status line, lualine-style: the mode badge, where you are, a notice (or the first keys of
 //! a sequence), and on the right the hint line and the backend's state, the segments apart by
-//! ` │ `. Unread counts are the top bar's, never repeated here.
+//! ` │ `. Unread counts are the view switcher's, never repeated here.
 //!
 //! ```text
 //!  NORMAL  ▌A company › #backend │ Copied 3 messages │ i write · k messages · ? help │ demo
@@ -36,7 +36,7 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
     let place = match ctx {
         Ctx::CommandLine => Place::CommandLine,
         Ctx::Root => Place::Welcome,
-        Ctx::Nav => Place::Nav,
+        Ctx::ViewSwitcher => Place::ViewSwitcher,
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_)) => Place::ListSection,
             Some(_) => Place::ListConversation,
@@ -120,12 +120,18 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let mut ws_name = ws.map(|w| w.name.line().into_string());
     let stripe = ws.map(|w| Span::styled("▌", t.workspace(w.color)));
     let main = app.work.home().and_then(|p| app.model.target(&p.target));
-    let mut place_text = app.backend.map(|_| match main {
-        Some(c) if app.work.focused().is_some_and(|p| p.is_thread()) => {
-            format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))
-        }
-        Some(c) => breadcrumb(c),
-        None => app.i18n.label(view_label(app.shell.view)).to_string(),
+    let view = app.i18n.label(view_label(app.shell.view)).to_string();
+    // With the list panel out of the layout, its view switcher is too: the place names the view.
+    let view_hidden = app.backend.is_some() && !crate::screen::too_small(app.size) && app.areas().list.is_none();
+    let mut place_text = app.backend.map(|_| {
+        let place = match main {
+            Some(c) if app.work.focused().is_some_and(|p| p.is_thread()) => {
+                format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))
+            }
+            Some(c) => breadcrumb(c),
+            None => return view.clone(),
+        };
+        if view_hidden { format!("{view} › {place}") } else { place }
     });
     // The notice, or the first keys of a sequence until its popup shows.
     let msg: Option<(String, Style)> = if !app.keys.pending().is_empty() {
@@ -188,7 +194,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
-    // the next pane, the top bar), the workspace's name (cut with `…`, eight cells kept), the other hints by
+    // the next pane, the view switcher), the workspace's name (cut with `…`, eight cells kept), the other hints by
     // worth, the middle of the place, the place's first key and help, the name. Then what is left is filled again: a dropped hint comes back where cutting
     // the name makes room for it, and the name grows into the rest, so no run of blank cells is
     // left between the two sides.
@@ -279,7 +285,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             // a peek is the row's other way to open).
             let left_out = |l: Label| (0..n).any(|j| resolved[j].1 == l && !with.contains(&j));
             let tab_left_out = left_out(Label::HintNewTab);
-            // The way to the top bar comes before the next pane, which leads there too.
+            // The way to the view switcher comes before the next pane, which leads there too.
             let has = |l: Label| with.iter().any(|&j| resolved[j].1 == l);
             let broken = (!with.is_empty() && needs(5))
                 || (with.iter().any(|&i| worth(i) < 4) && needs(4))

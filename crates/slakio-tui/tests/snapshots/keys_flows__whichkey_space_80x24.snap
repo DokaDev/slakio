@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: d.snap()
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
-│ ▾ Favorites            ││                                                    │
-│   # backend            ││                                                    │
-│   # incidents       3  ││                                                    │
-│                        ││                                                    │
-│ ▾ Ops                  ││                                                    │
-│   # deploys            ││       No conversation open                         │
-│   # alerts             ││       Pick one in the list and press Enter.        │
-│   # partner-shared ext ││                                                    │
-│   # hostile-strings    ││       Enter    Open                                │
-│   # big-history        ││       Space h  Home                                │
-│   # long-threads       ││       Space d  DMs                                 │
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+│ Home @24  D●11  A@37  F  L ││                                                │
+├────────────────────────────┤│                                                │
+│ ▾ Favorites                ││                                                │
+│   # backend                ││                                                │
+│   # incidents           3  ││                                                │
+│                            ││                                                │
+│ ▾ Ops                      ││     No conversation open                       │
+│   # deploys                ││     Pick one in the list and press Enter.      │
+│   # alerts                 ││                                                │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────╮
-│ r    Top bar: workspace, views         [    Back to the conversation before  │
-│ h    Show Home                         ]    Forward again                    │
-│ d    Show DMs                          1…9  Show tab 1 to 9                  │
-│ a    Show Activity                     ?    Keyboard help                    │
-│ f    Show Files                        /    Open the command line            │
-│ l    Show Later                        q    Quit                             │
-│ e    Show or hide the list panel       w    +Window                          │
-│ W    Switch workspace                  t    +Tab                             │
+│ r    View switcher (in the list panel)                                       │
+│ h    Show Home                                                               │
+│ d    Show DMs                                                                │
+│ a    Show Activity                                                           │
+│ f    Show Files                                                              │
+│ l    Show Later                                                              │
+│ e    Show or hide the list panel                                             │
+│ W    Switch workspace                                                        │
+│ [    Back to the conversation before                                         │
+│ ]    Forward again                                                           │
+│ …                                                                            │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo

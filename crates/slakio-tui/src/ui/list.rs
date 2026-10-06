@@ -1,9 +1,12 @@
-//! The list panel: the view picked on the top bar. Home lists the workspace's sidebar sections
+//! The list panel: under its workspace chip and view switcher ([`super::navbar`]), the view
+//! picked there. Home lists the workspace's sidebar sections
 //! (folded with `Enter`) and their conversations, a blank row between two sections; DMs lists
 //! the DMs. Views built in a later version say so and how to get back.
 //!
 //! ```text
-//! ╭ Home ─────────────────────╮
+//! ╭ ▌A company ▾ ─────────────╮
+//! │ 󰋜  Home  󰍡  ●2  󰂚  @3  󰈙  󰃀 │   the view switcher
+//! ├───────────────────────────┤
 //! │ ▾ Favorites               │   col 0 gutter, col 1 fold mark, col 3 the section's name
 //! │   # backend               │   col 3 prefix, col 5 name
 //! │   # incidents         3   │   a pill: mentions (or unread DM messages)
@@ -22,7 +25,7 @@
 //!
 //! Unread conversations are bold, muted ones faint; nothing else marks them.
 
-use super::{avatar_chip, count_pill, frame, highlight, presence_mark, view_label};
+use super::{avatar_chip, count_pill, frame, highlight, presence_mark};
 use crate::app::model::Row;
 use crate::app::shell::{Region, View};
 use crate::app::{App, Focus};
@@ -45,9 +48,9 @@ const ICON_EXTERNAL: &str = "\u{F0339}";
 
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
-    let title = app.i18n.label(view_label(app.shell.view));
-    f.render_widget(frame(app, Region::List, &title), area);
-    let inner = screen::inner(area);
+    // The title is the workspace chip ([`super::navbar`]).
+    f.render_widget(frame(app, Region::List, ""), area);
+    let inner = screen::list_parts(area).rows;
     if inner.is_empty() {
         return;
     }

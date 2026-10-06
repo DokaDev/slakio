@@ -1,12 +1,14 @@
-//! The shell: the regions the focus moves between (the top bar, the list panel, the work area),
-//! the top bar's cursor, the workspace and the view the list panel shows, the list's cursor and
-//! scroll, and folded sections. It owns its update ([`Shell::update`]), which hands back a
-//! conversation to open (the work area opens it); the rows come from the read model.
+//! The shell: the regions the focus moves between (the view switcher, the list panel, the work
+//! area), the view switcher's cursor, the workspace and the view the list panel shows, the list's
+//! cursor and scroll, and folded sections. It owns its update ([`Shell::update`]), which hands
+//! back a conversation to open (the work area opens it); the rows come from the read model.
 //!
 //! ```text
-//! ▌A company ▾ │ Home  DMs ●2  Activity @3  Files  Later        the top bar
-//! ▾ Favorites         #backend                                   list panel, work area
-//! # backend   3
+//! ╭ ▌A company ▾ ───╮
+//! │ 󰋜  Home  󰍡  ●2  │   the view switcher            work area
+//! ├─────────────────┤
+//! │ ▾ Favorites     │   the list
+//! │   # backend   3 │
 //! ```
 
 use super::model::{Model, Row};
@@ -23,15 +25,16 @@ pub struct Open {
 }
 use std::collections::HashSet;
 
-/// The regions of the main screen, left to right.
+/// The regions of the main screen, in reading order: the view switcher (the list panel's first
+/// row), the list, the work area.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Region {
-    Nav,
+    ViewSwitcher,
     List,
     Work,
 }
 
-/// What the list panel shows, picked on the top bar.
+/// What the list panel shows, picked on the view switcher.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum View {
     Home,
@@ -42,10 +45,10 @@ pub enum View {
 }
 
 impl View {
-    /// In the top bar's order.
+    /// In the view switcher's order.
     pub const ALL: &'static [View] = &[View::Home, View::Dms, View::Activity, View::Files, View::Later];
 
-    /// The view's name (top bar, list title, breadcrumb).
+    /// The view's name (the view switcher, the breadcrumb).
     pub fn label(self) -> Label {
         match self {
             View::Home => Label::NavHome,
@@ -79,22 +82,9 @@ impl View {
     }
 }
 
-/// One item of the top bar.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NavItem {
-    /// The workspace shown (picking it opens the workspace switcher).
-    Workspace,
-    View(View),
-}
-
-/// The top bar's items: the workspace, then the views.
-pub fn nav_items() -> Vec<NavItem> {
-    std::iter::once(NavItem::Workspace).chain(View::ALL.iter().map(|v| NavItem::View(*v))).collect()
-}
-
 #[derive(Clone, Debug)]
 pub struct Shell {
-    /// Index into [`nav_items`].
+    /// The view switcher's cursor: index into [`View::ALL`].
     pub nav_cursor: usize,
     /// The workspace the list panel shows.
     pub workspace: usize,
@@ -113,7 +103,7 @@ impl Default for Shell {
     fn default() -> Self {
         Self {
             // On the view shown (Home).
-            nav_cursor: 1,
+            nav_cursor: 0,
             workspace: 0,
             view: View::Home,
             list_cursor: 0,
@@ -141,7 +131,6 @@ impl Shell {
         here: &mut Region,
     ) -> Option<Open> {
         let mut open = None;
-        let items = nav_items();
         let list = self.rows(model);
         let rows = list.len();
         let page = list_height.max(1) as isize;
@@ -150,9 +139,10 @@ impl Shell {
             ShellAction::FocusRight => *here = self.neighbour(*here, 1),
             // Up, down, next and previous need the work area: the app moves those.
             ShellAction::FocusUp | ShellAction::FocusDown | ShellAction::FocusNext | ShellAction::FocusPrev => {}
-            ShellAction::FocusNav if *here == Region::Nav => *here = self.leave_nav(),
-            ShellAction::FocusNav => *here = Region::Nav,
-            ShellAction::NavNext
+            ShellAction::FocusNav
+            | ShellAction::ViewNext
+            | ShellAction::ViewPrev
+            | ShellAction::NavNext
             | ShellAction::NavPrev
             | ShellAction::NavFirst
             | ShellAction::NavLast
@@ -161,7 +151,7 @@ impl Shell {
             | ShellAction::SwitcherNext
             | ShellAction::SwitcherPrev
             | ShellAction::SwitcherChoose
-            | ShellAction::SwitcherClose => self.nav(action, &items, model, here),
+            | ShellAction::SwitcherClose => self.nav(action, model, here),
             ShellAction::ListNext => self.list_cursor = step(&list, self.list_cursor, 1),
             ShellAction::ListPrev => self.list_cursor = step(&list, self.list_cursor, -1),
             ShellAction::ListHalfDown => self.list_cursor = step(&list, self.list_cursor, (page / 2).max(1)),
@@ -184,16 +174,16 @@ impl Shell {
                 Some(Row::Conversation(_)) => {
                     match list[..self.list_cursor].iter().rposition(|r| matches!(r, Row::Section(_))) {
                         Some(header) => self.list_cursor = header,
-                        None => *here = Region::Nav,
+                        None => *here = Region::ViewSwitcher,
                     }
                 }
                 Some(Row::Section(i)) => {
                     let id = model.section(*i).id.clone();
                     if !self.collapsed.insert(id) {
-                        *here = Region::Nav;
+                        *here = Region::ViewSwitcher;
                     }
                 }
-                _ => *here = Region::Nav,
+                _ => *here = Region::ViewSwitcher,
             },
             ShellAction::ListSectionPrev | ShellAction::ListSectionNext => {
                 let header = |r: &Row| matches!(r, Row::Section(_));
@@ -208,12 +198,12 @@ impl Shell {
             }
             ShellAction::ToggleList => {
                 self.list_hidden = !self.list_hidden;
-                if self.list_hidden && *here == Region::List {
+                if self.list_hidden && matches!(*here, Region::List | Region::ViewSwitcher) {
                     *here = Region::Work;
                 }
             }
             ShellAction::Show(view) => {
-                self.select(NavItem::View(view), &items, model);
+                self.select(view, model);
                 *here = Region::List;
             }
         }
@@ -221,20 +211,28 @@ impl Shell {
         open
     }
 
-    /// The top bar's keys (the switcher's are the app's).
-    fn nav(&mut self, action: ShellAction, items: &[NavItem], model: &Model, here: &mut Region) {
-        let last_item = items.len().saturating_sub(1);
+    /// The view switcher's keys and `[` / `]` (the workspace switcher's are the app's).
+    fn nav(&mut self, action: ShellAction, model: &Model, here: &mut Region) {
+        let last_item = View::ALL.len() - 1;
         match action {
+            ShellAction::FocusNav if *here == Region::ViewSwitcher => *here = self.leave_nav(),
+            // The view switcher is the list panel's: it shows again.
+            ShellAction::FocusNav => {
+                self.list_hidden = false;
+                self.nav_cursor = self.view_index();
+                *here = Region::ViewSwitcher;
+            }
+            ShellAction::ViewNext | ShellAction::ViewPrev => {
+                let by = if action == ShellAction::ViewNext { 1 } else { last_item };
+                self.select(View::ALL[(self.view_index() + by) % View::ALL.len()], model);
+            }
             ShellAction::NavNext => self.nav_cursor = (self.nav_cursor + 1).min(last_item),
             ShellAction::NavPrev => self.nav_cursor = self.nav_cursor.saturating_sub(1),
             ShellAction::NavFirst => self.nav_cursor = 0,
             ShellAction::NavLast => self.nav_cursor = last_item,
-            // The workspace is picked in its switcher (the app opens it).
             ShellAction::NavSelect => {
-                if let Some(NavItem::View(v)) = items.get(self.nav_cursor).copied() {
-                    self.select(NavItem::View(v), items, model);
-                    *here = Region::List;
-                }
+                self.select(View::ALL[self.nav_cursor.min(last_item)], model);
+                *here = Region::List;
             }
             ShellAction::NavLeave => *here = self.leave_nav(),
             // The app keeps the switcher.
@@ -280,13 +278,10 @@ impl Shell {
         }
     }
 
-    /// Show `item` (one of `items`, the top bar) in the list panel (the focus goes there: the
-    /// app moves it). The workspace item shows nothing by itself ([`Self::select_workspace`]).
-    pub fn select(&mut self, item: NavItem, items: &[NavItem], model: &Model) {
-        if let NavItem::View(v) = item {
-            self.view = v;
-        }
-        self.nav_cursor = items.iter().position(|i| *i == item).unwrap_or(self.nav_cursor);
+    /// Show view `v` in the list panel (the focus goes there: the app moves it).
+    pub fn select(&mut self, v: View, model: &Model) {
+        self.view = v;
+        self.nav_cursor = self.view_index();
         self.home_cursor(model);
         self.list_hidden = false;
     }
@@ -295,7 +290,7 @@ impl Shell {
     pub fn select_workspace(&mut self, ws: usize, model: &Model) {
         self.workspace = ws.min(model.workspaces().len().saturating_sub(1));
         self.view = View::Home;
-        self.nav_cursor = 1;
+        self.nav_cursor = 0;
         self.home_cursor(model);
         self.list_hidden = false;
     }
@@ -351,7 +346,7 @@ impl Shell {
     pub fn clamp(&mut self, model: &Model, list_height: usize) {
         let n = model.workspaces().len();
         self.workspace = self.workspace.min(n.saturating_sub(1));
-        self.nav_cursor = self.nav_cursor.min(nav_items().len() - 1);
+        self.nav_cursor = self.nav_cursor.min(View::ALL.len() - 1);
         if model.is_loaded() && std::mem::take(&mut self.pending_home) {
             self.home_cursor(model);
         }
@@ -359,18 +354,23 @@ impl Shell {
         self.scroll(list_height);
     }
 
-    /// Where the focus goes from the top bar without picking anything: the list, or the work area
-    /// when the list is hidden.
+    /// The view shown: index into [`View::ALL`].
+    fn view_index(&self) -> usize {
+        View::ALL.iter().position(|v| *v == self.view).unwrap_or(0)
+    }
+
+    /// Where the focus goes from the view switcher without picking anything: the list, or the
+    /// work area when the list is hidden.
     fn leave_nav(&self) -> Region {
         if self.list_hidden { Region::Work } else { Region::List }
     }
 
-    /// The region `step` places to the left (-1) or right (1) of `here`, skipping a hidden list
-    /// panel.
+    /// The region `step` places before (-1) or after (1) `here`, skipping a hidden list panel
+    /// (and its view switcher).
     fn neighbour(&self, here: Region, step: i8) -> Region {
-        let order: Vec<Region> = [Region::Nav, Region::List, Region::Work]
+        let order: Vec<Region> = [Region::ViewSwitcher, Region::List, Region::Work]
             .into_iter()
-            .filter(|r| *r != Region::List || !self.list_hidden)
+            .filter(|r| *r == Region::Work || !self.list_hidden)
             .collect();
         let at = order.iter().position(|r| *r == here).unwrap_or(0);
         let to = (at as i8 + step).clamp(0, order.len() as i8 - 1);

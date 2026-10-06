@@ -43,7 +43,7 @@ fn index_of(d: &Demo, name: &str) -> usize {
 /// Where the mark of the DM named `name` is drawn: (x, y). DMs has no sections, so the mark is
 /// the first cell after the gutter, or the cell after the avatar chip there.
 fn mark_at(d: &Demo, name: &str) -> (u16, u16) {
-    let list = screen::inner(d.app.areas().list.expect("the list panel"));
+    let list = screen::list_parts(d.app.areas().list.expect("the list panel")).rows;
     let y = list.y + (index_of(d, name) - d.app.list_top()) as u16;
     (list.x + if d.app.settings.avatars { 3 } else { 1 }, y)
 }
@@ -114,7 +114,7 @@ fn a_dm_title_says_whether_its_peer_is_around() {
     let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == Presence::Away).expect("someone away");
     d.app.move_list_cursor_to(index_of(&d, name));
     d.keys("enter");
-    let title = d.screen().lines().nth(1).unwrap().to_string();
+    let title = d.screen().lines().next().unwrap().to_string();
     assert!(title.contains(&format!("@{name} ○ away")), "{title}");
 }
 

@@ -2,33 +2,33 @@
 source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&small.snap())
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ DMs ───────────────────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────────╮
-│▎MK● Minsu Kim       3  ││                                                                        │
-│ JP● Jiho Park          ││ ───────────────────────────── 2026-01-09 ───────────────────────────── │
-│ ＊○ ＊＊＊             ││ MK Minsu Kim     Waiting on deploy alert staging lunch           00:44 │
-│ JL◐ Jiyoung Lee        ││                                                                        │
-│ AM● Alex Morgan        ││ MK Minsu Kim     We retry looks again budget queue now tomorrow  01:36 │
-│ ＊○ ＊＊＊             ││                  sprint review on tracing production                   │
-│ H ● Hana            4  ││                                                                        │
-│ SR● Sam Rivera      1  ││ M  Me            Ok, monitoring                                  02:16 │
-│ ＊○ ＊＊＊             ││                                                                        │
-│ TK◐ Taylor Kim         ││ M  Me            Staging today ticket the broken broken still    03:50 │
-│ CP● Chris Park         ││                  pager review done lunch someone                       │
-│ ＊○ ＊＊＊          2  ││                  ⤷ 12 replies · last 04:02                             │
-│ ML◐ Mallory live       ││                                                                        │
-│ 3   Jiho Park, ＊…  2  ││ M  Me            Rolling back                                    04:08 │
-│                        ││                   🎉 3                                                 │
-│                        ││                                                                        │
-│                        ││ MK Minsu Kim     Done schema for please today deploy looks fine  05:26 │
-│                        ││                  timeout retry maybe looks                             │
-│                        ││                                                                        │
-│                        ││ MK Minsu Kim     For looks maybe rollback                        06:17 │
-│                        ││                                                                        │
-│                        ││ M  Me            Metrics staging dashboard index design today    07:27 │
-│                        ││                  lunch review review migration again on branch         │
-│                        ││                   👍 1                                                 │
-│                        │├─ Message @Minsu Kim ───────────────────────────────────────────────────┤
-│                        ││ › Press i to write                                                     │
-╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › @Minsu Kim │ i write · k messages · Esc list · Ctrl+R top bar · ? help │ demo
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────╮
+│ H@24  DMs ●11  A@37  F  L  ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
+├────────────────────────────┤│ MK Minsu Kim     Waiting on deploy alert staging lunch       00:44 │
+│▎MK● Minsu Kim           3  ││                                                                    │
+│ JP● Jiho Park              ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
+│ ＊○ ＊＊＊                 ││                  tomorrow sprint review on tracing                 │
+│ JL◐ Jiyoung Lee            ││                  production                                        │
+│ AM● Alex Morgan            ││                                                                    │
+│ ＊○ ＊＊＊                 ││ M  Me            Ok, monitoring                              02:16 │
+│ H ● Hana                4  ││                                                                    │
+│ SR● Sam Rivera          1  ││ M  Me            Staging today ticket the broken broken      03:50 │
+│ ＊○ ＊＊＊                 ││                  still pager review done lunch someone             │
+│ TK◐ Taylor Kim             ││                  ⤷ 12 replies · last 04:02                         │
+│ CP● Chris Park             ││                                                                    │
+│ ＊○ ＊＊＊              2  ││ M  Me            Rolling back                                04:08 │
+│ ML◐ Mallory live           ││                   🎉 3                                             │
+│ 3   Jiho Park, ＊＊＊…  2  ││                                                                    │
+│                            ││ MK Minsu Kim     Done schema for please today deploy looks   05:26 │
+│                            ││                  fine timeout retry maybe looks                    │
+│                            ││                                                                    │
+│                            ││ MK Minsu Kim     For looks maybe rollback                    06:17 │
+│                            ││                                                                    │
+│                            ││ M  Me            Metrics staging dashboard index design      07:27 │
+│                            ││                  today lunch review review migration again         │
+│                            ││                  on branch                                         │
+│                            ││                   👍 1                                             │
+│                            │├─ Message @Minsu Kim ───────────────────────────────────────────────┤
+│                            ││ › Press i to write                                                 │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › @Minsu Kim   │ i write · k messages · Esc list · Ctrl+R views · ? help │ demo

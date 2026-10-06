@@ -7,7 +7,7 @@
 //! │─────────────────────────────────────────────────────────────│
 //! │ ▾ List panel                                                │
 //! │   Next row                                         j / Down │
-//! │ ▸ Top bar                                                  8 │
+//! │ ▸ View switcher                                            8 │
 //! ╰──────────────────── ↑↓ move · Enter run · / search · Esc close ╯
 //! ```
 

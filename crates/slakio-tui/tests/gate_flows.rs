@@ -111,22 +111,27 @@ fn help_stays_on_the_hint_line_at_80_columns() {
 }
 
 #[test]
-fn the_top_bar_marks_the_workspace_with_its_band_and_mentions_only_in_red() {
+fn the_list_panel_marks_the_workspace_with_its_band_and_mentions_only_in_red() {
     let d = tokyo(120, 40);
     let buf = d.buffer();
     let t = d.app.theme.clone();
-    assert_eq!(buf[(1, 0)].symbol(), "▌");
-    assert_eq!(Some(buf[(1, 0)].fg), t.workspace(d.app.model.workspaces()[0].color).fg, "the workspace's color");
-    let bar = d.app.nav_bar().unwrap();
-    for p in
-        bar.pieces.iter().filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark))
-    {
-        let c = &buf[(p.x + 1, 0)];
-        let mention = match p.item.filter(|i| *i > 0) {
-            Some(i) => d.app.view_unread(d.app.workspace(), slakio_tui::app::shell::View::ALL[i - 1]).red(),
-            None => p.text.trim().starts_with('@'),
-        };
-        assert_eq!(c.fg == t.error, mention, "{:?}: red for mentions only", p.text);
+    assert_eq!(buf[(2, 0)].symbol(), "▌", "the chip on the list panel's title");
+    assert_eq!(Some(buf[(2, 0)].fg), t.workspace(d.app.model.workspaces()[0].color).fg, "the workspace's color");
+    let chip = d.app.chip_bar().unwrap();
+    let views = d.app.view_switcher().unwrap();
+    for (bar, y) in [(chip, 0), (views, 1)] {
+        for p in bar
+            .pieces
+            .iter()
+            .filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark))
+        {
+            let c = &buf[(p.x + 1, y)];
+            let mention = match p.item {
+                Some(i) => d.app.view_unread(d.app.workspace(), slakio_tui::app::shell::View::ALL[i]).red(),
+                None => p.text.trim().starts_with('@'),
+            };
+            assert_eq!(c.fg == t.error, mention, "{:?}: red for mentions only", p.text);
+        }
     }
 }
 
@@ -139,7 +144,7 @@ fn the_which_key_popup_dims_the_screen_and_hides_the_hints() {
     d.now = t0 + WHICH_KEY_DELAY;
     d.app.on_tick(d.now);
     let after = d.buffer();
-    let list = screen::inner(d.app.areas().list.unwrap());
+    let list = screen::list_parts(d.app.areas().list.unwrap()).rows;
     let (x, y) = (list.x + 3, list.y);
     assert_ne!(after[(x, y)].fg, before[(x, y)].fg, "the list behind the popup is dimmed");
     assert!(!d.status_line().contains("Enter open"), "{}", d.status_line());

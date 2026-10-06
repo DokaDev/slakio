@@ -1,4 +1,4 @@
-//! Where the keyboard is: the top bar, the list panel or the work area — one [`Region`] field of
+//! Where the keyboard is: the view switcher, the list panel or the work area — one [`Region`] field of
 //! the app, changed in one place ([`App::set_focus`]) and read by the key map, drawing and the
 //! mouse alike ([`App::focus`]). Which pane of the work area has it is not kept twice: it is the
 //! work area's active pane (the one the keyboard goes back to there), so the focus can never
@@ -30,7 +30,7 @@ impl App {
     /// area itself, with no pane open).
     pub fn focus(&self) -> Focus {
         match self.region {
-            Region::Nav => Focus::Nav,
+            Region::ViewSwitcher => Focus::ViewSwitcher,
             Region::List => Focus::List,
             Region::Work => self.work.active().map_or(Focus::Work, Focus::on),
         }
@@ -40,7 +40,7 @@ impl App {
     /// not open takes nothing.
     pub(crate) fn set_focus(&mut self, focus: Focus) {
         self.region = match focus {
-            Focus::Nav => Region::Nav,
+            Focus::ViewSwitcher => Region::ViewSwitcher,
             Focus::List => Region::List,
             Focus::Work => Region::Work,
             Focus::Pane(h) if self.work.pane(h.id()).is_some() => {
@@ -70,26 +70,27 @@ impl App {
     /// The focus goes to `region` (the work area: its active pane).
     pub(crate) fn focus_region(&mut self, region: Region) {
         match region {
-            Region::Nav => self.set_focus(Focus::Nav),
+            Region::ViewSwitcher => self.set_focus(Focus::ViewSwitcher),
             Region::List => self.set_focus(Focus::List),
             Region::Work => self.focus_work(),
         }
     }
 
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: top bar, list, the panes in
-    /// reading order (the conversation, the thread panel beside it), round again. A hidden list
-    /// or a closed pane is skipped.
+    /// Move the focus to the next (`1`) or previous (`-1`) panel: view switcher, list, the panes
+    /// in reading order (the conversation, the thread panel beside it), round again. A hidden
+    /// list (and its view switcher) or a closed pane is skipped.
     pub(super) fn cycle(&mut self, step: isize) {
-        let mut stops = vec![Focus::Nav];
+        let mut stops = Vec::new();
         if !self.shell.list_hidden {
-            stops.push(Focus::List);
+            stops.extend([Focus::ViewSwitcher, Focus::List]);
         }
         stops.extend(self.work.ids().into_iter().map(Focus::on));
         let at = stops.iter().position(|s| *s == self.focus());
         let n = stops.len() as isize;
         let to = match at {
             Some(i) => stops[(i as isize + step).rem_euclid(n) as usize],
-            None => stops[0],
+            None if n > 0 => stops[0],
+            None => return,
         };
         self.work.set_insert(false);
         self.set_focus(to);
@@ -126,7 +127,7 @@ impl App {
         }
     }
 
-    /// A shell action: the focus between the regions, the top bar, the list panel (what the
+    /// A shell action: the focus between the regions, the view switcher, the list panel (what the
     /// shell opens, the work area opens).
     pub(super) fn shell(&mut self, a: ShellAction, now: Instant) {
         if self.backend.is_none() {
@@ -145,7 +146,6 @@ impl App {
             | ShellAction::SwitcherPrev
             | ShellAction::SwitcherChoose
             | ShellAction::SwitcherClose => return self.switcher_key(a),
-            ShellAction::NavSelect if self.nav_select() => return,
             _ => {}
         }
         let height = self.list_height();

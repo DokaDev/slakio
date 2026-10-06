@@ -11,6 +11,7 @@ use ratatui::crossterm::event::MouseEventKind;
 use ratatui::style::Modifier;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::{Focus, Mode, PaneKind};
+use slakio_tui::screen;
 
 fn list_row_of(d: &Demo, name: &str) -> usize {
     d.app
@@ -62,17 +63,20 @@ fn the_first_cursor_is_on_the_first_conversation_not_a_header() {
 }
 
 #[test]
-fn the_top_bar_takes_a_row_and_the_list_starts_at_the_left_edge() {
+fn the_list_starts_at_the_top_left_corner_and_its_borders_run_down() {
     let mut d = Demo::new(120, 40);
     d.keys("ctrl+r");
     let a = d.app.areas();
     let list = a.list.expect("the list panel");
-    assert_eq!((list.x, list.y, a.nav.height), (0, 1, 1));
+    assert_eq!((list.x, list.y), (0, 0));
     let buf = d.buffer();
-    // Focused, the bar covers nothing: the list's borders show on every row.
+    // Focused, the view switcher covers nothing: the list's borders show on every row, joined
+    // by the rule under the switcher.
+    let rule = screen::list_parts(list).rule.unwrap();
     for y in list.y + 1..list.bottom() - 1 {
-        assert_eq!(buf[(0, y)].symbol(), "│", "row {y}");
-        assert_eq!(buf[(list.right() - 1, y)].symbol(), "│", "row {y}");
+        let (l, r) = if y == rule { ("├", "┤") } else { ("│", "│") };
+        assert_eq!(buf[(0, y)].symbol(), l, "row {y}");
+        assert_eq!(buf[(list.right() - 1, y)].symbol(), r, "row {y}");
     }
 }
 
@@ -94,9 +98,11 @@ fn no_selection_is_drawn_underlined() {
 
 #[test]
 fn a_long_name_is_clipped_with_an_ellipsis_apart_from_its_badge() {
-    let d = Demo::new(80, 40);
+    // A group DM's names are the longest in the list.
+    let mut d = Demo::new(80, 40);
+    d.keys("space d");
     let s = d.screen();
-    let row = s.lines().find(|l| l.contains("feed-customer") && l.trim_end().ends_with('│') && l.contains('…'));
+    let row = s.lines().find(|l| l.contains("Jiho Park") && l.contains('…'));
     let row = row.unwrap_or_else(|| panic!("a clipped name ends in …:\n{s}"));
     let after = row.split('…').nth(1).unwrap();
     assert!(after.starts_with(' '), "a space between the name and its badge: {row}");
@@ -147,7 +153,7 @@ fn tab_moves_the_focus_to_the_next_pane_and_back() {
     d.open("long-threads");
     d.keys("g g enter");
     d.keys("tab");
-    assert_eq!(d.app.focus(), Focus::Nav, "after the thread panel comes the rail");
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher, "after the thread panel comes the rail");
     d.keys("tab");
     assert_eq!(d.app.focus(), Focus::List, "then the list");
     d.keys("tab");

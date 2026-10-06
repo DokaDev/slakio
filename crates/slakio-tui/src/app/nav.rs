@@ -1,20 +1,22 @@
-//! The top bar as the app routes it: what its chip and views say, the workspace switcher it
-//! opens, and the mouse on both. The geometry is [`crate::navbar`]'s.
+//! Navigation in the list panel as the app routes it: what the workspace chip (the panel's
+//! title) and the view switcher (its first row) say, the workspace switcher the chip opens, and
+//! the mouse on both. The geometry is [`crate::navbar`]'s.
 //!
-//! The keyboard reaches the bar with `Ctrl+R` / `Space r` (`:nav`), or `Tab` round the panels;
-//! `h`/`l` and the arrows move along it, `Enter` shows the view under the cursor in the list
-//! panel (on the workspace: opens the switcher), `Esc` goes back. `Space W` opens the switcher
-//! from anywhere outside text; in it `j`/`k` move, `Enter` switches, `Esc` closes.
+//! The keyboard reaches the view switcher with `Ctrl+R` / `Space r` (`:nav`), or `Tab` round
+//! the panels; `h`/`l` and the arrows move along it, `Enter` shows the view under the cursor in
+//! the list panel, `Esc` goes back. In the list, `[` / `]` show the view before or after.
+//! `Space W` opens the workspace switcher from anywhere outside text; in it `j`/`k` move,
+//! `Enter` switches, `Esc` closes.
 //!
-//! Counts (ui-ux-spec §H): Home `@n` the mentions in its channels, else `●` when a channel is
+//! Counts (ui-ux-spec §H.1): Home `@n` the mentions in its channels, else `●` when a channel is
 //! unread; DMs `●n` the unread messages of its DMs; Activity `@n` the mentions of every
 //! workspace. Only mentions are `@` and red. Another workspace's mark follows `▾` with its letter.
 
-use super::shell::{NavItem, View, nav_items};
+use super::shell::View;
 use super::tabs::Unread;
 use super::{App, Focus};
 use crate::action::ShellAction;
-use crate::navbar::{self, Bar, Chip, Item};
+use crate::navbar::{self, Bar, Chip, Item, Part};
 use crate::screen;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
@@ -45,9 +47,11 @@ impl App {
         u
     }
 
-    /// The top bar as laid out now (`None` without a backend).
-    pub fn nav_bar(&self) -> Option<Bar> {
+    /// The workspace chip as laid out now on the list panel's title (`None` without a backend
+    /// or while the list panel is not shown).
+    pub fn chip_bar(&self) -> Option<Bar> {
         self.backend?;
+        let list = self.areas().list?;
         let ws = self.model.workspaces().get(self.shell.workspace)?;
         let others = (0..self.model.workspaces().len())
             .filter(|w| *w != self.shell.workspace)
@@ -62,6 +66,14 @@ impl App {
             })
             .collect();
         let chip = Chip { name: ws.name.line().into_string(), others };
+        Some(navbar::chip(screen::list_parts(list).title, &chip))
+    }
+
+    /// The view switcher as laid out now on the list panel's first row (`None` without a
+    /// backend or while the list panel is not shown).
+    pub fn view_switcher(&self) -> Option<Bar> {
+        self.backend?;
+        let list = self.areas().list?;
         let icons = self.settings.icons;
         let views: Vec<Item> = View::ALL
             .iter()
@@ -72,7 +84,8 @@ impl App {
                 badge: self.view_unread(self.shell.workspace, *v).badge(),
             })
             .collect();
-        Some(navbar::layout(self.areas().nav, &chip, &views))
+        let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
+        Some(navbar::views(screen::list_parts(list).views, &views, shown))
     }
 
     /// Open the workspace switcher, its cursor on the workspace shown.
@@ -86,7 +99,7 @@ impl App {
     /// The switcher's box on the screen now, while it is open.
     pub fn switcher_box(&self) -> Option<Rect> {
         self.switcher?;
-        let x = self.nav_bar().and_then(|b| b.span(0)).map_or(0, |(from, _)| from);
+        let x = self.chip_bar().and_then(|b| b.pieces.iter().find(|p| p.part == Part::Band).map(|p| p.x)).unwrap_or(0);
         Some(screen::switcher(self.size, x, self.model.workspaces().len()))
     }
 
@@ -109,29 +122,23 @@ impl App {
         self.set_focus(Focus::List);
     }
 
-    /// Enter on the top bar: the workspace opens the switcher; a view the shell shows.
-    pub(super) fn nav_select(&mut self) -> bool {
-        let on_chip = nav_items().get(self.shell.nav_cursor) == Some(&NavItem::Workspace);
-        if on_chip {
-            self.open_switcher();
-        }
-        on_chip
-    }
-
-    /// A click on the top bar at column `x`: the chip opens the switcher, a view shows in the
-    /// list panel, which gets the keyboard.
-    pub(super) fn nav_click(&mut self, x: u16) {
-        let Some(i) = self.nav_bar().and_then(|b| b.hit(x)) else { return };
-        let items = nav_items();
-        self.shell.nav_cursor = i;
-        match items.get(i) {
-            Some(NavItem::Workspace) => self.open_switcher(),
-            Some(item) => {
-                self.shell.select(*item, &items, &self.model);
-                self.set_focus(Focus::List);
+    /// A click on the list panel's title row or its view switcher at `at`: the chip opens the
+    /// workspace switcher, a view shows in the list panel, which gets the keyboard. `false`
+    /// when nothing is there.
+    pub(super) fn nav_click(&mut self, at: Position) -> bool {
+        if let Some(chip) = self.chip_bar().filter(|b| b.area.y == at.y) {
+            let (from, to) = chip.extent();
+            if at.x >= from && at.x < to {
+                self.open_switcher();
             }
-            None => {}
+            return true;
         }
+        let Some(bar) = self.view_switcher().filter(|b| b.area.y == at.y) else { return false };
+        if let Some(&v) = bar.hit(at.x).and_then(|i| View::ALL.get(i)) {
+            self.shell.select(v, &self.model);
+            self.set_focus(Focus::List);
+        }
+        true
     }
 
     /// The mouse over the switcher: a click on a workspace switches to it, outside closes it;

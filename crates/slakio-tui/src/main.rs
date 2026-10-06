@@ -73,7 +73,7 @@ fn main() -> ExitCode {
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {
         app.connect(b.capabilities());
-        // Asked once, where the top bar can preview the answer; the answer is saved.
+        // Asked once, where the view switcher can preview the answer; the answer is saved.
         if cfg.icons == "ask" && config_path.is_some() && cfg_err.is_none() {
             app.ask_icons();
         }

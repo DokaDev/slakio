@@ -1,5 +1,5 @@
 //! What the app shows, asked from outside: where the keyboard is, which popup is up, the panes
-//! and what they hold, the list panel and the top bar, the keyboard help. Tests read the app through
+//! and what they hold, the list panel and its view switcher, the keyboard help. Tests read the app through
 //! these queries, never through the sub-states (which are private to the crate), so the state
 //! can change shape without touching them. Panes are named by a [`PaneHandle`], never by their
 //! place, so the queries hold when the work area gains splits.
@@ -38,7 +38,8 @@ impl PaneHandle {
 /// Where the keyboard is, under any popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
-    Nav,
+    /// The view switcher, the list panel's first row.
+    ViewSwitcher,
     List,
     Pane(PaneHandle),
     /// The work area with no pane open.
@@ -206,7 +207,7 @@ impl App {
         self.shell.workspace
     }
 
-    /// The top bar's item under its cursor (index into [`super::shell::nav_items`]).
+    /// The view under the view switcher's cursor (index into [`super::shell::View::ALL`]).
     pub fn nav_cursor(&self) -> usize {
         self.shell.nav_cursor
     }

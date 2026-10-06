@@ -2,41 +2,51 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-    [ R 0..2] [ B R 2..11] [ R 11..16] [ B R 16..20] [ R 20..22] [ B R 22..32] [ R 32..36] [ B R 36..40] [ R 40..50] [ B R 50..54] [ R 54..80]
-╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
-│ ▾ Favorites            ││                                                    │
-    [ D 2..3] [ B 4..13]
-│▎  # backend            ││                                                    │
-│   # incidents       3  ││                                                    │
-    [ B 4..5] [ B 6..15] [ B R 21..24]
-│                        ││                                                    │
-│ ▾ Ops                  ││                                                    │
-    [ D 2..3] [ B 4..7]
-│   # deploys            ││       No conversation open                         │
-    [ B 34..54]
-│   # alerts             ││       Pick one in the list and press Enter.        │
-│   # partner-shared ext ││                                                    │
-    [ D 20..24]
-│   # hostile-strings    ││       Enter    Open                                │
-    [ B 4..5] [ B 6..21] [ B 34..39]
-│   # big-history        ││       Space h  Home                                │
-    [ B 34..41]
-│   # long-threads       ││       Space d  DMs                                 │
-    [ B 34..41]
-│                        ││       Ctrl+O   Back to the last one                │
-    [ B 34..40]
-│ ▾ Channels             ││       ?        Keyboard help                       │
-    [ D 2..3] [ B 4..12] [ B 34..35]
-│   # announcements      ││       Ctrl+Q   Quit                                │
-    [ B 34..40]
-│   # design-review      ││                                                    │
-    [ D 4..5] [ D 6..19]
-│   # feed-alert-134     ││                                                    │
-│   # feed-alert-8       ││                                                    │
-│   # feed-budget-162    ││                                                    │
-│   # feed-budget-33     ││                                                    │
-│   # feed-build-50      ││                                                    │
-╰────────────────────────╯╰────────────────────────────────────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+    [ B 0..30]
+│ Home @24  D●11  A@37  F  L ││                                                │
+    [ B 0..1] [ B R 2..10] [ B 13..16] [ B 19..22] [ B 29..30]
+├────────────────────────────┤│                                                │
+    [ B 0..30]
+│ ▾ Favorites                ││                                                │
+    [ B 0..1] [ D 2..3] [ B 4..13] [ B 29..30]
+│▎  # backend                ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # incidents           3  ││                                                │
+    [ B 0..1] [ B 4..5] [ B 6..15] [ B R 25..28] [ B 29..30]
+│                            ││                                                │
+    [ B 0..1] [ B 29..30]
+│ ▾ Ops                      ││     No conversation open                       │
+    [ B 0..1] [ D 2..3] [ B 4..7] [ B 29..30] [ B 36..56]
+│   # deploys                ││     Pick one in the list and press Enter.      │
+    [ B 0..1] [ B 29..30]
+│   # alerts                 ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # partner-shared ext     ││     Enter    Open                              │
+    [ B 0..1] [ D 20..24] [ B 29..30] [ B 36..41]
+│   # hostile-strings        ││     Space h  Home                              │
+    [ B 0..1] [ B 4..5] [ B 6..21] [ B 29..30] [ B 36..43]
+│   # big-history            ││     Space d  DMs                               │
+    [ B 0..1] [ B 29..30] [ B 36..43]
+│   # long-threads           ││     Ctrl+O   Back to the last one              │
+    [ B 0..1] [ B 29..30] [ B 36..42]
+│                            ││     ?        Keyboard help                     │
+    [ B 0..1] [ B 29..30] [ B 36..37]
+│ ▾ Channels                 ││     Ctrl+Q   Quit                              │
+    [ B 0..1] [ D 2..3] [ B 4..12] [ B 29..30] [ B 36..42]
+│   # announcements          ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # design-review          ││                                                │
+    [ B 0..1] [ D 4..5] [ D 6..19] [ B 29..30]
+│   # feed-alert-134         ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # feed-alert-8           ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # feed-budget-162        ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # feed-budget-33         ││                                                │
+    [ B 0..1] [ B 29..30]
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+    [ B 0..30]
  NORMAL  ▌A company › Home │ Enter show · h/l move · ? help · Space more │ demo
     [ B R 0..8] [ D 19..22] [ B 29..34] [ D 39..42] [ B 42..45] [ D 50..53] [ B 53..54] [ D 59..62] [ B 62..67]

@@ -117,7 +117,7 @@ impl App {
                 }
                 thread
             }
-            Focus::Nav | Focus::Work => None,
+            Focus::ViewSwitcher | Focus::Work => None,
         };
         if let Some(t) = target {
             let id = self.work.open_tab(t);
@@ -146,7 +146,7 @@ impl App {
 
     /// Close the work area's active pane (`Ctrl+W`, `:q`): its tab with its last pane, never the
     /// app. From a pane the keyboard goes to the pane shown next, else to the list (on the
-    /// conversation closed); from the list or the top bar it stays there. With nothing open, says
+    /// conversation closed); from the list or the view switcher it stays there. With nothing open, says
     /// how to quit.
     pub(super) fn close_pane(&mut self, now: Instant) {
         if self.work.active().is_none() {

@@ -1,6 +1,6 @@
-//! The styles of the two bars: the top bar (the app's: the workspace and the views, on the status
-//! line's surface, a reversed row without truecolor) and the tab bar (the work area's: on the
-//! background), and what is shown among their peers, raised alike in both.
+//! The styles of the two rows of peers: the tab bar (the work area's) and the view switcher (the
+//! list panel's first row), both on the background, and what is shown among the peers, raised
+//! alike in both.
 
 use super::{Kind, Theme};
 use ratatui::style::{Color, Modifier, Style};
@@ -11,8 +11,8 @@ impl Theme {
         self.base()
     }
 
-    /// A tab's title (and the spaces of its label): the tab shown on the raised surface, in
-    /// bold; the others muted.
+    /// A tab's title (and the spaces of its label), or a view on the view switcher: the one shown
+    /// on the raised surface, in bold; the others muted.
     pub fn tab(&self, shown: bool) -> Style {
         match (self.kind, shown) {
             (Kind::Truecolor, true) => self.bold().bg(self.raised()),
@@ -23,8 +23,8 @@ impl Theme {
     }
 
     /// The background of what is shown among its peers (the tab shown, the view shown): the
-    /// unfocused selection's on a dark theme, unless the top bar's surface or the background is
-    /// that color already; the selection's on a light one (its unfocused one is too faint there).
+    /// unfocused selection's on a dark theme, unless the status line's surface or the background
+    /// is that color already; the selection's on a light one (its unfocused one is too faint there).
     pub fn raised(&self) -> Color {
         let light = luminance(self.bg).is_some_and(|l| l > 0.5);
         if light || self.cursor_line == self.surface || self.cursor_line == self.bg {
@@ -48,7 +48,8 @@ impl Theme {
         }
     }
 
-    /// A tab's unread count (`●3`): a mention's color when one mentions the user.
+    /// A tab's or a view's unread count (`●3`, `@3`): a mention's color when one mentions the
+    /// user.
     pub fn tab_badge(&self, shown: bool, mention: bool) -> Style {
         let dot = self.dot(mention);
         match self.tab(shown).bg {
@@ -57,55 +58,7 @@ impl Theme {
         }
     }
 
-    /// The top bar's row: the status line's surface; without truecolor the whole row reversed,
-    /// so it reads apart from the tab bar by shape, not only color.
-    pub fn nav_bar(&self) -> Style {
-        match self.kind {
-            Kind::Truecolor => self.text().bg(self.surface),
-            _ => Style::new().add_modifier(Modifier::REVERSED),
-        }
-    }
-
-    /// A view on the top bar: the one the list shows raised and bold like the tab shown (out of
-    /// the reversed bar without truecolor), the others muted.
-    pub fn nav_item(&self, shown: bool) -> Style {
-        match (self.kind, shown) {
-            (Kind::Truecolor, true) => self.tab(true),
-            (Kind::Truecolor, false) => self.muted().bg(self.surface),
-            (_, true) => Style::new().add_modifier(Modifier::BOLD).remove_modifier(Modifier::REVERSED),
-            (_, false) => self.nav_bar(),
-        }
-    }
-
-    /// A count on the top bar: a mention in the mention color (out of the reversed bar without
-    /// truecolor), unread bold.
-    pub fn nav_marker(&self, mention: bool) -> Style {
-        match (self.kind, mention) {
-            (Kind::Truecolor, m) => self.dot(m).bg(self.surface),
-            // Inside the reversed row: a mention in its color there, unread bold.
-            (_, true) => self.nav_bar().patch(self.dot(true)),
-            (_, false) => self.nav_bar().add_modifier(Modifier::BOLD),
-        }
-    }
-
-    /// The count of the view shown: its marker on the raised background (out of the reversed
-    /// bar without truecolor).
-    pub fn nav_shown_marker(&self, mention: bool) -> Style {
-        match self.kind {
-            Kind::Truecolor => self.dot(mention).bg(self.raised()),
-            _ => self.dot(mention).remove_modifier(Modifier::REVERSED),
-        }
-    }
-
-    /// The top bar's quiet marks (`▾`, the separator): muted on its surface.
-    pub fn nav_quiet(&self) -> Style {
-        match self.kind {
-            Kind::Truecolor => self.muted().bg(self.surface),
-            _ => self.nav_bar(),
-        }
-    }
-
-    /// A count on the top bar (`@3`, `●2`, `●`): a mention in the mention color, unread bold;
+    /// A count in the workspace switcher (`@3`, `●2`, `●`): a mention in the mention color, unread bold;
     /// without truecolor a mention is reversed too, so it never reads by color alone.
     pub fn marker(&self, mention: bool) -> Style {
         match (mention, self.kind) {

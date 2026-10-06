@@ -76,10 +76,10 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.keys("ctrl+p");
     d.type_text("rail");
     let rows = d.app.palette_rows();
-    assert_eq!(rows[0].name, ":nav, :rail", "the old name still finds the top bar");
+    assert_eq!(rows[0].name, ":nav, :rail", "the old name still finds the view switcher");
     assert_eq!(rows[0].keys, "Ctrl+R / Space r", "the keys from where the keyboard is");
     d.keys("enter");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     // An action without a command: found by its label.
     d.keys("esc ctrl+p");
     d.type_text("next panel");
@@ -88,7 +88,7 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.type_text("nextpan");
     assert_eq!(d.app.palette_rows()[0].label, "Next panel");
     d.keys("enter");
-    assert_eq!(d.app.focus(), Focus::Nav, "Tab's action ran: nothing is open, the top bar is next");
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher, "Tab's action ran: nothing is open, the view switcher is next");
 }
 
 #[test]

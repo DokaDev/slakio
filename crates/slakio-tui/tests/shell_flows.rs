@@ -59,12 +59,15 @@ fn an_answer_to_an_older_boot_request_is_dropped() {
 }
 
 #[test]
-fn the_top_bar_shows_the_workspace_and_the_views() {
+fn the_list_panel_shows_the_workspace_and_the_views() {
     let mut d = Demo::new(120, 40);
-    let top = d.screen().lines().next().unwrap().to_string();
-    assert!(top.contains("▌A company") && top.contains("Home") && top.contains("Activity"), "{top}");
+    let screen = d.screen();
+    let mut lines = screen.lines();
+    let (top, views) = (lines.next().unwrap(), lines.next().unwrap());
+    assert!(top.starts_with("╭ ▌A company ▾"), "{top}");
+    assert!(views.contains("Home") && views.contains("A@"), "{views}");
     d.keys("ctrl+r");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     insta::assert_snapshot!("demo_nav_focus_120x40", d.snap());
 }
 
@@ -135,7 +138,7 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
     assert!(d.status_line().contains("Space w"), "{}", d.status_line());
     assert_eq!(d.app.focus(), Focus::List);
     d.keys("h");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     assert!(!d.status_line().contains("Space w"));
     d.keys("space w l ctrl+l");
     assert_eq!(d.app.focus(), Focus::List, "never onto an empty work area");
@@ -166,10 +169,10 @@ fn clicks_switch_workspace_and_open_a_conversation() {
     let b = d.app.switcher_box().expect("the switcher");
     d.mouse(MouseEventKind::Down(MouseButton::Left), b.x + 3, b.y + 2);
     assert_eq!(d.app.workspace(), 1);
-    // A list row opens it: row 3 is the first channel under the first section (row 1 is the
-    // list's border, under the top bar).
+    // A list row opens it: row 4 is the first channel under the first section (row 0 is the
+    // chip on the list's border, 1 the view switcher, 2 its rule, 3 the section).
     let list = d.app.areas().list.unwrap();
-    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 3);
+    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 4);
     let open = d.app.open_target().expect("opened").clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);

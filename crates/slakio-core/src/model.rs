@@ -54,7 +54,7 @@ string_id!(
 );
 
 /// One of the theme's workspace colours. The colour belongs to the workspace, not to the theme:
-/// the top bar, list stripes, pane titles and the status line all use the same slot.
+/// the workspace chip, list stripes, pane titles and the status line all use the same slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WorkspaceColor(pub u8);
 

@@ -19,8 +19,9 @@
 //! draws initials, as it will where a terminal cannot show images. `:avatars` changes the
 //! setting while the app runs and saves it here too.
 //!
-//! `rail_expand` was a setting of the left rail, which became the top bar: a file that still has
-//! it is used as it is, and the app says the key can go ([`Config::retired`]).
+//! `rail_expand` was a setting of the left rail (later the top bar, now the view switcher): a
+//! file that still has it is used as it is, and the app says the key can go
+//! ([`Config::retired`]).
 //!
 //! A missing file is the defaults. A file that exists but cannot be used (unreadable, not valid
 //! TOML, an unknown key, a value out of range) is never treated as missing: the app runs with

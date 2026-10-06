@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ──────────────────╮╭ ▌#deploys ─────────────────────────────────────────╮
-│ ▾ Favorites            ││ ─────────────────── 2026-01-05 ─────────────────── │
-│   # backend            ││ KN  Kate Nam  10:21                                │
-│   # incidents       3  ││     Staging customer again cache maybe waiting     │
-│                        ││     timeout draft after                            │
-│ ▾ Ops                  ││     ⤷ 9 replies · last 10:30                       │
-│▎  # deploys            ││                                                    │
-│   # alerts             ││ MB  Max Baek  10:26                                │
-│   # partner-shared ext ││     Broken done dashboard broken review pager      │
-│   # hostile-strings    ││      🎉 5   🙏 3                                   │
-│   # big-history        ││                                                    │
-│   # long-threads       ││ ＊  ＊＊＊  11:32                                  │
-│                        ││     The is latency looks staging meeting build     │
-│ ▾ Channels             ││     migration                                      │
-│   # announcements      ││                                                    │
-│   # design-review      ││ MJ  Mia Jang  12:03                                │
-│   # feed-alert-134     ││     Done draft cache now index we for pager        │
-│   # feed-alert-8       ││     latency tracing draft roadmap                  │
-│   # feed-budget-162    ││      ✅ 5   👍 3   🔥 2                            │
-│   # feed-budget-33     │├─ Message #deploys ─────────────────────────────────┤
-│   # feed-build-50      ││ › Press i to write                                 │
-╰────────────────────────╯╰────────────────────────────────────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
+│ Home @24  D●11  A@37  F  L ││ ───────────────── 2026-01-05 ───────────────── │
+├────────────────────────────┤│ KN  Kate Nam  10:21                            │
+│ ▾ Favorites                ││     Staging customer again cache maybe waiting │
+│   # backend                ││     timeout draft after                        │
+│   # incidents           3  ││     ⤷ 9 replies · last 10:30                   │
+│                            ││                                                │
+│ ▾ Ops                      ││ MB  Max Baek  10:26                            │
+│▎  # deploys                ││     Broken done dashboard broken review pager  │
+│   # alerts                 ││      🎉 5   🙏 3                               │
+│   # partner-shared ext     ││                                                │
+│   # hostile-strings        ││ ＊  ＊＊＊  11:32                              │
+│   # big-history            ││     The is latency looks staging meeting build │
+│   # long-threads           ││     migration                                  │
+│                            ││                                                │
+│ ▾ Channels                 ││ MJ  Mia Jang  12:03                            │
+│   # announcements          ││     Done draft cache now index we for pager    │
+│   # design-review          ││     latency tracing draft roadmap              │
+│   # feed-alert-134         ││      ✅ 5   👍 3   🔥 2                        │
+│   # feed-alert-8           ││                                                │
+│   # feed-budget-162        │├─ Message #deploys ─────────────────────────────┤
+│   # feed-budget-33         ││ › Press i to write                             │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #deploys       │ Enter thread · t new tab · ? help │ demo

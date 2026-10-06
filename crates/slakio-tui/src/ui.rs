@@ -1,11 +1,12 @@
 //! Drawing a frame of [`App`]. Without a backend: the welcome text and the status line. With
-//! one: the shell — the top bar, the list panel, the work area — over the status line (see [`crate::screen`]
-//! for the geometry), or, on a terminal too small for it, only how much room it needs. Popups
+//! one: the shell — the list panel (navigation: the workspace, the views, the list) and the work
+//! area — over the status line (see [`crate::screen`] for the geometry), or, on a terminal too small for it, only how much room it needs. Popups
 //! go on top: the which-key popup above the status line, the keyboard help, the command palette
 //! and a question over the dimmed screen.
 //!
-//! * [`navbar`], [`list`], [`work`] — the three regions (and [`switcher`], the workspace switcher); [`tabbar`] — the work area's tabs, when
-//!   there are two or more; [`timeline`] — a pane's messages;
+//! * [`list`], [`work`] — the two regions; [`navbar`] — the list panel's workspace chip and
+//!   view switcher (and [`switcher`], the workspace switcher); [`tabbar`] — the work area's
+//!   tabs, when there are two or more; [`timeline`] — a pane's messages;
 //!   [`statusline`] — the bottom line with its hints; [`empty`] — empty states that list keys;
 //!   [`guide`], [`help`], [`palette`], [`dialog`] — the popups.
 //!
@@ -57,13 +58,11 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
         let a = layout.areas;
         if let Some(l) = a.list {
             list::draw(f, app, l);
+            navbar::draw(f, app, l);
         }
         work::draw(f, app, &layout, &views);
         if let Some(bar) = app.tab_bar() {
             tabbar::draw(f, app, &bar);
-        }
-        if let Some(bar) = app.nav_bar() {
-            navbar::draw(f, app, &bar);
         }
     }
     statusline::draw(f, app, status, now);
@@ -150,7 +149,7 @@ fn draw_too_small(f: &mut Frame, app: &App, area: Rect) {
 fn frame<'a>(app: &App, region: Region, title: &str) -> Block<'a> {
     let focused = matches!(
         (region, app.focus()),
-        (Region::Nav, Focus::Nav) | (Region::List, Focus::List) | (Region::Work, Focus::Pane(_) | Focus::Work)
+        (Region::List, Focus::List | Focus::ViewSwitcher) | (Region::Work, Focus::Pane(_) | Focus::Work)
     );
     panel(app, focused, Line::from(title_span(app, title, focused)))
 }
@@ -169,7 +168,7 @@ fn title_span(app: &App, text: &str, focused: bool) -> Span<'static> {
     Span::styled(format!(" {text} "), app.theme.title(focused))
 }
 
-/// The name of a view (top bar labels, list title, breadcrumb).
+/// The name of a view (the view switcher, the breadcrumb).
 pub(crate) fn view_label(view: View) -> Label {
     view.label()
 }

@@ -2,51 +2,51 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-    [ R 0..1] [ws R 1..2] [ B R 2..11] [ R 11..16] [ B R 16..17] [err B R 17..20] [ R 20..22] [/bdr B 22..27] [err/bdr B 27..31] [/bdr B 31..32] [ R 32..36] [err B R 36..40] [ R 40..50] [err B R 50..54] [ R 54..80]
-╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
-    [bdr 0..1] [mut 1..7] [bdr 7..80]
-│ ▾ Favorites            ││                                                    │
-    [bdr 0..1] [bdr 2..3] [mut B 4..13] [bdr 25..27] [bdr 79..80]
-│▎  # backend            ││                                                    │
-    [bdr 0..1] [mut 1..2] [mut 4..5] [bdr 25..27] [bdr 79..80]
-│   # incidents       3  ││                                                    │
-    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 21..24] [bdr 25..27] [bdr 79..80]
-│                        ││                                                    │
-    [bdr 0..1] [bdr 25..27] [bdr 79..80]
-│ ▾ Ops                  ││                                                    │
-    [bdr 0..1] [bdr 2..3] [mut B 4..7] [bdr 25..27] [bdr 79..80]
-│   # deploys            ││       No conversation open                         │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [ B 34..54] [bdr 79..80]
-│   # alerts             ││       Pick one in the list and press Enter.        │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [mut 34..71] [bdr 79..80]
-│   # partner-shared ext ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 20..24] [bdr 25..27] [bdr 79..80]
-│   # hostile-strings    ││       Enter    Open                                │
-    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 25..27] [warm B 34..39] [bdr 79..80]
-│   # big-history        ││       Space h  Home                                │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 34..41] [bdr 79..80]
-│   # long-threads       ││       Space d  DMs                                 │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 34..41] [bdr 79..80]
-│                        ││       Ctrl+O   Back to the last one                │
-    [bdr 0..1] [bdr 25..27] [warm B 34..40] [bdr 79..80]
-│ ▾ Channels             ││       ?        Keyboard help                       │
-    [bdr 0..1] [bdr 2..3] [mut B 4..12] [bdr 25..27] [warm B 34..35] [bdr 79..80]
-│   # announcements      ││       Ctrl+Q   Quit                                │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [warm B 34..40] [bdr 79..80]
-│   # design-review      ││                                                    │
-    [bdr 0..1] [bdr 4..5] [bdr 6..19] [bdr 25..27] [bdr 79..80]
-│   # feed-alert-134     ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
-│   # feed-alert-8       ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
-│   # feed-budget-162    ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
-│   # feed-budget-33     ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
-│   # feed-build-50      ││                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
-╰────────────────────────╯╰────────────────────────────────────────────────────╯
-    [bdr 0..80]
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+    [acc 0..1] [ B 1..2] [ws 2..3] [ B 3..12] [mut 12..14] [ B 14..17] [mut B 17..18] [err B 18..21] [ B 21..22] [acc 22..30] [bdr 30..80]
+│ Home @24  D●11  A@37  F  L ││                                                │
+    [acc 0..1] [/bdr B R 2..6] [err/bdr B 6..10] [mut 12..13] [err B 13..16] [mut 18..19] [err B 19..22] [mut 24..25] [mut 27..28] [acc 29..30] [bdr 30..31] [bdr 79..80]
+├────────────────────────────┤│                                                │
+    [acc 0..30] [bdr 30..31] [bdr 79..80]
+│ ▾ Favorites                ││                                                │
+    [acc 0..1] [bdr 2..3] [mut B 4..13] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│▎  # backend                ││                                                │
+    [acc 0..1] [mut 1..2] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # incidents           3  ││                                                │
+    [acc 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│                            ││                                                │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│ ▾ Ops                      ││     No conversation open                       │
+    [acc 0..1] [bdr 2..3] [mut B 4..7] [acc 29..30] [bdr 30..31] [ B 36..56] [bdr 79..80]
+│   # deploys                ││     Pick one in the list and press Enter.      │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [mut 36..73] [bdr 79..80]
+│   # alerts                 ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # partner-shared ext     ││     Enter    Open                              │
+    [acc 0..1] [mut 4..5] [bdr 20..24] [acc 29..30] [bdr 30..31] [warm B 36..41] [bdr 79..80]
+│   # hostile-strings        ││     Space h  Home                              │
+    [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [warm B 36..43] [bdr 79..80]
+│   # big-history            ││     Space d  DMs                               │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 36..43] [bdr 79..80]
+│   # long-threads           ││     Ctrl+O   Back to the last one              │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 36..42] [bdr 79..80]
+│                            ││     ?        Keyboard help                     │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [warm B 36..37] [bdr 79..80]
+│ ▾ Channels                 ││     Ctrl+Q   Quit                              │
+    [acc 0..1] [bdr 2..3] [mut B 4..12] [acc 29..30] [bdr 30..31] [warm B 36..42] [bdr 79..80]
+│   # announcements          ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # design-review          ││                                                │
+    [acc 0..1] [bdr 4..5] [bdr 6..19] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # feed-alert-134         ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # feed-alert-8           ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # feed-budget-162        ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│   # feed-budget-33         ││                                                │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+    [acc 0..30] [bdr 30..80]
  NORMAL  ▌A company › Home │ Enter show · h/l move · ? help · Space more │ demo
     [on/av B 0..8] [ws 9..10] [bdr 19..22] [bdr 26..29] [ B 29..34] [mut 34..39] [bdr 39..42] [ B 42..45] [mut 45..50] [bdr 50..53] [ B 53..54] [mut 54..59] [bdr 59..62] [ B 62..67] [mut 67..72] [bdr 72..75] [warm 75..79]

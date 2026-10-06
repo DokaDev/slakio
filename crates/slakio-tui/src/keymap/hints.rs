@@ -19,7 +19,8 @@ pub enum Place {
     ListSection,
     /// The list panel with nothing to list (a view of a later version).
     ListEmpty,
-    Nav,
+    /// The view switcher.
+    ViewSwitcher,
     /// The work area with nothing open.
     WorkEmpty,
     /// A main pane, no message selected.
@@ -52,6 +53,8 @@ use Hint::{Leader, One, Pair};
 const OPEN: Action = Action::Shell(ShellAction::ListOpen);
 const NEXT_PANE: Action = Action::Shell(ShellAction::FocusNext);
 const NAV: Action = Action::Shell(ShellAction::FocusNav);
+/// In the list panel the views are right above: `[` / `]` show the one before or after.
+const VIEWS: Hint = Pair(Action::Shell(ShellAction::ViewPrev), Action::Shell(ShellAction::ViewNext), Label::HintNav);
 const COMMANDS: Action = Action::CommandLine(CommandLineAction::Open);
 const HELP: Action = Action::Help(HelpAction::Open);
 const QUIT: Action = Action::App(AppAction::Quit);
@@ -72,7 +75,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(NEW_TAB, Label::HintNewTab),
             One(NEXT_PANE, Label::HintNextPane),
             One(COMMANDS, Label::HintCommands),
-            One(NAV, Label::HintNav),
+            VIEWS,
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
@@ -80,17 +83,14 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(OPEN, Label::HintFold),
             Pair(Action::Shell(ShellAction::ListNext), Action::Shell(ShellAction::ListPrev), Label::HintMove),
             One(NEXT_PANE, Label::HintNextPane),
-            One(NAV, Label::HintNav),
+            VIEWS,
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
-        Place::ListEmpty => &[
-            One(NEXT_PANE, Label::HintNextPane),
-            One(NAV, Label::HintNav),
-            One(HELP, Label::HintHelp),
-            Leader(Label::HintMore),
-        ],
-        Place::Nav => &[
+        Place::ListEmpty => {
+            &[VIEWS, One(NEXT_PANE, Label::HintNextPane), One(HELP, Label::HintHelp), Leader(Label::HintMore)]
+        }
+        Place::ViewSwitcher => &[
             One(Action::Shell(ShellAction::NavSelect), Label::HintShow),
             Pair(Action::Shell(ShellAction::NavPrev), Action::Shell(ShellAction::NavNext), Label::HintMove),
             One(Action::Shell(ShellAction::NavLeave), Label::HintBack),
@@ -195,7 +195,7 @@ mod tests {
             (Place::ListConversation, Ctx::List),
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),
-            (Place::Nav, Ctx::Nav),
+            (Place::ViewSwitcher, Ctx::ViewSwitcher),
             (Place::WorkEmpty, Ctx::PaneNormal),
             (Place::Pane, Ctx::PaneNormal),
             (Place::PaneSelected, Ctx::PaneNormal),

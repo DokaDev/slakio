@@ -1,4 +1,4 @@
-//! The workspace switcher: a small popup under the top bar's workspace chip, one row per
+//! The workspace switcher: a small popup under the list panel's workspace chip, one row per
 //! workspace — its color band, its name and what it holds unread (`@3`, `●`) — the cursor on
 //! the one to switch to.
 //!

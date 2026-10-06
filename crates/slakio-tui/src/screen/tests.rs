@@ -7,18 +7,32 @@ fn plain() -> Shape {
 }
 
 #[test]
-fn the_regions_tile_the_screen_under_the_top_bar_and_above_the_status_line() {
+fn the_regions_tile_the_screen_above_the_status_line_and_no_row_spans_it() {
     let a = areas(SIZE, plain());
-    assert_eq!(a.nav, Rect::new(0, 0, 120, 1), "the top bar, the whole width");
     assert_eq!(a.status, Rect::new(0, 39, 120, 1));
     let list = a.list.unwrap();
-    assert_eq!(list, Rect::new(0, 1, 26, 38), "the list from the left edge");
-    assert_eq!((a.work.x, a.work.y, a.work.right()), (list.right(), 1, 120));
+    assert_eq!(list, Rect::new(0, 0, 30, 39), "the list from the top left corner");
+    assert_eq!((a.work.x, a.work.y, a.work.right()), (list.right(), 0, 120));
     assert_eq!(list_width(200), 36);
     let hidden = areas(SIZE, Shape { list_hidden: true, ..plain() });
     assert_eq!((hidden.list, hidden.work.x, hidden.work.width), (None, 0, 120));
     let tabs = areas(SIZE, Shape { tabs: true, ..plain() });
-    assert_eq!((tabs.tabs, tabs.work.y), (Some(Rect::new(26, 1, 94, 1)), 2), "the tab bar under the top bar");
+    assert_eq!((tabs.tabs, tabs.work.y), (Some(Rect::new(30, 0, 90, 1)), 1), "the tab bar: the work area's first row");
+}
+
+#[test]
+fn the_list_panel_has_the_chip_the_view_switcher_a_rule_and_the_rows() {
+    let p = list_parts(Rect::new(0, 0, 26, 39));
+    assert_eq!(p.title, Rect::new(1, 0, 24, 1), "the top border between the corners");
+    assert_eq!(p.views, Rect::new(1, 1, 24, 1));
+    assert_eq!(p.rule, Some(2));
+    assert_eq!(p.rows, Rect::new(1, 3, 24, 35));
+    let low = list_parts(Rect::new(0, 0, 26, 4));
+    assert_eq!((low.views.height, low.rule, low.rows.height), (1, None, 1));
+    for h in 0..6 {
+        let p = list_parts(Rect::new(0, 0, 26, h));
+        assert!(p.rows.bottom() <= h.saturating_sub(1).max(p.rows.y), "{h}");
+    }
 }
 
 #[test]
@@ -52,7 +66,7 @@ fn a_pane_has_its_messages_a_divider_and_the_composer() {
 }
 
 #[test]
-fn the_switcher_sits_under_the_top_bar_inside_the_screen() {
+fn the_switcher_sits_under_the_chip_inside_the_screen() {
     assert_eq!(switcher(SIZE, 1, 2), Rect::new(1, 1, SWITCHER_WIDTH, 4));
     assert_eq!(switcher(Rect::new(0, 0, 50, 10), 40, 2).right(), 50, "kept on screen");
     assert_eq!(switcher(Rect::new(0, 0, 20, 10), 0, 30).height, 8);
@@ -128,7 +142,7 @@ fn the_frame_lays_out_each_open_pane_with_its_composer() {
         assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x, f.areas.work.right()));
         let inside = Position { x: t.rect.x + 1, y: t.rect.y + 1 };
         assert_eq!(f.pane_at(inside).map(|p| p.id), Some(THREAD));
-        assert_eq!(f.pane_at(Position { x: 0, y: 0 }), None, "the top bar is no pane");
+        assert_eq!(f.pane_at(Position { x: 0, y: h - 1 }), None, "the status line is no pane");
     }
 }
 

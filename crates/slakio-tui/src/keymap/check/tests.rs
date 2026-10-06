@@ -27,11 +27,11 @@ fn duplicates_shadows_prefixes_and_text_keys_are_reported() {
     assert_eq!(kinds(&[b(Ctx::Shell, "x", A), b(Ctx::List, "x", B)], false), [Shadow]);
     assert_eq!(kinds(&[b(Ctx::Shell, "x", A), b(Ctx::List, "x", A)], false), [], "same action, nothing hidden");
     assert_eq!(kinds(&[b(Ctx::List, "g", A), b(Ctx::List, "g g", B)], false), [Prefix]);
-    assert_eq!(kinds(&[b(Ctx::Shell, "space w", A), b(Ctx::Nav, "space w h", B)], false), [Prefix]);
+    assert_eq!(kinds(&[b(Ctx::Shell, "space w", A), b(Ctx::ViewSwitcher, "space w h", B)], false), [Prefix]);
     assert_eq!(kinds(&[b(Ctx::CommandLine, "a", A)], false), [TextKey]);
     assert_eq!(kinds(&[b(Ctx::CommandLine, "space", A)], false), [TextKey]);
     // Siblings never see each other's keys.
-    assert_eq!(kinds(&[b(Ctx::Nav, "j", A), b(Ctx::List, "j", B)], false), []);
+    assert_eq!(kinds(&[b(Ctx::ViewSwitcher, "j", A), b(Ctx::List, "j", B)], false), []);
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn an_action_reachable_only_by_fragile_keys_needs_a_fallback() {
     assert_eq!(kinds(&[b(Ctx::Shell, "ctrl+h", A), b(Ctx::Shell, "space w h", A)], false), []);
     // A fallback in a parent counts; one in a sibling does not.
     assert_eq!(kinds(&[b(Ctx::List, "alt+1", A), b(Ctx::Shell, "space 1", A)], false), []);
-    assert_eq!(kinds(&[b(Ctx::List, "alt+1", A), b(Ctx::Nav, "space 1", A)], false), [NoFallback]);
+    assert_eq!(kinds(&[b(Ctx::List, "alt+1", A), b(Ctx::ViewSwitcher, "space 1", A)], false), [NoFallback]);
     // `Ctrl+L` / `Ctrl+J` / `Ctrl+K` arrive as themselves.
     assert_eq!(kinds(&[b(Ctx::Shell, "ctrl+l", A), b(Ctx::Shell, "ctrl+j", B), b(Ctx::Shell, "ctrl+k", C)], false), []);
 }

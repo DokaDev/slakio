@@ -67,7 +67,7 @@ fn esc_steps_out_one_level_at_a_time_and_never_closes_anything() {
     // 9. The list is the outermost: Esc does nothing.
     d.keys("esc");
     assert_eq!(d.app.focus(), Focus::List);
-    // 8. The top bar → the list.
+    // 8. The view switcher → the list.
     d.keys("ctrl+h esc");
     assert_eq!(d.app.focus(), Focus::List);
 }
@@ -98,8 +98,8 @@ fn enter_on_a_message_moves_to_its_thread_and_a_switch_returns_to_the_first_conv
     assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
     assert_eq!(selected(&d), None, "the thread starts with nothing selected");
     d.keys("ctrl+h ctrl+h ctrl+h");
-    assert_eq!(d.app.focus(), Focus::Nav);
-    d.keys("home enter j enter");
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
+    d.keys("space W j enter");
     assert_eq!((d.app.workspace(), d.app.focus()), (1, Focus::List));
     let rows = d.app.list_rows();
     assert!(matches!(rows[d.app.list_cursor()], Row::Conversation(_)), "the first conversation, not a header");
@@ -116,13 +116,13 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
     assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
     d.keys("left left");
     assert_eq!(d.app.focus(), Focus::List);
-    // In the list: h goes to the section's header, folds it, then the top bar.
+    // In the list: h goes to the section's header, folds it, then the view switcher.
     d.keys("h");
     assert!(matches!(d.app.list_rows()[d.app.list_cursor()], Row::Section(_)));
     d.keys("h");
     assert!(d.screen().contains("▸ Ops"), "folded");
     d.keys("h");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     d.keys("j");
     assert_eq!(d.app.focus(), Focus::List, "down from the bar, back to the list");
     d.keys("l");
@@ -140,22 +140,22 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
 fn tab_and_f6_go_round_the_open_panels_skipping_a_hidden_list() {
     let mut d = Demo::new(120, 40);
     d.keys("tab");
-    assert_eq!(d.app.focus(), Focus::Nav, "nothing open: the top bar and the list are the stops");
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher, "nothing open: the view switcher and the list are the stops");
     d.keys("tab");
     assert_eq!(d.app.focus(), Focus::List);
     d.open("long-threads");
     d.keys("g g enter f6");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     d.keys("f6");
     assert_eq!(d.app.focus(), Focus::List);
     d.keys("shift+f6");
-    assert_eq!(d.app.focus(), Focus::Nav, "backwards, the top bar is before the list");
+    assert_eq!(d.app.focus(), Focus::ViewSwitcher, "backwards, the view switcher is before the list");
     d.keys("shift+f6");
     assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
     d.keys("space e tab");
-    assert_eq!(d.app.focus(), Focus::Nav);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation), "the hidden list and its view switcher are skipped");
     d.keys("tab");
-    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation), "the hidden list is skipped");
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
 }
 
 #[test]
@@ -198,9 +198,9 @@ fn space_capital_w_picks_a_workspace_in_the_switcher() {
 #[test]
 fn arrows_pages_home_and_end_work_wherever_j_and_k_do() {
     let mut d = Demo::new(120, 40);
-    // The top bar: the workspace and five views.
+    // The view switcher: five views.
     d.keys("ctrl+h end");
-    assert_eq!(d.app.nav_cursor(), 5);
+    assert_eq!(d.app.nav_cursor(), 4);
     d.keys("home right");
     assert_eq!(d.app.nav_cursor(), 1);
     d.keys("esc");
@@ -345,7 +345,7 @@ fn question_mark_f1_and_space_question_mark_open_the_help_where_the_keyboard_is(
     assert!(s.contains("Keys — List panel") && s.contains("▾ List panel"), "{s}");
     let rows = d.app.help_rows();
     let rail = rows.iter().any(|r| {
-        matches!(r, slakio_tui::app::help::Row::Section { ctx: slakio_tui::keymap::Ctx::Nav, open: false, count } if *count > 0)
+        matches!(r, slakio_tui::app::help::Row::Section { ctx: slakio_tui::keymap::Ctx::ViewSwitcher, open: false, count } if *count > 0)
     });
     assert!(rail, "other contexts are folded with their number of keys");
     insta::assert_snapshot!("help_list_120x40", s);
@@ -391,9 +391,8 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     let mut d = Demo::new(160, 40);
     let hints = |d: &Demo| d.status_line();
     assert!(
-        hints(&d).contains(
-            "Enter open · l peek · t new tab · Tab next pane · : commands · Ctrl+R top bar · ? help · Space more"
-        ),
+        hints(&d)
+            .contains("Enter open · l peek · t new tab · Tab next pane · : commands · [/] views · ? help · Space more"),
         "{}",
         hints(&d)
     );
@@ -403,7 +402,7 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     assert!(hints(&d).contains("Enter show · h/l move · Esc back"), "{}", hints(&d));
     d.keys("esc");
     d.open("long-threads");
-    assert!(hints(&d).contains("i write · k messages · Esc list · Ctrl+R top bar"), "{}", hints(&d));
+    assert!(hints(&d).contains("i write · k messages · Esc list · Ctrl+R views"), "{}", hints(&d));
     d.keys("k");
     assert!(
         hints(&d).contains("Enter thread · t new tab · y copy · V select · i write · Esc deselect"),
@@ -455,7 +454,7 @@ fn the_icons_question_previews_the_answer_and_saves_it() {
     let s = d.screen();
     assert!(s.contains("Nerd Font icons?") && s.contains("[ No, letters ]"), "{s}");
     d.keys("right");
-    assert!(d.app.settings.icons, "the top bar previews the answer with the focus");
+    assert!(d.app.settings.icons, "the view switcher previews the answer with the focus");
     assert!(d.screen().contains('\u{F02DC}'));
     d.keys("left");
     assert!(!d.app.settings.icons);

@@ -19,7 +19,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 
-/// The glyphs the icons question shows (the top bar's and the list's).
+/// The glyphs the icons question shows (the view switcher's and the list's).
 const PREVIEW: &str = "\u{F02DC}  \u{F0361}  \u{F009A}  \u{F0219}  \u{F00C0}  \u{F033E}  \u{F0339}";
 
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {

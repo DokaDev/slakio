@@ -74,8 +74,11 @@ fn case_2_thread_panel_snapshots() {
 fn rows_above_the_history(d: &Demo, name: &str) -> usize {
     let screen = d.screen();
     let lines: Vec<&str> = screen.lines().collect();
-    let title = lines.iter().position(|l| l.contains(&format!("▌#{name} "))).expect("the pane title");
-    let col = lines[title].chars().position(|c| c == '▌').expect("the title mark") - 1;
+    let mark = format!("▌#{name} ");
+    let title = lines.iter().position(|l| l.contains(&mark)).expect("the pane title");
+    // The pane's own mark (the list panel's title has the workspace's).
+    let at = lines[title].find(&mark).expect("the title mark");
+    let col = lines[title][..at].chars().count() - 1;
     lines[title + 1..].iter().take_while(|l| l.chars().skip(col).take(20).collect::<String>().trim().is_empty()).count()
 }
 

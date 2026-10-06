@@ -31,7 +31,7 @@ pub enum AppAction {
     Interrupt,
     /// The command palette (the `:` command line); closes it when it is open.
     Palette,
-    /// Pick another workspace (the switcher under the top bar's workspace).
+    /// Pick another workspace (the switcher under the list panel's workspace chip).
     ChooseWorkspace,
     /// Picture people by their initials chip, or not (`:avatars`); saved in the config file.
     ToggleAvatars,
@@ -52,7 +52,7 @@ pub enum CommandLineAction {
     Prev,
 }
 
-/// Actions of the shell: focus between the panels, the top bar, the list panel.
+/// Actions of the shell: focus between the panels, the view switcher, the list panel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShellAction {
     FocusLeft,
@@ -60,16 +60,16 @@ pub enum ShellAction {
     /// No panel is above or below another yet (splits come later): says so.
     FocusUp,
     FocusDown,
-    /// The next panel: top bar, list, main pane, thread panel, round again.
+    /// The next panel: view switcher, list, main pane, thread panel, round again.
     FocusNext,
     FocusPrev,
-    /// Go to the top bar; from the top bar, back to the list.
+    /// Go to the view switcher (showing the list panel); from it, back to the list.
     FocusNav,
     NavNext,
     NavPrev,
     NavFirst,
     NavLast,
-    /// Show the top bar's item under the cursor in the list panel (the workspace: its switcher).
+    /// Show the view under the view switcher's cursor in the list panel.
     NavSelect,
     /// Back to the list panel, showing nothing new.
     NavLeave,
@@ -90,13 +90,17 @@ pub enum ShellAction {
     ListOpen,
     /// Open the conversation under the cursor and stay in the list, or unfold its section.
     ListPeek,
-    /// To the conversation's section header; fold the section; from a folded one, the top bar.
+    /// To the conversation's section header; fold the section; from a folded one, the view
+    /// switcher.
     ListLeft,
     ListSectionPrev,
     ListSectionNext,
+    /// Show the next (previous) view in the list panel, round again.
+    ViewNext,
+    ViewPrev,
     /// Show or hide the list panel.
     ToggleList,
-    /// Show a view of the top bar in the list panel.
+    /// Show a view in the list panel.
     Show(View),
 }
 
@@ -264,7 +268,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::FocusDown, "focus.down", Label::ActionFocusDown, &[]),
     shell(ShellAction::FocusUp, "focus.up", Label::ActionFocusUp, &[]),
     shell(ShellAction::FocusRight, "focus.right", Label::ActionFocusRight, &[]),
-    // `:rail` is the name it had before the top bar.
+    // `:rail` is the name it had before the top bar, which the view switcher replaced.
     shell(ShellAction::FocusNav, "nav.focus", Label::ActionNavFocus, &["nav", "rail"]),
     shell(ShellAction::NavNext, "nav.next", Label::ActionNavNext, &[]),
     shell(ShellAction::NavPrev, "nav.prev", Label::ActionNavPrev, &[]),
@@ -289,6 +293,8 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::ListLeft, "list.fold", Label::ActionListFold, &[]),
     shell(ShellAction::ListSectionPrev, "list.section_prev", Label::ActionListSectionPrev, &[]),
     shell(ShellAction::ListSectionNext, "list.section_next", Label::ActionListSectionNext, &[]),
+    shell(ShellAction::ViewNext, "view.next", Label::ActionViewNext, &[]),
+    shell(ShellAction::ViewPrev, "view.prev", Label::ActionViewPrev, &[]),
     shell(ShellAction::ToggleList, "list.toggle_panel", Label::ActionListTogglePanel, &["list"]),
     shell(ShellAction::Show(View::Home), "view.home", Label::ActionViewHome, &["home"]),
     shell(ShellAction::Show(View::Dms), "view.dms", Label::ActionViewDms, &["dms"]),

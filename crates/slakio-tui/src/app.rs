@@ -20,11 +20,11 @@
 //! | a selected message | no selection (back to the newest) | |
 //! | the thread panel | the main pane | closes it; the main pane selects its message |
 //! | the main pane | the list, on its conversation | closes it, and its tab with its last pane: the tab shown next, else the list, on its conversation |
-//! | the top bar | the list | |
+//! | the view switcher | the list | |
 //! | the list | nothing | |
 //!
-//! The top bar is reached from anywhere outside text with `Ctrl+R` or `Space r` ([`nav`]), and
-//! is a stop of the `Tab` round (before the list). Tabs ([`tabs`]) keep their own panes; the mouse is
+//! The view switcher (the list panel's first row) is reached from anywhere outside text with
+//! `Ctrl+R` or `Space r` ([`nav`]), and is a stop of the `Tab` round (before the list). Tabs ([`tabs`]) keep their own panes; the mouse is
 //! [`mouse`]'s.
 
 pub mod cmdline;
@@ -198,7 +198,7 @@ impl App {
         self.boot = self.work.requests.ask(Command::Boot);
     }
 
-    /// Ask once whether the terminal shows Nerd Font icons; the top bar previews the answer that
+    /// Ask once whether the terminal shows Nerd Font icons; the view switcher previews the answer that
     /// has the focus, and the answer is saved ([`Effect::Save`]).
     pub fn ask_icons(&mut self) {
         self.dialog = Some(Dialog::new(Question::Icons));
@@ -271,7 +271,7 @@ impl App {
             return Ctx::Root;
         }
         match self.focus() {
-            Focus::Nav => Ctx::Nav,
+            Focus::ViewSwitcher => Ctx::ViewSwitcher,
             Focus::List => Ctx::List,
             Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
             Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
@@ -283,7 +283,7 @@ impl App {
     fn list_height(&self) -> usize {
         let a = self.areas();
         let panel = a.list.unwrap_or(a.work);
-        usize::from(screen::inner(panel).height).max(1)
+        usize::from(screen::list_parts(panel).rows.height).max(1)
     }
 
     /// Rows of messages the focused pane shows.
@@ -563,9 +563,7 @@ impl App {
                 {
                     return self.set_focus(Focus::on(id));
                 }
-                if self.shell.list_hidden {
-                    self.set_focus(Focus::Nav);
-                } else {
+                if !self.shell.list_hidden {
                     self.focus_list(main_target);
                 }
             }
@@ -647,7 +645,7 @@ impl App {
             DialogAction::Toggle => {
                 d.yes = !d.yes;
                 if d.question == Question::Icons {
-                    // The top bar shows the answer that has the focus.
+                    // The view switcher shows the answer that has the focus.
                     self.settings.icons = d.yes;
                 }
                 self.dialog = Some(d);

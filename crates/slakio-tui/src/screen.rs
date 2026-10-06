@@ -2,16 +2,19 @@
 //! scrolling in the app state, so a click lands on exactly the row that was drawn there.
 //!
 //! ```text
-//!  ▌A company ▾ │ Home  DMs ●2  Activity @3  Files  Later        the top bar (crate::navbar)
-//! ╭ list ──────╮╭ main pane ─────────╮╭ thread ──────╮
-//! │            ││                    ││              │
-//! │            │├─ Message #backend ─┤├─ Reply ──────┤
-//! │            ││ › Press i to write ││ ›            │
-//! ╰────────────╯╰────────────────────╯╰──────────────╯
+//! ╭ ▌A company ▾ ──╮╭ main pane ─────────╮╭ thread ──────╮   the chip: the list's title
+//! │ 󰋜  Home  󰍡  ●2 ││                    ││              │   the view switcher
+//! ├────────────────┤│                    ││              │   (crate::navbar)
+//! │ # backend      ││                    ││              │
+//! │                │├─ Message #backend ─┤├─ Reply ──────┤
+//! │                ││ › Press i to write ││ ›            │
+//! ╰────────────────╯╰────────────────────╯╰──────────────╯
 //!  status line
 //! ```
 //!
-//! With two tabs or more, the work area's first row is the tab bar ([`crate::tabbar`]).
+//! No row runs across the whole screen but the status line: the left column navigates (the
+//! workspace, the views, the list), the right one is the work. With two tabs or more, the work
+//! area's first row is the tab bar ([`crate::tabbar`]).
 //!
 //! On a narrow screen an open thread panel takes the list panel's room (the list is left out
 //! of the layout only, and comes back when the thread closes or the list is focused);
@@ -33,8 +36,6 @@ pub const MAIN_MIN: u16 = 40;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Areas {
-    /// The top bar: the workspace and the views, across the whole width.
-    pub nav: Rect,
     pub list: Option<Rect>,
     /// The tab bar, the work area's first row, while there are two tabs or more.
     pub tabs: Option<Rect>,
@@ -59,15 +60,15 @@ pub struct Shape {
     pub tabs: bool,
 }
 
-/// The width of the list panel on a screen `width` wide: a fifth or so, 26 to 36 cells.
+/// The width of the list panel on a screen `width` wide: a fifth or so, 30 to 36 cells (from
+/// 30 the view switcher has room for its counts with icons on).
 pub fn list_width(width: u16) -> u16 {
-    (width * 22 / 100).clamp(26, 36)
+    (width * 22 / 100).clamp(30, 36)
 }
 
 /// The areas for a screen of `size`.
 pub fn areas(size: Rect, s: Shape) -> Areas {
-    let [nav, body, status] =
-        Layout::vertical([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)]).areas(size);
+    let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(size);
     let mut list_w = if s.list_hidden { 0 } else { list_width(body.width) };
     let work_w = body.width.saturating_sub(list_w);
     let squeezed = s.thread && work_w < WORK_WIDE && !s.list_focused;
@@ -79,7 +80,30 @@ pub fn areas(size: Rect, s: Shape) -> Areas {
         true => (Some(Rect { height: 1, ..work }), Rect { y: work.y + 1, height: work.height - 1, ..work }),
         false => (None, work),
     };
-    Areas { nav, list: (list_w > 0).then_some(list), tabs, work, status }
+    Areas { list: (list_w > 0).then_some(list), tabs, work, status }
+}
+
+/// The parts of the list panel: the workspace chip on its top border, the view switcher (its
+/// first row), the rule under that (joined to the border) and the rows of the list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ListParts {
+    /// The title: the top border between its corners.
+    pub title: Rect,
+    pub views: Rect,
+    /// `None` when the panel is too low for one.
+    pub rule: Option<u16>,
+    pub rows: Rect,
+}
+
+/// The parts of list panel `list`.
+pub fn list_parts(list: Rect) -> ListParts {
+    let inner = inner(list);
+    let title = Rect { x: list.x + 1, y: list.y, width: list.width.saturating_sub(2), height: 1.min(list.height) };
+    let views = Rect { height: inner.height.min(1), ..inner };
+    let rule = (inner.height >= 3).then_some(inner.y + 1);
+    let skip = if rule.is_some() { 2 } else { views.height };
+    let rows = Rect { y: inner.y + skip, height: inner.height - skip, ..inner };
+    ListParts { title, views, rule, rows }
 }
 
 /// The most lines a composer shows before it scrolls.
@@ -181,8 +205,8 @@ pub fn frame(
 /// The width of the workspace switcher.
 pub const SWITCHER_WIDTH: u16 = 32;
 
-/// Where the workspace switcher is drawn on a screen `size`: under the top bar, from column `x`
-/// (the chip's), one row per workspace of `n` (the screen keeps it inside).
+/// Where the workspace switcher is drawn on a screen `size`: under the list panel's title, from
+/// column `x` (the chip's), one row per workspace of `n` (the screen keeps it inside).
 pub fn switcher(size: Rect, x: u16, n: usize) -> Rect {
     let w = SWITCHER_WIDTH.min(size.width);
     let h = (n as u16 + 2).min(size.height.saturating_sub(2));

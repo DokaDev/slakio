@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ──────────────────╮‹ 4 #rand… ×  5 #depl… ×  6 #long… ×  7 #big-… ×
-│ ▾ Favorites            │╭ ▌#big-history ─────────────────────────────────────╮
-│   # backend            ││     Deploy customer sprint staging can             │
-│   # incidents       3  ││                                                    │
-│                        ││ MB  Max Baek  11:30                                │
-│ ▾ Ops                  ││     PR is up                                       │
-│   # deploys            ││                                                    │
-│   # alerts             ││ AM  Alex Morgan  12:23                             │
-│   # partner-shared ext ││     Meeting moved to 3pm                           │
-│   # hostile-strings    ││      ✅ 2                                          │
-│▎  # big-history        ││                                                    │
-│   # long-threads       ││ IM  Ivy Moon  12:53                                │
-│                        ││     We rollback after                              │
-│ ▾ Channels             ││                                                    │
-│   # announcements      ││ JL  Jordan Lee  13:32                              │
-│   # design-review      ││     We on fine                                     │
-│   # feed-alert-134     ││                                                    │
-│   # feed-alert-8       ││ RO  Ryan Oh  13:48                                 │
-│   # feed-budget-162    ││     ＊＊ ＊＊＊＊＊＊                              │
-│   # feed-budget-33     │├─ Message #big-history ─────────────────────────────┤
-│   # feed-build-50      ││ › Press i to write                                 │
-╰────────────────────────╯╰────────────────────────────────────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮‹ 4 #rand… ×  5 #depl… ×  6 #long… ×  7 #big-… ×
+│ Home @24  D●11  A@37  F  L │╭ ▌#big-history ─────────────────────────────────╮
+├────────────────────────────┤│ LK  Leo Kang  11:14                            │
+│ ▾ Favorites                ││     Deploy customer sprint staging can         │
+│   # backend                ││                                                │
+│   # incidents           3  ││ MB  Max Baek  11:30                            │
+│                            ││     PR is up                                   │
+│ ▾ Ops                      ││                                                │
+│   # deploys                ││ AM  Alex Morgan  12:23                         │
+│   # alerts                 ││     Meeting moved to 3pm                       │
+│   # partner-shared ext     ││      ✅ 2                                      │
+│   # hostile-strings        ││                                                │
+│▎  # big-history            ││ IM  Ivy Moon  12:53                            │
+│   # long-threads           ││     We rollback after                          │
+│                            ││                                                │
+│ ▾ Channels                 ││ JL  Jordan Lee  13:32                          │
+│   # announcements          ││     We on fine                                 │
+│   # design-review          ││                                                │
+│   # feed-alert-134         ││ RO  Ryan Oh  13:48                             │
+│   # feed-alert-8           ││     ＊＊ ＊＊＊＊＊＊                          │
+│   # feed-budget-162        │├─ Message #big-history ─────────────────────────┤
+│   # feed-budget-33         ││ › Press i to write                             │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #big-history       │ i write · ? help · Space more │ demo

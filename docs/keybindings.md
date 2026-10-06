@@ -29,8 +29,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `F6` | Next panel | `focus.next` |
 | `Shift+Tab` | Previous panel | `focus.prev` |
 | `Shift+F6` | Previous panel | `focus.prev` |
-| `Ctrl+R` | Top bar: workspace, views | `nav.focus` |
-| `Space r` | Top bar: workspace, views | `nav.focus` |
+| `Ctrl+R` | View switcher (in the list panel) | `nav.focus` |
+| `Space r` | View switcher (in the list panel) | `nav.focus` |
 | `Ctrl+H` | Move the focus left | `focus.left` |
 | `Ctrl+J` | Move the focus down | `focus.down` |
 | `Ctrl+K` | Move the focus up | `focus.up` |
@@ -85,19 +85,19 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space /` | Open the command line | `cmdline.open` |
 | `Space q` | Quit | `app.quit` |
 
-## Top bar (`nav`)
+## View switcher (`nav`)
 
 | Keys | Action | Id |
 |---|---|---|
-| `l` | Next item of the top bar | `nav.next` |
-| `Right` | Next item of the top bar | `nav.next` |
-| `h` | Previous item of the top bar | `nav.prev` |
-| `Left` | Previous item of the top bar | `nav.prev` |
-| `g g` | First item of the top bar | `nav.first` |
-| `Home` | First item of the top bar | `nav.first` |
-| `G` | Last item of the top bar | `nav.last` |
-| `End` | Last item of the top bar | `nav.last` |
-| `Enter` | Show it (the workspace: switch workspaces) | `nav.select` |
+| `l` | Next view on the view switcher | `nav.next` |
+| `Right` | Next view on the view switcher | `nav.next` |
+| `h` | Previous view on the view switcher | `nav.prev` |
+| `Left` | Previous view on the view switcher | `nav.prev` |
+| `g g` | First view on the view switcher | `nav.first` |
+| `Home` | First view on the view switcher | `nav.first` |
+| `G` | Last view on the view switcher | `nav.last` |
+| `End` | Last view on the view switcher | `nav.last` |
+| `Enter` | Show the view | `nav.select` |
 | `Esc` | Back to the list | `nav.leave` |
 | `j` | Back to the list | `nav.leave` |
 | `Down` | Back to the list | `nav.leave` |
@@ -121,10 +121,12 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Enter` | Open the conversation, or fold the section | `list.open` |
 | `l` | Open, staying in the list (or unfold) | `list.peek` |
 | `Right` | Open, staying in the list (or unfold) | `list.peek` |
-| `h` | To the section header, fold it, then the top bar | `list.fold` |
-| `Left` | To the section header, fold it, then the top bar | `list.fold` |
+| `h` | To the section header, fold it, then the view switcher | `list.fold` |
+| `Left` | To the section header, fold it, then the view switcher | `list.fold` |
 | `{` | Previous section | `list.section_prev` |
 | `}` | Next section | `list.section_next` |
+| `[` | Show the previous view | `view.prev` |
+| `]` | Show the next view | `view.next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
 
 ## Work area (Normal mode) (`pane.normal`)
@@ -259,7 +261,7 @@ Type `:` and the command, then `Enter`.
 | `:avatars` |  | Show or hide avatars (initials) |
 | `:icons` |  | Show Nerd Font icons, or text instead |
 | `:density` |  | Comfortable or compact messages |
-| `:nav` | `:rail` | Top bar: workspace, views |
+| `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |
 | `:dms` |  | Show DMs |

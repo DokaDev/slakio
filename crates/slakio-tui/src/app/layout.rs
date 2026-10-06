@@ -12,7 +12,7 @@ impl App {
         screen::Shape {
             list_hidden: self.shell.list_hidden,
             thread: self.work.has_panel(),
-            list_focused: self.focus() == Focus::List,
+            list_focused: matches!(self.focus(), Focus::List | Focus::ViewSwitcher),
             tabs: self.work.tabs().len() > 1,
         }
     }

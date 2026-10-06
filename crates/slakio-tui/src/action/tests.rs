@@ -49,6 +49,8 @@ fn every_action_is_registered() {
             ListLeft,
             ListSectionPrev,
             ListSectionNext,
+            ViewNext,
+            ViewPrev,
             ToggleList,
         ]
         .into_iter()

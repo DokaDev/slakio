@@ -2,7 +2,7 @@ use super::*;
 
 const ICONS: [&str; 5] = ["\u{F02DC}", "\u{F0361}", "\u{F009A}", "\u{F0219}", "\u{F00C0}"];
 
-fn views(icons: bool) -> Vec<Item> {
+fn items(icons: bool) -> Vec<Item> {
     let names = ["Home", "DMs", "Activity", "Files", "Later"];
     let badges = [None, Some("●2"), Some("@3"), None, None];
     (0..5)
@@ -15,11 +15,11 @@ fn views(icons: bool) -> Vec<Item> {
         .collect()
 }
 
-fn chip() -> Chip {
+fn ws() -> Chip {
     Chip { name: "A company".to_string(), others: vec![("B".to_string(), "@2".to_string())] }
 }
 
-/// The bar as text; a glyph slot shows as `G_` (its two cells).
+/// A line as text; a glyph slot shows as `G_` (its two cells).
 fn text(b: &Bar) -> String {
     let mut s = String::new();
     for p in &b.pieces {
@@ -28,65 +28,67 @@ fn text(b: &Bar) -> String {
     s.trim_end().to_string()
 }
 
-#[test]
-fn with_room_the_bar_says_everything() {
-    let area = Rect::new(0, 0, 120, 1);
-    assert_eq!(
-        text(&layout(area, &chip(), &views(false))),
-        " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later"
-    );
-    assert_eq!(
-        text(&layout(area, &chip(), &views(true))),
-        " ▌A company ▾ · B @2 │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later"
-    );
+fn row(w: u16, icons: bool, shown: usize) -> String {
+    text(&views(Rect::new(0, 1, w, 1), &items(icons), shown))
 }
 
 #[test]
-fn narrower_it_cuts_the_name_drops_glyphs_then_names_then_numbers_and_never_wraps() {
-    let at = |w: u16, icons: bool| text(&layout(Rect::new(0, 0, w, 1), &chip(), &views(icons)));
-    assert_eq!(at(64, false), " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later");
-    assert_eq!(at(62, false), " ▌A compa… ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later", "the name first");
-    assert_eq!(at(60, false), " ▌A company ▾ · B @2 │ H  D ●2  A @3  F  L", "then letters (icons off)");
-    assert_eq!(at(74, true), " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later", "words before glyphs");
-    assert_eq!(at(60, true), " ▌A company ▾ · B @2 │ G_ G_ ●2  G_ @3  G_ G_", "then glyphs alone, two cells apart");
-    assert_eq!(at(40, false), " ▌A company ▾ · B @ │ H  D ●  A @  F  L", "then counts without numbers");
-    assert_eq!(at(34, false), " ▌A ▾ · B @ │ H  D ●  A @  F  L", "then the name's letter");
-    assert_eq!(at(80, true), " ▌A company ▾ · B @2 │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later");
-    for w in 0..200 {
+fn the_view_switcher_shows_glyphs_and_counts_and_spells_the_view_shown() {
+    assert_eq!(row(40, true, 0), " G_Home  G_●2  G_@3  G_ G_", "a bare glyph's slot is one of the two cells apart");
+    assert_eq!(row(40, true, 2), " G_ G_●2  G_Activity @3  G_ G_");
+    assert_eq!(row(40, false, 0), " Home  D●2  A@3  F  L", "icons off: letters, the view shown spelled");
+    assert_eq!(row(40, false, 1), " H  DMs ●2  A@3  F  L");
+}
+
+#[test]
+fn a_narrow_view_switcher_closes_up_drops_the_numbers_then_is_cut_and_never_wraps() {
+    assert_eq!(row(26, false, 2), " H  D●2  Activity @3  F  L");
+    assert_eq!(row(25, false, 2), " H D●2 Activity @3 F L", "one cell apart");
+    assert_eq!(row(20, false, 2), " H D● Activity @ F L", "then counts without numbers");
+    let cut = row(12, false, 2);
+    assert!(cut.starts_with(" H D● Activ") && cut.ends_with('…'), "then cut: {cut}");
+    for w in 0..60 {
         for icons in [false, true] {
-            let b = layout(Rect::new(3, 0, w, 1), &chip(), &views(icons));
-            let used: u16 = b.pieces.iter().map(|p| p.width).sum();
-            assert!(used <= w, "{w} {icons}: {used}");
-            assert!(b.pieces.windows(2).all(|p| p[0].x + p[0].width == p[1].x), "{w}: contiguous");
+            for shown in 0..5 {
+                let b = views(Rect::new(3, 1, w, 1), &items(icons), shown);
+                let used: u16 = b.pieces.iter().map(|p| p.width).sum();
+                assert!(used <= w, "{w} {icons}: {used}");
+                assert!(b.pieces.windows(2).all(|p| p[0].x + p[0].width == p[1].x), "{w}: contiguous");
+            }
         }
     }
 }
 
 #[test]
 fn a_glyph_takes_two_cells_and_a_click_on_either_is_its_view() {
-    let b = layout(Rect::new(10, 0, 120, 1), &chip(), &views(true));
+    let b = views(Rect::new(10, 1, 40, 1), &items(true), 2);
     let g = b.pieces.iter().find(|p| p.part == Part::Glyph && p.item == Some(2)).unwrap();
     assert_eq!(g.width, GLYPH_SLOT);
     assert_eq!((b.hit(g.x), b.hit(g.x + 1)), (Some(2), Some(2)), "the glyph's cell and the blank after it");
     let label = b.pieces.iter().find(|p| p.part == Part::Label && p.item == Some(2)).unwrap();
-    assert_eq!(label.x, g.x + GLYPH_SLOT + 1, "the name starts after the slot and a space");
-    assert_eq!(b.hit(10), Some(0), "the chip");
-    let sep = b.pieces.iter().find(|p| p.part == Part::Sep).unwrap();
-    assert_eq!(b.hit(sep.x), None);
+    assert_eq!(label.x, g.x + GLYPH_SLOT, "the name starts after the slot");
     let (from, to) = b.span(2).unwrap();
     assert!(from <= g.x && to > label.x);
     // A glyph that does not fit whole is left out, never cut in half.
-    for w in 0..120 {
-        let b = layout(Rect::new(0, 0, w, 1), &chip(), &views(true));
+    for w in 0..40 {
+        let b = views(Rect::new(0, 0, w, 1), &items(true), 0);
         assert!(b.pieces.iter().filter(|p| p.part == Part::Glyph).all(|p| p.width == GLYPH_SLOT && p.x + 2 <= w));
-        // After a glyph's slot comes a blank (or nothing): text never starts right after a
-        // glyph, so a glyph drawn two cells wide that the terminal redraws alone covers no text.
-        for pair in b.pieces.windows(2).filter(|p| p[0].part == Part::Glyph) {
-            assert!(
-                matches!(pair[1].part, Part::Blank | Part::Badge) && pair[1].text.starts_with(' '),
-                "{w}: {pair:?}"
-            );
-        }
+    }
+}
+
+#[test]
+fn the_chip_cuts_the_name_then_the_numbers_then_the_name_to_its_letter() {
+    let at = |w: u16| text(&chip(Rect::new(1, 0, w, 1), &ws()));
+    assert_eq!(at(30), " ▌A company ▾ · B @2");
+    assert_eq!(at(20), " ▌A compa… ▾ · B @2", "the name first, eight cells kept");
+    assert_eq!(at(15), " ▌A c… ▾ · B @", "then the numbers");
+    assert_eq!(at(13), " ▌A ▾ · B @", "then the name to its letter");
+    let b = chip(Rect::new(1, 0, 30, 1), &ws());
+    assert!(b.pieces.iter().all(|p| p.item.is_none()), "the chip is one thing");
+    assert_eq!(b.extent(), (1, 22));
+    for w in 0..40 {
+        let b = chip(Rect::new(1, 0, w, 1), &ws());
+        assert!(b.pieces.iter().map(|p| p.width).sum::<u16>() <= w, "{w}");
     }
 }
 

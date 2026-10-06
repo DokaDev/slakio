@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
- ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
-╭ Home ──────────────────╮ 1 #backend ×  2 #incidents ×
-│ ▾ Favorites            │╭ ▌#incidents ───────────────────────────────────────╮
-│   # backend            ││     Thanks!                                        │
-│▎  # incidents       3  ││                                                    │
-│                        ││ MJ  Mia Jang  02:18                                │
-│ ▾ Ops                  ││     Still budget build latency rollback rollback   │
-│   # deploys            ││     retry sprint draft maybe lunch waiting the     │
-│   # alerts             ││     budget                                         │
-│   # partner-shared ext ││                                                    │
-│   # hostile-strings    ││ DY  Dana Yoon  02:38                               │
-│   # big-history        ││     Tomorrow ticket should merge waiting           │
-│   # long-threads       ││                                                    │
-│                        ││ MK  Minsu Kim  02:52                               │
-│ ▾ Channels             ││     After check fine check branch metrics latency  │
-│   # announcements      ││     check                                          │
-│   # design-review      ││                                                    │
-│   # feed-alert-134     ││ MJ  Mia Jang  03:33                                │
-│   # feed-alert-8       ││     Budget invoice on is schema can on deploy      │
-│   # feed-budget-162    ││     check now release tracing on invoice           │
-│   # feed-budget-33     │├─ Message #incidents ───────────────────────────────┤
-│   # feed-build-50      ││ › Press i to write                                 │
-╰────────────────────────╯╰────────────────────────────────────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮ 1 #backend ×  2 #incidents ×
+│ Home @24  D●11  A@37  F  L │╭ ▌#incidents ───────────────────────────────────╮
+├────────────────────────────┤│ RC  Robin Choi  01:49                          │
+│ ▾ Favorites                ││     Thanks!                                    │
+│   # backend                ││                                                │
+│▎  # incidents           3  ││ MJ  Mia Jang  02:18                            │
+│                            ││     Still budget build latency rollback        │
+│ ▾ Ops                      ││     rollback retry sprint draft maybe lunch    │
+│   # deploys                ││     waiting the budget                         │
+│   # alerts                 ││                                                │
+│   # partner-shared ext     ││ DY  Dana Yoon  02:38                           │
+│   # hostile-strings        ││     Tomorrow ticket should merge waiting       │
+│   # big-history            ││                                                │
+│   # long-threads           ││ MK  Minsu Kim  02:52                           │
+│                            ││     After check fine check branch metrics      │
+│ ▾ Channels                 ││     latency check                              │
+│   # announcements          ││                                                │
+│   # design-review          ││ MJ  Mia Jang  03:33                            │
+│   # feed-alert-134         ││     Budget invoice on is schema can on deploy  │
+│   # feed-alert-8           ││     check now release tracing on invoice       │
+│   # feed-budget-162        │├─ Message #incidents ───────────────────────────┤
+│   # feed-budget-33         ││ › Press i to write                             │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #incidents         │ i write · ? help · Space more │ demo
