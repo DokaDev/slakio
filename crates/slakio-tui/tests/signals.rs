@@ -1,6 +1,7 @@
 //! The real binary in a pseudo terminal (`script`): ended by `:qa`, from outside with SIGTERM
 //! or SIGHUP, or by a panic, it restores the terminal every time (alternate screen left, mouse
-//! and bracketed paste off, the cursor shown with the user's shape). Unix only.
+//! and bracketed paste off, the cursor shown with the user's shape). A setting changed while it
+//! runs reaches the config file. Unix only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line with the reason and
 //! passes; with `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead, so a runner
@@ -48,10 +49,15 @@ impl Run {
     /// Start the binary in a new scratch directory named after `tag`, with `env` set; `None`
     /// (with a note) when `script` cannot start.
     fn start(tag: &str, env: &[(&str, &str)]) -> Option<Run> {
+        Self::with_config(tag, env, "")
+    }
+
+    /// [`Run::start`] with `config` as the config file's text.
+    fn with_config(tag: &str, env: &[(&str, &str)], config: &str) -> Option<Run> {
         let dir = std::env::temp_dir().join(format!("slakio-signals-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("config.toml"), "").unwrap();
+        std::fs::write(dir.join("config.toml"), config).unwrap();
         let child = start(&dir, env)?;
         Some(Run { child, dir })
     }
@@ -172,6 +178,22 @@ fn colon_qa_quits_and_restores_the_terminal() {
     run.type_bytes(b":qa\r");
     run.wait_end("the binary to quit after :qa");
     assert_restored(&run.output(), ":qa");
+}
+
+/// `:theme` while running draws with the theme at once and saves it in the config file, which
+/// keeps its comments and other settings.
+#[test]
+fn a_theme_picked_while_running_is_saved_keeping_the_files_comments() {
+    let config = "# my settings\nlanguage = \"en\" # English, please\ntheme = \"auto\"\n";
+    let Some(mut run) = Run::with_config("theme", &[], config) else { return };
+    run.drawn();
+    run.type_bytes(b":theme nord\r");
+    let path = run.dir.join("config.toml");
+    wait_for("the theme to be saved", 20, || std::fs::read_to_string(&path).is_ok_and(|t| t.contains("nord")));
+    run.type_bytes(b":qa\r");
+    run.wait_end("the binary to quit after :qa");
+    let saved = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(saved, "# my settings\nlanguage = \"en\" # English, please\ntheme = \"nord\"\n");
 }
 
 #[test]

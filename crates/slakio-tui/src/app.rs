@@ -41,7 +41,7 @@ use crate::action::{
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
-use crate::theme::Theme;
+use crate::theme::{self, Look, Theme};
 use dialog::{Dialog, Question};
 use help::Help;
 use model::Model;
@@ -106,6 +106,10 @@ pub struct App {
     guide: Guide,
     pub i18n: I18n,
     pub theme: Theme,
+    /// The `theme` setting as written (`auto`, a family or a theme), and what decides how it is
+    /// drawn here; `:theme` changes the one and keeps the other.
+    pub theme_setting: String,
+    pub look: Look,
     pub settings: Settings,
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
@@ -138,6 +142,8 @@ impl App {
             guide: Guide::default(),
             i18n: I18n::new(lang),
             theme,
+            theme_setting: "auto".to_string(),
+            look: Look::default(),
             settings: Settings::default(),
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),
@@ -824,12 +830,32 @@ impl App {
                 if name.is_empty() {
                     return;
                 }
+                if let Some(arg) = theme_arg(name) {
+                    if let Err(msg) = self.set_theme(arg, now) {
+                        self.warn(msg, now);
+                    }
+                    return;
+                }
                 match action::by_command(name) {
                     Some(a) => self.dispatch(a, now),
                     None => self.warn(Msg::CommandUnknown { name: name.to_string() }, now),
                 }
             }
         }
+    }
+
+    /// `:theme <name>`: draw with theme `name` from now on and save it in the config file. A
+    /// name the setting does not take changes nothing and says which ones it takes.
+    pub fn set_theme(&mut self, name: &str, now: Instant) -> Result<(), Msg> {
+        let name = name.trim().to_ascii_lowercase();
+        if !theme::NAMES.contains(&name.as_str()) {
+            return Err(Msg::ThemeUnknown { name, names: theme::NAMES.join(", ") });
+        }
+        self.theme = self.look.theme(&name);
+        self.theme_setting.clone_from(&name);
+        self.effects.push(Effect::Save { key: "theme", value: name.clone() });
+        self.info(Msg::ThemeChanged { name }, now);
+        Ok(())
     }
 
     /// Open the keyboard help for context `ctx`.
@@ -933,5 +959,17 @@ impl App {
             changed |= !self.keys.pending().is_empty();
         }
         changed
+    }
+}
+
+/// The theme name of `:theme <name>` (also `:colorscheme`, `:colo` as in vim, and
+/// `:set theme=<name>`).
+pub fn theme_arg(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        "theme" | "colorscheme" | "colo" => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix("theme=").map(str::trim),
+        _ => None,
     }
 }

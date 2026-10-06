@@ -13,6 +13,8 @@
 
 # The command line.
 "command.unknown" = "Not a command: {name}"
+"theme.changed" = "Theme: {name} (saved)"
+"theme.unknown" = "Unknown theme {name} (use {names})"
 
 # Config file problems (the app runs with the defaults; the raw detail goes to the error log).
 "config.read_failed" = "The config file could not be read; using the defaults"

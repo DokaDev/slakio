@@ -19,7 +19,7 @@ use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange::exchange;
 use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
-use slakio_tui::theme::{Background, Theme};
+use slakio_tui::theme::{Background, Look};
 use slakio_tui::ui;
 use slakio_world::World;
 use std::io::{self, Stdout, Write};
@@ -58,7 +58,10 @@ fn main() -> ExitCode {
     // muted text of the terminal's colors; never asked without colors.
     let background =
         if env("NO_COLOR").is_some_and(|v| !v.is_empty()) { Background::Unknown } else { term::background() };
-    let mut app = App::new(lang, Theme::from_env(&cfg.theme, env, background));
+    let look = Look::from_env(env, background);
+    let mut app = App::new(lang, look.theme(&cfg.theme));
+    app.look = look;
+    app.theme_setting.clone_from(&cfg.theme);
     app.settings = Settings { icons: cfg.icons == "on", rail_push: cfg.rail_expand == "push" };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
@@ -69,6 +72,9 @@ fn main() -> ExitCode {
             app.ask_icons();
         }
     }
+    // A config file that could not be used is never written over (a setting changed in the app
+    // is then not saved, and the app says so).
+    let writable = cfg_err.is_none();
     if let Some(e) = cfg_err {
         ErrorLog::new(paths.errors_log()).record("config", &e.fault());
         app.warn(config_message(&e), Instant::now());
@@ -92,7 +98,14 @@ fn main() -> ExitCode {
         let _restore = term::guard();
         let (mut terminal, enhanced) = term::setup_terminal()?;
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
-        run(&mut terminal, app, backend, &mut stats, Saved { config: config_path, errors: paths.errors_log() }).await
+        run(
+            &mut terminal,
+            app,
+            backend,
+            &mut stats,
+            Saved { config: config_path.filter(|_| writable), errors: paths.errors_log() },
+        )
+        .await
     });
     if let Some(s) = stats.as_mut() {
         s.write();

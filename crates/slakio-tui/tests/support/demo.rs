@@ -54,9 +54,7 @@ impl Demo {
 
     pub fn command(&mut self, cmd: &str) {
         self.keys(":");
-        for c in cmd.chars() {
-            self.keys(&c.to_string());
-        }
+        self.type_text(cmd);
         self.keys("enter");
     }
 

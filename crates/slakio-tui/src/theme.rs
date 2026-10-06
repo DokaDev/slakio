@@ -58,6 +58,32 @@ pub enum Background {
     Unknown,
 }
 
+/// What decides how a theme name is drawn on this terminal: 24-bit color or not, its
+/// background, and `NO_COLOR`. Read once at startup, kept for a theme picked later.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Look {
+    pub truecolor: bool,
+    pub background: Background,
+    pub no_color: bool,
+}
+
+impl Look {
+    /// From the environment `env` (`COLORTERM`, `NO_COLOR`) and the terminal's `background`.
+    pub fn from_env(env: impl Fn(&str) -> Option<String>, background: Background) -> Self {
+        Self {
+            truecolor: env("COLORTERM")
+                .is_some_and(|v| matches!(v.to_ascii_lowercase().as_str(), "truecolor" | "24bit")),
+            background,
+            no_color: env("NO_COLOR").is_some_and(|v| !v.is_empty()),
+        }
+    }
+
+    /// The theme the setting `name` draws with here: none at all under `NO_COLOR`.
+    pub fn theme(self, name: &str) -> Theme {
+        if self.no_color { Theme::no_color() } else { resolve(name, self.truecolor, self.background) }
+    }
+}
+
 /// The tokens of a theme.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Theme {
@@ -160,12 +186,7 @@ impl Theme {
     /// terminal's `background`. `NO_COLOR` wins over everything; an unknown name is `auto`
     /// (the config file check rejects it before).
     pub fn from_env(name: &str, env: impl Fn(&str) -> Option<String>, background: Background) -> Self {
-        if env("NO_COLOR").is_some_and(|v| !v.is_empty()) {
-            return Self::no_color();
-        }
-        let truecolor =
-            env("COLORTERM").is_some_and(|v| matches!(v.to_ascii_lowercase().as_str(), "truecolor" | "24bit"));
-        resolve(name, truecolor, background)
+        Look::from_env(env, background).theme(name)
     }
 
     fn plain(&self) -> bool {
