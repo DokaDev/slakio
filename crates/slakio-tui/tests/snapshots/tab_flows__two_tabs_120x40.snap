@@ -5,39 +5,39 @@ expression: d.snap()
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮ 1 #backend ×  2 #incidents ×
 │ ▾ Favorites            │╭ ▌#incidents ───────────────────────────────────────────────────────────────────────────────╮
-│   # backend            ││ AR Amy Ryu       Pager production the index draft someone today rollback alert       16:27 │
-│▎  # incidents       3  ││ ＊ ＊＊＊        Can the someone looks                                               17:19 │
-│                        ││                  ⤷ 3 replies · last 17:22                                                  │
-│ ▾ Ops                  ││                  :+1: 2                                                                    │
-│   # deploys            ││ DB Deploy Bot    Now still meeting please pager can on draft roadmap migration looks 17:45 │
-│   # alerts             ││                  merge (edited)                                                            │
-│   # partner-shared ext ││ EB Eve Bae       Can someone review this?                                            18:13 │
-│   # hostile-strings    ││ AS Ava Shin      Deploy merge metrics timeout                                        18:47 │
-│   # big-history        ││ ＊ ＊＊＊        Again build dashboard fine looks lunch staging broken staging       19:10 │
-│   # long-threads       ││ AM Alex Morgan   Rolling back (edited)                                               19:43 │
-│                        ││ ES Ethan Song    Customer broken dashboard index branch fine customer someone we     20:01 │
-│ ▾ Channels             ││ BY Ben Yu        Deploy latency again retry check now review done a we metrics       20:37 │
-│   # announcements      ││                  please                                                                    │
-│   # design-review      ││                  :white_check_mark: 2  :fire: 5                                            │
-│   # feed-alert-134     ││ AM Alex Morgan   Alert retry design ticket ticket migration should can check latency 20:56 │
-│   # feed-alert-8       ││ HJ Hyunwoo Jung  Now fine now migration migration build index                        21:49 │
-│   # feed-budget-162    ││                  :fire: 1                                                                  │
-│   # feed-budget-33     ││ MB Max Baek      Starting deploy                                                     21:53 │
-│   # feed-build-50      ││ AR Amy Ryu       Timeout we release is                                               22:40 │
-│   # feed-cache-119     ││ AM Alex Morgan   Check staging design                                                23:03 │
-│   # feed-customer-161  ││ ＊ ＊＊＊        Design design design draft sprint                                   23:44 │
-│   # feed-customer…  1  ││ KN Kate Nam      Review index we dashboard budget latency roadmap again please       23:56 │
-│   # feed-dashboard-22  ││                  sprint cache fine metrics                                                 │
-│   # feed-dashboard-41  ││ ─────────────────────────────────────── 2026-01-07 ─────────────────────────────────────── │
-│   # feed-design-34     ││ G  Grafana       Suspect the DB pool 🎉                                              00:46 │
-│   # feed-design-83     ││ JL Jordan Lee    Thanks! (edited)                                                    00:51 │
-│   # feed-draft-142     ││ RC Robin Choi    Thanks!                                                             01:49 │
-│   # feed-draft-58      ││ MJ Mia Jang      Still budget build latency rollback rollback retry sprint draft     02:18 │
-│   # feed-draft-84      ││                  maybe lunch waiting the budget                                            │
-│   # feed-index-199  2  ││ DY Dana Yoon     Tomorrow ticket should merge waiting                                02:38 │
-│   # feed-index-39      ││ MK Minsu Kim     After check fine check branch metrics latency check                 02:52 │
-│   # feed-index-5    1  ││ MJ Mia Jang      Budget invoice on is schema can on deploy check now release tracing 03:33 │
-│   # feed-invoice-16    ││                  on invoice                                                                │
+│   # backend            ││                                                                                            │
+│▎  # incidents       3  ││  AM   Alex Morgan  23:03                                                                   │
+│                        ││       Check staging design                                                                 │
+│ ▾ Ops                  ││                                                                                            │
+│   # deploys            ││  ＊   ＊＊＊  23:44                                                                        │
+│   # alerts             ││       Design design design draft sprint                                                    │
+│   # partner-shared ext ││                                                                                            │
+│   # hostile-strings    ││  KN   Kate Nam  23:56                                                                      │
+│   # big-history        ││       Review index we dashboard budget latency roadmap again please sprint cache fine      │
+│   # long-threads       ││       metrics                                                                              │
+│                        ││                                                                                            │
+│ ▾ Channels             ││ ─────────────────────────────────────── 2026-01-07 ─────────────────────────────────────── │
+│   # announcements      ││  G    Grafana  00:46                                                                       │
+│   # design-review      ││       Suspect the DB pool 🎉                                                               │
+│   # feed-alert-134     ││                                                                                            │
+│   # feed-alert-8       ││  JL   Jordan Lee  00:51                                                                    │
+│   # feed-budget-162    ││       Thanks! (edited)                                                                     │
+│   # feed-budget-33     ││                                                                                            │
+│   # feed-build-50      ││  RC   Robin Choi  01:49                                                                    │
+│   # feed-cache-119     ││       Thanks!                                                                              │
+│   # feed-customer-161  ││                                                                                            │
+│   # feed-customer…  1  ││  MJ   Mia Jang  02:18                                                                      │
+│   # feed-dashboard-22  ││       Still budget build latency rollback rollback retry sprint draft maybe lunch waiting  │
+│   # feed-dashboard-41  ││       the budget                                                                           │
+│   # feed-design-34     ││                                                                                            │
+│   # feed-design-83     ││  DY   Dana Yoon  02:38                                                                     │
+│   # feed-draft-142     ││       Tomorrow ticket should merge waiting                                                 │
+│   # feed-draft-58      ││                                                                                            │
+│   # feed-draft-84      ││  MK   Minsu Kim  02:52                                                                     │
+│   # feed-index-199  2  ││       After check fine check branch metrics latency check                                  │
+│   # feed-index-39      ││                                                                                            │
+│   # feed-index-5    1  ││  MJ   Mia Jang  03:33                                                                      │
+│   # feed-invoice-16    ││       Budget invoice on is schema can on deploy check now release tracing on invoice       │
 │   # feed-invoice-168   │├─ Message #incidents ───────────────────────────────────────────────────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                                                         │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯

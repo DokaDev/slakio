@@ -67,6 +67,7 @@ fn main() -> ExitCode {
         icons: cfg.icons == "on",
         // `image` (photos) comes later; until then it draws initials.
         avatars: cfg.avatars != "off",
+        compact: cfg.density == "compact",
     };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);

@@ -4,24 +4,24 @@ expression: s
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮
-│ ▾ Favorites            ││ MJ Mia Jang · 06:35                                │
-│▎  # backend            ││    Budget metrics merge design rollback alert      │
-│   # incidents       3  ││    alert should draft after alert on staging       │
-│                        ││    tomorrow                                        │
-│ ▾ Ops                  ││ TK Tom Ko · 06:41                                  │
-│   # deploys            ││    On waiting migration someone index can staging  │
-│   # aler╭ Quit slakio? ────────────────────────────────────────────╮         │
+│ ▾ Favorites            ││ TK  Tom Ko  06:41                                  │
+│▎  # backend            ││     On waiting migration someone index can staging │
+│   # incidents       3  ││     should                                         │
+│                        ││                                                    │
+│ ▾ Ops                  ││ KN  Kate Nam  06:51                                │
+│   # deploys            ││     Production roadmap customer build alert now    │
+│   # aler╭ Quit slakio? ────────────────────────────────────────────╮oken     │
 │   # part│ A message you wrote has not been sent; quitting loses    │         │
-│   # host│ it.                                                      │ now     │
-│   # big-│                                                          │ken      │
+│   # host│ it.                                                      │         │
+│   # big-│                                                          │         │
 │   # long│                    [ Stay ]   [ Quit ]                   │         │
 │         ╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
-│ ▾ Channels             ││    Confirmed                                       │
-│   # announcements      ││ KN Kate Nam · 07:05                                │
-│   # design-review      ││    Ticket review pager pager production on build   │
-│   # feed-alert-134     ││    alert the on draft                              │
-│   # feed-alert-8       ││ SR Sam Rivera · 07:14                              │
-│   # feed-budget-162    ││    Meeting moved to 3pm                            │
+│ ▾ Channels             ││ KN  Kate Nam  07:05                                │
+│   # announcements      ││     Ticket review pager pager production on build  │
+│   # design-review      ││     alert the on draft                             │
+│   # feed-alert-134     ││                                                    │
+│   # feed-alert-8       ││ SR  Sam Rivera  07:14                              │
+│   # feed-budget-162    ││     Meeting moved to 3pm                           │
 │   # feed-budget-33     │├─ Message #backend ─────────────────────────────────┤
 │   # feed-build-50      ││ › half written                                     │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯

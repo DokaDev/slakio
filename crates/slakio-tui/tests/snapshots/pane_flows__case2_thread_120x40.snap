@@ -4,40 +4,40 @@ expression: mask_hangul(&s)
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#long-threads ───────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ────────╮
-│ ▾ Favorites            ││▎──────────────────── 2026-01-06 ───────────────────── ││    metrics done build build       │
-│   # backend            ││▎JL Jiyoung Lee · 07:23                                ││ DC Dan Cho · 03:14                │
-│   # incidents       3  ││▎   We waiting waiting now index a the a the release   ││    Starting deploy                │
-│                        ││▎   ⤷ 1,200 replies · last 03:23                       ││ ＊ ＊＊＊ · 03:15                 │
-│ ▾ Ops                  ││ DC Dan Cho · 07:30                                    ││    Rolling back                   │
-│   # deploys            ││    Still index lunch index                            ││ SR Sam Rivera · 03:16             │
-│   # alerts             ││    ⤷ 6 replies · last 07:36                           ││    Suspect the DB pool            │
-│   # partner-shared ext ││ OH Owen Hwang · 07:37                                 ││ MJ Mia Jang · 03:17               │
-│   # hostile-strings    ││    Queue a after cache invoice on customer metrics on ││    Staging fine invoice release   │
-│   # big-history        ││    maybe sprint                                       ││    merge                          │
-│▎  # long-threads       ││    ⤷ 12 replies · last 07:49                          ││ JH Jiwon Han · 03:18              │
-│                        ││ LJ Lily Jeon · 07:41                                  ││    Budget should timeout timeout  │
-│ ▾ Channels             ││    Confirmed                                          ││    after tomorrow budget meeting  │
-│   # announcements      ││ LJ Lily Jeon · 07:54                                  ││    someone production release     │
-│   # design-review      ││    see https://docs.example.com/runbooks/latency      ││ TK Tom Ko · 03:19                 │
-│   # feed-alert-134     ││ OH Owen Hwang · 08:00                                 ││    Draft draft is is customer can │
-│   # feed-alert-8       ││    Migration branch index queue should                ││    retry dashboard                │
-│   # feed-budget-162    ││ DY Dana Yoon · 08:05                                  ││ NS Nina Seo · 03:20               │
-│   # feed-budget-33     ││    Tracing on we pager please looks budget waiting    ││    After ticket customer timeout  │
-│   # feed-build-50      ││    merge budget queue still branch metrics customer   ││    queue again timeout check      │
-│   # feed-cache-119     ││    invoice                                            ││    sprint deploy review maybe is  │
-│   # feed-customer-161  ││ TK Tom Ko · 08:13                                     ││    build tracing latency          │
-│   # feed-customer…  1  ││    ＊＊ ＊＊＊＊＊＊                                  ││ MB Max Baek · 03:21               │
-│   # feed-dashboard-22  ││ MK Minsu Kim · 08:21                                  ││    Latency timeout should for     │
-│   # feed-dashboard-41  ││    Review lunch lunch design schema merge design      ││    invoice on index roadmap a     │
-│   # feed-design-34     ││    build the looks                                    ││    budget tracing is queue index  │
-│   # feed-design-83     ││ SR Sam Rivera · 08:33                                 ││    ticket                         │
-│   # feed-draft-142     ││    Tracing timeout index merge now deploy queue done  ││ IM Ivy Moon · 03:22               │
-│   # feed-draft-58      ││    retry meeting can pager pager (edited)             ││    Draft broken can looks staging │
-│   # feed-draft-84      ││ H  Hana · 08:35                                       ││    done tracing now lunch meeting │
-│   # feed-index-199  2  ││    For cache timeout ticket migration pager rollback  ││    invoice migration done         │
-│   # feed-index-39      ││    branch tracing after a done on tomorrow broken     ││    customer please                │
-│   # feed-index-5    1  ││    schema                                             ││ EB Eve Bae · 03:23                │
-│   # feed-invoice-16    ││    ⤷ 1 reply · last 08:36                             ││    ＊＊＊＊＊                     │
+│ ▾ Favorites            ││ ──────────────────── 2026-01-06 ───────────────────── ││ MJ  Mia Jang  03:17               │
+│   # backend            ││▎JL  Jiyoung Lee  07:23                                ││     Staging fine invoice release  │
+│   # incidents       3  ││▎    We waiting waiting now index a the a the release  ││     merge                         │
+│                        ││▎    ⤷ 1,200 replies · last 03:23                      ││                                   │
+│ ▾ Ops                  ││                                                       ││ JH  Jiwon Han  03:18              │
+│   # deploys            ││ DC  Dan Cho  07:30                                    ││     Budget should timeout timeout │
+│   # alerts             ││     Still index lunch index                           ││     after tomorrow budget meeting │
+│   # partner-shared ext ││     ⤷ 6 replies · last 07:36                          ││     someone production release    │
+│   # hostile-strings    ││                                                       ││                                   │
+│   # big-history        ││ OH  Owen Hwang  07:37                                 ││ TK  Tom Ko  03:19                 │
+│▎  # long-threads       ││     Queue a after cache invoice on customer metrics   ││     Draft draft is is customer    │
+│                        ││     on maybe sprint                                   ││     can retry dashboard           │
+│ ▾ Channels             ││     ⤷ 12 replies · last 07:49                         ││                                   │
+│   # announcements      ││                                                       ││ NS  Nina Seo  03:20               │
+│   # design-review      ││ LJ  Lily Jeon  07:41                                  ││     After ticket customer timeout │
+│   # feed-alert-134     ││     Confirmed                                         ││     queue again timeout check     │
+│   # feed-alert-8       ││                                                       ││     sprint deploy review maybe is │
+│   # feed-budget-162    ││ LJ  Lily Jeon  07:54                                  ││     build tracing latency         │
+│   # feed-budget-33     ││     see https://docs.example.com/runbooks/latency     ││                                   │
+│   # feed-build-50      ││                                                       ││ MB  Max Baek  03:21               │
+│   # feed-cache-119     ││ OH  Owen Hwang  08:00                                 ││     Latency timeout should for    │
+│   # feed-customer-161  ││     Migration branch index queue should               ││     invoice on index roadmap a    │
+│   # feed-customer…  1  ││                                                       ││     budget tracing is queue index │
+│   # feed-dashboard-22  ││ DY  Dana Yoon  08:05                                  ││     ticket                        │
+│   # feed-dashboard-41  ││     Tracing on we pager please looks budget waiting   ││                                   │
+│   # feed-design-34     ││     merge budget queue still branch metrics customer  ││ IM  Ivy Moon  03:22               │
+│   # feed-design-83     ││     invoice                                           ││     Draft broken can looks        │
+│   # feed-draft-142     ││                                                       ││     staging done tracing now      │
+│   # feed-draft-58      ││ TK  Tom Ko  08:13                                     ││     lunch meeting invoice         │
+│   # feed-draft-84      ││     ＊＊ ＊＊＊＊＊＊                                 ││     migration done customer       │
+│   # feed-index-199  2  ││                                                       ││     please                        │
+│   # feed-index-39      ││ MK  Minsu Kim  08:21                                  ││                                   │
+│   # feed-index-5    1  ││     Review lunch lunch design schema merge design     ││ EB  Eve Bae  03:23                │
+│   # feed-invoice-16    ││     build the looks                                   ││     ＊＊＊＊＊                    │
 │   # feed-invoice-168   │├─ Message #long-threads ───────────────────────────────┤├─ Reply ───────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                    ││ › Press i to reply                │
 ╰────────────────────────╯╰───────────────────────────────────────────────────────╯╰───────────────────────────────────╯

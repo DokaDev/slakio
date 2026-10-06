@@ -11,7 +11,11 @@
 //!   by a hash of the person's id: the same in every run and every theme, and kept apart from
 //!   the workspace colors.
 //!
-//! Profile photos come later; where a terminal cannot show them, these chips stay.
+//! A person's picture fills a [`Slot`] beside their message: 4 × 2 cells in the comfortable
+//! layout (about square in a terminal's cells), 2 × 1 where a pane is narrow. What fills it is
+//! an [`Art`]: initials now, drawn on the slot's first row with the rest of the block in the same
+//! tint; a profile photo (a later step, the kitty graphics protocol) fills the same cells, and
+//! initials stay its fallback where a terminal cannot show images.
 
 use crate::text::width;
 use slakio_core::model::UserId;
@@ -54,6 +58,38 @@ pub fn slot(id: &UserId) -> usize {
         h = h.wrapping_mul(0x0100_0193);
     }
     h as usize
+}
+
+/// The cells a person's picture takes beside their message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Slot {
+    pub cols: usize,
+    pub rows: usize,
+}
+
+/// The comfortable layout's slot: 4 × 2 cells.
+pub const BLOCK: Slot = Slot { cols: 4, rows: 2 };
+/// A narrow pane's slot: the 2-cell chip on one row.
+pub const CHIP: Slot = Slot { cols: WIDTH, rows: 1 };
+
+/// What fills a slot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Art {
+    /// The person's initials ([`initials`], [`WIDTH`] cells), centered on the slot's first row.
+    Initials(String),
+}
+
+impl Art {
+    /// The text of row `k` of `slot` (exactly `slot.cols` cells; blank past the art).
+    pub fn row(&self, slot: Slot, k: usize) -> String {
+        match self {
+            Art::Initials(i) if k == 0 => {
+                let pad = slot.cols.saturating_sub(WIDTH);
+                format!("{}{i}{}", " ".repeat(pad / 2), " ".repeat(pad - pad / 2))
+            }
+            Art::Initials(_) => " ".repeat(slot.cols),
+        }
+    }
 }
 
 #[cfg(test)]

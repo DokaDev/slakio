@@ -307,3 +307,8 @@
 "switcher.title" = "Workspaces"
 "switcher.keys" = "Enter switch · Esc close"
 "config.retired" = "{key} is no longer used (the rail became the top bar); it can be removed from the config file"
+"action.density" = "Comfortable or compact messages"
+"density.changed" = "Density: {name}"
+"density.unknown" = "Unknown density {name} (one of {names})"
+"density.comfortable" = "As in GUI Slack: an avatar block, the name over the text (default)"
+"density.compact" = "Columns: the name beside the text"

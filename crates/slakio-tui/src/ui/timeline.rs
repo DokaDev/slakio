@@ -1,58 +1,31 @@
 //! A pane's messages, laid out only as far as the screen reaches: from the message at the bottom
-//! upwards until the area is full. A message's rows are its date separator (on a new day), its
-//! text wrapped beside the sender's name with the time on the right, a cut marker for very long
-//! text, the "N replies" row of a thread and its reaction pills. A message right after one of
-//! the same sender (within five minutes, the same day) leaves the name out. In a pane narrower
-//! than [`STACKED_BELOW`] the name and time head the message and the text goes below them.
-//!
-//! ```text
-//! ─────────────────── 2026-01-05 ───────────────────     MK Minsu Kim · 10:02
-//! MK Minsu Kim     Starting deploy             10:02        Starting deploy
-//!                  ⤷ 4 replies · last 10:15                 ⤷ 4 replies · last 10:15
-//!                  Rolled back                 10:04        Rolled back
-//! JP Jiho Park     PR is up (edited)           10:20     JP Jiho Park · 10:20
-//!                  :eyes: 2  :+1: 1                         PR is up (edited)
-//! ```
-//!
-//! `MK` is the sender's avatar chip ([`crate::avatar`]), on the first message of a group only;
-//! with `avatars = "off"` the name starts the row.
+//! upwards until the area is full. Each message's rows come from [`message`] (the comfortable
+//! layout, or the compact one): the blank and the date separator above it, its header and text,
+//! the "N replies" link, its reactions as chips.
 //!
 //! A conversation sits at the bottom, by the composer, as in any chat; a thread starts at the
 //! top: its message, a `── N replies ──` divider, then the replies (the newest stay in view once
-//! they fill the pane).
+//! they fill the pane). The selection paints every row of its message's block (never the blank
+//! between blocks or a date separator).
 //!
 //! Every row laid out is counted ([`rows_laid_out`]): the performance budget holds a frame to
 //! at most twice the rows the area shows, however long the history.
 
-use super::{avatar_chip, highlight};
+pub mod message;
+
+use super::highlight;
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::{Hit, Pane};
-use crate::app::timelines::Timeline;
 use crate::keymap::Ctx;
-use crate::text::{clip, width, wrap};
 use crate::theme::Selection;
-use crate::time;
+use message::{Kind, Laid};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use std::cell::Cell;
 use std::collections::HashMap;
-
-/// The sender's column, at most.
-const AUTHOR_WIDTH: usize = 14;
-/// The avatar chip and the space after it, before the sender's name.
-const AVATAR_COLUMN: usize = crate::avatar::WIDTH + 1;
-/// The time column (`10:02` and a space before it).
-const TIME_WIDTH: usize = 6;
-/// Rows of text a message shows at most; the rest is marked, not drawn.
-pub const MAX_TEXT_ROWS: usize = 40;
-/// A pane whose inside is narrower than this stacks each message: name and time, then the text.
-pub const STACKED_BELOW: usize = 56;
-/// Messages of one sender this close together form a group: the name shows once.
-const GROUP_SECS: u64 = 5 * 60;
 
 thread_local! {
     static LAID_OUT: Cell<u64> = const { Cell::new(0) };
@@ -65,155 +38,6 @@ pub fn rows_laid_out() -> u64 {
 
 pub fn reset_rows_laid_out() {
     LAID_OUT.with(|c| c.set(0));
-}
-
-/// A row laid out, and whether it is the message's "N replies" link.
-type Laid = (Line<'static>, bool);
-
-/// Message `i` follows one of the same sender closely: its name is left out.
-fn grouped(pane: &Pane, tl: &Timeline, i: usize) -> bool {
-    let Some(prev) = i.checked_sub(1).map(|p| &tl.items[p]) else { return false };
-    let m = &tl.items[i];
-    // A thread's own message and its first reply never group: the divider is between them.
-    let root = pane.root(tl);
-    prev.user == m.user
-        && time::day(prev.ts) == time::day(m.ts)
-        && m.ts.0.saturating_sub(prev.ts.0) <= GROUP_SECS * 1_000_000
-        && root != Some(i - 1)
-        && prev.thread.is_none()
-}
-
-/// The rows of message `i` of `pane` for a width of `w` cells.
-#[expect(clippy::too_many_lines, reason = "header, text and footer rows of a message in one place; to be split")]
-fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid> {
-    let t = &app.theme;
-    let m = &tl.items[i];
-    let mut out: Vec<Laid> = Vec::new();
-    let new_day = i == 0 || time::day(tl.items[i - 1].ts) != time::day(m.ts);
-    if new_day {
-        out.push((rule(&time::date(m.ts), w, t.faint()), false));
-    }
-    let stacked = w < STACKED_BELOW;
-    let group = grouped(pane, tl, i);
-    let author_style = if m.own { t.own_author() } else { t.author() };
-    // The sender's chip and a space before the name; the column grows by as much, so the text
-    // starts at the same place on every row.
-    let chip = if group { None } else { avatar_chip(app, &m.user, m.author.as_str()) };
-    let chip_w = if app.settings.avatars { AVATAR_COLUMN } else { 0 };
-    // Stacked, the chip leads the header when there is room for it, and the text goes under
-    // the name.
-    let stacked_chip = stacked && chip_w > 0 && w.saturating_sub(TIME_WIDTH + 2) > AVATAR_COLUMN + 4;
-    let (indent_w, text_w) = if stacked {
-        let indent = if stacked_chip { AVATAR_COLUMN } else { 2 };
-        (indent, w.saturating_sub(indent).max(4))
-    } else {
-        let author_w = AUTHOR_WIDTH.min(w / 4).max(4) + chip_w;
-        (author_w, w.saturating_sub(author_w + TIME_WIDTH).max(4))
-    };
-    let indent = " ".repeat(indent_w);
-    if stacked && !group {
-        let mut spans = Vec::new();
-        let mut room = w.saturating_sub(TIME_WIDTH + 2);
-        if let Some(chip) = chip.clone().filter(|_| stacked_chip) {
-            spans.extend([chip, Span::raw(" ")]);
-            room -= AVATAR_COLUMN;
-        }
-        spans.extend([
-            Span::styled(clip(m.author.as_str(), room), author_style),
-            Span::styled(" · ", t.faint()),
-            Span::styled(time::hm(m.ts), t.faint()),
-        ]);
-        out.push((Line::from(spans), false));
-    }
-    let (mut lines, more) = wrap(m.text.as_str(), text_w, MAX_TEXT_ROWS);
-    let edited = app.i18n.label(Label::MessageEdited).to_string();
-    // The edited marker goes after the last line of text when it fits there.
-    let mut edited_row = false;
-    if m.edited {
-        let last = lines.last_mut().expect("wrap gives a line");
-        if width(last) + 1 + width(&edited) <= text_w {
-            last.push(' ');
-        } else {
-            edited_row = true;
-        }
-    }
-    let n = lines.len();
-    for (k, l) in lines.into_iter().enumerate() {
-        let mut spans: Vec<Span<'static>> = Vec::new();
-        if k == 0 && !stacked && !group {
-            let mut name_w = indent_w;
-            if let Some(chip) = chip.clone() {
-                spans.extend([chip, Span::raw(" ")]);
-                name_w -= chip_w;
-            }
-            let name = clip(m.author.as_str(), name_w - 1);
-            let pad = " ".repeat(name_w - width(&name));
-            spans.push(Span::styled(format!("{name}{pad}"), author_style));
-        } else {
-            spans.push(Span::raw(indent.clone()));
-        }
-        let lw = width(&l);
-        spans.push(Span::styled(l, t.text()));
-        let mut used = lw;
-        if m.edited && !edited_row && k + 1 == n {
-            used += width(&edited);
-            spans.push(Span::styled(edited.clone(), t.muted()));
-        }
-        if k == 0 && !stacked {
-            spans.push(Span::raw(" ".repeat(text_w.saturating_sub(used) + 1)));
-            spans.push(Span::styled(time::hm(m.ts), t.faint()));
-        }
-        out.push((Line::from(spans), false));
-    }
-    if edited_row {
-        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(edited, t.muted())]), false));
-    }
-    if more {
-        let label = app.i18n.label(Label::MessageMore).to_string();
-        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(label, t.muted())]), false));
-    }
-    if let Some(th) = m.thread.filter(|_| !pane.is_thread()) {
-        let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply) };
-        let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));
-        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(text, t.link())]), true));
-    }
-    if !m.reactions.is_empty() {
-        let mut spans = vec![Span::raw(indent)];
-        for (k, r) in m.reactions.iter().enumerate() {
-            if k > 0 {
-                spans.push(Span::raw("  "));
-            }
-            let style = if r.mine { t.reaction_mine() } else { t.reaction() };
-            spans.push(Span::styled(format!(":{}: {}", r.name, r.count), style));
-        }
-        out.push((Line::from(spans), false));
-    }
-    // Below a thread's own message: how many replies follow, or that none do yet.
-    if pane.root(tl) == Some(i) {
-        let replies = m.thread.map_or(tl.items.len().saturating_sub(1), |t| t.replies as usize);
-        if replies > 0 {
-            let label = app.i18n.msg(&Msg::ThreadReplies { count: replies as u64 }).to_string();
-            out.push((rule(&label, w, t.faint()), false));
-        } else if tl.complete {
-            out.push((Line::styled(no_replies(app), t.faint()), false));
-        }
-    }
-    LAID_OUT.with(|c| c.set(c.get() + out.len() as u64));
-    out
-}
-
-/// `── label ──` across `w` cells.
-fn rule(label: &str, w: usize, style: ratatui::style::Style) -> Line<'static> {
-    let label = format!(" {label} ");
-    let left = w.saturating_sub(width(&label)) / 2;
-    let right = w.saturating_sub(width(&label) + left);
-    Line::styled(format!("{}{label}{}", "─".repeat(left), "─".repeat(right)), style)
-}
-
-/// "No replies yet · i reply", with the key bound.
-fn no_replies(app: &App) -> String {
-    let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
-    app.i18n.msg(&Msg::ThreadNoReplies { keys }).to_string()
 }
 
 /// Draw `pane`'s messages into `area`; `focused`: the pane has the keyboard (the selection is
@@ -241,11 +65,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let (h, w) = (usize::from(area.height), usize::from(area.width.saturating_sub(2)).max(1));
     let n = tl.items.len();
     let mut laid: HashMap<usize, Vec<Laid>> = HashMap::new();
-    let height = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| {
-        laid.entry(i).or_insert_with(|| rows(app, pane, tl, i, w)).len()
-    };
-    // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
     let selected = pane.selected_index(tl);
+    let range = pane.range(tl);
+    let rows = |i: usize| {
+        let out = message::rows(app, pane, tl, i, w, selected == Some(i) && range.is_none_or(|(a, b)| a == b));
+        LAID_OUT.with(|c| c.set(c.get() + out.len() as u64));
+        out
+    };
+    let height = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| laid.entry(i).or_insert_with(|| rows(i)).len();
+    // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
     let mut bottom = pane.bottom.get().and_then(|ts| tl.index_near(ts)).unwrap_or(n - 1).min(n - 1);
     if let Some(sel) = selected.map(|s| s.min(n - 1)) {
         if sel > bottom {
@@ -288,7 +116,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut total = 0;
     let mut i = bottom;
     loop {
-        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, tl, i, w));
+        let rows = laid.remove(&i).unwrap_or_else(|| rows(i));
         total += rows.len();
         shown.push((i, rows));
         if total >= h || i == 0 {
@@ -304,12 +132,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let from_top = total < h && (bottom + 1 < n || pane.is_thread());
     let mut i = bottom + 1;
     while total < h && i < n {
-        let rows = laid.remove(&i).unwrap_or_else(|| rows(app, pane, tl, i, w));
+        let rows = laid.remove(&i).unwrap_or_else(|| rows(i));
         total += rows.len();
         shown.push((i, rows));
         i += 1;
     }
-    let range = pane.range(tl);
     let how = |i: usize| match (focused, pane.visual.is_some()) {
         (_, true) if selected != Some(i) => Selection::Visual,
         (true, _) => Selection::Focused,
@@ -322,7 +149,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut hits = pane.hits.borrow_mut();
     for (i, rows) in shown {
         let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i));
-        for (line, link) in rows {
+        for (line, kind) in rows {
             if skip > 0 {
                 skip -= 1;
                 continue;
@@ -332,10 +159,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
             let row = Rect { y, height: 1, ..area };
             f.render_widget(Paragraph::new(line), text_area(row));
-            if selected {
+            if selected && matches!(kind, Kind::Content | Kind::Link) {
                 highlight(f, app, row, how(i));
             }
-            hits.push(Hit { y, message: i, link });
+            if kind != Kind::Gap {
+                hits.push(Hit { y, message: i, link: kind == Kind::Link });
+            }
             y += 1;
         }
     }

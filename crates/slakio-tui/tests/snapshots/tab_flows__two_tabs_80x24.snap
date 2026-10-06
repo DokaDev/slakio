@@ -5,23 +5,23 @@ expression: d.snap()
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮ 1 #backend ×  2 #incidents ×
 │ ▾ Favorites            │╭ ▌#incidents ───────────────────────────────────────╮
-│   # backend            ││    Suspect the DB pool 🎉                          │
-│▎  # incidents       3  ││ JL Jordan Lee · 00:51                              │
-│                        ││    Thanks! (edited)                                │
-│ ▾ Ops                  ││ RC Robin Choi · 01:49                              │
-│   # deploys            ││    Thanks!                                         │
-│   # alerts             ││ MJ Mia Jang · 02:18                                │
-│   # partner-shared ext ││    Still budget build latency rollback rollback    │
-│   # hostile-strings    ││    retry sprint draft maybe lunch waiting the      │
-│   # big-history        ││    budget                                          │
-│   # long-threads       ││ DY Dana Yoon · 02:38                               │
-│                        ││    Tomorrow ticket should merge waiting            │
-│ ▾ Channels             ││ MK Minsu Kim · 02:52                               │
-│   # announcements      ││    After check fine check branch metrics latency   │
-│   # design-review      ││    check                                           │
-│   # feed-alert-134     ││ MJ Mia Jang · 03:33                                │
-│   # feed-alert-8       ││    Budget invoice on is schema can on deploy check │
-│   # feed-budget-162    ││    now release tracing on invoice                  │
+│   # backend            ││     Thanks!                                        │
+│▎  # incidents       3  ││                                                    │
+│                        ││ MJ  Mia Jang  02:18                                │
+│ ▾ Ops                  ││     Still budget build latency rollback rollback   │
+│   # deploys            ││     retry sprint draft maybe lunch waiting the     │
+│   # alerts             ││     budget                                         │
+│   # partner-shared ext ││                                                    │
+│   # hostile-strings    ││ DY  Dana Yoon  02:38                               │
+│   # big-history        ││     Tomorrow ticket should merge waiting           │
+│   # long-threads       ││                                                    │
+│                        ││ MK  Minsu Kim  02:52                               │
+│ ▾ Channels             ││     After check fine check branch metrics latency  │
+│   # announcements      ││     check                                          │
+│   # design-review      ││                                                    │
+│   # feed-alert-134     ││ MJ  Mia Jang  03:33                                │
+│   # feed-alert-8       ││     Budget invoice on is schema can on deploy      │
+│   # feed-budget-162    ││     check now release tracing on invoice           │
 │   # feed-budget-33     │├─ Message #incidents ───────────────────────────────┤
 │   # feed-build-50      ││ › Press i to write                                 │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯

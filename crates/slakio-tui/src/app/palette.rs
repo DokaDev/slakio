@@ -55,6 +55,8 @@ pub enum Item {
     Rename,
     /// A value for `:icons <value>` (index into [`ICON_VALUES`]).
     Icons(usize),
+    /// A value for `:density <value>` (index into [`DENSITY_VALUES`]).
+    Density(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
@@ -73,7 +75,9 @@ pub struct Row {
 fn offered(a: Action, backend: bool) -> bool {
     match a {
         Action::App(AppAction::Quit) => true,
-        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars | AppAction::ToggleIcons)
+        Action::App(
+            AppAction::ChooseWorkspace | AppAction::ToggleAvatars | AppAction::ToggleIcons | AppAction::ToggleDensity,
+        )
         | Action::Shell(_)
         | Action::Pane(_)
         | Action::Tab(_) => backend,
@@ -130,6 +134,9 @@ impl App {
         }
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
+        }
+        if let Some(arg) = setting_arg(line, "density") {
+            return ranked(DENSITY_VALUES, arg).into_iter().map(Item::Density).collect();
         }
         if let Some(arg) = icons_arg(line) {
             let mut hits: Vec<(u8, i32, usize)> = ICON_VALUES
@@ -230,6 +237,18 @@ impl App {
                         keys: if on == self.settings.icons { label(Label::PaletteCurrent) } else { String::new() },
                     }
                 }
+                Item::Density(i) => {
+                    let compact = DENSITY_VALUES[i] == "compact";
+                    Row {
+                        name: DENSITY_VALUES[i].to_string(),
+                        label: label(if compact { Label::DensityCompact } else { Label::DensityComfortable }),
+                        keys: if compact == self.settings.compact {
+                            label(Label::PaletteCurrent)
+                        } else {
+                            String::new()
+                        },
+                    }
+                }
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -302,6 +321,12 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(Item::Density(i)) => {
+                self.cmdline.close();
+                if let Err(msg) = self.set_density(DENSITY_VALUES[i], now) {
+                    self.warn(msg, now);
+                }
+            }
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();
                 self.cmdline.close();
@@ -316,6 +341,10 @@ impl App {
                         Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") }
                     }
                     (.., Some(name)) => Msg::IconsUnknown { name: name.to_string(), names: ICON_VALUES.join(", ") },
+                    _ if setting_arg(&text, "density").is_some() => Msg::DensityUnknown {
+                        name: setting_arg(&text, "density").unwrap_or_default().to_string(),
+                        names: DENSITY_VALUES.join(", "),
+                    },
                     _ => {
                         let word = text.split_whitespace().next().unwrap_or_default().to_string();
                         if action::by_command(&word).is_some() {
@@ -361,6 +390,28 @@ impl App {
     }
 }
 
+/// The values `:density` takes.
+pub const DENSITY_VALUES: &[&str] = &["comfortable", "compact"];
+
+/// The value of `:<key> <value>` (also `:set <key>=<value>`).
+fn setting_arg<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        w if w == key => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix(key)?.strip_prefix('=').map(str::trim),
+        _ => None,
+    }
+}
+
+/// The indices of `values` that `arg` matches, best first.
+fn ranked(values: &[&str], arg: &str) -> Vec<usize> {
+    let mut hits: Vec<(u8, i32, usize)> =
+        values.iter().enumerate().filter_map(|(i, v)| action::rank(arg, &[], &[v]).map(|(t, s)| (t, -s, i))).collect();
+    hits.sort_unstable();
+    hits.into_iter().map(|(.., i)| i).collect()
+}
+
 /// The values `:icons` takes (`icons = "ask"` stays for the first run).
 pub const ICON_VALUES: &[&str] = &["on", "off"];
 
@@ -400,6 +451,32 @@ impl App {
         self.settings.avatars = value == "initials";
         self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
         self.info(Msg::AvatarsChanged { name: value }, now);
+        Ok(())
+    }
+
+    /// `:avatars`, `:density`, `:icons` alone: the other value of the setting, saved.
+    pub(super) fn toggle(&mut self, a: AppAction, now: Instant) {
+        let s = self.settings;
+        let done = match a {
+            AppAction::ToggleAvatars => self.set_avatars(if s.avatars { "off" } else { "initials" }, now),
+            AppAction::ToggleDensity => self.set_density(if s.compact { "comfortable" } else { "compact" }, now),
+            _ => self.set_icons(if s.icons { "off" } else { "on" }, now),
+        };
+        if let Err(msg) = done {
+            self.warn(msg, now);
+        }
+    }
+
+    /// `:density <comfortable|compact>`: lay messages out so from now on, and save it in the
+    /// config file. Another value changes nothing and says which ones work.
+    pub fn set_density(&mut self, value: &str, now: Instant) -> Result<(), Msg> {
+        let value = value.trim().to_ascii_lowercase();
+        if !DENSITY_VALUES.contains(&value.as_str()) {
+            return Err(Msg::DensityUnknown { name: value, names: DENSITY_VALUES.join(", ") });
+        }
+        self.settings.compact = value == "compact";
+        self.effects.push(Effect::Save { key: "density", value: value.clone() });
+        self.info(Msg::DensityChanged { name: value }, now);
         Ok(())
     }
 

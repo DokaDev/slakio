@@ -91,8 +91,14 @@ fn gg_puts_the_oldest_message_on_the_first_row_and_a_short_history_sits_at_the_b
     insta::assert_snapshot!("gg_long_history_80x24", mask_hangul(&d.screen()));
     d.keys("j j j k k k");
     assert_eq!(rows_above_the_history(&d, "deploys"), 0, "moving near the top keeps it there");
-    // A history that fits whole sits at the bottom, by the composer, before and after `gg`.
-    let mut d = Demo::new(120, 40);
+    // A history that fits whole sits at the bottom, by the composer, before and after `gg` (in
+    // the compact layout twenty messages fit on a tall screen).
+    let mut d = Demo::with(
+        120,
+        60,
+        slakio_core::i18n::Lang::En,
+        slakio_tui::app::Settings { compact: true, ..Default::default() },
+    );
     d.open("feed-ticket-104");
     let main = conversation(&d);
     assert!(main.complete() && main.messages().len() == 20, "a short channel: {}", main.messages().len());
@@ -100,7 +106,7 @@ fn gg_puts_the_oldest_message_on_the_first_row_and_a_short_history_sits_at_the_b
     assert!(gap > 0, "it fits with rows to spare");
     d.keys("g g");
     assert_eq!(rows_above_the_history(&d, "feed-ticket-104"), gap, "gg moves nothing");
-    insta::assert_snapshot!("gg_short_history_120x40", mask_hangul(&d.screen()));
+    insta::assert_snapshot!("gg_short_history_120x60", mask_hangul(&d.screen()));
 }
 
 #[test]
@@ -133,7 +139,13 @@ fn messages_show_threads_reactions_and_edits() {
     let items = conversation(&d).messages().to_vec();
     let find = |p: &dyn Fn(&slakio_tui::app::pane::Shown) -> bool| items.iter().position(p).expect("one exists");
     // (message, any of these shows it)
-    let reactions: &[&str] = &[":+1: ", ":eyes: ", ":tada: ", ":fire: ", ":pray: ", ":white_check_mark: "];
+    // Reactions are chips of emoji: ` 👍 2 `.
+    let emoji: Vec<String> = ["+1", "eyes", "tada", "fire", "pray", "white_check_mark"]
+        .iter()
+        .map(|n| format!(" {} ", slakio_tui::emoji::get(n).unwrap()))
+        .collect();
+    let reactions: Vec<&str> = emoji.iter().map(String::as_str).collect();
+    let reactions: &[&str] = &reactions;
     let cases: [(usize, &[&str]); 3] = [
         (find(&|m| m.thread.is_some()), &[" replies · last ", " reply · last "]),
         (find(&|m| !m.reactions.is_empty()), reactions),
@@ -196,7 +208,7 @@ fn the_composer_takes_korean_ime_text_and_enter_echoes_it_locally() {
     assert!(main.composer_text().is_empty());
     assert!(d.status_line().contains("not sent anywhere"), "{}", d.status_line());
     let s = d.screen();
-    assert!(s.contains(&format!("Me            {HELLO}")), "the echo is in view: {s}");
+    assert!(s.contains("Me  ") && s.contains(HELLO), "the echo is in view, under the user's name: {s}");
     d.keys("esc");
     assert_eq!(d.app.mode(), Mode::Normal);
 }

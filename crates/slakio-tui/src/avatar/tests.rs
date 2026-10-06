@@ -1,4 +1,5 @@
 use super::*;
+use crate::text::width;
 
 #[test]
 fn latin_names_give_the_first_and_last_initial() {
@@ -44,4 +45,13 @@ fn a_persons_slot_is_stable_and_spreads_people_out() {
     let slots: std::collections::HashSet<usize> =
         (0..12).map(|i| slot(&id(&format!("UDEMOA{:03}", i + 1))) % 8).collect();
     assert!(slots.len() >= 5, "twelve people use most of eight colors: {slots:?}");
+}
+
+#[test]
+fn initials_fill_a_slot_on_its_first_row_and_the_rest_stays_blank() {
+    let art = Art::Initials("MK".to_string());
+    assert_eq!((art.row(BLOCK, 0), art.row(BLOCK, 1)), (" MK ".to_string(), "    ".to_string()));
+    assert_eq!(art.row(CHIP, 0), "MK");
+    let hangul = Art::Initials("\u{AE40}".to_string());
+    assert_eq!(width(&hangul.row(BLOCK, 0)), 4, "a wide syllable keeps the slot's width");
 }

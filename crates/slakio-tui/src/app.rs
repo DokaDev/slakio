@@ -105,11 +105,13 @@ pub struct Settings {
     pub icons: bool,
     /// People are pictured by an initials chip (`avatars = "initials"`, the default).
     pub avatars: bool,
+    /// Messages in compact columns instead of the comfortable layout (`density`).
+    pub compact: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { icons: false, avatars: true }
+        Self { icons: false, avatars: true, compact: false }
     }
 }
 
@@ -478,17 +480,7 @@ impl App {
                     }
                 }
             }
-            AppAction::ToggleAvatars => {
-                let value = if self.settings.avatars { "off" } else { "initials" };
-                if let Err(msg) = self.set_avatars(value, now) {
-                    self.warn(msg, now);
-                }
-            }
-            AppAction::ToggleIcons => {
-                if let Err(msg) = self.set_icons(if self.settings.icons { "off" } else { "on" }, now) {
-                    self.warn(msg, now);
-                }
-            }
+            AppAction::ToggleAvatars | AppAction::ToggleDensity | AppAction::ToggleIcons => self.toggle(a, now),
             AppAction::ChooseWorkspace => self.open_switcher(),
         }
     }

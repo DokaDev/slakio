@@ -4,24 +4,24 @@ expression: mask_hangul(&s)
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮
-│ ▾ Favorites            ││ MJ Mia Jang · 06:35                                │
-│▎  # backend            ││    Budget metrics merge design rollback alert      │
-│   # incidents       3  ││    alert should draft after alert on staging       │
-│                        ││    tomorrow                                        │
-│ ▾ Ops                  ││ TK Tom Ko · 06:41                                  │
-│   # deploys            ││    On waiting migration someone index can staging  │
-│   # alerts             ││    should                                          │
-│   # partner-shared ext ││ KN Kate Nam · 06:51                                │
-│   # hostile-strings    ││    Production roadmap customer build alert now     │
-│   # big-history        ││    latency fine review latency roadmap broken      │
-│   # long-threads       ││    should for                                      │
-│                        ││ ＊ ＊＊＊ · 06:59                                  │
-│ ▾ Channels             ││    Confirmed                                       │
-│   # announcements      ││ KN Kate Nam · 07:05                                │
-│   # design-review      ││    Ticket review pager pager production on build   │
-│   # feed-alert-134     ││    alert the on draft                              │
-│   # feed-alert-8       ││ SR Sam Rivera · 07:14                              │
-│   # feed-budget-162    ││    Meeting moved to 3pm                            │
+│ ▾ Favorites            ││ TK  Tom Ko  06:41                                  │
+│▎  # backend            ││     On waiting migration someone index can staging │
+│   # incidents       3  ││     should                                         │
+│                        ││                                                    │
+│ ▾ Ops                  ││ KN  Kate Nam  06:51                                │
+│   # deploys            ││     Production roadmap customer build alert now    │
+│   # alerts             ││     latency fine review latency roadmap broken     │
+│   # partner-shared ext ││     should for                                     │
+│   # hostile-strings    ││                                                    │
+│   # big-history        ││ ＊  ＊＊＊  06:59                                  │
+│   # long-threads       ││     Confirmed                                      │
+│                        ││                                                    │
+│ ▾ Channels             ││ KN  Kate Nam  07:05                                │
+│   # announcements      ││     Ticket review pager pager production on build  │
+│   # design-review      ││     alert the on draft                             │
+│   # feed-alert-134     ││                                                    │
+│   # feed-alert-8       ││ SR  Sam Rivera  07:14                              │
+│   # feed-budget-162    ││     Meeting moved to 3pm                           │
 │   # feed-budget-33     │├─ Message #backend ─────────────────────────────────┤
 │   # feed-build-50      ││ › Press i to write                                 │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯

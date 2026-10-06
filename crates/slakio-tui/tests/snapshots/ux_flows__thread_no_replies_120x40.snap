@@ -4,40 +4,40 @@ expression: "demo::mask_hangul(&s)"
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ────────────────────────────────────────────╮╭ ▌⤷ Thread · #backend ─────────────╮
-│ ▾ Favorites            ││    see https://docs.example.com/runbooks/latency      ││ ────────── 2026-01-06 ─────────── │
-│▎  # backend            ││ JP Jiho Park · 05:51                                  ││ SR Sam Rivera · 07:14             │
-│   # incidents       3  ││    Meeting for staging please someone someone on      ││    Meeting moved to 3pm           │
-│                        ││    maybe timeout retry a we design can sprint         ││ No replies yet · i reply          │
-│ ▾ Ops                  ││    production                                         ││                                   │
-│   # deploys            ││ JH Jiwon Han · 05:58                                  ││                                   │
-│   # alerts             ││    Rolling back                                       ││                                   │
-│   # partner-shared ext ││ HJ Hyunwoo Jung · 06:05                               ││                                   │
-│   # hostile-strings    ││    Schema production after invoice cache is should    ││                                   │
-│   # big-history        ││ KN Kate Nam · 06:13                                   ││                                   │
-│   # long-threads       ││    Suspect the DB pool 🎉                             ││                                   │
-│                        ││ LJ Lily Jeon · 06:19                                  ││                                   │
-│ ▾ Channels             ││    Dashboard schema budget draft please is now        ││                                   │
-│   # announcements      ││    waiting fine a lunch production someone cache      ││                                   │
-│   # design-review      ││    release done                                       ││                                   │
-│   # feed-alert-134     ││ KN Kate Nam · 06:26                                   ││                                   │
-│   # feed-alert-8       ││    Check a customer should maybe                      ││                                   │
-│   # feed-budget-162    ││ MJ Mia Jang · 06:35                                   ││                                   │
-│   # feed-budget-33     ││    Budget metrics merge design rollback alert alert   ││                                   │
-│   # feed-build-50      ││    should draft after alert on staging tomorrow       ││                                   │
-│   # feed-cache-119     ││ TK Tom Ko · 06:41                                     ││                                   │
-│   # feed-customer-161  ││    On waiting migration someone index can staging     ││                                   │
-│   # feed-customer…  1  ││    should                                             ││                                   │
-│   # feed-dashboard-22  ││ KN Kate Nam · 06:51                                   ││                                   │
-│   # feed-dashboard-41  ││    Production roadmap customer build alert now        ││                                   │
-│   # feed-design-34     ││    latency fine review latency roadmap broken should  ││                                   │
-│   # feed-design-83     ││    for                                                ││                                   │
-│   # feed-draft-142     ││ ＊ ＊＊＊ · 06:59                                     ││                                   │
-│   # feed-draft-58      ││    Confirmed                                          ││                                   │
-│   # feed-draft-84      ││ KN Kate Nam · 07:05                                   ││                                   │
-│   # feed-index-199  2  ││    Ticket review pager pager production on build      ││                                   │
-│   # feed-index-39      ││    alert the on draft                                 ││                                   │
-│   # feed-index-5    1  ││▎SR Sam Rivera · 07:14                                 ││                                   │
-│   # feed-invoice-16    ││▎   Meeting moved to 3pm                               ││                                   │
+│ ▾ Favorites            ││                                                       ││ ────────── 2026-01-06 ─────────── │
+│▎  # backend            ││ KN  Kate Nam  06:13                                   ││ SR  Sam Rivera  07:14             │
+│   # incidents       3  ││     Suspect the DB pool 🎉                            ││     Meeting moved to 3pm          │
+│                        ││                                                       ││ No replies yet · i reply          │
+│ ▾ Ops                  ││ LJ  Lily Jeon  06:19                                  ││                                   │
+│   # deploys            ││     Dashboard schema budget draft please is now       ││                                   │
+│   # alerts             ││     waiting fine a lunch production someone cache     ││                                   │
+│   # partner-shared ext ││     release done                                      ││                                   │
+│   # hostile-strings    ││                                                       ││                                   │
+│   # big-history        ││ KN  Kate Nam  06:26                                   ││                                   │
+│   # long-threads       ││     Check a customer should maybe                     ││                                   │
+│                        ││                                                       ││                                   │
+│ ▾ Channels             ││ MJ  Mia Jang  06:35                                   ││                                   │
+│   # announcements      ││     Budget metrics merge design rollback alert alert  ││                                   │
+│   # design-review      ││     should draft after alert on staging tomorrow      ││                                   │
+│   # feed-alert-134     ││                                                       ││                                   │
+│   # feed-alert-8       ││ TK  Tom Ko  06:41                                     ││                                   │
+│   # feed-budget-162    ││     On waiting migration someone index can staging    ││                                   │
+│   # feed-budget-33     ││     should                                            ││                                   │
+│   # feed-build-50      ││                                                       ││                                   │
+│   # feed-cache-119     ││ KN  Kate Nam  06:51                                   ││                                   │
+│   # feed-customer-161  ││     Production roadmap customer build alert now       ││                                   │
+│   # feed-customer…  1  ││     latency fine review latency roadmap broken should ││                                   │
+│   # feed-dashboard-22  ││     for                                               ││                                   │
+│   # feed-dashboard-41  ││                                                       ││                                   │
+│   # feed-design-34     ││ ＊  ＊＊＊  06:59                                     ││                                   │
+│   # feed-design-83     ││     Confirmed                                         ││                                   │
+│   # feed-draft-142     ││                                                       ││                                   │
+│   # feed-draft-58      ││ KN  Kate Nam  07:05                                   ││                                   │
+│   # feed-draft-84      ││     Ticket review pager pager production on build     ││                                   │
+│   # feed-index-199  2  ││     alert the on draft                                ││                                   │
+│   # feed-index-39      ││                                                       ││                                   │
+│   # feed-index-5    1  ││▎SR  Sam Rivera  07:14                                 ││                                   │
+│   # feed-invoice-16    ││▎    Meeting moved to 3pm                              ││                                   │
 │   # feed-invoice-168   │├─ Message #backend ────────────────────────────────────┤├─ Reply ───────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                    ││ › Press i to reply                │
 ╰────────────────────────╯╰───────────────────────────────────────────────────────╯╰───────────────────────────────────╯

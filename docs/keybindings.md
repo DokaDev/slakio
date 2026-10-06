@@ -258,6 +258,7 @@ Type `:` and the command, then `Enter`.
 | `:help` |  | Keyboard help |
 | `:avatars` |  | Show or hide avatars (initials) |
 | `:icons` |  | Show Nerd Font icons, or text instead |
+| `:density` |  | Comfortable or compact messages |
 | `:nav` | `:rail` | Top bar: workspace, views |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |

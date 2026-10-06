@@ -37,6 +37,8 @@ pub enum AppAction {
     ToggleAvatars,
     /// Nerd Font icons, or text instead (`:icons`); saved in the config file.
     ToggleIcons,
+    /// Messages comfortable or compact (`:density`); saved in the config file.
+    ToggleDensity,
 }
 
 /// Actions of the `:` command line.
@@ -250,6 +252,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     help(HelpAction::Open, "help.open", Label::ActionHelpOpen, &["help"]),
     app(AppAction::ToggleAvatars, "avatars.toggle", Label::ActionAvatars, &["avatars"]),
     app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),
+    app(AppAction::ToggleDensity, "density.toggle", Label::ActionDensity, &["density"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),

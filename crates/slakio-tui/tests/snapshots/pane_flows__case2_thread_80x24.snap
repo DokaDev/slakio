@@ -4,24 +4,24 @@ expression: mask_hangul(&s)
 ---
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ ▌#long-threads ────────────────────────────╮╭ ▌⤷ Thread · #long-threads ─────╮
-│▎─────────────── 2026-01-06 ─────────────── ││    After ticket customer       │
-│▎JL Jiyoung Lee · 07:23                     ││    timeout queue again timeout │
-│▎   We waiting waiting now index a the a    ││    check sprint deploy review  │
-│▎   the release                             ││    maybe is build tracing      │
-│▎   ⤷ 1,200 replies · last 03:23            ││    latency                     │
-│ DC Dan Cho · 07:30                         ││ MB Max Baek · 03:21            │
-│    Still index lunch index                 ││    Latency timeout should for  │
-│    ⤷ 6 replies · last 07:36                ││    invoice on index roadmap a  │
-│ OH Owen Hwang · 07:37                      ││    budget tracing is queue     │
-│    Queue a after cache invoice on customer ││    index ticket                │
-│    metrics on maybe sprint                 ││ IM Ivy Moon · 03:22            │
-│    ⤷ 12 replies · last 07:49               ││    Draft broken can looks      │
-│ LJ Lily Jeon · 07:41                       ││    staging done tracing now    │
-│    Confirmed                               ││    lunch meeting invoice       │
-│ LJ Lily Jeon · 07:54                       ││    migration done customer     │
-│    see https://docs.example.com/runbooks/  ││    please                      │
-│    latency                                 ││ EB Eve Bae · 03:23             │
-│ OH Owen Hwang · 08:00                      ││    ＊＊＊＊＊                  │
+│ ─────────────── 2026-01-06 ─────────────── ││     deploy review maybe is     │
+│▎JL  Jiyoung Lee  07:23                     ││     build tracing latency      │
+│▎    We waiting waiting now index a the a   ││                                │
+│▎    the release                            ││ MB  Max Baek  03:21            │
+│▎    ⤷ 1,200 replies · last 03:23           ││     Latency timeout should for │
+│                                            ││     invoice on index roadmap a │
+│ DC  Dan Cho  07:30                         ││     budget tracing is queue    │
+│     Still index lunch index                ││     index ticket               │
+│     ⤷ 6 replies · last 07:36               ││                                │
+│                                            ││ IM  Ivy Moon  03:22            │
+│ OH  Owen Hwang  07:37                      ││     Draft broken can looks     │
+│     Queue a after cache invoice on         ││     staging done tracing now   │
+│     customer metrics on maybe sprint       ││     lunch meeting invoice      │
+│     ⤷ 12 replies · last 07:49              ││     migration done customer    │
+│                                            ││     please                     │
+│ LJ  Lily Jeon  07:41                       ││                                │
+│     Confirmed                              ││ EB  Eve Bae  03:23             │
+│                                            ││     ＊＊＊＊＊                 │
 ├─ Message #long-threads ────────────────────┤├─ Reply ────────────────────────┤
 │ › Press i to write                         ││ › Press i to reply             │
 ╰────────────────────────────────────────────╯╰────────────────────────────────╯

@@ -42,8 +42,13 @@ images, and settings. This README only lists what works; it will grow with each 
   - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
     with mention counts; `Enter` or a click opens the conversation in the work area and moves
     there, `l` opens it and stays in the list;
-  - the conversation shows its messages (date separators, edited marker, reaction pills,
-    "N replies" rows), loading older ones as you go up; `j` / `k` select messages, `g g` /
+  - the conversation shows its messages as in GUI Slack (`density = "comfortable"`): the
+    sender's initials in a 4 × 2 block, the name and time over the text, a sender's messages
+    within five minutes grouped under one header (their time shows when selected), one blank
+    row between blocks and after reactions, reactions as emoji chips (Slack's shortcodes such as
+    `:+1:` drawn as emoji, skin tones too; a workspace's own emoji stay `:name:`); `:density`
+    switches to compact columns and saves it; date separators, the edited marker, "N replies"
+    rows; older messages load as you go up; `j` / `k` select messages, `g g` /
     `G` jump to the oldest / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
     wheel too), `Enter` opens the selected message's thread in a panel on the right (another
     thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
@@ -129,6 +134,7 @@ theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast",
                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
 avatars = "initials"     # a person's initials on a colored chip, or "off"
+density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`

@@ -43,7 +43,8 @@ fn text(buf: &Buffer, x: u16, y: u16, w: u16) -> String {
 
 /// The demo with `#backend` open in `theme`.
 fn backend(w: u16, h: u16, theme: Theme, avatars: bool) -> Demo {
-    let mut d = Demo::with(w, h, Lang::En, Settings { avatars, ..Settings::default() });
+    // The columns these tests measure are the compact layout's (the comfortable one: message_flows).
+    let mut d = Demo::with(w, h, Lang::En, Settings { avatars, compact: true, ..Settings::default() });
     d.app.theme = theme;
     d.open("backend");
     d
@@ -132,7 +133,7 @@ fn with_avatars_off_the_name_starts_the_row_as_before() {
 
 /// The DMs view in `theme`, the list cursor on row `at`.
 fn dms(theme: Theme, avatars: bool) -> Demo {
-    let mut d = Demo::with(120, 40, Lang::En, Settings { avatars, ..Settings::default() });
+    let mut d = Demo::with(120, 40, Lang::En, Settings { avatars, compact: true, ..Settings::default() });
     d.app.theme = theme;
     d.keys("space d");
     assert_eq!(d.app.view(), View::Dms);

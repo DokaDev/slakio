@@ -5,39 +5,39 @@ expression: mask_hangul(&s)
  ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││ ─────────────────────────────────────── 2026-01-05 ─────────────────────────────────────── │
-│   # backend            ││ JP Jiho Park     beforeafter                                                         13:43 │
-│   # incidents       3  ││                  :blink: 2                                                                 │
-│                        ││ JP Jiho Park     abc                                                                 14:04 │
-│ ▾ Ops                  ││ JL Jiyoung Lee   red blinking and truecolor                                          14:19 │
-│   # deploys            ││ H  Hana                                                                              14:48 │
-│   # alerts             ││ ＊ ＊＊＊        visible (edited)                                                    15:22 │
-│   # partner-shared ext ││ EB Eve Bae                                                                           15:24 │
-│▎  # hostile-strings    ││ ZL Zoe Lim       docs.example.com                                                    15:55 │
-│   # big-history        ││ TK Tom Ko        after dcs                                                           16:13 │
-│   # long-threads       ││ SR Sam Rivera    after apc                                                           16:40 │
-│                        ││ RO Ryan Oh       c1 red                                                              17:07 │
-│ ▾ Channels             ││ JH Jiwon Han     dangling (edited)                                                   17:28 │
-│   # announcements      ││                  :tada: 4                                                                  │
-│   # design-review      ││ AS Ava Shin      a�b�c�d�e�f�g                                                       17:51 │
-│   # feed-alert-134     ││ EB Eve Bae       innocent text                                                       18:10 │
-│   # feed-alert-8       ││                  EVIL                                                                      │
-│   # feed-budget-162    ││ CP Chris Park    col1    col2    col3                                                18:34 │
-│   # feed-budget-33     ││                  line two                                                                  │
-│   # feed-build-50      ││                  line three                                                                │
-│   # feed-cache-119     ││ NH Noah Han      invoice_fdp.exe attached                                            18:56 │
-│   # feed-customer-161  ││ ML Mallory live  open isolates                                                       19:08 │
-│   # feed-customer…  1  ││                  :fire: 5  :pray: 3                                                        │
-│   # feed-dashboard-22  ││ AR Amy Ryu       ab                                                                  19:33 │
-│   # feed-dashboard-41  ││ LK Leo Kang      xy                                                                  20:07 │
-│   # feed-design-34     ││ ＊ ＊＊＊        é̶                                                                   20:16 │
-│   # feed-design-83     ││ JL Jordan Lee    ❤️                                                                  20:51 │
-│   # feed-draft-142     ││ ＊ ＊＊＊        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 21:17 │
-│   # feed-draft-58      ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
-│   # feed-draft-84      ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
-│   # feed-index-199  2  ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
-│   # feed-index-39      ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
-│   # feed-index-5    1  ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
-│   # feed-invoice-16    ││                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
+│   # backend            ││  JP   Jiho Park  13:43                                                                     │
+│   # incidents       3  ││       beforeafter                                                                          │
+│                        ││        :blink: 2                                                                           │
+│ ▾ Ops                  ││                                                                                            │
+│   # deploys            ││  JP   Jiho Park  14:04                                                                     │
+│   # alerts             ││       abc                                                                                  │
+│   # partner-shared ext ││                                                                                            │
+│▎  # hostile-strings    ││  JL   Jiyoung Lee  14:19                                                                   │
+│   # big-history        ││       red blinking and truecolor                                                           │
+│   # long-threads       ││                                                                                            │
+│                        ││  H    Hana  14:48                                                                          │
+│ ▾ Channels             ││                                                                                            │
+│   # announcements      ││                                                                                            │
+│   # design-review      ││  ＊   ＊＊＊  15:22                                                                        │
+│   # feed-alert-134     ││       visible (edited)                                                                     │
+│   # feed-alert-8       ││                                                                                            │
+│   # feed-budget-162    ││  EB   Eve Bae  15:24                                                                       │
+│   # feed-budget-33     ││                                                                                            │
+│   # feed-build-50      ││                                                                                            │
+│   # feed-cache-119     ││  ZL   Zoe Lim  15:55                                                                       │
+│   # feed-customer-161  ││       docs.example.com                                                                     │
+│   # feed-customer…  1  ││                                                                                            │
+│   # feed-dashboard-22  ││  TK   Tom Ko  16:13                                                                        │
+│   # feed-dashboard-41  ││       after dcs                                                                            │
+│   # feed-design-34     ││                                                                                            │
+│   # feed-design-83     ││  SR   Sam Rivera  16:40                                                                    │
+│   # feed-draft-142     ││       after apc                                                                            │
+│   # feed-draft-58      ││                                                                                            │
+│   # feed-draft-84      ││  RO   Ryan Oh  17:07                                                                       │
+│   # feed-index-199  2  ││       c1 red                                                                               │
+│   # feed-index-39      ││                                                                                            │
+│   # feed-index-5    1  ││  JH   Jiwon Han  17:28                                                                     │
+│   # feed-invoice-16    ││       dangling (edited)                                                                    │
 │   # feed-invoice-168   │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                                                         │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
