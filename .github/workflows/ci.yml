@@ -67,13 +67,26 @@ jobs:
           # instead of skipping when `script` cannot start.
           SLAKIO_REQUIRE_PTY: "1"
 
-  # No Hangul outside the values of locales/ko.toml, no old project name, no absolute home paths.
+  # No Hangul outside the values of locales/ko.toml, no old project name, no absolute home paths,
+  # and the ratchet on file sizes.
   repo-rules:
     name: repository rules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The pushed commits, for the snapshot check of refactors.
+          fetch-depth: 0
       - run: bash .github/scripts/repo-rules.sh
+      - name: Refactors change no snapshot
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "no earlier commit to compare with"
+            exit 0
+          fi
+          bash .github/scripts/refactor-snapshots.sh "$BASE"
 
   # tui -> core <- adapters (docs/architecture.md, "Dependency rules").
   dependency-direction:

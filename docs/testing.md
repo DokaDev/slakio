@@ -32,6 +32,8 @@ Rules:
 - Flow tests read the app through its queries (`app/query.rs`: where the focus is, which popup
   is up, the panes and what they hold) and drive it by keys, the mouse and `select_message`;
   the work area's own state is private to the crate, so its shape can change without them.
+- A `refactor:` commit changes no snapshot: a snapshot that changes means behavior changed
+  (`.github/scripts/refactor-snapshots.sh`, run in CI over the pushed commits).
 - Every fix ships a test that fails without it. An assertion is never weakened to make a test
   pass.
 - Test data is invented; nothing from a real workspace is ever committed (see CONTRIBUTING.md).
