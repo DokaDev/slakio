@@ -1,22 +1,22 @@
 ---
-source: crates/slakio-tui/tests/shell_flows.rs
-expression: mask_hangul(&s)
+source: crates/slakio-tui/tests/presence_flows.rs
+expression: mask_hangul(&d.screen())
 ---
 ╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ ● Kim                  ││                                                                                        │
+│▌A││ ● Kim               1  ││                                                                                        │
 │▌B││ ● Park                 ││                                                                                        │
 │──││ ○ Lee                  ││                                                                                        │
 │H ││ ◐ Minsu                ││                                                                                        │
 │D●││ ● Jiwon                ││                                                                                        │
-│A●││ @ Park, Lee, Minsu  1  ││                                                                                        │
-│F ││                        ││                                                                                        │
-│L ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
-│  ││                        ││                                                                                        │
+│A●││ ○ Seoyeon              ││                                                                                        │
+│F ││ ● Hyunwoo           2  ││                                                                                        │
+│L ││ ● Alex Morgan       1  ││                                                                                        │
+│  ││ ○ Sam Rivera           ││                                                                                        │
+│  ││ ◐ Jordan Lee           ││                                                                                        │
+│  ││ ● Taylor Kim           ││                                                                                        │
+│  ││ ○ Chris Park        2  ││                                                                                        │
+│  ││ ◐ Mallory live         ││                                                                                        │
+│  ││ @ Park, Lee, Minsu  2  ││                                                                                        │
 │  ││                        ││                         No conversation open                                           │
 │  ││                        ││                         Pick one in the list and press Enter.                          │
 │  ││                        ││                                                                                        │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │  ││                        ││                                                                                        │
 │  ││                        ││                                                                                        │
 ╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › DMs     │ Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 1 │ demo
+ NORMAL  ▌A company › DMs │ Enter open · l peek · Tab next pane · : commands · ? help · Space more │  @37  DM 16 │ demo

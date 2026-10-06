@@ -230,7 +230,7 @@ fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
     d.keys("enter");
     let s = d.screen();
     assert_harmless(&s);
-    assert!(s.contains("@ Mallory live"), "the list row: {s}");
+    assert!(s.contains("◐ Mallory live"), "the list row, its peer in do not disturb: {s}");
     assert!(s.contains("▌@Mallory live"), "the pane title: {s}");
     assert!(d.status_line().contains("@Mallory live"), "{}", d.status_line());
     assert!(!s.contains("owned"), "the title sequence is gone, its text too: {s}");

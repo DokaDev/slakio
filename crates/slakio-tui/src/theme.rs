@@ -20,7 +20,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use slakio_core::model::WorkspaceColor;
+use slakio_core::model::{Presence, WorkspaceColor};
 
 mod builtins;
 pub use builtins::*;
@@ -227,6 +227,16 @@ impl Theme {
     /// An unread mark that is not a count (`●`): plain, or a mention's color.
     pub fn dot(&self, mention: bool) -> Style {
         if mention && !self.plain() { Style::new().fg(self.error).add_modifier(Modifier::BOLD) } else { self.bold() }
+    }
+
+    /// A person's presence mark: active in the success color, away muted, do not disturb in the
+    /// warning color. The marks differ in shape too ([`crate::ui`]), so no color is needed.
+    pub fn presence(&self, p: Presence) -> Style {
+        match p {
+            Presence::Active => Style::new().fg(self.success),
+            Presence::Dnd => Style::new().fg(self.warning),
+            Presence::Away | Presence::Unknown => self.muted(),
+        }
     }
 
     pub fn accent(&self) -> Style {

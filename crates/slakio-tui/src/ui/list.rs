@@ -12,11 +12,13 @@
 //! │   ▪ secret-proj           │   ▪ = private
 //! │   # partner-shared    ext │   ext = shared with another organization
 //! │   # feed-customer-1…  1   │   names end in … where they would touch the pill
+//! │   ● Minsu Kim             │   a DM: its peer is active (●), away (○) or in do not
+//! │   ◐ Jiyoung Lee           │   disturb (◐); `@` while unknown
 //! ```
 //!
 //! Unread conversations are bold, muted ones faint; nothing else marks them.
 
-use super::{count_pill, frame, highlight, view_label};
+use super::{count_pill, frame, highlight, presence_mark, view_label};
 use crate::app::App;
 use crate::app::model::Row;
 use crate::app::shell::{Region, View};
@@ -123,12 +125,26 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) {
                 (ConversationKind::Dm { .. } | ConversationKind::GroupDm { .. }, _) => "@",
             };
             let unread = c.unread > 0 && !c.muted;
-            let (name_style, prefix_style) = if c.muted {
+            let (name_style, mut prefix_style) = if c.muted {
                 (t.faint(), t.faint())
             } else if unread {
                 (t.bold(), t.bold())
             } else {
                 (t.text(), t.muted())
+            };
+            // A DM shows its peer's presence in place of `@`: the shape tells it, the color helps.
+            let presence = match &c.kind {
+                ConversationKind::Dm { user } => app.model.user(user).and_then(|u| presence_mark(u.presence, icons)),
+                _ => None,
+            };
+            let prefix = match presence {
+                Some((mark, p)) => {
+                    if !c.muted {
+                        prefix_style = t.presence(p);
+                    }
+                    mark
+                }
+                None => prefix,
             };
             // Mentions always show; a DM's unread messages unless it is muted.
             let count = if c.mentions > 0 {

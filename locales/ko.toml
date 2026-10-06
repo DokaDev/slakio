@@ -30,6 +30,9 @@
 "pane.loading" = "메시지를 불러오는 중…"
 "pane.no_messages" = "아직 메시지가 없습니다 · {keys} 쓰기"
 "pane.thread" = "스레드"
+"presence.active" = "활동 중"
+"presence.away" = "자리 비움"
+"presence.dnd" = "방해 금지"
 
 "message.edited" = "(수정됨)"
 "message.more" = "… 이 메시지의 나머지는 표시하지 않습니다"

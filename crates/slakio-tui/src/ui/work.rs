@@ -4,14 +4,14 @@
 //! composer: a prompt and the text, no box of its own.
 //!
 //! ```text
-//! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮
+//! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮   a DM: ▌@Minsu Kim ● active
 //! │ Kim   Starting deploy   10:02  ││ Kim   Starting …       │
 //! ├─ Message #backend ─────────────┤├─ Reply ────────────────┤
 //! │ › Press i to write             ││ ›                      │
 //! ╰────────────────────────────────╯╰────────────────────────╯
 //! ```
 
-use super::{frame, panel, timeline};
+use super::{frame, panel, presence_mark, timeline};
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::Pane;
@@ -25,7 +25,7 @@ use ratatui::layout::{Position, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
-use slakio_core::model::Conversation;
+use slakio_core::model::{Conversation, ConversationKind, Presence};
 
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let Some(main) = app.work.main.as_ref() else {
@@ -60,7 +60,22 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
         Side::Main => format!("{name} "),
         Side::Thread => format!("⤷ {} · {name} ", app.i18n.label(Label::PaneThread)),
     };
-    let title = Line::from(vec![Span::raw(" "), stripe, Span::styled(text, t.title(focused))]);
+    let mut spans = vec![Span::raw(" "), stripe, Span::styled(text, t.title(focused))];
+    // A DM's title says whether its peer is around: `@Minsu Kim ● active`.
+    let peer = match conversation.map(|c| &c.kind) {
+        Some(ConversationKind::Dm { user }) if side == Side::Main => app.model.user(user),
+        _ => None,
+    };
+    if let Some((mark, p)) = peer.and_then(|u| presence_mark(u.presence, app.settings.icons)) {
+        let label = match p {
+            Presence::Active => Label::PresenceActive,
+            Presence::Away => Label::PresenceAway,
+            _ => Label::PresenceDnd,
+        };
+        spans.push(Span::styled(mark, t.presence(p)));
+        spans.push(Span::styled(format!(" {} ", app.i18n.label(label)), t.muted()));
+    }
+    let title = Line::from(spans);
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && app.work.insert;
     let view = pane.composer.view(screen::composer_width(area));

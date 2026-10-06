@@ -33,6 +33,7 @@ use ratatui::symbols::border;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use slakio_core::i18n::{Label, Localized, Msg};
+use slakio_core::model::Presence;
 use slakio_core::sanitize::Safe;
 use std::time::Instant;
 
@@ -164,6 +165,20 @@ fn view_glyph(view: View, icons: bool) -> &'static str {
         (View::Files, true) => "\u{F0219}",
         (View::Later, true) => "\u{F00C0}",
     }
+}
+
+/// A person's presence mark: `●` active, `○` away, `◐` (with icons, a moon) in do not
+/// disturb; none while unknown. Told apart by shape, so it reads without color.
+fn presence_mark(p: Presence, icons: bool) -> Option<(&'static str, Presence)> {
+    let mark = match (p, icons) {
+        (Presence::Active, _) => "●",
+        (Presence::Away, _) => "○",
+        (Presence::Dnd, false) => "◐",
+        // nf-md-weather_night
+        (Presence::Dnd, true) => "\u{F0594}",
+        (Presence::Unknown, _) => return None,
+    };
+    Some((mark, p))
 }
 
 /// The first letter of a workspace's name, upper case: its rail letter.

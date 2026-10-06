@@ -40,6 +40,10 @@
 "pane.loading" = "Loading messages…"
 "pane.no_messages" = "No messages yet · {keys} write"
 "pane.thread" = "Thread"
+# A DM's title: its peer's presence.
+"presence.active" = "active"
+"presence.away" = "away"
+"presence.dnd" = "do not disturb"
 
 # A message in a pane.
 "message.edited" = "(edited)"
