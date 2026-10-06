@@ -30,8 +30,9 @@ Rules:
   never rewrites them under CI. Hangul in a screen (the demo has Korean names) is written as
   `＊` in snapshot files, which hold no Hangul like every tracked file.
 - Flow tests read the app through its queries (`app/query.rs`: where the focus is, which popup
-  is up, the panes and what they hold) and drive it by keys, the mouse and `select_message`;
-  the work area's own state is private to the crate, so its shape can change without them.
+  is up, the panes by handle and what they hold, the list panel, the rail, the help) and drive
+  it by keys, the mouse and a few hidden test drivers (`select_message`, `move_list_cursor_to`);
+  the sub-states are private to the crate, so their shape can change without the tests.
 - A `refactor:` commit changes no snapshot: a snapshot that changes means behavior changed
   (`.github/scripts/refactor-snapshots.sh`, run in CI over the pushed commits).
 - Every fix ships a test that fails without it. An assertion is never weakened to make a test

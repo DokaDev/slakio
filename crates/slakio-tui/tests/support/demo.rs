@@ -9,7 +9,7 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{Event, KeyModifiers, MouseEvent, MouseEventKind};
 use slakio_core::backend::Backend;
 use slakio_core::i18n::Lang;
-use slakio_tui::app::{App, Settings};
+use slakio_tui::app::{App, PaneKind, PaneRef, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::keymap::parse_keys;
 use slakio_tui::theme::Theme;
@@ -130,19 +130,32 @@ pub fn assert_harmless(screen: &str) {
 }
 
 impl Demo {
+    /// The open pane that shows a `kind`.
+    pub fn pane(&self, kind: PaneKind) -> Option<PaneRef<'_>> {
+        self.app.open_panes().into_iter().find(|p| p.kind() == kind)
+    }
+
+    /// Where the pane that shows a `kind` is drawn, while it is on screen.
+    pub fn pane_area(&self, kind: PaneKind) -> Option<ratatui::layout::Rect> {
+        self.app.panes_on_screen().into_iter().find(|(p, _)| p.kind() == kind).map(|(_, r)| r)
+    }
+
+    /// What the pane with the keyboard shows; `None` when no pane has it.
+    pub fn focused_kind(&self) -> Option<PaneKind> {
+        self.app.focused_pane().map(PaneRef::kind)
+    }
+
     /// Open the conversation of the shown workspace named `name` from the list panel (Home).
     pub fn open(&mut self, name: &str) {
         use slakio_tui::app::model::Row;
-        use slakio_tui::app::shell::{Region, View};
-        self.app.shell.view = View::Home;
-        self.app.shell.collapsed.clear();
-        let rows = self.app.shell.rows(&self.app.model);
+        use slakio_tui::app::shell::View;
+        self.app.show_unfolded(View::Home);
+        let rows = self.app.list_rows();
         let at = rows
             .iter()
             .position(|r| matches!(r, Row::Conversation(i) if self.app.model.conversation(*i).name == name))
             .unwrap_or_else(|| panic!("no conversation {name}"));
-        self.app.shell.focus = Region::List;
-        self.app.shell.list_cursor = at;
+        self.app.focus_list_row(at);
         self.keys("enter");
     }
 

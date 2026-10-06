@@ -123,11 +123,11 @@ fn the_which_key_popup_dims_the_screen_and_hides_the_hints() {
 fn dividers_span_the_pane_and_use_one_color() {
     let mut d = tokyo(120, 40);
     d.open("long-threads");
-    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let main = d.pane(PaneKind::Conversation).unwrap();
     let i = main.messages().iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).unwrap();
     d.app.select_message(i);
     d.keys("enter");
-    let thread = d.app.pane_area(PaneKind::Thread);
+    let thread = d.pane_area(PaneKind::Thread);
     let thread = thread.unwrap();
     let buf = d.buffer();
     let inner = screen::inner(thread);

@@ -10,7 +10,7 @@ use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use slakio_core::backend::{Backend, Envelope, Event as BackendEvent, Generation};
 use slakio_core::i18n::Lang;
 use slakio_tui::app::shell::View;
-use slakio_tui::app::{App, Focus, Settings};
+use slakio_tui::app::{App, Focus, PaneKind, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::theme::Theme;
 use slakio_world::World;
@@ -75,10 +75,10 @@ fn the_focused_rail_expands_over_the_list_or_pushes_it_aside() {
 fn the_rail_switches_workspace_and_view() {
     let mut d = Demo::new(120, 40);
     d.keys("ctrl+h j enter");
-    assert_eq!((d.app.shell.workspace, d.app.focus()), (1, Focus::List));
+    assert_eq!((d.app.workspace(), d.app.focus()), (1, Focus::List));
     assert!(d.status_line().contains("B side"), "{}", d.status_line());
     d.keys("space d");
-    assert_eq!(d.app.shell.view, View::Dms);
+    assert_eq!(d.app.view(), View::Dms);
     let s = d.screen();
     assert!(s.contains(" DMs "), "{s}");
     assert!(!s.contains("# general"), "DMs lists no channels");
@@ -90,13 +90,13 @@ fn views_of_a_later_version_say_so_and_show_no_invented_rows() {
     let mut d = Demo::new(120, 40);
     for (keys, view) in [("space a", View::Activity), ("space f", View::Files), ("space l", View::Later)] {
         d.keys(keys);
-        assert_eq!(d.app.shell.view, view);
+        assert_eq!(d.app.view(), view);
         let s = d.screen();
         assert!(s.contains("comes in a") && s.contains("Space h  Home"), "{s}");
         assert!(!s.contains("# "), "{s}");
     }
     d.command("home");
-    assert_eq!(d.app.shell.view, View::Home);
+    assert_eq!(d.app.view(), View::Home);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn enter_opens_a_conversation_in_the_work_area_and_the_breadcrumb() {
     d.keys("enter");
     let s = d.screen();
     assert!(s.contains("▌#backend") && s.contains("├─ Message #backend") && s.contains("› Press i to write"), "{s}");
-    assert_eq!(d.app.focus(), Focus::Conversation, "the opened conversation has the keyboard");
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation), "the opened conversation has the keyboard");
     assert!(d.status_line().contains("#backend"), "{}", d.status_line());
     insta::assert_snapshot!("demo_open_120x40", mask_hangul(&s));
 }
@@ -115,17 +115,17 @@ fn enter_opens_a_conversation_in_the_work_area_and_the_breadcrumb() {
 #[test]
 fn list_keys_move_jump_and_fold() {
     let mut d = Demo::new(120, 40);
-    let rows = d.app.shell.rows(&d.app.model).len();
+    let rows = d.app.list_rows().len();
     d.keys("G");
-    assert_eq!(d.app.shell.list_cursor, rows - 1);
+    assert_eq!(d.app.list_cursor(), rows - 1);
     d.keys("g g");
-    assert_eq!(d.app.shell.list_cursor, 0);
+    assert_eq!(d.app.list_cursor(), 0);
     d.keys("enter");
     assert!(d.screen().contains("▸ Favorites"), "folded");
-    assert_eq!(d.app.shell.rows(&d.app.model).len(), rows - 2);
+    assert_eq!(d.app.list_rows().len(), rows - 2);
     // Down past the blank row under the folded section, and up again onto Ops.
     d.keys("down down up");
-    assert_eq!(d.app.shell.list_cursor, 2);
+    assert_eq!(d.app.list_cursor(), 2);
     assert!(d.screen().contains("▾ Ops"));
 }
 
@@ -141,10 +141,10 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
     d.keys("space w l ctrl+l");
     assert_eq!(d.app.focus(), Focus::List, "never onto an empty work area");
     d.keys("enter ctrl+h ctrl+l");
-    assert_eq!(d.app.focus(), Focus::Conversation);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation));
     // A sequence nothing is bound to is dropped without doing anything.
     d.keys("space x");
-    assert_eq!(d.app.focus(), Focus::Conversation);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation));
     assert!(d.app.keys.pending().is_empty());
 }
 
@@ -152,7 +152,7 @@ fn a_leader_sequence_shows_its_keys_until_it_ends() {
 fn the_list_panel_hides_and_comes_back() {
     let mut d = Demo::new(120, 40);
     d.keys("space e");
-    assert!(d.app.shell.list_hidden);
+    assert!(d.app.list_hidden());
     assert!(!d.screen().contains("Favorites"));
     d.command("list");
     assert!(d.screen().contains("Favorites"), "{}", d.screen());
@@ -162,24 +162,24 @@ fn the_list_panel_hides_and_comes_back() {
 fn hovering_the_rail_expands_it_and_clicks_select_and_open() {
     let mut d = Demo::new(120, 40);
     assert!(d.mouse(MouseEventKind::Moved, 1, 5), "entering the rail redraws");
-    assert!(d.app.shell.rail_expanded());
+    assert!(d.app.rail_expanded());
     assert!(!d.mouse(MouseEventKind::Moved, 2, 5), "moving along the same item does not");
     assert!(d.mouse(MouseEventKind::Moved, 2, 6), "another item is lit");
     assert!(d.mouse(MouseEventKind::Moved, 60, 6));
-    assert!(!d.app.shell.rail_expanded());
+    assert!(!d.app.rail_expanded());
     // Row 2 of the rail is workspace B (row 0 is the border).
     d.mouse(MouseEventKind::Down(MouseButton::Left), 1, 2);
-    assert_eq!(d.app.shell.workspace, 1);
+    assert_eq!(d.app.workspace(), 1);
     // The separator does nothing.
     d.mouse(MouseEventKind::Down(MouseButton::Left), 1, 3);
-    assert_eq!(d.app.shell.workspace, 1);
+    assert_eq!(d.app.workspace(), 1);
     // A list row opens it: row 2 is the first channel under the first section.
     let list = d.app.areas().list.unwrap();
     d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 2);
     let open = d.app.open_target().expect("opened").clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);
-    assert_eq!(d.app.focus(), Focus::Conversation);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation));
 }
 
 #[test]
@@ -214,7 +214,7 @@ fn icons_replace_the_rail_letters() {
 fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
     let mut d = Demo::new(120, 40);
     d.keys("space d");
-    let rows = d.app.shell.rows(&d.app.model);
+    let rows = d.app.list_rows();
     let at = rows
         .iter()
         .position(|r| match r {
@@ -237,7 +237,7 @@ fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
     // A hostile section name of the other workspace.
     // Home puts the rail cursor on Home; one up is workspace B.
     d.keys("space h ctrl+h k enter");
-    assert_eq!(d.app.shell.workspace, 1);
+    assert_eq!(d.app.workspace(), 1);
     let s = d.screen();
     assert_harmless(&s);
     assert!(s.contains("▾ Side projects"), "{s}");

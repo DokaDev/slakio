@@ -52,7 +52,7 @@ fn backend(w: u16, h: u16, theme: Theme, avatars: bool) -> Demo {
 /// The first row drawn of each message of the main pane on screen: (message, y).
 fn first_rows(d: &Demo) -> Vec<(usize, u16)> {
     let _ = d.buffer();
-    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let pane = d.pane(PaneKind::Conversation).unwrap();
     let mut out: Vec<(usize, u16)> = Vec::new();
     for (message, y) in pane.drawn_rows() {
         if !out.iter().any(|(m, _)| *m == message) {
@@ -67,8 +67,8 @@ fn a_message_group_starts_with_its_senders_chip_and_the_text_column_stays_put() 
     let theme = tokyo();
     let d = backend(200, 50, theme.clone(), true);
     let buf = d.buffer();
-    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
-    let main = d.app.pane_area(PaneKind::Conversation);
+    let pane = d.pane(PaneKind::Conversation).unwrap();
+    let main = d.pane_area(PaneKind::Conversation);
     // The pane's text starts one cell in (the gutter); the chip is first.
     let x0 = screen::inner(main.unwrap()).x + 1;
     let mut chips = 0;
@@ -110,9 +110,9 @@ fn with_avatars_off_the_name_starts_the_row_as_before() {
     let theme = tokyo();
     let d = backend(200, 50, theme.clone(), false);
     let buf = d.buffer();
-    let main = d.app.pane_area(PaneKind::Conversation);
+    let main = d.pane_area(PaneKind::Conversation);
     let x0 = screen::inner(main.unwrap()).x + 1;
-    let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let pane = d.pane(PaneKind::Conversation).unwrap();
     for (i, y) in first_rows(&d) {
         assert!(!is_chip(&theme, buf[(x0, y)].bg), "message {i}");
         if i == 0 || pane.messages()[i - 1].user != pane.messages()[i].user {
@@ -130,7 +130,7 @@ fn dms(theme: Theme, avatars: bool) -> Demo {
     let mut d = Demo::with(120, 40, Lang::En, Settings { avatars, ..Settings::default() });
     d.app.theme = theme;
     d.keys("space d");
-    assert_eq!(d.app.shell.view, View::Dms);
+    assert_eq!(d.app.view(), View::Dms);
     d
 }
 
@@ -140,7 +140,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
     let d = dms(theme.clone(), true);
     let buf = d.buffer();
     let list = screen::inner(d.app.areas().list.unwrap());
-    let rows = d.app.shell.rows(&d.app.model);
+    let rows = d.app.list_rows();
     let mut seen_group = false;
     for (k, row) in rows.iter().enumerate() {
         let Row::Conversation(i) = row else { continue };
@@ -154,7 +154,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
                 // A muted DM's chip is muted, on the group chip's background.
                 let bg = if c.muted { theme.avatar_muted().bg } else { theme.avatar(slot).bg };
                 let bg = bg.unwrap();
-                if k != d.app.shell.list_cursor || !c.muted {
+                if k != d.app.list_cursor() || !c.muted {
                     assert_eq!(buf[(x, y)].bg, bg, "{}", c.name.line());
                 }
                 let want = avatar::initials(u.display_name.line().as_str(), String::new);
@@ -175,7 +175,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
     }
     assert!(seen_group);
     // The selected row keeps the chip's color and the mark's.
-    let selected = list.y + d.app.shell.list_cursor as u16;
+    let selected = list.y + d.app.list_cursor() as u16;
     assert_eq!(buf[(list.x + 5, selected)].bg, theme.selection);
     assert!(is_chip(&theme, buf[(list.x + 1, selected)].bg), "the chip stays on the bar");
     assert_eq!(buf[(list.x + 3, selected)].fg, theme.success, "Minsu Kim is active");
@@ -188,7 +188,7 @@ fn without_colors_a_chip_is_reversed_and_presence_still_has_its_shape() {
     let buf = d.buffer();
     let list = screen::inner(d.app.areas().list.unwrap());
     // A row not muted below the selected one (that one is reversed as a whole).
-    let rows = d.app.shell.rows(&d.app.model);
+    let rows = d.app.list_rows();
     let k = (1..rows.len())
         .find(|&k| matches!(rows[k], Row::Conversation(i) if !d.app.model.conversation(i).muted))
         .unwrap();
@@ -211,7 +211,7 @@ fn a_dm_title_starts_with_the_peers_chip() {
     let mut d = dms(theme.clone(), true);
     d.keys("enter");
     let buf = d.buffer();
-    let main = d.app.pane_area(PaneKind::Conversation);
+    let main = d.pane_area(PaneKind::Conversation);
     let top = main.unwrap().y;
     let line: String = (0..d.app.size.width).map(|x| buf[(x, top)].symbol().to_string()).collect();
     assert!(line.contains("▌MK @Minsu Kim ● active"), "{line}");
@@ -276,9 +276,9 @@ fn a_stacked_message_indents_its_text_under_the_name() {
     for (avatars, indent) in [(true, 3u16), (false, 2)] {
         let d = backend(80, 24, Theme::terminal(), avatars);
         let buf = d.buffer();
-        let main = d.app.pane_area(PaneKind::Conversation);
+        let main = d.pane_area(PaneKind::Conversation);
         let x0 = screen::inner(main.unwrap()).x + 1;
-        let pane = d.app.pane_of(PaneKind::Conversation).unwrap();
+        let pane = d.pane(PaneKind::Conversation).unwrap();
         let hits: Vec<(usize, u16)> = pane.drawn_rows();
         let mut checked = 0;
         for i in hits.iter().map(|h| h.0).collect::<std::collections::BTreeSet<_>>() {

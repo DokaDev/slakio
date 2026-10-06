@@ -1,32 +1,33 @@
 //! What the app shows, asked from outside: where the keyboard is, which popup is up, the panes
-//! and what they hold. Tests read the app through these queries, never
-//! through the sub-states, so the work area can change shape without touching them.
+//! and what they hold, the list panel and the rail, the keyboard help. Tests read the app through
+//! these queries, never through the sub-states (which are private to the crate), so the state
+//! can change shape without touching them. Panes are named by a [`PaneHandle`], never by their
+//! place, so the queries hold when the work area gains splits.
+//!
+//! A few drivers at the end put the app in a state keys would take long to reach; they are for
+//! tests only and hidden from the docs.
 
 use super::App;
 use super::dialog::Question;
+use super::help;
+use super::model::Row;
 use super::pane::{Pane, Shown};
-use super::shell::Region;
-use super::work::Side;
+use super::shell::{Region, View};
+use crate::keymap::Ctx;
 use crate::screen::Slot;
 use ratatui::layout::Rect;
 use slakio_core::model::Target;
+
+/// An open pane, as long as it stays open.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PaneHandle(Slot);
 
 /// Where the keyboard is, under any popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
     Rail,
     List,
-    /// The pane with a conversation.
-    Conversation,
-    /// The thread panel.
-    Thread,
-}
-
-impl Focus {
-    /// A pane of the work area has the keyboard.
-    pub fn is_pane(self) -> bool {
-        matches!(self, Self::Conversation | Self::Thread)
-    }
+    Pane(PaneHandle),
 }
 
 /// What a pane shows.
@@ -46,56 +47,66 @@ pub enum Overlay {
 
 /// A pane, read only.
 #[derive(Clone, Copy, Debug)]
-pub struct PaneRef<'a>(&'a Pane);
+pub struct PaneRef<'a> {
+    pane: &'a Pane,
+    handle: PaneHandle,
+}
 
 impl<'a> PaneRef<'a> {
+    pub fn handle(self) -> PaneHandle {
+        self.handle
+    }
+
     pub fn kind(self) -> PaneKind {
-        if self.0.is_thread() { PaneKind::Thread } else { PaneKind::Conversation }
+        if self.pane.is_thread() { PaneKind::Thread } else { PaneKind::Conversation }
     }
 
     pub fn target(self) -> &'a Target {
-        &self.0.target
+        &self.pane.target
     }
 
     /// The loaded messages, oldest first.
     pub fn messages(self) -> &'a [Shown] {
-        &self.0.items
+        &self.pane.items
     }
 
     /// The oldest message is loaded.
     pub fn complete(self) -> bool {
-        self.0.complete
+        self.pane.complete
     }
 
     /// The selected message (index into [`Self::messages`]).
     pub fn selected(self) -> Option<usize> {
-        self.0.selected
+        self.pane.selected
     }
 
     /// The selected messages: the VISUAL range, or the selected one.
     pub fn range(self) -> Option<(usize, usize)> {
-        self.0.range()
+        self.pane.range()
     }
 
     /// The rows drawn last, top down: (message, screen row) for each row of a message.
     pub fn drawn_rows(self) -> Vec<(usize, u16)> {
-        self.0.hits.borrow().iter().map(|h| (h.message, h.y)).collect()
+        self.pane.hits.borrow().iter().map(|h| (h.message, h.y)).collect()
     }
 
     /// What its composer holds.
     pub fn composer_text(self) -> &'a str {
-        self.0.composer.text()
+        self.pane.composer.text()
     }
 }
 
 impl App {
+    fn pane_ref(&self, slot: Slot) -> Option<PaneRef<'_>> {
+        self.work.pane(slot).map(|pane| PaneRef { pane, handle: PaneHandle(slot) })
+    }
+
     /// Where the keyboard is, under any popup.
     pub fn focus(&self) -> Focus {
-        match (self.shell.focus, self.work.side) {
-            (Region::Rail, _) => Focus::Rail,
-            (Region::List, _) => Focus::List,
-            (Region::Work, Side::Main) => Focus::Conversation,
-            (Region::Work, Side::Thread) => Focus::Thread,
+        match self.shell.focus {
+            Region::Rail => Focus::Rail,
+            Region::List => Focus::List,
+            Region::Work => Focus::Pane(PaneHandle(self.work.side.slot())),
         }
     }
 
@@ -110,40 +121,132 @@ impl App {
         self.cmdline.is_open().then_some(Overlay::Palette)
     }
 
-    /// The pane that has (or would have, with the work area focused) the keyboard.
-    pub fn focused_pane(&self) -> Option<PaneRef<'_>> {
-        self.work.focused().map(PaneRef)
+    /// The pane `handle` names, while it is open.
+    pub fn pane_for(&self, handle: PaneHandle) -> Option<PaneRef<'_>> {
+        self.pane_ref(handle.0)
     }
 
-    /// The pane of kind `kind`, when open.
-    pub fn pane_of(&self, kind: PaneKind) -> Option<PaneRef<'_>> {
-        match kind {
-            PaneKind::Conversation => self.work.main.as_ref(),
-            PaneKind::Thread => self.work.thread.as_ref(),
+    /// The pane with the keyboard, if a pane has it.
+    pub fn focused_pane(&self) -> Option<PaneRef<'_>> {
+        match self.focus() {
+            Focus::Pane(h) => self.pane_for(h),
+            _ => None,
         }
-        .map(PaneRef)
+    }
+
+    /// Every open pane, shown or not, in reading order.
+    pub fn open_panes(&self) -> Vec<PaneRef<'_>> {
+        [Slot::Main, Slot::Thread].into_iter().filter_map(|s| self.pane_ref(s)).collect()
+    }
+
+    /// The panes on screen and where each is drawn (a narrow screen leaves some out).
+    pub fn panes_on_screen(&self) -> Vec<(PaneRef<'_>, Rect)> {
+        let frame = self.frame();
+        frame.panes.iter().filter_map(|l| self.pane_ref(l.slot).map(|p| (p, l.rect))).collect()
+    }
+
+    /// Where the messages of pane `handle` are drawn, while it is on screen.
+    pub fn message_area(&self, handle: PaneHandle) -> Option<Rect> {
+        self.frame().pane(handle.0).map(|l| l.parts.messages)
+    }
+
+    /// The open pane that shows `target`.
+    pub fn pane_showing(&self, target: &Target) -> Option<PaneRef<'_>> {
+        self.open_panes().into_iter().find(|p| p.target() == target)
     }
 
     /// The conversation open in the work area.
     pub fn open_target(&self) -> Option<&Target> {
-        self.pane_of(PaneKind::Conversation).map(PaneRef::target)
+        self.pane_ref(Slot::Main).map(PaneRef::target)
     }
 
-    /// Where the pane of kind `kind` is drawn; `None` when it is closed or left out (a narrow
-    /// screen shows only the pane with the keyboard).
-    pub fn pane_area(&self, kind: PaneKind) -> Option<Rect> {
-        let slot = match kind {
-            PaneKind::Conversation => Slot::Main,
-            PaneKind::Thread => Slot::Thread,
-        };
-        self.frame().pane(slot).map(|p| p.rect)
+    /// The rows of the list panel, top down.
+    pub fn list_rows(&self) -> Vec<Row> {
+        self.shell.rows(&self.model)
     }
 
-    /// Select message `index` of the focused pane, as a click does but without asking for
-    /// older messages (for tests that pick a message by what it holds).
+    /// The row of the list panel's cursor.
+    pub fn list_cursor(&self) -> usize {
+        self.shell.list_cursor
+    }
+
+    /// The first row the list panel shows.
+    pub fn list_top(&self) -> usize {
+        self.shell.list_top
+    }
+
+    /// The user hid the list panel.
+    pub fn list_hidden(&self) -> bool {
+        self.shell.list_hidden
+    }
+
+    /// What the list panel lists.
+    pub fn view(&self) -> View {
+        self.shell.view
+    }
+
+    /// The workspace shown (index into the model's workspaces).
+    pub fn workspace(&self) -> usize {
+        self.shell.workspace
+    }
+
+    /// The rail item under the rail's cursor.
+    pub fn rail_cursor(&self) -> usize {
+        self.shell.rail_cursor
+    }
+
+    /// The rail is drawn wide, with labels.
+    pub fn rail_expanded(&self) -> bool {
+        self.shell.rail_expanded()
+    }
+
+    /// The rows of the keyboard help, while it is open (else none).
+    pub fn help_rows(&self) -> Vec<help::Row> {
+        self.help.as_ref().map(|h| h.rows(&self.keymap, &self.i18n)).unwrap_or_default()
+    }
+
+    /// Where the keyboard was when the help opened, while it is open.
+    pub fn help_origin(&self) -> Option<Ctx> {
+        self.help.as_ref().map(|h| h.origin)
+    }
+
+    /// The help's filter is being typed.
+    pub fn help_typing(&self) -> bool {
+        self.help.as_ref().is_some_and(|h| h.typing)
+    }
+
+    /// Test driver: select message `index` (the last one if past it) of the focused pane, as a
+    /// click does but without asking for older messages.
+    #[doc(hidden)]
     pub fn select_message(&mut self, index: usize) {
-        if let Some(p) = self.work.focused_mut() {
-            p.selected = Some(index);
+        if self.shell.focus != Region::Work {
+            return;
         }
+        if let Some(p) = self.work.focused_mut()
+            && let Some(last) = p.items.len().checked_sub(1)
+        {
+            p.selected = Some(index.min(last));
+        }
+    }
+
+    /// Test driver: put the list panel's cursor on row `row` (the last one if past it).
+    #[doc(hidden)]
+    pub fn move_list_cursor_to(&mut self, row: usize) {
+        let last = self.list_rows().len().saturating_sub(1);
+        self.shell.list_cursor = row.min(last);
+    }
+
+    /// Test driver: the list panel gets the keyboard, its cursor on row `row`.
+    #[doc(hidden)]
+    pub fn focus_list_row(&mut self, row: usize) {
+        self.shell.focus = Region::List;
+        self.move_list_cursor_to(row);
+    }
+
+    /// Test driver: the list panel lists `view` with every section unfolded.
+    #[doc(hidden)]
+    pub fn show_unfolded(&mut self, view: View) {
+        self.shell.view = view;
+        self.shell.collapsed.clear();
     }
 }

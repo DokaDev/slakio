@@ -20,21 +20,21 @@ fn dms(theme: Theme, settings: Settings) -> Demo {
     let mut d = Demo::with(120, 40, Lang::En, settings);
     d.app.theme = theme;
     d.keys("space d");
-    assert_eq!(d.app.shell.view, View::Dms);
+    assert_eq!(d.app.view(), View::Dms);
     d
 }
 
 /// The presence of the peer of the DM named `name` (in the list shown).
 fn presence_of(d: &Demo, name: &str) -> Presence {
     let model = &d.app.model;
-    let Row::Conversation(i) = d.app.shell.rows(model)[index_of(d, name)] else { unreachable!() };
+    let Row::Conversation(i) = d.app.list_rows()[index_of(d, name)] else { unreachable!() };
     let ConversationKind::Dm { user } = &model.conversation(i).kind else { panic!("{name} is not a DM") };
     model.user(user).expect("the peer").presence
 }
 
 /// The index of the DM named `name` among the list's rows.
 fn index_of(d: &Demo, name: &str) -> usize {
-    let rows = d.app.shell.rows(&d.app.model);
+    let rows = d.app.list_rows();
     (0..rows.len())
         .find(|&i| matches!(rows[i], Row::Conversation(c) if d.app.model.conversation(c).name == name))
         .unwrap_or_else(|| panic!("no row {name}"))
@@ -44,12 +44,12 @@ fn index_of(d: &Demo, name: &str) -> usize {
 /// the first cell after the gutter, or the cell after the avatar chip there.
 fn mark_at(d: &Demo, name: &str) -> (u16, u16) {
     let list = screen::inner(d.app.areas().list.expect("the list panel"));
-    let y = list.y + (index_of(d, name) - d.app.shell.list_top) as u16;
+    let y = list.y + (index_of(d, name) - d.app.list_top()) as u16;
     (list.x + if d.app.settings.avatars { 3 } else { 1 }, y)
 }
 
 fn muted(d: &Demo, name: &str) -> bool {
-    let Row::Conversation(i) = d.app.shell.rows(&d.app.model)[index_of(d, name)] else { unreachable!() };
+    let Row::Conversation(i) = d.app.list_rows()[index_of(d, name)] else { unreachable!() };
     d.app.model.conversation(i).muted
 }
 
@@ -112,7 +112,7 @@ fn icons_on_draw_do_not_disturb_as_the_same_half_disc() {
 fn a_dm_title_says_whether_its_peer_is_around() {
     let mut d = dms(Theme::no_color(), Settings::default());
     let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == Presence::Away).expect("someone away");
-    d.app.shell.list_cursor = index_of(&d, name);
+    d.app.move_list_cursor_to(index_of(&d, name));
     d.keys("enter");
     let title = d.screen().lines().next().unwrap().to_string();
     assert!(title.contains(&format!("@{name} ○ away")), "{title}");
@@ -124,7 +124,7 @@ fn the_selected_row_keeps_its_presence_color_in_the_16_color_theme() {
     let mut d = dms(theme.clone(), Settings::default());
     for p in [Presence::Active, Presence::Away, Presence::Dnd] {
         let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == p && !muted(&d, n)).expect("a peer");
-        d.app.shell.list_cursor = index_of(&d, name);
+        d.app.move_list_cursor_to(index_of(&d, name));
         let buf = d.buffer();
         let cell = &buf[mark_at(&d, name)];
         assert_eq!(cell.bg, theme.selection, "{name} is on the selection bar");

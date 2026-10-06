@@ -14,8 +14,7 @@ use slakio_tui::app::{Focus, Mode, PaneKind};
 
 fn list_row_of(d: &Demo, name: &str) -> usize {
     d.app
-        .shell
-        .rows(&d.app.model)
+        .list_rows()
         .iter()
         .position(|r| matches!(r, Row::Conversation(i) if d.app.model.conversation(*i).name == name))
         .unwrap_or_else(|| panic!("no row {name}"))
@@ -28,11 +27,11 @@ fn ctrl_w_on_the_main_pane_hands_the_focus_to_the_list_on_its_row() {
     d.keys("ctrl+w");
     assert!(d.app.open_target().is_none());
     assert_eq!(d.app.focus(), Focus::List, "the focus never stays on an empty work area");
-    assert_eq!(d.app.shell.list_cursor, list_row_of(&d, "incidents"));
+    assert_eq!(d.app.list_cursor(), list_row_of(&d, "incidents"));
     // j now moves the list again.
-    let at = d.app.shell.list_cursor;
+    let at = d.app.list_cursor();
     d.keys("j");
-    assert_ne!(d.app.shell.list_cursor, at);
+    assert_ne!(d.app.list_cursor(), at);
 }
 
 #[test]
@@ -40,10 +39,10 @@ fn closing_the_thread_panel_focuses_the_main_pane_on_its_message() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!(d.app.focus(), Focus::Thread);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
     d.keys("ctrl+w");
-    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
-    assert_eq!((d.app.focus(), main.selected()), (Focus::Conversation, Some(0)));
+    let main = d.pane(PaneKind::Conversation).unwrap();
+    assert_eq!((d.focused_kind(), main.selected()), (Some(PaneKind::Conversation), Some(0)));
 }
 
 #[test]
@@ -51,15 +50,15 @@ fn enter_without_a_selected_message_starts_writing() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
     d.keys("enter");
-    assert!(d.app.pane_of(PaneKind::Thread).is_none(), "no thread opens by surprise");
+    assert!(d.pane(PaneKind::Thread).is_none(), "no thread opens by surprise");
     assert_eq!(d.app.mode(), Mode::Insert);
 }
 
 #[test]
 fn the_first_cursor_is_on_the_first_conversation_not_a_header() {
     let d = Demo::new(120, 40);
-    let rows = d.app.shell.rows(&d.app.model);
-    assert!(matches!(rows[d.app.shell.list_cursor], Row::Conversation(_)), "{:?}", rows[d.app.shell.list_cursor]);
+    let rows = d.app.list_rows();
+    assert!(matches!(rows[d.app.list_cursor()], Row::Conversation(_)), "{:?}", rows[d.app.list_cursor()]);
 }
 
 #[test]
@@ -115,12 +114,12 @@ fn the_composer_has_no_box_of_its_own() {
 fn the_thread_panel_starts_with_its_message_at_the_top() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
-    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let main = d.pane(PaneKind::Conversation).unwrap();
     let i = main.messages().iter().position(|m| m.thread.is_some_and(|t| t.replies == 6)).expect("a short thread");
     d.app.select_message(i);
     d.keys("enter");
-    assert_eq!(d.app.focus(), Focus::Thread);
-    let thread = d.app.pane_area(PaneKind::Thread);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
+    let thread = d.pane_area(PaneKind::Thread);
     let thread = thread.expect("the thread panel");
     let buf = d.buffer();
     let text = |y: u16| (thread.x + 1..thread.right() - 1).map(|x| buf[(x, y)].symbol()).collect::<String>();
@@ -135,7 +134,7 @@ fn a_thread_on_an_80x24_terminal_leaves_the_main_pane_forty_columns() {
     let mut d = Demo::new(80, 24);
     d.open("long-threads");
     d.keys("g g enter");
-    let (main, thread) = (d.app.pane_area(PaneKind::Conversation), d.app.pane_area(PaneKind::Thread));
+    let (main, thread) = (d.pane_area(PaneKind::Conversation), d.pane_area(PaneKind::Thread));
     let main = main.expect("the main pane");
     assert!(main.width >= 40, "main pane {} columns", main.width);
     assert!(thread.is_some_and(|t| t.width >= 34));
@@ -151,7 +150,7 @@ fn tab_moves_the_focus_to_the_next_pane_and_back() {
     d.keys("tab");
     assert_eq!(d.app.focus(), Focus::List, "then the list");
     d.keys("tab");
-    assert_eq!(d.app.focus(), Focus::Conversation);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Conversation));
     d.keys("shift+tab");
     assert_eq!(d.app.focus(), Focus::List);
 }
@@ -166,11 +165,11 @@ fn ctrl_q_quits_from_the_list() {
 #[test]
 fn page_keys_move_the_list() {
     let mut d = Demo::new(80, 24);
-    let at = d.app.shell.list_cursor;
+    let at = d.app.list_cursor();
     d.keys("pagedown");
-    assert!(d.app.shell.list_cursor > at + 5, "{} -> {}", at, d.app.shell.list_cursor);
+    assert!(d.app.list_cursor() > at + 5, "{} -> {}", at, d.app.list_cursor());
     d.keys("end");
-    assert_eq!(d.app.shell.list_cursor, d.app.shell.rows(&d.app.model).len() - 1);
+    assert_eq!(d.app.list_cursor(), d.app.list_rows().len() - 1);
 }
 
 #[test]
@@ -178,14 +177,11 @@ fn the_mouse_wheel_scrolls_the_list_and_the_messages() {
     let mut d = Demo::new(120, 40);
     let list = d.app.areas().list.unwrap();
     d.mouse(MouseEventKind::ScrollDown, list.x + 3, 5);
-    assert_eq!(d.app.shell.list_top, 3);
+    assert_eq!(d.app.list_top(), 3);
     d.open("backend");
     let work = d.app.areas().work;
     d.mouse(MouseEventKind::ScrollUp, work.x + 10, 10);
-    assert!(
-        d.app.pane_of(PaneKind::Conversation).unwrap().selected().is_some(),
-        "the wheel moves through the messages"
-    );
+    assert!(d.pane(PaneKind::Conversation).unwrap().selected().is_some(), "the wheel moves through the messages");
 }
 
 #[test]
@@ -200,7 +196,7 @@ fn going_back_with_no_history_says_which_way() {
 fn a_thread_without_replies_says_so_under_its_message() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
-    let main = d.app.pane_of(PaneKind::Conversation).unwrap();
+    let main = d.pane(PaneKind::Conversation).unwrap();
     let i = main.messages().iter().rposition(|m| m.thread.is_none()).expect("a message without a thread");
     d.app.select_message(i);
     d.keys("enter");

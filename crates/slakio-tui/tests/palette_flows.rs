@@ -67,7 +67,7 @@ fn colon_opens_the_same_palette_and_typing_filters_it() {
     assert!(rows.iter().skip(1).all(|r| r.name.is_empty()), "then actions found by their words: {rows:?}");
     insta::assert_snapshot!("palette_filter_80x24", d.snap());
     d.keys("enter");
-    assert_eq!((d.app.shell.view, d.app.mode()), (View::Dms, Mode::Normal));
+    assert_eq!((d.app.view(), d.app.mode()), (View::Dms, Mode::Normal));
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn the_mouse_scrolls_picks_and_closes() {
     let at = d.app.palette_rows().iter().position(|r| r.label == "Show DMs").expect("Show DMs");
     assert!(at < usize::from(b.list.height));
     assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y + at as u16));
-    assert_eq!((d.app.shell.view, d.app.mode()), (View::Dms, Mode::Normal), "a click runs the entry");
+    assert_eq!((d.app.view(), d.app.mode()), (View::Dms, Mode::Normal), "a click runs the entry");
     d.keys(":");
     assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), 1, 39));
     assert_eq!(d.app.mode(), Mode::Normal, "a click outside closes it");

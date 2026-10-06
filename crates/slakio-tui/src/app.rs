@@ -49,7 +49,7 @@ use crate::theme::{self, Look, Theme};
 use dialog::{Dialog, Question};
 use help::Help;
 use model::Model;
-pub use query::{Focus, Overlay, PaneKind, PaneRef};
+pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 use shell::{Region, Shell, rail_items};
@@ -126,13 +126,13 @@ pub struct App {
     pub settings: Settings,
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
-    pub shell: Shell,
+    pub(crate) shell: Shell,
     pub(crate) work: Work,
     pub model: Model,
     /// The keyboard help, while open.
-    pub help: Option<Help>,
+    pub(crate) help: Option<Help>,
     /// A question, while asked.
-    pub dialog: Option<Dialog>,
+    pub(crate) dialog: Option<Dialog>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     /// The generation of the last boot request; older answers are dropped.

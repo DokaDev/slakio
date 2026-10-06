@@ -11,7 +11,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 use slakio_core::i18n::Lang;
-use slakio_tui::app::{Focus, Settings};
+use slakio_tui::app::{Focus, PaneKind, Settings};
 use slakio_tui::screen;
 use slakio_tui::theme::{BUILTINS, Background, Kind, Theme, resolve};
 
@@ -87,11 +87,11 @@ fn unfocused_text_keeps_its_color() {
         let mut d = demo(&t, 120, 40);
         d.keys("l");
         let list = d.app.areas().list.unwrap();
-        let cursor_y = list.y + 1 + (d.app.shell.list_cursor - d.app.shell.list_top) as u16;
+        let cursor_y = list.y + 1 + (d.app.list_cursor() - d.app.list_top()) as u16;
         assert_eq!(d.app.focus(), Focus::List);
         let focused = inside(&d.buffer(), list, Some(cursor_y));
         d.keys("tab");
-        assert_eq!(d.app.focus(), Focus::Conversation);
+        assert_eq!(d.focused_kind(), Some(PaneKind::Conversation));
         let unfocused = inside(&d.buffer(), list, Some(cursor_y));
         assert_eq!(focused, unfocused, "{}: the list's text changed with the focus", t.name);
     }
@@ -137,7 +137,7 @@ fn the_selection_is_a_bar_across_the_row() {
         let d = demo(&t, 120, 40);
         let list = d.app.areas().list.unwrap();
         let inner = screen::inner(list);
-        let y = inner.y + (d.app.shell.list_cursor - d.app.shell.list_top) as u16;
+        let y = inner.y + (d.app.list_cursor() - d.app.list_top()) as u16;
         let buf = d.buffer();
         for x in inner.left()..inner.right() {
             let c = &buf[(x, y)];
@@ -155,7 +155,7 @@ fn the_selection_is_a_bar_across_the_row() {
     // Without color: reversed.
     let d = demo(&Theme::no_color(), 120, 40);
     let inner = screen::inner(d.app.areas().list.unwrap());
-    let y = inner.y + d.app.shell.list_cursor as u16;
+    let y = inner.y + d.app.list_cursor() as u16;
     assert!(d.buffer()[(inner.x + 4, y)].modifier.contains(Modifier::REVERSED));
 }
 

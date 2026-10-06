@@ -12,7 +12,7 @@ use slakio_tui::ui::timeline;
 
 /// The conversation pane (open).
 fn conversation(d: &Demo) -> PaneRef<'_> {
-    d.app.pane_of(PaneKind::Conversation).expect("a conversation is open")
+    d.pane(PaneKind::Conversation).expect("a conversation is open")
 }
 
 /// "Hello" in Korean, as an IME commits it.
@@ -22,9 +22,9 @@ const HELLO: &str = "\u{C548}\u{B155}\u{D558}\u{C138}\u{C694}";
 fn a_channel_opens_in_place_with_its_messages_and_j_k_move_through_them() {
     let mut d = Demo::new(120, 40);
     d.open("backend");
-    let main = d.app.pane_of(PaneKind::Conversation).expect("open");
+    let main = d.pane(PaneKind::Conversation).expect("open");
     assert!(!main.messages().is_empty() && main.complete());
-    assert_eq!((d.app.focus(), main.selected()), (Focus::Conversation, None));
+    assert_eq!((d.focused_kind(), main.selected()), (Some(PaneKind::Conversation), None));
     let n = main.messages().len();
     d.keys("k");
     assert_eq!(conversation(&d).selected(), Some(n - 1), "the first move selects the newest");
@@ -107,18 +107,18 @@ fn enter_on_a_message_opens_its_thread_and_another_one_replaces_it() {
     let mut d = Demo::new(120, 40);
     d.open("long-threads");
     d.keys("g g enter");
-    assert_eq!(d.app.focus(), Focus::Thread);
-    let first = d.app.pane_of(PaneKind::Thread).unwrap();
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
+    let first = d.pane(PaneKind::Thread).unwrap();
     assert!(first.messages().len() > 100, "the 1,200-reply thread, newest page first");
     let first = first.target().clone();
     // Back to the channel, one message down, Enter: the panel shows that thread instead.
     d.keys("ctrl+h j enter");
-    let second = d.app.pane_of(PaneKind::Thread).unwrap().target().clone();
+    let second = d.pane(PaneKind::Thread).unwrap().target().clone();
     assert_ne!(first, second);
-    assert_eq!(d.app.focus(), Focus::Thread);
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
     // Ctrl+W closes the panel, then the conversation.
     d.keys("ctrl+w");
-    assert!(d.app.pane_of(PaneKind::Thread).is_none() && d.app.focus() == Focus::Conversation);
+    assert!(d.pane(PaneKind::Thread).is_none() && d.focused_kind() == Some(PaneKind::Conversation));
     d.keys("ctrl+w");
     assert!(d.app.open_target().is_none());
     assert_eq!(d.app.focus(), Focus::List, "the list has the keyboard again");
@@ -227,7 +227,7 @@ fn a_reply_in_the_thread_panel_is_echoed_there() {
     d.keys("g g enter i");
     d.type_text("ack");
     d.keys("enter esc");
-    let thread = d.app.pane_of(PaneKind::Thread).unwrap();
+    let thread = d.pane(PaneKind::Thread).unwrap();
     assert_eq!(thread.messages().last().unwrap().text.as_str(), "ack");
     assert_ne!(conversation(&d).messages().last().unwrap().text.as_str(), "ack");
 }
@@ -304,11 +304,11 @@ fn back_and_forward_return_to_the_conversations_before() {
 fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_rows() {
     let mut d = Demo::new(120, 40);
     d.open("big-history");
-    // The rows of messages on screen: each open pane's height inside its border, less the
-    // composer (three rows when empty).
+    // The rows of messages on screen: each shown pane's message area.
     let check = |d: &mut Demo, what: &str| {
-        let panes = 1 + u64::from(d.app.pane_of(PaneKind::Thread).is_some());
-        let visible = panes * u64::from(d.app.areas().work.height - 2 - 3);
+        let on_screen = d.app.panes_on_screen();
+        let areas = on_screen.iter().filter_map(|(p, _)| d.app.message_area(p.handle()));
+        let visible: u64 = areas.map(|r| u64::from(r.height)).sum();
         timeline::reset_rows_laid_out();
         let _ = d.screen();
         let rows = timeline::rows_laid_out();
@@ -331,10 +331,6 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
     d.keys("g g enter");
     check(&mut d, "thread");
     d.keys("g g");
-    assert_eq!(
-        d.app.pane_of(PaneKind::Thread).unwrap().messages().len(),
-        1_201,
-        "the thread's message and its replies"
-    );
+    assert_eq!(d.pane(PaneKind::Thread).unwrap().messages().len(), 1_201, "the thread's message and its replies");
     check(&mut d, "thread gg");
 }
