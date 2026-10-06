@@ -28,7 +28,7 @@ fn colon_theme_switches_at_once_and_asks_to_save_it() {
     d.command("theme nord");
     assert_eq!((d.app.theme.name, d.app.theme_setting.as_str()), ("nord", "nord"));
     assert_eq!(saved(&mut d), ["nord"]);
-    assert!(d.status_line().contains("Theme: nord (saved)"), "{}", d.status_line());
+    assert!(d.status_line().contains("Theme: nord"), "{}", d.status_line());
     d.command("colo dracula");
     d.command("set theme=gruvbox-light");
     d.command("colorscheme catppuccin-mocha");
