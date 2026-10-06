@@ -4,14 +4,14 @@
 //! composer: a prompt and the text, no box of its own.
 //!
 //! ```text
-//! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮   a DM: ▌@Minsu Kim ● active
-//! │ Kim   Starting deploy   10:02  ││ Kim   Starting …       │
+//! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮   a DM: ▌MK @Minsu Kim ● active
+//! │ MK Minsu Kim  Deploying  10:02 ││ MK Minsu Kim · 10:02   │
 //! ├─ Message #backend ─────────────┤├─ Reply ────────────────┤
 //! │ › Press i to write             ││ ›                      │
 //! ╰────────────────────────────────╯╰────────────────────────╯
 //! ```
 
-use super::{frame, panel, presence_mark, timeline};
+use super::{avatar_chip, frame, panel, presence_mark, timeline};
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::Pane;
@@ -60,12 +60,17 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
         Side::Main => format!("{name} "),
         Side::Thread => format!("⤷ {} · {name} ", app.i18n.label(Label::PaneThread)),
     };
-    let mut spans = vec![Span::raw(" "), stripe, Span::styled(text, t.title(focused))];
-    // A DM's title says whether its peer is around: `@Minsu Kim ● active`.
     let peer = match conversation.map(|c| &c.kind) {
         Some(ConversationKind::Dm { user }) if side == Side::Main => app.model.user(user),
         _ => None,
     };
+    let mut spans = vec![Span::raw(" "), stripe];
+    // A DM's title starts with its peer's avatar chip: `MK @Minsu Kim`.
+    if let Some(chip) = peer.and_then(|u| avatar_chip(app, &u.id, u.display_name.line().as_str())) {
+        spans.extend([chip, Span::raw(" ")]);
+    }
+    spans.push(Span::styled(text, t.title(focused)));
+    // A DM's title says whether its peer is around: `@Minsu Kim ● active`.
     if let Some((mark, p)) = peer.and_then(|u| presence_mark(u.presence, app.settings.icons)) {
         let label = match p {
             Presence::Active => Label::PresenceActive,

@@ -62,7 +62,12 @@ fn main() -> ExitCode {
     let mut app = App::new(lang, look.theme(&cfg.theme));
     app.look = look;
     app.theme_setting.clone_from(&cfg.theme);
-    app.settings = Settings { icons: cfg.icons == "on", rail_push: cfg.rail_expand == "push" };
+    app.settings = Settings {
+        icons: cfg.icons == "on",
+        rail_push: cfg.rail_expand == "push",
+        // `image` (photos) comes later; until then it draws initials.
+        avatars: cfg.avatars != "off",
+    };
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {

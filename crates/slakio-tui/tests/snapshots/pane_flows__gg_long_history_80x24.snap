@@ -4,23 +4,23 @@ expression: mask_hangul(&d.screen())
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#deploys ─────────────────────────────────────╮
 │▌A││ ▾ Favorites            ││ ───────────────── 2026-01-05 ───────────────── │
-│▌B││   # backend            ││ Kate Nam · 10:21                               │
+│▌B││   # backend            ││ KN Kate Nam · 10:21                            │
 │──││   # incidents       3  ││   Staging customer again cache maybe waiting   │
 │H ││                        ││   timeout draft after                          │
 │D●││ ▾ Ops                  ││   ⤷ 9 replies · last 10:30                     │
-│A●││▎  # deploys            ││ Max Baek · 10:26                               │
+│A●││▎  # deploys            ││ MB Max Baek · 10:26                            │
 │F ││   # alerts             ││   Broken done dashboard broken review pager    │
 │L ││   # partner-shared ext ││   :tada: 5  :pray: 3                           │
-│  ││   # hostile-strings    ││ ＊＊＊ · 11:32                                 │
+│  ││   # hostile-strings    ││ ＊ ＊＊＊ · 11:32                              │
 │  ││   # big-history        ││   The is latency looks staging meeting build   │
 │  ││   # long-threads       ││   migration                                    │
-│  ││                        ││ Mia Jang · 12:03                               │
+│  ││                        ││ MJ Mia Jang · 12:03                            │
 │  ││ ▾ Channels             ││   Done draft cache now index we for pager      │
 │  ││   # announcements      ││   latency tracing draft roadmap                │
 │  ││   # design-review      ││   :white_check_mark: 5  :+1: 3  :fire: 2       │
-│  ││   # feed-alert-134     ││ Grafana · 13:16                                │
+│  ││   # feed-alert-134     ││ G  Grafana · 13:16                             │
 │  ││   # feed-alert-8       ││   Starting deploy                              │
-│  ││   # feed-budget-162    ││ ＊＊＊ · 13:27                                 │
+│  ││   # feed-budget-162    ││ ＊ ＊＊＊ · 13:27                              │
 │  ││   # feed-budget-33     ││   Meeting moved to 3pm                         │
 │  ││   # feed-build-50      │├─ Message #deploys ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │

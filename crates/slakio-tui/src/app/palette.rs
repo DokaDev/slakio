@@ -17,7 +17,7 @@
 //! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
 //! ```
 
-use super::{App, theme_arg};
+use super::{AVATAR_VALUES, App, avatars_arg, theme_arg};
 use crate::action::{self, Action, AppAction, HelpAction, REGISTRY};
 use crate::keymap::keys;
 use crate::screen::{self, PaletteBox};
@@ -48,6 +48,8 @@ pub enum Item {
     ThemeCommand,
     /// A theme for `:theme` (index into [`NAMES`]).
     Theme(usize),
+    /// A value for `:avatars <value>` (index into [`AVATAR_VALUES`]).
+    Avatars(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
@@ -66,7 +68,9 @@ pub struct Row {
 fn offered(a: Action, backend: bool) -> bool {
     match a {
         Action::App(AppAction::Quit) => true,
-        Action::App(AppAction::ChooseWorkspace) | Action::Shell(_) | Action::Pane(_) => backend,
+        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars) | Action::Shell(_) | Action::Pane(_) => {
+            backend
+        }
         Action::Help(h) => h == HelpAction::Open,
         Action::App(_) | Action::CommandLine(_) | Action::Composer(_) | Action::Dialog(_) => false,
     }
@@ -111,6 +115,15 @@ impl App {
         let line = self.cmdline.text().trim_start();
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
+        }
+        if let Some(arg) = avatars_arg(line) {
+            let mut hits: Vec<(u8, i32, usize)> = AVATAR_VALUES
+                .iter()
+                .enumerate()
+                .filter_map(|(i, v)| action::rank(arg, &[], &[v]).map(|(t, s)| (t, -s, i)))
+                .collect();
+            hits.sort_unstable();
+            return hits.into_iter().map(|(.., i)| Item::Avatars(i)).collect();
         }
         let word = line.trim_end();
         if word.contains(char::is_whitespace) {
@@ -174,6 +187,14 @@ impl App {
                     label: label(theme_label(NAMES[i])),
                     keys: if NAMES[i] == self.theme_setting { label(Label::PaletteCurrent) } else { String::new() },
                 },
+                Item::Avatars(i) => {
+                    let on = AVATAR_VALUES[i] == "initials";
+                    Row {
+                        name: AVATAR_VALUES[i].to_string(),
+                        label: label(if on { Label::AvatarsInitials } else { Label::AvatarsOff }),
+                        keys: if on == self.settings.avatars { label(Label::PaletteCurrent) } else { String::new() },
+                    }
+                }
                 Item::Action(i) => {
                     Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
                 }
@@ -227,10 +248,17 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(Item::Avatars(i)) => {
+                self.cmdline.close();
+                if let Err(msg) = self.set_avatars(AVATAR_VALUES[i], now) {
+                    self.warn(msg, now);
+                }
+            }
             None => {
-                let error = match theme_arg(&text) {
-                    Some(name) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
-                    None => {
+                let error = match (theme_arg(&text), avatars_arg(&text)) {
+                    (Some(name), _) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
+                    (_, Some(name)) => Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") },
+                    _ => {
                         let word = text.split_whitespace().next().unwrap_or_default().to_string();
                         if action::by_command(&word).is_some() {
                             Msg::CommandNoArgs { name: word }

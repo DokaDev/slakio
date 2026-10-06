@@ -213,6 +213,7 @@ Type `:` and the command, then `Enter`.
 | `:qa` | `:qall` `:quitall` `:q` `:quit` | Quit |
 | `:workspace` |  | Switch workspace |
 | `:help` |  | Keyboard help |
+| `:avatars` |  | Show or hide avatars (initials) |
 | `:rail` |  | Rail: workspaces and views |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |

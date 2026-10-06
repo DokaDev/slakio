@@ -211,3 +211,46 @@ fn dimming_blends_truecolor_and_marks_ansi() {
     TERMINAL.dim_area(&mut buf, Rect::new(0, 0, 2, 1));
     assert!(buf[(1, 0)].modifier.contains(Modifier::DIM));
 }
+
+/// Initials on an avatar chip read like the badges' text (4.5:1 on every chip color), the chips
+/// differ from each other, and a selection bar keeps them.
+#[test]
+fn every_avatar_chip_keeps_its_initials_readable() {
+    for t in truecolor() {
+        assert!(t.avatars.len() >= 6, "{}", t.name);
+        for &c in t.avatars {
+            assert!(contrast(t.mode_fg, c) >= 4.5, "{}: initials on {c:?} {:.2}", t.name, contrast(t.mode_fg, c));
+            assert!(!t.workspaces.contains(&c) || t.workspaces.len() == 1, "{}: {c:?} is a workspace's", t.name);
+            // A chip never reads as a pill, a mode badge or a mark.
+            for (k, token) in [
+                ("error", t.error),
+                ("warning", t.warning),
+                ("success", t.success),
+                ("accent", t.accent),
+                ("accent_warm", t.accent_warm),
+                ("normal", t.mode_normal),
+                ("insert", t.mode_insert),
+                ("visual", t.mode_visual),
+                ("command", t.mode_command),
+            ] {
+                assert_ne!(c, token, "{}: an avatar color is the {k} color", t.name);
+            }
+        }
+        let mut seen = t.avatars.to_vec();
+        seen.dedup();
+        assert_eq!(seen.len(), t.avatars.len(), "{}", t.name);
+    }
+    // The 16-color theme: bright colors under black.
+    assert_eq!(TERMINAL.mode_fg, Color::Black);
+    assert!(TERMINAL.avatars.iter().all(|c| !matches!(c, Color::Black | Color::DarkGray | Color::Reset)));
+    for t in BUILTINS {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 4, 1));
+        buf[(1, 0)].set_style(t.avatar(3));
+        t.paint_selection(&mut buf, Rect::new(0, 0, 4, 1), Selection::Focused);
+        if t.kind != Kind::NoColor {
+            assert_eq!(buf[(1, 0)].bg, t.avatars[3 % t.avatars.len()], "{}: the chip keeps its color", t.name);
+        }
+    }
+    let plain = Theme::no_color().avatar(0);
+    assert!(plain.add_modifier.contains(Modifier::REVERSED | Modifier::BOLD), "no colors: reversed");
+}

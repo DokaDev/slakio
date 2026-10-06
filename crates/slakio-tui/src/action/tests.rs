@@ -88,7 +88,7 @@ fn every_action_is_registered() {
     };
     let app = {
         use AppAction::*;
-        [Quit, Interrupt, Palette, ChooseWorkspace].map(Action::App)
+        [Quit, Interrupt, Palette, ChooseWorkspace, ToggleAvatars].map(Action::App)
     };
     let all = app
         .into_iter()

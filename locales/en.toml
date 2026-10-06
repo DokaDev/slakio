@@ -15,6 +15,11 @@
 "command.unknown" = "Not a command: {name}"
 "theme.changed" = "Theme: {name}"
 "theme.unknown" = "Unknown theme {name} (use {names})"
+"action.avatars" = "Show or hide avatars (initials)"
+"avatars.changed" = "Avatars: {name}"
+"avatars.unknown" = "Unknown avatars setting {name} (one of {names})"
+"avatars.initials" = "A person's initials on a color of their own (default)"
+"avatars.off" = "No avatars: names only"
 "command.no_args" = ":{name} takes no argument"
 
 # The command palette: the `:` command line with its list.

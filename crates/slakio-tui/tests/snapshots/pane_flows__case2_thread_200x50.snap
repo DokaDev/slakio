@@ -3,51 +3,51 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ────────────────────────────╮╭ ▌#long-threads ──────────────────────────────────────────────────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────────────────────────────╮
-│▌A││ ▾ Favorites                      ││▎────────────────────────────────────────── 2026-01-06 ────────────────────────────────────────── ││               release staging queue on broken            │
-│▌B││   # backend                      ││▎Jiyoung Lee   We waiting waiting now index a the a the release                             07:23 ││               lunch production index timeout draft       │
-│──││   # incidents                 3  ││▎              ⤷ 1,200 replies · last 03:23                                                       ││               latency                                    │
-│H ││                                  ││ Dan Cho       Still index lunch index                                                      07:30 ││ ＊＊＊        Someone still tracing a after        03:03 │
-│D●││ ▾ Ops                            ││               ⤷ 6 replies · last 07:36                                                           ││               someone branch pager                       │
-│A●││   # deploys                      ││ Owen Hwang    Queue a after cache invoice on customer metrics on maybe sprint              07:37 ││ Amy Ryu       ```                                  03:04 │
-│F ││   # alerts                       ││               ⤷ 12 replies · last 07:49                                                          ││               SELECT count(*) FROM jobs WHERE            │
-│L ││   # partner-shared ext           ││ Lily Jeon     Confirmed                                                                    07:41 ││               state = 'stuck';                           │
-│  ││   # hostile-strings              ││ Lily Jeon     see https://docs.example.com/runbooks/latency                                07:54 ││               ```                                        │
-│  ││   # big-history                  ││ Owen Hwang    Migration branch index queue should                                          08:00 ││ Kate Nam      ＊＊ ＊＊＊?                         03:05 │
-│  ││▎  # long-threads                 ││ Dana Yoon     Tracing on we pager please looks budget waiting merge budget queue still     08:05 ││ Chris Park    Again roadmap lunch                  03:06 │
-│  ││                                  ││               branch metrics customer invoice                                                    ││ Hana          PR is up                             03:07 │
-│  ││ ▾ Channels                       ││ Tom Ko        ＊＊ ＊＊＊＊＊＊                                                            08:13 ││ Leo Kang      Latency release looks tomorrow       03:08 │
-│  ││   # announcements                ││ Minsu Kim     Review lunch lunch design schema merge design build the looks                08:21 ││               customer looks cache broken draft          │
-│  ││   # design-review                ││ Sam Rivera    Tracing timeout index merge now deploy queue done retry meeting can pager    08:33 ││               for                                        │
-│  ││   # feed-alert-134               ││               pager (edited)                                                                     ││ ＊＊＊        Design roadmap someone latency       03:09 │
-│  ││   # feed-alert-8                 ││ Hana          For cache timeout ticket migration pager rollback branch tracing after a     08:35 ││               deploy check someone draft merge           │
-│  ││   # feed-budget-162              ││               done on tomorrow broken schema                                                     ││               production roadmap schema maybe            │
-│  ││   # feed-budget-33               ││               ⤷ 1 reply · last 08:36                                                             ││               should looks invoice                       │
-│  ││   # feed-build-50                ││               :+1: 3                                                                             ││ Ryan Oh       Fine schema can looks design review  03:10 │
-│  ││   # feed-cache-119               ││ Ryan Oh       Fine the we timeout index sprint someone deploy someone looks review branch  08:44 ││               the draft                                  │
-│  ││   # feed-customer-161            ││               the pager still index                                                              ││ Taylor Kim    Staging latency merge timeout        03:11 │
-│  ││   # feed-customer-167         1  ││ ＊＊＊        Schema after meeting deploy ticket release ticket budget                     08:55 ││ Minsu Kim     Build rollback done broken merge     03:12 │
-│  ││   # feed-dashboard-22            ││ Chris Park    Thanks!                                                                      09:03 ││ Nina Seo      Latency today design draft metrics   03:13 │
-│  ││   # feed-dashboard-41            ││ ＊＊＊        A meeting latency branch staging schema we retry tracing                     09:05 ││               done build build                           │
-│  ││   # feed-design-34               ││ Hana          Queue pager build                                                            09:16 ││ Dan Cho       Starting deploy                      03:14 │
-│  ││   # feed-design-83               ││ Dana Yoon     Confirmed                                                                    09:27 ││ ＊＊＊        Rolling back                         03:15 │
-│  ││   # feed-draft-142               ││ ＊＊＊        We waiting customer merge build after now the invoice (edited)               09:30 ││ Sam Rivera    Suspect the DB pool                  03:16 │
-│  ││   # feed-draft-58                ││               :white_check_mark: 1                                                               ││ Mia Jang      Staging fine invoice release merge   03:17 │
-│  ││   # feed-draft-84                ││ Jiwon Han     Alert review alert cache tomorrow lunch budget should (edited)               09:35 ││ Jiwon Han     Budget should timeout timeout after  03:18 │
-│  ││   # feed-index-199            2  ││               :fire: 5  :pray: 3  :eyes: 2                                                       ││               tomorrow budget meeting someone            │
-│  ││   # feed-index-39                ││ Ivy Moon      Queue roadmap looks timeout                                                  09:48 ││               production release                         │
-│  ││   # feed-index-5              1  ││ Leo Kang      Ticket cache tomorrow build someone latency the please branch schema we now  09:57 ││ Tom Ko        Draft draft is is customer can retry 03:19 │
-│  ││   # feed-invoice-16              ││               can                                                                                ││               dashboard                                  │
-│  ││   # feed-invoice-168             ││ Hana          Looking into it                                                              09:59 ││ Nina Seo      After ticket customer timeout queue  03:20 │
-│  ││   # feed-latency-144             ││ Ethan Song    After the should ticket customer retry for latency alert metrics staging     10:12 ││               again timeout check sprint deploy          │
-│  ││   # feed-meeting-82              ││               again queue                                                                        ││               review maybe is build tracing              │
-│  ││   # feed-merge-192               ││ Nina Seo      Cache draft merge merge sprint fine please roadmap now migration customer    10:16 ││               latency                                    │
-│  ││   # feed-merge-54                ││               maybe looks meeting                                                                ││ Max Baek      Latency timeout should for invoice   03:21 │
-│  ││   # feed-metrics-125             ││ Nina Seo      Meeting schema we tomorrow now ticket sprint after budget meeting            10:22 ││               on index roadmap a budget tracing is       │
-│  ││   # feed-metrics-13              ││ Hyunwoo Jung  A timeout roadmap sprint tracing ticket tomorrow staging staging             10:32 ││               queue index ticket                         │
-│  ││   # feed-metrics-18              ││               :white_check_mark: 1  :eyes: 4                                                     ││ Ivy Moon      Draft broken can looks staging done  03:22 │
-│  ││   # feed-production-111          ││ Hyunwoo Jung  Rollback ticket metrics meeting looks deploy merge release again metrics     10:40 ││               tracing now lunch meeting invoice          │
-│  ││   # feed-production-44           ││               index build staging is (edited)                                                    ││               migration done customer please             │
-│  ││   # feed-queue-224               ││ ＊＊＊        Branch release still check please production tomorrow pager retry waiting    10:50 ││ Eve Bae       ＊＊＊＊＊                           03:23 │
+│▌A││ ▾ Favorites                      ││▎────────────────────────────────────────── 2026-01-06 ────────────────────────────────────────── ││                  draft latency                           │
+│▌B││   # backend                      ││▎JL Jiyoung Lee   We waiting waiting now index a the a the release                          07:23 ││ ＊ ＊＊＊        Someone still tracing a after     03:03 │
+│──││   # incidents                 3  ││▎                 ⤷ 1,200 replies · last 03:23                                                    ││                  someone branch pager                    │
+│H ││                                  ││ DC Dan Cho       Still index lunch index                                                   07:30 ││ AR Amy Ryu       ```                               03:04 │
+│D●││ ▾ Ops                            ││                  ⤷ 6 replies · last 07:36                                                        ││                  SELECT count(*) FROM jobs WHERE         │
+│A●││   # deploys                      ││ OH Owen Hwang    Queue a after cache invoice on customer metrics on maybe sprint           07:37 ││                  state = 'stuck';                        │
+│F ││   # alerts                       ││                  ⤷ 12 replies · last 07:49                                                       ││                  ```                                     │
+│L ││   # partner-shared ext           ││ LJ Lily Jeon     Confirmed                                                                 07:41 ││ KN Kate Nam      ＊＊ ＊＊＊?                      03:05 │
+│  ││   # hostile-strings              ││ LJ Lily Jeon     see https://docs.example.com/runbooks/latency                             07:54 ││ CP Chris Park    Again roadmap lunch               03:06 │
+│  ││   # big-history                  ││ OH Owen Hwang    Migration branch index queue should                                       08:00 ││ H  Hana          PR is up                          03:07 │
+│  ││▎  # long-threads                 ││ DY Dana Yoon     Tracing on we pager please looks budget waiting merge budget queue still  08:05 ││ LK Leo Kang      Latency release looks tomorrow    03:08 │
+│  ││                                  ││                  branch metrics customer invoice                                                 ││                  customer looks cache broken draft       │
+│  ││ ▾ Channels                       ││ TK Tom Ko        ＊＊ ＊＊＊＊＊＊                                                         08:13 ││                  for                                     │
+│  ││   # announcements                ││ MK Minsu Kim     Review lunch lunch design schema merge design build the looks             08:21 ││ ＊ ＊＊＊        Design roadmap someone latency    03:09 │
+│  ││   # design-review                ││ SR Sam Rivera    Tracing timeout index merge now deploy queue done retry meeting can pager 08:33 ││                  deploy check someone draft merge        │
+│  ││   # feed-alert-134               ││                  pager (edited)                                                                  ││                  production roadmap schema maybe         │
+│  ││   # feed-alert-8                 ││ H  Hana          For cache timeout ticket migration pager rollback branch tracing after a  08:35 ││                  should looks invoice                    │
+│  ││   # feed-budget-162              ││                  done on tomorrow broken schema                                                  ││ RO Ryan Oh       Fine schema can looks design      03:10 │
+│  ││   # feed-budget-33               ││                  ⤷ 1 reply · last 08:36                                                          ││                  review the draft                        │
+│  ││   # feed-build-50                ││                  :+1: 3                                                                          ││ TK Taylor Kim    Staging latency merge timeout     03:11 │
+│  ││   # feed-cache-119               ││ RO Ryan Oh       Fine the we timeout index sprint someone deploy someone looks review      08:44 ││ MK Minsu Kim     Build rollback done broken merge  03:12 │
+│  ││   # feed-customer-161            ││                  branch the pager still index                                                    ││ NS Nina Seo      Latency today design draft        03:13 │
+│  ││   # feed-customer-167         1  ││ ＊ ＊＊＊        Schema after meeting deploy ticket release ticket budget                  08:55 ││                  metrics done build build                │
+│  ││   # feed-dashboard-22            ││ CP Chris Park    Thanks!                                                                   09:03 ││ DC Dan Cho       Starting deploy                   03:14 │
+│  ││   # feed-dashboard-41            ││ ＊ ＊＊＊        A meeting latency branch staging schema we retry tracing                  09:05 ││ ＊ ＊＊＊        Rolling back                      03:15 │
+│  ││   # feed-design-34               ││ H  Hana          Queue pager build                                                         09:16 ││ SR Sam Rivera    Suspect the DB pool               03:16 │
+│  ││   # feed-design-83               ││ DY Dana Yoon     Confirmed                                                                 09:27 ││ MJ Mia Jang      Staging fine invoice release      03:17 │
+│  ││   # feed-draft-142               ││ ＊ ＊＊＊        We waiting customer merge build after now the invoice (edited)            09:30 ││                  merge                                   │
+│  ││   # feed-draft-58                ││                  :white_check_mark: 1                                                            ││ JH Jiwon Han     Budget should timeout timeout     03:18 │
+│  ││   # feed-draft-84                ││ JH Jiwon Han     Alert review alert cache tomorrow lunch budget should (edited)            09:35 ││                  after tomorrow budget meeting           │
+│  ││   # feed-index-199            2  ││                  :fire: 5  :pray: 3  :eyes: 2                                                    ││                  someone production release              │
+│  ││   # feed-index-39                ││ IM Ivy Moon      Queue roadmap looks timeout                                               09:48 ││ TK Tom Ko        Draft draft is is customer can    03:19 │
+│  ││   # feed-index-5              1  ││ LK Leo Kang      Ticket cache tomorrow build someone latency the please branch schema we   09:57 ││                  retry dashboard                         │
+│  ││   # feed-invoice-16              ││                  now can                                                                         ││ NS Nina Seo      After ticket customer timeout     03:20 │
+│  ││   # feed-invoice-168             ││ H  Hana          Looking into it                                                           09:59 ││                  queue again timeout check sprint        │
+│  ││   # feed-latency-144             ││ ES Ethan Song    After the should ticket customer retry for latency alert metrics staging  10:12 ││                  deploy review maybe is build            │
+│  ││   # feed-meeting-82              ││                  again queue                                                                     ││                  tracing latency                         │
+│  ││   # feed-merge-192               ││ NS Nina Seo      Cache draft merge merge sprint fine please roadmap now migration customer 10:16 ││ MB Max Baek      Latency timeout should for        03:21 │
+│  ││   # feed-merge-54                ││                  maybe looks meeting                                                             ││                  invoice on index roadmap a budget       │
+│  ││   # feed-metrics-125             ││ NS Nina Seo      Meeting schema we tomorrow now ticket sprint after budget meeting         10:22 ││                  tracing is queue index ticket           │
+│  ││   # feed-metrics-13              ││ HJ Hyunwoo Jung  A timeout roadmap sprint tracing ticket tomorrow staging staging          10:32 ││ IM Ivy Moon      Draft broken can looks staging    03:22 │
+│  ││   # feed-metrics-18              ││                  :white_check_mark: 1  :eyes: 4                                                  ││                  done tracing now lunch meeting          │
+│  ││   # feed-production-111          ││ HJ Hyunwoo Jung  Rollback ticket metrics meeting looks deploy merge release again metrics  10:40 ││                  invoice migration done customer         │
+│  ││   # feed-production-44           ││                  index build staging is (edited)                                                 ││                  please                                  │
+│  ││   # feed-queue-224               ││ ＊ ＊＊＊        Branch release still check please production tomorrow pager retry waiting 10:50 ││ EB Eve Bae       ＊＊＊＊＊                        03:23 │
 │  ││   # feed-retry-63                │├─ Message #long-threads ──────────────────────────────────────────────────────────────────────────┤├─ Reply ──────────────────────────────────────────────────┤
 │  ││   # feed-review-152              ││ › Press i to write                                                                               ││ › Press i to reply                                       │
 ╰──╯╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

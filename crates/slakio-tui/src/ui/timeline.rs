@@ -6,13 +6,16 @@
 //! than [`STACKED_BELOW`] the name and time head the message and the text goes below them.
 //!
 //! ```text
-//! ──────────────── 2026-01-05 ────────────────     Kim · 10:02
-//! Kim           Starting deploy          10:02       Starting deploy
-//!               ⤷ 4 replies · last 10:15             ⤷ 4 replies · last 10:15
-//!               Rolled back              10:04       Rolled back
-//! Park          PR is up (edited)        10:20     Park · 10:20
-//!               :eyes: 2  :+1: 1                     PR is up (edited)
+//! ─────────────────── 2026-01-05 ───────────────────     MK Minsu Kim · 10:02
+//! MK Minsu Kim     Starting deploy             10:02       Starting deploy
+//!                  ⤷ 4 replies · last 10:15                ⤷ 4 replies · last 10:15
+//!                  Rolled back                 10:04       Rolled back
+//! JP Jiho Park     PR is up (edited)           10:20     JP Jiho Park · 10:20
+//!                  :eyes: 2  :+1: 1                        PR is up (edited)
 //! ```
+//!
+//! `MK` is the sender's avatar chip ([`crate::avatar`]), on the first message of a group only;
+//! with `avatars = "off"` the name starts the row.
 //!
 //! A conversation sits at the bottom, by the composer, as in any chat; a thread starts at the
 //! top: its message, a `── N replies ──` divider, then the replies (the newest stay in view once
@@ -21,7 +24,7 @@
 //! Every row laid out is counted ([`rows_laid_out`]): the performance budget holds a frame to
 //! at most twice the rows the area shows, however long the history.
 
-use super::highlight;
+use super::{avatar_chip, highlight};
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::{Hit, Pane};
@@ -39,6 +42,8 @@ use std::collections::HashMap;
 
 /// The sender's column, at most.
 const AUTHOR_WIDTH: usize = 14;
+/// The avatar chip and the space after it, before the sender's name.
+const AVATAR_COLUMN: usize = crate::avatar::WIDTH + 1;
 /// The time column (`10:02` and a space before it).
 const TIME_WIDTH: usize = 6;
 /// Rows of text a message shows at most; the rest is marked, not drawn.
@@ -89,23 +94,30 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
     let stacked = w < STACKED_BELOW;
     let group = grouped(pane, i);
     let author_style = if m.own { t.own_author() } else { t.author() };
+    // The sender's chip and a space before the name; the column grows by as much, so the text
+    // starts at the same place on every row.
+    let chip = if group { None } else { avatar_chip(app, &m.user, m.author.as_str()) };
+    let chip_w = if app.settings.avatars { AVATAR_COLUMN } else { 0 };
     let (indent_w, text_w) = if stacked {
         (2, w.saturating_sub(2).max(4))
     } else {
-        let author_w = AUTHOR_WIDTH.min(w / 4).max(4);
+        let author_w = AUTHOR_WIDTH.min(w / 4).max(4) + chip_w;
         (author_w, w.saturating_sub(author_w + TIME_WIDTH).max(4))
     };
     let indent = " ".repeat(indent_w);
     if stacked && !group {
-        let name = clip(m.author.as_str(), w.saturating_sub(TIME_WIDTH + 2));
-        out.push((
-            Line::from(vec![
-                Span::styled(name, author_style),
-                Span::styled(" · ", t.faint()),
-                Span::styled(time::hm(m.ts), t.faint()),
-            ]),
-            false,
-        ));
+        let mut spans = Vec::new();
+        let mut room = w.saturating_sub(TIME_WIDTH + 2);
+        if let Some(chip) = chip.clone().filter(|_| room > AVATAR_COLUMN + 4) {
+            spans.extend([chip, Span::raw(" ")]);
+            room -= AVATAR_COLUMN;
+        }
+        spans.extend([
+            Span::styled(clip(m.author.as_str(), room), author_style),
+            Span::styled(" · ", t.faint()),
+            Span::styled(time::hm(m.ts), t.faint()),
+        ]);
+        out.push((Line::from(spans), false));
     }
     let (mut lines, more) = wrap(m.text.as_str(), text_w, MAX_TEXT_ROWS);
     let edited = app.i18n.label(Label::MessageEdited).to_string();
@@ -123,8 +135,13 @@ fn rows(app: &App, pane: &Pane, i: usize, w: usize) -> Vec<Laid> {
     for (k, l) in lines.into_iter().enumerate() {
         let mut spans: Vec<Span<'static>> = Vec::new();
         if k == 0 && !stacked && !group {
-            let name = clip(m.author.as_str(), indent_w - 1);
-            let pad = " ".repeat(indent_w - width(&name));
+            let mut name_w = indent_w;
+            if let Some(chip) = chip.clone() {
+                spans.extend([chip, Span::raw(" ")]);
+                name_w -= chip_w;
+            }
+            let name = clip(m.author.as_str(), name_w - 1);
+            let pad = " ".repeat(name_w - width(&name));
             spans.push(Span::styled(format!("{name}{pad}"), author_style));
         } else {
             spans.push(Span::raw(indent.clone()));

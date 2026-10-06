@@ -195,6 +195,9 @@ fn token(t: &Theme, c: Color, fg: bool) -> Option<&'static str> {
     if c == t.fg && fg || c == t.bg && !fg || c == Color::Reset {
         return None;
     }
+    if !fg && t.avatars.contains(&c) {
+        return Some("av");
+    }
     let workspace = t.workspaces.contains(&c).then_some("ws");
     Some(named.iter().find(|(x, _)| *x == c).map(|(_, n)| *n).or(workspace).unwrap_or(if fg { "fg?" } else { "bg?" }))
 }

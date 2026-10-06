@@ -3,24 +3,24 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ ▌#long-threads ────────────────────────╮╭ ▌⤷ Thread · #long-threads ─────╮
-│▌A││▎───────────── 2026-01-06 ───────────── ││ Nina Seo · 03:20               │
-│▌B││▎Jiyoung Lee · 07:23                    ││   After ticket customer        │
+│▌A││▎───────────── 2026-01-06 ───────────── ││ NS Nina Seo · 03:20            │
+│▌B││▎JL Jiyoung Lee · 07:23                 ││   After ticket customer        │
 │──││▎  We waiting waiting now index a the a ││   timeout queue again timeout  │
 │H ││▎  the release                          ││   check sprint deploy review   │
 │D●││▎  ⤷ 1,200 replies · last 03:23         ││   maybe is build tracing       │
-│A●││ Dan Cho · 07:30                        ││   latency                      │
-│F ││   Still index lunch index              ││ Max Baek · 03:21               │
+│A●││ DC Dan Cho · 07:30                     ││   latency                      │
+│F ││   Still index lunch index              ││ MB Max Baek · 03:21            │
 │L ││   ⤷ 6 replies · last 07:36             ││   Latency timeout should for   │
-│  ││ Owen Hwang · 07:37                     ││   invoice on index roadmap a   │
+│  ││ OH Owen Hwang · 07:37                  ││   invoice on index roadmap a   │
 │  ││   Queue a after cache invoice on       ││   budget tracing is queue      │
 │  ││   customer metrics on maybe sprint     ││   index ticket                 │
-│  ││   ⤷ 12 replies · last 07:49            ││ Ivy Moon · 03:22               │
-│  ││ Lily Jeon · 07:41                      ││   Draft broken can looks       │
+│  ││   ⤷ 12 replies · last 07:49            ││ IM Ivy Moon · 03:22            │
+│  ││ LJ Lily Jeon · 07:41                   ││   Draft broken can looks       │
 │  ││   Confirmed                            ││   staging done tracing now     │
-│  ││ Lily Jeon · 07:54                      ││   lunch meeting invoice        │
+│  ││ LJ Lily Jeon · 07:54                   ││   lunch meeting invoice        │
 │  ││   see https://docs.example.com/        ││   migration done customer      │
 │  ││   runbooks/latency                     ││   please                       │
-│  ││ Owen Hwang · 08:00                     ││ Eve Bae · 03:23                │
+│  ││ OH Owen Hwang · 08:00                  ││ EB Eve Bae · 03:23             │
 │  ││   Migration branch index queue should  ││   ＊＊＊＊＊                   │
 │  │├─ Message #long-threads ────────────────┤├─ Reply ────────────────────────┤
 │  ││ › Press i to write                     ││ › Press i to reply             │

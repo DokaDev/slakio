@@ -1,0 +1,34 @@
+---
+source: crates/slakio-tui/tests/avatar_flows.rs
+expression: mask_hangul(&small.snap())
+---
+╭──╮╭ DMs ───────────────────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────╮
+│▌A││▎MK● Minsu Kim       1  ││ MK Minsu Kim     ```                                         22:20 │
+│▌B││ JP● Jiho Park          ││                  SELECT count(*) FROM jobs WHERE state =           │
+│──││ ＊○ ＊＊＊             ││                  'stuck';                                          │
+│H ││ JL◐ Jiyoung Lee        ││                  ```                                               │
+│D●││ AM● Alex Morgan        ││ M  Me            Please customer queue migration index a     23:35 │
+│A●││ ＊○ ＊＊＊             ││                  merge merge budget waiting can staging            │
+│F ││ H ● Hana            2  ││                  merge roadmap                                     │
+│L ││ SR● Sam Rivera      1  ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
+│  ││ ＊○ ＊＊＊             ││ MK Minsu Kim     Waiting on deploy alert staging lunch       00:44 │
+│  ││ TK◐ Taylor Kim         ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
+│  ││ CP● Chris Park         ││                  tomorrow sprint review on tracing                 │
+│  ││ ＊○ ＊＊＊          2  ││                  production                                        │
+│  ││ ML◐ Mallory live       ││ M  Me            Ok, monitoring                              02:16 │
+│  ││ 3   Jiho Park, ＊…  2  ││ M  Me            Staging today ticket the broken broken      03:50 │
+│  ││                        ││                  still pager review done lunch someone             │
+│  ││                        ││                  ⤷ 12 replies · last 04:02                         │
+│  ││                        ││ M  Me            Rolling back                                04:08 │
+│  ││                        ││                  :tada: 3                                          │
+│  ││                        ││ MK Minsu Kim     Done schema for please today deploy looks   05:26 │
+│  ││                        ││                  fine timeout retry maybe looks                    │
+│  ││                        ││ MK Minsu Kim     For looks maybe rollback                    06:17 │
+│  ││                        ││ M  Me            Metrics staging dashboard index design      07:27 │
+│  ││                        ││                  today lunch review review migration again         │
+│  ││                        ││                  on branch                                         │
+│  ││                        ││                  :+1: 1                                            │
+│  ││                        │├─ Message @Minsu Kim ───────────────────────────────────────────────┤
+│  ││                        ││ › Press i to write                                                 │
+╰──╯╰────────────────────────╯╰────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › @Minsu Kim  │ i write · k messages · ? help · Space more │  @37  DM 16 │ demo

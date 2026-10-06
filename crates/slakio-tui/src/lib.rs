@@ -8,7 +8,7 @@
 //! * [`ui`] — drawing a frame.
 //! * [`demo`] — the demo backend over the invented world (`slakio --demo`); [`exchange`] —
 //!   requests and answers between the app and a backend.
-//! * [`theme`] — color and style tokens.
+//! * [`theme`] — color and style tokens; [`avatar`] — a person's initials chip.
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
 //! * [`input`] — Hangul typed where a key command was meant.
@@ -18,6 +18,7 @@
 
 pub mod action;
 pub mod app;
+pub mod avatar;
 pub mod demo;
 pub mod exchange;
 pub mod input;

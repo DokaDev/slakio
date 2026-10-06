@@ -4,23 +4,23 @@ expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────╮
 │▌A││ ▾ Favorites            ││   Check a customer should maybe                │
-│▌B││▎  # backend            ││ Mia Jang · 06:35                               │
+│▌B││▎  # backend            ││ MJ Mia Jang · 06:35                            │
 │──││   # incidents       3  ││   Budget metrics merge design rollback alert   │
 │H ││                        ││   alert should draft after alert on staging    │
 │D●││ ▾ Ops                  ││   tomorrow                                     │
-│A●││   # deploys            ││ Tom Ko · 06:41                                 │
+│A●││   # deploys            ││ TK Tom Ko · 06:41                              │
 │F ││   # alerts             ││   On waiting migration someone index can       │
 │L ││   # partner-shared ext ││   staging should                               │
-│  ││   # hostile-strings    ││ Kate Nam · 06:51                               │
+│  ││   # hostile-strings    ││ KN Kate Nam · 06:51                            │
 │  ││   # big-history        ││   Production roadmap customer build alert now  │
 │  ││   # long-threads       ││   latency fine review latency roadmap broken   │
 │  ││                        ││   should for                                   │
-│  ││ ▾ Channels             ││ ＊＊＊ · 06:59                                 │
+│  ││ ▾ Channels             ││ ＊ ＊＊＊ · 06:59                              │
 │  ││   # announcements      ││   Confirmed                                    │
-│  ││   # design-review      ││ Kate Nam · 07:05                               │
+│  ││   # design-review      ││ KN Kate Nam · 07:05                            │
 │  ││   # feed-alert-134     ││   Ticket review pager pager production on      │
 │  ││   # feed-alert-8       ││   build alert the on draft                     │
-│  ││   # feed-budget-162    ││ Sam Rivera · 07:14                             │
+│  ││   # feed-budget-162    ││ SR Sam Rivera · 07:14                          │
 │  ││   # feed-budget-33     ││   Meeting moved to 3pm                         │
 │  ││   # feed-build-50      │├─ Message #backend ─────────────────────────────┤
 │  ││   # feed-cache-119     ││ › Press i to write                             │

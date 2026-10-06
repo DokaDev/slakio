@@ -80,7 +80,7 @@ fn the_rail_switches_workspace_and_view() {
     d.keys("space d");
     assert_eq!(d.app.shell.view, View::Dms);
     let s = d.screen();
-    assert!(s.contains(" DMs ") && s.contains("@ "), "{s}");
+    assert!(s.contains(" DMs "), "{s}");
     assert!(!s.contains("# general"), "DMs lists no channels");
     insta::assert_snapshot!("demo_dms_120x40", mask_hangul(&s));
 }
@@ -231,7 +231,7 @@ fn hostile_names_are_drawn_sanitised_in_the_list_title_and_status_line() {
     let s = d.screen();
     assert_harmless(&s);
     assert!(s.contains("◐ Mallory live"), "the list row, its peer in do not disturb: {s}");
-    assert!(s.contains("▌@Mallory live"), "the pane title: {s}");
+    assert!(s.contains("▌ML @Mallory live"), "the pane title, the initials sanitised too: {s}");
     assert!(d.status_line().contains("@Mallory live"), "{}", d.status_line());
     assert!(!s.contains("owned"), "the title sequence is gone, its text too: {s}");
     // A hostile section name of the other workspace.

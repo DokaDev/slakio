@@ -14,15 +14,15 @@ expression: d.snap()
 │  ││   # hostile-string│  :workspace            Switch workspace                      Space W │                       │
 │  ││   # big-history   │  :help                 Keyboard help                          ? / F1 │                       │
 │  ││   # long-threads  │  :theme <theme>        Change the color theme                        │                       │
-│  ││                   │  :rail                 Rail: workspaces and views   Ctrl+R / Space r │                       │
-│  ││ ▾ Channels        │  :list                 Show or hide the list panel           Space e │                       │
-│  ││   # announcements │  :home                 Show Home                             Space h │                       │
-│  ││   # design-review │  :dms                  Show DMs                              Space d │                       │
-│  ││   # feed-alert-134│  :activity             Show Activity                         Space a │                       │
-│  ││   # feed-alert-8  │  :files                Show Files                            Space f │                       │
-│  ││   # feed-budget-16│  :later                Show Later                            Space l │                       │
-│  ││   # feed-budget-33│  :close                Close the pane                      Space w c │                       │
-│  ││   # feed-build-50 │  :back                 Back to the conversation …  Ctrl+O / Alt+Left │                       │
+│  ││                   │  :avatars              Show or hide avatars (initials)               │                       │
+│  ││ ▾ Channels        │  :rail                 Rail: workspaces and views   Ctrl+R / Space r │                       │
+│  ││   # announcements │  :list                 Show or hide the list panel           Space e │                       │
+│  ││   # design-review │  :home                 Show Home                             Space h │                       │
+│  ││   # feed-alert-134│  :dms                  Show DMs                              Space d │                       │
+│  ││   # feed-alert-8  │  :activity             Show Activity                         Space a │                       │
+│  ││   # feed-budget-16│  :files                Show Files                            Space f │                       │
+│  ││   # feed-budget-33│  :later                Show Later                            Space l │                       │
+│  ││   # feed-build-50 │  :close                Close the pane                      Space w c │                       │
 │  ││   # feed-cache-119╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
 │  ││   # feed-customer-161  ││                         ?        Keyboard help                                         │
 │  ││   # feed-customer…  1  ││                         Ctrl+Q   Quit                                                  │

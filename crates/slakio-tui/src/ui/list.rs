@@ -12,16 +12,21 @@
 //! │   ▪ secret-proj           │   ▪ = private
 //! │   # partner-shared    ext │   ext = shared with another organization
 //! │   # feed-customer-1…  1   │   names end in … where they would touch the pill
-//! │   ● Minsu Kim             │   a DM: its peer is active (●), away (○) or in do not
-//! │   ◐ Jiyoung Lee           │   disturb (◐); `@` while unknown
+//! │   MK● Minsu Kim           │   a DM: its peer's avatar chip, and at its corner whether
+//! │   JL◐ Jiyoung Lee         │   they are active (●), away (○) or in do not disturb (◐)
+//! │   3   Jiho Park, …        │   a group DM: how many people are in it
 //! ```
+//!
+//! With `avatars = "off"` a DM starts with the presence mark alone (`● Minsu Kim`, `@` while
+//! unknown) and a group DM with `@`.
 //!
 //! Unread conversations are bold, muted ones faint; nothing else marks them.
 
-use super::{count_pill, frame, highlight, presence_mark, view_label};
+use super::{avatar_chip, count_pill, frame, highlight, presence_mark, view_label};
 use crate::app::App;
 use crate::app::model::Row;
 use crate::app::shell::{Region, View};
+use crate::avatar;
 use crate::screen;
 use crate::text::{clip, width};
 use crate::theme::Selection;
@@ -74,6 +79,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
 /// Inside the gutter and the right padding.
 fn pad(r: Rect) -> Rect {
     Rect { x: r.x + 1, width: r.width.saturating_sub(2), ..r }
+}
+
+/// The row of `c` starts with an avatar chip: avatars are on and it is a DM or a group DM.
+fn avatars_on(app: &App, c: &slakio_core::model::Conversation) -> bool {
+    app.settings.avatars && c.is_dm()
 }
 
 /// Draw `text` from column `x` of `row`, at most `w` cells.
@@ -164,7 +174,32 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             let pill = if count > 0 { right(f, area, &count_pill(count), t.badge()) } else { 0 };
             // DMs has no sections: its rows start where a section's name would.
             let x = if app.shell.view == View::Home { 3 } else { 1 };
-            put(f, area, x, 1, vec![Span::styled(prefix, prefix_style)]);
+            // With avatars, a DM starts with its peer's chip and the presence mark at its
+            // corner, a group DM with a chip of how many people are in it; the name follows.
+            let chip = avatars_on(app, c).then(|| match &c.kind {
+                ConversationKind::Dm { user } => avatar_chip(app, user, c.name.line().as_str()),
+                ConversationKind::GroupDm { users } => {
+                    let n = if users.len() > 9 { "9+".to_string() } else { format!("{:<2}", users.len()) };
+                    Some(Span::styled(n, t.avatar_group()))
+                }
+                ConversationKind::Channel { .. } => None,
+            });
+            let (mark_x, name_x) = match chip.flatten() {
+                Some(mut chip) => {
+                    if c.muted {
+                        chip.style = t.faint();
+                    }
+                    put(f, area, x, avatar::WIDTH as u16, vec![chip]);
+                    if let Some((mark, _)) = presence {
+                        put(f, area, x + 2, 1, vec![Span::styled(mark, prefix_style)]);
+                    }
+                    (x + 2, x + 4)
+                }
+                None => {
+                    put(f, area, x, 1, vec![Span::styled(prefix, prefix_style)]);
+                    (x, x + 2)
+                }
+            };
             let tag = match (c.external, icons) {
                 (false, _) => String::new(),
                 (true, false) => format!(" {}", app.i18n.label(Label::ListExternal)),
@@ -173,15 +208,15 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             let tag_w = width(&tag) as u16;
             // One blank cell at least between the name and what is right of it.
             let gap = if pill > 0 { pill + 2 } else { 1 };
-            let room = area.width.saturating_sub(x + 2 + gap + tag_w);
+            let room = area.width.saturating_sub(name_x + gap + tag_w);
             let name = clip(c.name.line().as_str(), usize::from(room));
             let name_w = width(&name) as u16;
             let mut spans = vec![Span::styled(name, name_style)];
             if !tag.is_empty() {
                 spans.push(Span::styled(tag, t.faint()));
             }
-            put(f, area, x + 2, name_w + tag_w, spans);
-            presence.filter(|_| !c.muted).map(|(_, p)| (area.x + x, p))
+            put(f, area, name_x, name_w + tag_w, spans);
+            presence.filter(|_| !c.muted).map(|(_, p)| (area.x + mark_x, p))
         }
     }
 }

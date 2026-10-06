@@ -86,12 +86,20 @@ pub enum Effect {
 }
 
 /// Display settings from the config file.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     /// Nerd Font icons instead of letters.
     pub icons: bool,
     /// The expanded rail pushes the list panel aside instead of covering it.
     pub rail_push: bool,
+    /// People are pictured by an initials chip (`avatars = "initials"`, the default).
+    pub avatars: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { icons: false, rail_push: false, avatars: true }
+    }
 }
 
 /// The unfinished key sequence's popup: when it shows, and whether it does yet.
@@ -594,6 +602,12 @@ impl App {
                     }
                 }
             }
+            AppAction::ToggleAvatars => {
+                let value = if self.settings.avatars { "off" } else { "initials" };
+                if let Err(msg) = self.set_avatars(value, now) {
+                    self.warn(msg, now);
+                }
+            }
             AppAction::ChooseWorkspace => {
                 if self.backend.is_some() {
                     self.shell.focus = Region::Rail;
@@ -862,6 +876,19 @@ impl App {
         Ok(())
     }
 
+    /// `:avatars <initials|off>`: picture people by their initials chip, or not, from now on,
+    /// and save it in the config file. Another value changes nothing and says which ones work.
+    pub fn set_avatars(&mut self, value: &str, now: Instant) -> Result<(), Msg> {
+        let value = value.trim().to_ascii_lowercase();
+        if !AVATAR_VALUES.contains(&value.as_str()) {
+            return Err(Msg::AvatarsUnknown { name: value, names: AVATAR_VALUES.join(", ") });
+        }
+        self.settings.avatars = value == "initials";
+        self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
+        self.info(Msg::AvatarsChanged { name: value }, now);
+        Ok(())
+    }
+
     /// Open the keyboard help for context `ctx`.
     fn open_help(&mut self, ctx: Ctx) {
         self.keys.clear();
@@ -963,6 +990,20 @@ impl App {
             changed |= !self.keys.pending().is_empty();
         }
         changed
+    }
+}
+
+/// The values `:avatars` takes (the config file also keeps `image` for photos, later).
+pub const AVATAR_VALUES: &[&str] = &["initials", "off"];
+
+/// The value of `:avatars <value>` (also `:set avatars=<value>`).
+pub fn avatars_arg(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        "avatars" => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix("avatars=").map(str::trim),
+        _ => None,
     }
 }
 

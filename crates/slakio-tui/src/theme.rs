@@ -125,6 +125,9 @@ pub struct Theme {
     pub mode_fg: Color,
     /// Workspace colors, by [`WorkspaceColor`] slot (wrapping around).
     pub workspaces: &'static [Color],
+    /// Avatar chips, a person's by a slot of their id ([`crate::avatar::slot`]), under
+    /// [`Self::mode_fg`] text.
+    pub avatars: &'static [Color],
     pub dim: Dim,
 }
 
@@ -145,8 +148,15 @@ pub enum Selection {
 impl Theme {
     /// No color at all (`NO_COLOR`): shapes only.
     pub fn no_color() -> Self {
-        Self { name: "no-color", kind: Kind::NoColor, workspaces: &[Color::Reset], dim: Dim::Modifier, ..TERMINAL }
-            .without_colors()
+        Self {
+            name: "no-color",
+            kind: Kind::NoColor,
+            workspaces: &[Color::Reset],
+            avatars: &[Color::Reset],
+            dim: Dim::Modifier,
+            ..TERMINAL
+        }
+        .without_colors()
     }
 
     fn without_colors(mut self) -> Self {
@@ -339,6 +349,23 @@ impl Theme {
         Style::new().fg(self.mode_fg).bg(bg).add_modifier(Modifier::BOLD)
     }
 
+    /// A person's avatar chip, of color slot `slot`: their initials bold on the color, or
+    /// reversed without colors.
+    pub fn avatar(&self, slot: usize) -> Style {
+        if self.plain() {
+            return Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD);
+        }
+        Style::new().fg(self.mode_fg).bg(self.avatars[slot % self.avatars.len()]).add_modifier(Modifier::BOLD)
+    }
+
+    /// The chip of a group DM (how many people are in it): body text on the reactions' surface.
+    pub fn avatar_group(&self) -> Style {
+        if self.plain() {
+            return self.bold();
+        }
+        Style::new().fg(self.fg).bg(self.surface_alt).add_modifier(Modifier::BOLD)
+    }
+
     /// The style of workspace color `c`.
     pub fn workspace(&self, c: WorkspaceColor) -> Style {
         Style::new().fg(self.workspaces[usize::from(c.0) % self.workspaces.len()])
@@ -347,8 +374,8 @@ impl Theme {
     /// Paint `how` over the row `row` already drawn, whatever it is drawn on (the app's
     /// background, a popup's surface). Its first cell is the gutter: where the theme has no
     /// background for `how`, a bar there marks the row. Muted and faint text, and text the bar
-    /// would hide, take the body color so it stays readable on the bar; bold and the pills (a
-    /// background of the error color) stay.
+    /// would hide, take the body color so it stays readable on the bar; bold, the pills (a
+    /// background of the error color) and the avatar chips stay.
     pub fn paint_selection(&self, buf: &mut Buffer, row: Rect, how: Selection) {
         let row = row.intersection(buf.area);
         if row.is_empty() {
@@ -370,8 +397,8 @@ impl Theme {
         if let Some(bg) = bg {
             for x in row.left()..row.right() {
                 let cell = &mut buf[(x, row.y)];
-                // A pill keeps its background.
-                if cell.bg == self.error && self.error != Color::Reset {
+                // A pill and an avatar chip keep their background.
+                if cell.bg != Color::Reset && (cell.bg == self.error || self.avatars.contains(&cell.bg)) {
                     continue;
                 }
                 cell.bg = bg;
