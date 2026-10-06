@@ -333,20 +333,59 @@ pub fn word_score(query: &str, text: &str) -> Option<i32> {
     best
 }
 
-/// Registry indices whose label (in the UI language or in English) or id matches `query`
-/// ([`word_score`]), best first; ties keep the registry's order. English words find actions
-/// while the UI is in Korean too.
-pub fn search(query: &str, i18n: &slakio_core::i18n::I18n) -> Vec<usize> {
+/// How well `query` matches an entry typed as `names` (`:` command names) and described by
+/// `words` (its labels and id): `(tier, score)`, the lower tier first, then the higher score;
+/// `None` when it does not match. Case is ignored.
+///
+/// | tier | match | e.g. |
+/// |---|---|---|
+/// | 0 | a name is `query` | `q` for `:q` |
+/// | 1 | a name starts with it | `the` for `:theme` |
+/// | 2 | a word of a name or of `words` starts with it | `color` for "Change the color theme" |
+/// | 3 | its letters in order, the first starting a word ([`word_score`]) | `thm` for `:theme` |
+///
+/// An empty `query` matches everything equally (tier 0).
+pub fn rank(query: &str, names: &[&str], words: &[&str]) -> Option<(u8, i32)> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Some((0, 0));
+    }
+    let all = || names.iter().chain(words);
+    if names.iter().any(|n| n.to_lowercase() == q) {
+        return Some((0, 0));
+    }
+    if let Some(n) = names.iter().filter(|n| n.to_lowercase().starts_with(&q)).map(|n| n.chars().count()).min() {
+        // The shortest name it starts first (`:q` before `:quit`).
+        return Some((1, -(n as i32)));
+    }
+    let score = all().filter_map(|t| word_score(&q, t)).max()?;
+    let word_start = all().any(|t| {
+        let t = t.to_lowercase();
+        t.match_indices(q.as_str()).any(|(i, _)| {
+            t[..i].chars().next_back().is_none_or(|c| matches!(c, ' ' | '.' | '_' | '-' | '/' | '(' | ':'))
+        })
+    });
+    Some((if word_start { 2 } else { 3 }, score))
+}
+
+/// How well `query` matches the registered action `s` ([`rank`]): its command names, its label
+/// in the UI language and in English, and its id. English words find actions while the UI is
+/// in Korean too.
+pub fn rank_spec(query: &str, s: &ActionSpec, i18n: &slakio_core::i18n::I18n) -> Option<(u8, i32)> {
     let english = slakio_core::i18n::I18n::new(slakio_core::i18n::Lang::En);
-    let mut hits: Vec<(i32, usize)> = REGISTRY
+    let (own, en) = (i18n.label(s.label).to_string(), english.label(s.label).to_string());
+    rank(query, s.commands, &[own.as_str(), en.as_str(), s.id])
+}
+
+/// Registry indices that match `query` ([`rank_spec`]), best first; ties keep the registry's
+/// order.
+pub fn search(query: &str, i18n: &slakio_core::i18n::I18n) -> Vec<usize> {
+    let mut hits: Vec<((u8, i32), usize)> = REGISTRY
         .iter()
         .enumerate()
-        .filter_map(|(i, s)| {
-            let (own, en) = (i18n.label(s.label).to_string(), english.label(s.label).to_string());
-            [own.as_str(), en.as_str(), s.id].iter().filter_map(|t| word_score(query, t)).max().map(|sc| (sc, i))
-        })
+        .filter_map(|(i, s)| rank_spec(query, s, i18n).map(|(t, sc)| ((t, -sc), i)))
         .collect();
-    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    hits.sort_unstable();
     hits.into_iter().map(|(_, i)| i).collect()
 }
 

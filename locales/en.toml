@@ -248,6 +248,7 @@
 "help.none" = "No key matches “{query}”"
 "dialog.quit_title" = "Quit slakio?"
 "dialog.quit_text" = "A message you wrote has not been sent; quitting loses it."
+"dialog.quit_confirm_text" = "No message is waiting to be sent."
 "dialog.quit_no" = "Stay"
 "dialog.quit_yes" = "Quit"
 "dialog.icons_title" = "Nerd Font icons?"

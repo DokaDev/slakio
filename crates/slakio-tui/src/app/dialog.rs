@@ -1,4 +1,5 @@
-//! A question with two answers, over the screen: quit with a message not sent, or use Nerd
+//! A question with two answers, over the screen: quit (with a message not sent, or after a
+//! click), or use Nerd
 //! Font icons (asked once). The safe answer has the focus, so `Enter` alone never does the risky
 //! thing; `y` and `n` answer directly.
 
@@ -7,6 +8,8 @@
 pub enum Question {
     /// A composer holds text that was not sent: quit anyway?
     Quit,
+    /// Quit? (Nothing is lost; asked when a click asked to quit.)
+    QuitConfirm,
     /// Does the terminal's font show Nerd Font icons? (The answer is saved.)
     Icons,
 }

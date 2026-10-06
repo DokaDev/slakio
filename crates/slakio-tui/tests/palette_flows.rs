@@ -9,6 +9,7 @@ mod demo;
 use demo::Demo;
 use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use slakio_core::i18n::Lang;
+use slakio_tui::app::dialog::Question;
 use slakio_tui::app::shell::{Region, View};
 use slakio_tui::app::{Mode, Settings};
 use slakio_tui::theme::{Background, resolve};
@@ -34,11 +35,16 @@ fn ctrl_p_opens_a_box_of_every_command_and_action_with_its_keys() {
     assert!(lines[1].contains(": type a command or an action name"), "{lines:#?}");
     assert!(lines[2].contains("├────"), "a rule joined to the sides: {lines:#?}");
     let all = lines.join("\n");
-    for want in [":qa, :qall, :quitall  Quit", ":theme <theme>", "Ctrl+Q / Space q", ":help", "? / F1"] {
+    for want in [":theme <theme>", ":help", "? / F1"] {
         assert!(all.contains(want), "{want}: {all}");
     }
-    // The list scrolls: the rest is there too.
+    // The list scrolls: the rest is there too. Quit is last, never the entry Enter would run.
     let rows = d.app.palette_rows();
+    let last = rows.last().unwrap();
+    assert_eq!((last.name.as_str(), last.label.as_str()), (":qa, :qall, :quitall", "Quit"), "{rows:#?}");
+    assert_eq!(last.keys, "Ctrl+Q / Space q");
+    assert!(!all.contains("Quit"), "not in the first screen: {all}");
+    assert_ne!(rows[d.app.cmdline.selected].label, "Quit");
     for (name, keys) in [(":theme <theme>", ""), (":rail", "Ctrl+R / Space r"), (":home", "Space h")] {
         assert!(rows.iter().any(|r| r.name == name && r.keys == keys), "{name}: {rows:#?}");
     }
@@ -191,4 +197,56 @@ fn the_palette_is_translated_and_drawn_in_every_theme() {
         // The badge stays bright under the dimmed screen.
         assert_eq!(buf[(1, 39)].bg, d.app.theme.mode_command, "{name}");
     }
+}
+
+#[test]
+fn letters_in_order_find_an_entry_ranked_name_then_word_start_then_letters() {
+    let mut d = Demo::new(120, 40);
+    d.keys(":");
+    d.type_text("thm");
+    assert_eq!(d.app.palette_rows()[0].name, ":theme <theme>", "thm finds the theme command");
+    d.keys("ctrl+p ctrl+p");
+    d.type_text("hom");
+    assert_eq!(d.app.palette_rows()[0].name, ":home", "a name it starts first");
+    d.keys("ctrl+p ctrl+p");
+    d.type_text("color");
+    assert_eq!(d.app.palette_rows()[0].name, ":theme <theme>", "a word of the label");
+    d.keys("ctrl+p ctrl+p");
+    d.type_text("shdm");
+    assert_eq!(d.app.palette_rows()[0].label, "Show DMs", "letters in order from a word start");
+    d.keys("ctrl+p ctrl+p");
+    d.type_text("theme tkn");
+    assert_eq!(d.app.palette_rows()[0].name, "tokyo-night", "theme names the same way");
+}
+
+#[test]
+fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
+    let mut d = Demo::new(120, 40);
+    d.keys(":");
+    d.type_text("qui");
+    let b = d.app.palette_box().unwrap();
+    assert_eq!(d.app.palette_rows()[0].label, "Quit");
+    assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y));
+    assert!(!d.app.quit, "a click never quits at once");
+    assert_eq!(d.app.mode(), Mode::Normal);
+    let s = d.screen();
+    assert!(s.contains("Quit slakio?") && s.contains("No message is waiting to be sent."), "{s}");
+    d.keys("enter");
+    assert!(!d.app.quit && d.app.dialog.is_none(), "Stay has the focus");
+    // With text not sent, the same question as Ctrl+Q; y quits.
+    d.open("backend");
+    d.keys("i");
+    d.type_text("half written");
+    d.keys("esc ctrl+p");
+    d.type_text("qui");
+    assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y));
+    assert_eq!(d.app.dialog.map(|q| q.question), Some(Question::Quit));
+    d.keys("y");
+    assert!(d.app.quit, "y quits");
+    // Typed, `:q` Enter is asked for by name: it quits as in vim.
+    let mut d = Demo::new(120, 40);
+    d.keys(":");
+    d.type_text("q");
+    d.keys("enter");
+    assert!(d.app.quit);
 }

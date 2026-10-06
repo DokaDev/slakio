@@ -139,3 +139,21 @@ fn search_finds_actions_by_their_words_from_word_starts() {
     let ko = I18n::new(Lang::Ko);
     assert_eq!(search("dms", &ko).first().map(|&i| REGISTRY[i].id), Some("view.dms"));
 }
+
+#[test]
+fn rank_puts_names_before_word_starts_before_letters_in_order() {
+    let theme = |q: &str| rank(q, &["theme", "colorscheme"], &["Change the color theme", "theme.set"]);
+    assert_eq!(theme("theme"), Some((0, 0)), "a name");
+    assert_eq!(theme("THE").map(|r| r.0), Some(1), "a name it starts, case ignored");
+    assert_eq!(theme("color").map(|r| r.0), Some(1), "colorscheme");
+    assert_eq!(theme("chan").map(|r| r.0), Some(2), "a word of the label");
+    assert_eq!(theme("set").map(|r| r.0), Some(2), "a word of the id");
+    assert_eq!(theme("thm").map(|r| r.0), Some(3), "its letters in order");
+    assert_eq!(theme("hm"), None, "the first letter must start a word");
+    assert_eq!(theme("tz"), None);
+    assert_eq!(theme(""), Some((0, 0)), "nothing typed: everything");
+    // The shorter name a word starts comes first (`:q` before `:quit`).
+    assert!(rank("q", &["qa", "q"], &[]) < rank("q", &["quit"], &[]));
+    // Within a tier, the better run of letters first.
+    assert!(rank("sd", &[], &["Show DMs"]).unwrap().1 > rank("sd", &[], &["Show the rail item and DMs"]).unwrap().1);
+}

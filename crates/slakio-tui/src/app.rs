@@ -574,10 +574,7 @@ impl App {
             AppAction::Quit => match self.dialog {
                 // Asked already: the question stays until it is answered.
                 Some(d) if d.question == Question::Quit => {}
-                _ if self.work.unsent() => {
-                    self.help = None;
-                    self.dialog = Some(Dialog::new(Question::Quit));
-                }
+                _ if self.work.unsent() => self.confirm_quit(),
                 _ => self.quit = true,
             },
             AppAction::Interrupt => {
@@ -604,6 +601,14 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Ask before quitting: about the text not sent when a composer holds some, else only
+    /// whether to quit (for a click, which is easy to make by mistake).
+    fn confirm_quit(&mut self) {
+        self.help = None;
+        let q = if self.work.unsent() { Question::Quit } else { Question::QuitConfirm };
+        self.dialog = Some(Dialog::new(q));
     }
 
     fn shell(&mut self, a: ShellAction, now: Instant) {
@@ -932,7 +937,7 @@ impl App {
         };
         self.dialog = None;
         match d.question {
-            Question::Quit => self.quit = yes,
+            Question::Quit | Question::QuitConfirm => self.quit = yes,
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });

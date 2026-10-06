@@ -36,6 +36,9 @@ const HELP: Action = Action::Help(HelpAction::Open);
 /// At most this many of a command's names are shown (all of them are typed).
 const NAMES_SHOWN: usize = 3;
 
+/// How an entry sorts: tier, `Quit`, minus the score, an action (not a command), place.
+type Order = (u8, bool, i32, bool, usize, u8);
+
 /// One entry of the palette's list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Item {
@@ -69,18 +72,10 @@ fn offered(a: Action, backend: bool) -> bool {
     }
 }
 
-/// The themes `arg` names: the exact name, then those it starts, then those its letters find.
+/// The themes `arg` names, best first ([`action::rank`]); ties keep the themes' order.
 fn themes(arg: &str) -> Vec<usize> {
-    let arg = arg.trim().to_ascii_lowercase();
-    let mut hits: Vec<(u8, i32, usize)> = NAMES
-        .iter()
-        .enumerate()
-        .filter_map(|(i, n)| match () {
-            _ if *n == arg => Some((0, 0, i)),
-            _ if n.starts_with(&arg) => Some((1, 0, i)),
-            _ => action::word_score(&arg, n).map(|s| (2, -s, i)),
-        })
-        .collect();
+    let mut hits: Vec<(u8, i32, usize)> =
+        NAMES.iter().enumerate().filter_map(|(i, n)| action::rank(arg, &[], &[n]).map(|(t, s)| (t, -s, i))).collect();
     hits.sort_unstable();
     hits.into_iter().map(|(.., i)| i).collect()
 }
@@ -108,7 +103,10 @@ fn theme_label(name: &str) -> Label {
 }
 
 impl App {
-    /// The palette's entries for the text typed so far.
+    /// The palette's entries for the text typed so far: every one [`action::rank`] matches,
+    /// the better match first; on a tie, commands in the registry's order (`:theme` after
+    /// the help), then the actions. `Quit` comes after everything that matches as well, so with
+    /// nothing typed it is last and never the entry `Enter` or a stray click would run.
     pub fn palette_items(&self) -> Vec<Item> {
         let line = self.cmdline.text().trim_start();
         if let Some(arg) = theme_arg(line) {
@@ -120,33 +118,26 @@ impl App {
         }
         let backend = self.backend.is_some();
         let below = self.region_context();
-        // What works here: a command, or a key from where the keyboard is.
-        let works = |i: usize| {
-            let s = &REGISTRY[i];
-            offered(s.action, backend) && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty())
-        };
-        let mut commands: Vec<usize> = (0..REGISTRY.len())
-            .filter(|&i| works(i) && REGISTRY[i].commands.iter().any(|c| c.starts_with(word)))
-            .collect();
-        commands.sort_by_key(|&i| !REGISTRY[i].commands.contains(&word));
-        let mut out: Vec<Item> = commands.iter().map(|&i| Item::Command(i)).collect();
-        if THEME_COMMANDS.iter().any(|c| c.starts_with(word)) {
-            // First when named; else after the help, so the empty list shows it early.
-            let help = out.iter().position(|it| matches!(it, Item::Command(i) if REGISTRY[*i].action == HELP));
-            let at = match help {
-                _ if THEME_COMMANDS.contains(&word) => 0,
-                Some(h) => h + 1,
-                None => out.len(),
-            };
-            out.insert(at, Item::ThemeCommand);
+        let english = slakio_core::i18n::I18n::new(slakio_core::i18n::Lang::En);
+        let mut hits: Vec<(Order, Item)> = Vec::new();
+        for (i, s) in REGISTRY.iter().enumerate() {
+            // What works here: a command, or a key from where the keyboard is.
+            let works = offered(s.action, backend)
+                && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty());
+            if works && let Some((tier, score)) = action::rank_spec(word, s, &self.i18n) {
+                let quit = s.action == Action::App(AppAction::Quit);
+                let item = if s.commands.is_empty() { Item::Action(i) } else { Item::Command(i) };
+                hits.push(((tier, quit, -score, s.commands.is_empty(), i, 0), item));
+            }
+            if s.action == HELP {
+                let (own, en) = (self.i18n.label(Label::ActionTheme), english.label(Label::ActionTheme));
+                if let Some((tier, score)) = action::rank(word, THEME_COMMANDS, &[&own, &en]) {
+                    hits.push(((tier, false, -score, false, i, 1), Item::ThemeCommand));
+                }
+            }
         }
-        out.extend(
-            action::search(word, &self.i18n)
-                .into_iter()
-                .filter(|&i| works(i) && !commands.contains(&i))
-                .map(Item::Action),
-        );
-        out
+        hits.sort_unstable_by_key(|h| h.0);
+        hits.into_iter().map(|(_, item)| item).collect()
     }
 
     /// The entries as drawn.
@@ -253,8 +244,8 @@ impl App {
         }
     }
 
-    /// The mouse over the palette: the wheel moves the selection, a click on an entry runs it,
-    /// a click outside closes the palette. `true` when the screen changed.
+    /// The mouse over the palette: the wheel moves the selection, a click on an entry runs it
+    /// (`Quit` asks first), a click outside closes the palette. `true` when the screen changed.
     pub(super) fn palette_mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
         let Some(b) = self.palette_box() else { return false };
         let at = Position { x: m.column, y: m.row };
@@ -268,7 +259,14 @@ impl App {
                 }
                 self.cmdline.selected = i;
                 self.cmdline.picked = true;
-                self.palette_run(now);
+                let quit = REGISTRY.iter().position(|s| s.action == Action::App(AppAction::Quit));
+                if matches!(self.palette_items()[i], Item::Command(q) | Item::Action(q) if Some(q) == quit) {
+                    // One click is easy to make by mistake: quitting asks first.
+                    self.cmdline.close();
+                    self.confirm_quit();
+                } else {
+                    self.palette_run(now);
+                }
             }
             MouseEventKind::Down(MouseButton::Left) if !b.rect.contains(at) => self.cmdline.close(),
             _ => return false,

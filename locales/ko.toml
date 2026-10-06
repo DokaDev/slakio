@@ -227,6 +227,7 @@
 "help.none" = "“{query}” 에 맞는 키가 없습니다"
 "dialog.quit_title" = "slakio를 종료할까요?"
 "dialog.quit_text" = "보내지 않은 메시지가 있습니다. 종료하면 사라집니다."
+"dialog.quit_confirm_text" = "보내지 않은 메시지는 없습니다."
 "dialog.quit_no" = "머무르기"
 "dialog.quit_yes" = "종료"
 "dialog.icons_title" = "Nerd Font 아이콘을 쓸까요?"

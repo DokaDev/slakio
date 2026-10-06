@@ -27,6 +27,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let Some(d) = app.dialog else { return };
     let (title, text, no, yes) = match d.question {
         Question::Quit => (Label::DialogQuitTitle, Label::DialogQuitText, Label::DialogQuitNo, Label::DialogQuitYes),
+        Question::QuitConfirm => {
+            (Label::DialogQuitTitle, Label::DialogQuitConfirmText, Label::DialogQuitNo, Label::DialogQuitYes)
+        }
         Question::Icons => {
             (Label::DialogIconsTitle, Label::DialogIconsText, Label::DialogIconsNo, Label::DialogIconsYes)
         }
