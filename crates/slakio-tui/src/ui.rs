@@ -174,11 +174,6 @@ pub(crate) fn view_label(view: View) -> Label {
     view.label()
 }
 
-/// The top bar's letter, or its Nerd Font icon, for a view.
-pub(crate) fn view_glyph(view: View, icons: bool) -> &'static str {
-    view.glyph(icons)
-}
-
 /// A person's presence mark: `●` active, `○` away, `◐` in do not disturb; none while
 /// unknown. One set of one weight, icons or not; told apart by shape, so it reads without
 /// color.
@@ -200,6 +195,19 @@ fn avatar_chip(app: &App, id: &UserId, name: &str) -> Option<Span<'static>> {
     }
     let handle = || app.model.user(id).map(|u| u.name.line().as_str().to_string()).unwrap_or_default();
     Some(Span::styled(avatar::initials(name, handle), app.theme.avatar(avatar::slot(id))))
+}
+
+/// Nerd Font glyph `g` at `(x, y)` in its two-cell slot: one cell whose symbol is the glyph and a
+/// blank, the cell after it blank and never written on its own. A terminal that draws the glyph
+/// two cells wide covers just its slot (the text after it is placed by a cursor move); one that
+/// draws it narrow clears the slot's second cell.
+pub(crate) fn glyph_cell(buf: &mut ratatui::buffer::Buffer, x: u16, y: u16, g: &str, style: ratatui::style::Style) {
+    let area = buf.area;
+    if x + 1 >= area.right() || y >= area.bottom() {
+        return;
+    }
+    buf[(x, y)].set_symbol(&format!("{g} ")).set_style(style);
+    buf[(x + 1, y)].set_symbol(" ").set_style(style);
 }
 
 /// The pill of count `n` (` 3 `, ` 99+ `).

@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/ux_flows.rs
 expression: s
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││                  ⤷ 8 replies · last 04:16                                                  │
 │▎  # backend            ││ DY Dana Yoon     Ok, monitoring                                                      04:17 │
@@ -41,4 +41,4 @@ expression: s
 │   # feed-invoice-168   │├─ Message #backend ─────────────────────────────────────────────────────────────────────────┤
 │   # feed-latency-144   ││ › Hello there                                                                              │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
- INSERT  ▌A company › #backend                  │ Enter send · Alt+Enter newline · Esc stop typing │  @37  DM 16 │ demo
+ INSERT  ▌A company › #backend                                │ Enter send · Alt+Enter newline · Esc stop typing │ demo

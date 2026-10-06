@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ ▌#long-threads ────────────────────────────╮╭ ▌⤷ Thread · #long-threads ─────╮
 │▎─────────────── 2026-01-06 ─────────────── ││    After ticket customer       │
 │▎JL Jiyoung Lee · 07:23                     ││    timeout queue again timeout │
@@ -25,4 +25,4 @@ expression: mask_hangul(&s)
 ├─ Message #long-threads ────────────────────┤├─ Reply ────────────────────────┤
 │ › Press i to write                         ││ › Press i to reply             │
 ╰────────────────────────────────────────────╯╰────────────────────────────────╯
- NORMAL  ▌A compa… › #long-th… ⤷ Thread │ i reply · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #long-threads › ⤷ Thread        │ i reply · ? help │ demo

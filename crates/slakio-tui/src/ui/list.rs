@@ -197,14 +197,19 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                     (x + 2, x + 4)
                 }
                 None => {
-                    put(f, area, x, 1, vec![Span::styled(prefix, prefix_style)]);
+                    if prefix == ICON_PRIVATE {
+                        super::glyph_cell(f.buffer_mut(), area.x + x, area.y, prefix, prefix_style);
+                    } else {
+                        put(f, area, x, 1, vec![Span::styled(prefix, prefix_style)]);
+                    }
                     (x, x + 2)
                 }
             };
             let tag = match (c.external, icons) {
                 (false, _) => String::new(),
                 (true, false) => format!(" {}", app.i18n.label(Label::ListExternal)),
-                (true, true) => format!(" {ICON_EXTERNAL}"),
+                // The glyph and the blank of its slot.
+                (true, true) => format!(" {ICON_EXTERNAL} "),
             };
             let tag_w = width(&tag) as u16;
             // One blank cell at least between the name and what is right of it.
@@ -217,6 +222,9 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                 spans.push(Span::styled(tag, t.faint()));
             }
             put(f, area, name_x, name_w + tag_w, spans);
+            if icons && c.external {
+                super::glyph_cell(f.buffer_mut(), area.x + name_x + name_w + 1, area.y, ICON_EXTERNAL, t.faint());
+            }
             presence.filter(|_| !c.muted).map(|(_, p)| (area.x + mark_x, p))
         }
     }

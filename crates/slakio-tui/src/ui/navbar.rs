@@ -29,18 +29,18 @@ pub(super) fn draw(f: &mut Frame, app: &App, bar: &Bar) {
         });
         let shown = view.is_some_and(|v| v == app.shell.view);
         let style = match p.part {
-            Part::Band => ws.map_or(t.nav_bar(), |w| t.workspace(w.color).bg(t.surface)),
-            Part::Name => t.bold().bg(t.surface),
-            Part::Caret | Part::Sep => t.divider().bg(t.surface),
-            Part::Mark | Part::Badge => t.marker(p.text.trim_start().starts_with('@')),
+            Part::Band => ws.map_or(t.nav_bar(), |w| t.nav_bar().patch(t.workspace(w.color))),
+            Part::Name => t.nav_bar().add_modifier(ratatui::style::Modifier::BOLD),
+            Part::Caret | Part::Sep => t.nav_quiet(),
+            Part::Other => t.nav_quiet().add_modifier(ratatui::style::Modifier::BOLD),
+            Part::Mark | Part::Badge => t.nav_marker(p.text.trim_start().starts_with('@')),
             Part::Glyph | Part::Label | Part::Blank if view.is_some() => t.nav_item(shown),
             Part::Glyph | Part::Label | Part::Blank => t.nav_bar(),
         };
         // On the view shown, its count keeps the raised background.
-        let style = if p.part == Part::Badge && shown { t.nav_item(true).patch(style) } else { style };
+        let style = if p.part == Part::Badge && shown { t.nav_shown_marker(p.text.contains('@')) } else { style };
         if p.part == Part::Glyph {
-            buf[(p.x, y)].set_symbol(&format!("{} ", p.text)).set_style(style);
-            buf[(p.x + 1, y)].set_symbol(" ").set_style(style);
+            super::glyph_cell(buf, p.x, y, &p.text, style);
         } else {
             buf.set_string(p.x, y, &p.text, style);
         }

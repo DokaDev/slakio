@@ -56,6 +56,11 @@ fn the_switcher_sits_under_the_top_bar_inside_the_screen() {
     assert_eq!(switcher(SIZE, 1, 2), Rect::new(1, 1, SWITCHER_WIDTH, 4));
     assert_eq!(switcher(Rect::new(0, 0, 50, 10), 40, 2).right(), 50, "kept on screen");
     assert_eq!(switcher(Rect::new(0, 0, 20, 10), 0, 30).height, 8);
+    // Thirty workspaces, six rows: the list scrolls to keep the cursor in view.
+    assert_eq!(switcher_first(0, 6), 0);
+    assert_eq!(switcher_first(5, 6), 0);
+    assert_eq!(switcher_first(6, 6), 1);
+    assert_eq!(switcher_first(29, 6), 24);
 }
 
 #[test]

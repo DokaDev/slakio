@@ -16,7 +16,7 @@ fn views(icons: bool) -> Vec<Item> {
 }
 
 fn chip() -> Chip {
-    Chip { name: "A company".to_string(), mark: Some("@2".to_string()) }
+    Chip { name: "A company".to_string(), others: vec![("B".to_string(), "@2".to_string())] }
 }
 
 /// The bar as text; a glyph slot shows as `G_` (its two cells).
@@ -33,24 +33,25 @@ fn with_room_the_bar_says_everything() {
     let area = Rect::new(0, 0, 120, 1);
     assert_eq!(
         text(&layout(area, &chip(), &views(false))),
-        " ▌A company @2 ▾ │ Home  DMs ●2  Activity @3  Files  Later"
+        " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later"
     );
     assert_eq!(
         text(&layout(area, &chip(), &views(true))),
-        " ▌A company @2 ▾ │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later"
+        " ▌A company ▾ · B @2 │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later"
     );
 }
 
 #[test]
-fn narrower_it_cuts_the_name_then_drops_view_names_then_numbers_and_never_wraps() {
+fn narrower_it_cuts_the_name_drops_glyphs_then_names_then_numbers_and_never_wraps() {
     let at = |w: u16, icons: bool| text(&layout(Rect::new(0, 0, w, 1), &chip(), &views(icons)));
-    assert_eq!(at(60, false), " ▌A company @2 ▾ │ Home  DMs ●2  Activity @3  Files  Later");
-    assert_eq!(at(58, false), " ▌A compa… @2 ▾ │ Home  DMs ●2  Activity @3  Files  Later", "the name first");
-    assert_eq!(at(56, false), " ▌A company @2 ▾ │ H  D ●2  A @3  F  L", "then letters (icons off)");
-    assert_eq!(at(70, true), " ▌A company @2 ▾ │ G_  G_ ●2  G_ @3  G_  G_", "or glyphs alone");
-    assert_eq!(at(35, false), " ▌A compa… @ ▾ │ H  D ●  A @  F  L", "then counts without numbers");
-    assert_eq!(at(30, false), " ▌A @ ▾ │ H  D ●  A @  F  L", "then the name's letter");
-    assert_eq!(at(80, true), " ▌A company @2 ▾ │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later");
+    assert_eq!(at(64, false), " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later");
+    assert_eq!(at(62, false), " ▌A compa… ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later", "the name first");
+    assert_eq!(at(60, false), " ▌A company ▾ · B @2 │ H  D ●2  A @3  F  L", "then letters (icons off)");
+    assert_eq!(at(74, true), " ▌A company ▾ · B @2 │ Home  DMs ●2  Activity @3  Files  Later", "words before glyphs");
+    assert_eq!(at(60, true), " ▌A company ▾ · B @2 │ G_ G_ ●2  G_ @3  G_ G_", "then glyphs alone, two cells apart");
+    assert_eq!(at(40, false), " ▌A company ▾ · B @ │ H  D ●  A @  F  L", "then counts without numbers");
+    assert_eq!(at(34, false), " ▌A ▾ · B @ │ H  D ●  A @  F  L", "then the name's letter");
+    assert_eq!(at(80, true), " ▌A company ▾ · B @2 │ G_ Home  G_ DMs ●2  G_ Activity @3  G_ Files  G_ Later");
     for w in 0..200 {
         for icons in [false, true] {
             let b = layout(Rect::new(3, 0, w, 1), &chip(), &views(icons));
@@ -78,6 +79,14 @@ fn a_glyph_takes_two_cells_and_a_click_on_either_is_its_view() {
     for w in 0..120 {
         let b = layout(Rect::new(0, 0, w, 1), &chip(), &views(true));
         assert!(b.pieces.iter().filter(|p| p.part == Part::Glyph).all(|p| p.width == GLYPH_SLOT && p.x + 2 <= w));
+        // After a glyph's slot comes a blank (or nothing): text never starts right after a
+        // glyph, so a glyph drawn two cells wide that the terminal redraws alone covers no text.
+        for pair in b.pieces.windows(2).filter(|p| p[0].part == Part::Glyph) {
+            assert!(
+                matches!(pair[1].part, Part::Blank | Part::Badge) && pair[1].text.starts_with(' '),
+                "{w}: {pair:?}"
+            );
+        }
     }
 }
 

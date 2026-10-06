@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/ux_flows.rs
 expression: "demo::mask_hangul(&s)"
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ────────────────────────────────────────────╮╭ ▌⤷ Thread · #backend ─────────────╮
 │ ▾ Favorites            ││    see https://docs.example.com/runbooks/latency      ││ ────────── 2026-01-06 ─────────── │
 │▎  # backend            ││ JP Jiho Park · 05:51                                  ││ SR Sam Rivera · 07:14             │
@@ -41,4 +41,4 @@ expression: "demo::mask_hangul(&s)"
 │   # feed-invoice-168   │├─ Message #backend ────────────────────────────────────┤├─ Reply ───────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                    ││ › Press i to reply                │
 ╰────────────────────────╯╰───────────────────────────────────────────────────────╯╰───────────────────────────────────╯
- NORMAL  ▌A compa… › #backend › ⤷ Thread │ i reply · k messages · Esc main · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend › ⤷ Thread              │ i reply · k messages · Esc main · Ctrl+W close · ? help │ demo

@@ -79,7 +79,7 @@ fn the_tab_shown_stands_out_on_the_bar() {
         match t.kind {
             Kind::NoColor => assert!(shown.modifier.contains(Modifier::REVERSED), "{}", t.name),
             Kind::Truecolor => {
-                assert_eq!((shown.fg, shown.bg), (t.fg, t.surface_alt), "{}", t.name);
+                assert_eq!((shown.fg, shown.bg), (t.fg, t.raised()), "{}", t.name);
                 assert_eq!(other.fg, t.fg_muted, "{}", t.name);
                 assert_eq!(cell(1, Part::Number).fg, t.accent, "{}", t.name);
                 assert_eq!(cell(2, Part::Close).fg, t.fg_dim, "{}", t.name);
@@ -156,12 +156,7 @@ fn the_top_bar_and_the_tab_bar_read_apart() {
         let bar = d.app.nav_bar().unwrap();
         let home = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(1)).unwrap();
         let cell = &buf[(home.x, 0)];
-        assert_eq!(
-            (cell.bg, cell.modifier.contains(Modifier::BOLD)),
-            (t.surface_alt, true),
-            "{}: Home is shown",
-            t.name
-        );
+        assert_eq!((cell.bg, cell.modifier.contains(Modifier::BOLD)), (t.raised(), true), "{}: Home is shown", t.name);
         let files = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(4)).unwrap();
         assert_eq!(buf[(files.x, 0)].fg, t.fg_muted, "{}", t.name);
     }
@@ -396,4 +391,48 @@ fn the_overflow_marks_carry_what_the_hidden_tabs_hold() {
     let cell = d.buffer()[(x, bar.area.y)].clone();
     assert_eq!(cell.symbol(), "›");
     assert_ne!(cell.fg, t.error, "the tabs on the right mention nobody");
+}
+
+// Without truecolor the top bar is a reversed row and the tab bar is not: they read apart by
+// shape. With truecolor the view shown and the tab shown share one raised background that
+// stands out of the bar's surface and of the background, in every theme; `▾` is quiet.
+#[test]
+fn the_top_bar_and_the_tab_shown_read_apart_in_every_theme() {
+    for t in themes() {
+        let d = tabs(&t);
+        let buf = d.buffer();
+        let bar = d.app.nav_bar().unwrap();
+        let tabs_bar = d.app.tab_bar().unwrap();
+        let piece = |part: slakio_tui::navbar::Part, item: Option<usize>| {
+            bar.pieces.iter().find(|p| p.part == part && (item.is_none() || p.item == item)).unwrap().clone()
+        };
+        let home = piece(slakio_tui::navbar::Part::Label, Some(1));
+        let files = piece(slakio_tui::navbar::Part::Label, Some(4));
+        let caret = piece(slakio_tui::navbar::Part::Caret, None);
+        let shown_tab = tabs_bar.pieces.iter().find(|p| p.tab == 1 && p.part == Part::Title).unwrap();
+        let other_tab = tabs_bar.pieces.iter().find(|p| p.tab == 2 && p.part == Part::Title).unwrap();
+        let (h, f, c) = (&buf[(home.x, 0)], &buf[(files.x, 0)], &buf[(caret.x + 1, 0)]);
+        let (st, ot) = (&buf[(shown_tab.x, tabs_bar.area.y)], &buf[(other_tab.x, tabs_bar.area.y)]);
+        match t.kind {
+            Kind::Truecolor => {
+                assert_eq!((h.bg, st.bg), (t.raised(), t.raised()), "{}: one raised background", t.name);
+                assert!(t.raised() != t.surface && t.raised() != t.bg, "{}: it stands out", t.name);
+                assert_eq!(c.fg, t.fg_muted, "{}: the caret is quiet", t.name);
+                assert_eq!(f.bg, t.surface, "{}", t.name);
+            }
+            _ => {
+                assert!(f.modifier.contains(Modifier::REVERSED), "{}: the bar is a reversed row", t.name);
+                assert!(!ot.modifier.contains(Modifier::REVERSED), "{}: the tab bar is not", t.name);
+                assert!(
+                    h.modifier.contains(Modifier::BOLD) && !h.modifier.contains(Modifier::REVERSED),
+                    "{}: the view shown stands out of it",
+                    t.name
+                );
+                assert!(st.modifier.contains(Modifier::REVERSED), "{}: the tab shown is reversed", t.name);
+            }
+        }
+        // Nothing between the name shown and its caret: the other workspaces' marks follow it.
+        let name = piece(slakio_tui::navbar::Part::Name, None);
+        assert_eq!(name.x + name.width, caret.x, "{}", t.name);
+    }
 }

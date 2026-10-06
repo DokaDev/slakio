@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────╮
 │ ▾ Favorites            ││ MJ Mia Jang · 06:35                                │
 │▎  # backend            ││    Budget metrics merge design rollback alert      │
@@ -25,4 +25,4 @@ expression: s
 │   # feed-budget-33     │├─ Message #backend ─────────────────────────────────┤
 │   # feed-build-50      ││ › half written                                     │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #backend                             │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend                                           │ demo

@@ -198,10 +198,20 @@ fn the_korean_ui_translates_the_shell() {
 }
 
 #[test]
-fn icons_replace_the_rail_letters() {
-    let d = Demo::with(120, 40, Lang::En, Settings { icons: true, ..Settings::default() });
+fn icons_replace_the_top_bar_letters_and_keep_a_two_cell_slot_in_the_list() {
+    let mut d = Demo::with(120, 40, Lang::En, Settings { icons: true, ..Settings::default() });
     let s = d.screen();
     assert!(s.contains('\u{F02DC}'), "the Home icon: {s}");
+    // A private channel's lock and a shared channel's link are glyphs in two-cell slots too.
+    d.app.show_unfolded(slakio_tui::app::shell::View::Home);
+    let buf = d.buffer();
+    let slots: Vec<String> = buf
+        .content()
+        .iter()
+        .map(|c| c.symbol().to_string())
+        .filter(|s| s == "\u{F033E} " || s == "\u{F0339} ")
+        .collect();
+    assert!(slots.iter().any(|s| s.starts_with('\u{F0339}')), "the shared channel's link in its slot");
 }
 
 #[test]

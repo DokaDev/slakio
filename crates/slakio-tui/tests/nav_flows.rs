@@ -119,33 +119,25 @@ fn a_click_shows_a_view_or_opens_the_switcher_whose_rows_switch() {
 #[test]
 fn the_counts_say_what_the_list_says() {
     let d = Demo::new(160, 40);
-    let dms: u32 = d
-        .app
-        .model
-        .conversations()
+    let convs = d.app.model.conversations();
+    let a_dms: u32 = convs
         .iter()
-        .filter(|c| c.workspace.as_str() == "TDEMOA" && c.is_dm() && c.unread > 0 && !c.muted && c.mentions == 0)
+        .filter(|c| c.workspace.as_str() == "TDEMOA" && c.is_dm() && c.unread > 0 && !c.muted)
         .map(|c| c.unread)
         .sum();
-    let dm_mentions: u32 = d
-        .app
-        .model
-        .conversations()
-        .iter()
-        .filter(|c| c.workspace.as_str() == "TDEMOA" && c.is_dm())
-        .map(|c| c.mentions)
-        .sum();
-    let mentions: u32 = d.app.model.conversations().iter().map(|c| c.mentions).sum();
-    let b_mentions: u32 =
-        d.app.model.conversations().iter().filter(|c| c.workspace.as_str() == "TDEMOB").map(|c| c.mentions).sum();
+    let mentions: u32 = convs.iter().map(|c| c.mentions).sum();
+    let b_mentions: u32 = convs.iter().filter(|c| c.workspace.as_str() == "TDEMOB").map(|c| c.mentions).sum();
     let line = top(&d);
-    let dm_mark = if dm_mentions > 0 { format!("DMs @{dm_mentions}") } else { format!("DMs ●{dms}") };
-    assert!(line.contains(&dm_mark), "{dm_mark}: {line}");
+    assert!(line.contains(&format!("DMs ●{a_dms}")), "this workspace's unread DM messages, never red: {line}");
     assert!(line.contains(&format!("Activity @{mentions}")), "{line}");
-    let chip_mark =
-        if b_mentions > 0 { format!("A company @{b_mentions} ▾") } else { "A company ● ▾".to_string() };
-    assert!(line.contains(&chip_mark), "the other workspace's attention on the chip: {line}");
+    assert!(line.contains(" ▌A company ▾ · B "), "no count beside the name shown; B's after the caret: {line}");
+    if b_mentions > 0 {
+        assert!(line.contains(&format!("· B @{b_mentions}")), "{line}");
+    }
     assert!(line.contains("Files  Later"), "no count where nothing is unread: {line}");
+    // The status line repeats no count: one number for one thing on the screen.
+    let status = d.status_line();
+    assert!(!status.contains(&format!("@{mentions}")) && !status.contains(&format!(" {a_dms}")), "{status}");
 }
 
 #[test]
@@ -215,4 +207,26 @@ fn which_key_and_the_help_list_the_top_bar_key() {
     d.type_text("/top bar");
     let s = d.screen();
     assert!(s.contains("Ctrl+R / Space r"), "{s}");
+}
+
+#[test]
+fn a_frame_that_changes_only_the_glyph_rewrites_its_slot_and_moves_before_the_next_text() {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Style;
+    let area = Rect::new(0, 0, 12, 1);
+    let mut before = Buffer::empty(area);
+    before.set_string(0, 0, " ", Style::new());
+    before[(1, 0)].set_symbol("\u{F02DC} ");
+    before[(2, 0)].set_symbol(" ");
+    before.set_string(3, 0, " Home ●2", Style::new());
+    let mut after = before.clone();
+    after[(1, 0)].set_symbol("\u{F0361} ");
+    let diff = before.diff(&after);
+    let xs: Vec<u16> = diff.iter().map(|(x, _, _)| *x).collect();
+    assert_eq!(xs, [1], "only the glyph's cell: its blank goes with it, the text is untouched");
+    // The count changes too: the text is written from its own column, not right after the glyph.
+    after.set_string(9, 0, "●3", Style::new());
+    let xs: Vec<u16> = before.diff(&after).iter().map(|(x, _, _)| *x).collect();
+    assert_eq!(xs, [1, 10], "{xs:?}");
 }

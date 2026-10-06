@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [err/surf B 11..14] [bdr/surf 14..16] [/surf 16..17] [bdr/surf 17..18] [/surf2 B 18..23] [err/surf2 B 23..27] [/surf2 B 27..28] [mut/surf 28..32] [err/surf B 32..35] [mut/surf 35..45] [err/surf B 45..49] [mut/surf 49..64] [/surf 64..120]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [mut/surf 32..36] [/surf B 36..40] [mut/surf 40..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..26] [acc 26..28] [ws 28..29] [ B 29..38] [acc 38..120]
 │ ▾ Favorites            ││                  ⤷ 8 replies · last 04:16                                                  │
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [mut 4..5] [bdr 25..26] [acc 26..27] [dim 28..118] [acc 119..120]
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
     [bdr 0..26] [acc 26..120]
- NORMAL  ▌A company › #backend         │ i write · k messages · Esc list · Ctrl+R top bar · ? help │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..38] [bdr/surf 38..41] [/surf B 41..42] [mut/surf 42..48] [dim/surf 48..51] [/surf B 51..52] [mut/surf 52..61] [dim/surf 61..64] [/surf B 64..67] [mut/surf 67..72] [dim/surf 72..75] [/surf B 75..81] [mut/surf 81..89] [dim/surf 89..92] [/surf B 92..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › #backend          │ i write · k messages · Esc list · Ctrl+R top bar · ? help · Space more │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..39] [bdr/surf 39..42] [/surf B 42..43] [mut/surf 43..49] [dim/surf 49..52] [/surf B 52..53] [mut/surf 53..62] [dim/surf 62..65] [/surf B 65..68] [mut/surf 68..73] [dim/surf 73..76] [/surf B 76..82] [mut/surf 82..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

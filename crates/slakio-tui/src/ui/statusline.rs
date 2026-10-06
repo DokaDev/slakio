@@ -1,20 +1,19 @@
 //! The status line, lualine-style: the mode badge, where you are, a notice (or the first keys of
-//! a sequence), and on the right the hint line, the unread totals and the backend's state, the
-//! segments apart by ` │ `.
+//! a sequence), and on the right the hint line and the backend's state, the segments apart by
+//! ` │ `. Unread counts are the top bar's, never repeated here.
 //!
 //! ```text
-//!  NORMAL  ▌A company › #backend │ Copied 3 messages │ i write · k messages · ? help │ 3 DM 2 │ demo
+//!  NORMAL  ▌A company › #backend │ Copied 3 messages │ i write · k messages · ? help │ demo
 //! ```
 //!
 //! The hint line shows the keys worth knowing where the keyboard is ([`crate::keymap::hints`]),
 //! read from the key map. When the line is short, parts go in this order: the workspace's name
-//! (its stripe stays), hints from the last, the middle of the place, the DM count, the mention
-//! count. The badge and `demo` always stay.
+//! (its stripe stays), hints from the last, the middle of the place. The badge and `demo` always
+//! stay.
 
+use super::view_label;
 use super::work::breadcrumb;
-use super::{count_pill, view_glyph, view_label};
 use crate::app::model::Row;
-use crate::app::shell::View;
 use crate::app::status::Level;
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
@@ -137,10 +136,6 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             (app.i18n.msg(&n.msg).to_string(), style)
         })
     };
-    // Unread totals.
-    let icons = app.settings.icons;
-    let mut mentions = app.backend.map_or(0, |_| app.model.mentions());
-    let mut dms = app.backend.map_or(0, |_| app.model.dm_unread(app.shell.workspace));
     let demo = app.backend.filter(|c| c.demo).map(|_| app.i18n.label(Label::StatusDemo).to_string());
 
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {
@@ -163,31 +158,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         }
         out
     };
-    let counts = |mentions: u32, dms: u32| -> Spans {
-        let mut out = Vec::new();
-        if mentions > 0 {
-            if icons {
-                out.push(Span::styled(format!("{} ", view_glyph(View::Activity, true)), t.muted()));
-            }
-            let pill = if icons { count_pill(mentions) } else { format!(" @{} ", count_pill(mentions).trim()) };
-            out.push(Span::styled(pill, t.badge()));
-        }
-        if dms > 0 {
-            let name = if icons {
-                view_glyph(View::Dms, true).to_string()
-            } else {
-                app.i18n.label(Label::StatusDms).to_string()
-            };
-            if !out.is_empty() {
-                out.push(Span::raw(" "));
-            }
-            out.push(Span::styled(format!("{name} {dms}"), t.bold()));
-        }
-        out
-    };
-    let right = |hints: &[(String, String)], mentions: u32, dms: u32| -> Spans {
+    let right = |hints: &[(String, String)]| -> Spans {
         let mut out: Spans = Vec::new();
-        for part in [hint_spans(hints), counts(mentions, dms)] {
+        for part in [hint_spans(hints)] {
             if part.is_empty() {
                 continue;
             }
@@ -209,20 +182,19 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         out.push(Span::raw(" "));
         out
     };
-    let need = |ws_name: &Option<String>, place_text: &Option<String>, hints: &[(String, String)], m: u32, d: u32| {
+    let need = |ws_name: &Option<String>, place_text: &Option<String>, hints: &[(String, String)]| {
         // A notice is worth more than the hints: they make room for it.
         let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + width(m).min(48));
-        spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints, m, d))
+        spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
     // the next pane, the top bar), the workspace's name (cut with `…`, eight cells kept), the other hints by
-    // worth, the middle of the place, the place's first key and help, the name, the DM count, the
-    // mentions. Then what is left is filled again: a dropped hint comes back where cutting
+    // worth, the middle of the place, the place's first key and help, the name. Then what is left is filled again: a dropped hint comes back where cutting
     // the name makes room for it, and the name grows into the rest, so no run of blank cells is
     // left between the two sides.
-    let over = |ws: &Option<String>, pl: &Option<String>, h: &[usize], m: u32, d: u32| {
+    let over = |ws: &Option<String>, pl: &Option<String>, h: &[usize]| {
         let pick: Vec<(String, String)> = h.iter().map(|&j| all_hints[j].clone()).collect();
-        need(ws, pl, &pick, m, d).saturating_sub(w)
+        need(ws, pl, &pick).saturating_sub(w)
     };
     let full_name = ws_name.clone();
     // The name cut by `by` cells, never under eight (or its own width).
@@ -250,46 +222,40 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .collect();
     let mut chosen: Vec<usize> = (0..resolved.len()).collect();
     for &i in &low_order {
-        if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+        if over(&ws_name, &place_text, &chosen) == 0 {
             break;
         }
         chosen.retain(|&j| j != i);
     }
-    let excess = over(&ws_name, &place_text, &chosen, mentions, dms);
+    let excess = over(&ws_name, &place_text, &chosen);
     if excess > 0 {
         ws_name = cut(excess);
     }
     for &i in &rest_order {
-        if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+        if over(&ws_name, &place_text, &chosen) == 0 {
             break;
         }
         // The place gives up its middle before the first key and help go.
         if worth(i) >= 4
             && let Some(p) = place_text.as_mut()
         {
-            let excess = over(&ws_name, &Some(p.clone()), &chosen, mentions, dms);
+            let excess = over(&ws_name, &Some(p.clone()), &chosen);
             *p = clip_middle(p, width(p).saturating_sub(excess).max(10));
-            if over(&ws_name, &place_text, &chosen, mentions, dms) == 0 {
+            if over(&ws_name, &place_text, &chosen) == 0 {
                 break;
             }
         }
         chosen.retain(|&j| j != i);
     }
     if let Some(p) = place_text.as_mut() {
-        let excess = over(&ws_name, &Some(p.clone()), &chosen, mentions, dms);
+        let excess = over(&ws_name, &Some(p.clone()), &chosen);
         if excess > 0 {
             *p = clip_middle(p, width(p).saturating_sub(excess).max(4));
         }
     }
 
-    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
+    if over(&ws_name, &place_text, &chosen) > 0 {
         ws_name = None;
-    }
-    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
-        dms = 0;
-    }
-    if over(&ws_name, &place_text, &chosen, mentions, dms) > 0 {
-        mentions = 0;
     }
     // The name is cut for more hints only where it had to be cut anyway.
     let cut_room = if ws_name == full_name { 0 } else { name_room };
@@ -301,8 +267,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         let mut best: Option<(usize, usize)> = {
             // What dropping gave, unless a set below fills more.
             let pick: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
-            let fits = need(&ws_name, &place_text, &pick, mentions, dms) <= w;
-            fits.then(|| (need(&full_name, &place_text, &pick, mentions, dms).min(w + cut_room), 0))
+            let fits = need(&ws_name, &place_text, &pick) <= w;
+            fits.then(|| (need(&full_name, &place_text, &pick).min(w + cut_room), 0))
         };
         for mask in 0..1usize << n {
             let with: Vec<usize> = (0..n).filter(|&i| mask >> i & 1 == 1).collect();
@@ -323,22 +289,22 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             if broken {
                 continue;
             }
-            if over(&full_name, &place_text, &with, mentions, dms) > cut_room {
+            if over(&full_name, &place_text, &with) > cut_room {
                 continue;
             }
             let pick: Vec<(String, String)> = with.iter().map(|&j| all_hints[j].clone()).collect();
-            let filled = need(&full_name, &place_text, &pick, mentions, dms).min(w + cut_room);
+            let filled = need(&full_name, &place_text, &pick).min(w + cut_room);
             let value: usize = with.iter().map(|&i| 1 << worth(i)).sum();
             if best.is_none_or(|(f, v)| filled > f || (filled == f && value > v)) {
                 best = Some((filled, value));
                 chosen = with;
             }
         }
-        ws_name = cut(over(&full_name, &place_text, &chosen, mentions, dms));
+        ws_name = cut(over(&full_name, &place_text, &chosen));
     }
     let hints: Vec<(String, String)> = chosen.iter().map(|&j| all_hints[j].clone()).collect();
     let mut line = left(&ws_name, &place_text);
-    let right_spans = right(&hints, mentions, dms);
+    let right_spans = right(&hints);
     if let Some((m, style)) = msg {
         let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 3);
         if room > 0 {

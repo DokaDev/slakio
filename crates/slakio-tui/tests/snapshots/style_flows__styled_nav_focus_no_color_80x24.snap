@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [ B 2..11] [ B R 11..14] [ B R 18..28] [ B R 32..35] [ B R 45..49]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [ R 0..2] [ B R 2..11] [ R 11..16] [ B R 16..17] [ B 17..20] [ R 20..22] [ B R 22..32] [ R 32..36] [ B R 36..40] [ R 40..50] [ B 50..54] [ R 54..80]
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││                                                    │
     [ D 2..3] [ B 4..13]
@@ -38,5 +38,5 @@ expression: screen_styled(&d)
 │   # feed-budget-33     ││                                                    │
 │   # feed-build-50      ││                                                    │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯
- NORMAL  ▌A compa… › Home │ Enter show · h/l move · ? help │  @37  DM 16 │ demo
-    [ B R 0..8] [ D 18..21] [ B 28..33] [ D 38..41] [ B 41..44] [ D 49..52] [ B 52..53] [ B R 61..66] [ B 67..72]
+ NORMAL  ▌A company › Home │ Enter show · h/l move · ? help · Space more │ demo
+    [ B R 0..8] [ D 19..22] [ B 29..34] [ D 39..42] [ B 42..45] [ D 50..53] [ B 53..54] [ D 59..62] [ B 62..67]

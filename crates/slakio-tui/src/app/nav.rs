@@ -6,8 +6,9 @@
 //! panel (on the workspace: opens the switcher), `Esc` goes back. `Space W` opens the switcher
 //! from anywhere outside text; in it `j`/`k` move, `Enter` switches, `Esc` closes.
 //!
-//! Counts read as the list's pills and the tab marks: `@n` mentions, `●n` a DM's unread
-//! messages, `●` unread channels; the chip's mark is the other workspaces'.
+//! Counts (ui-ux-spec §H): Home `@n` the mentions in its channels, else `●` when a channel is
+//! unread; DMs `●n` the unread messages of its DMs; Activity `@n` the mentions of every
+//! workspace. Only mentions are `@` and red. Another workspace's mark follows `▾` with its letter.
 
 use super::shell::{NavItem, View, nav_items};
 use super::tabs::Unread;
@@ -29,12 +30,10 @@ impl App {
                     u.mentions += c.mentions;
                     u.any |= c.unread > 0 && !c.muted;
                 }
-                View::Dms if c.is_dm() => {
-                    u.mentions += c.mentions;
-                    if c.unread > 0 && !c.muted {
-                        u.any = true;
-                        u.dms += if c.mentions == 0 { c.unread } else { 0 };
-                    }
+                // A DM's unread messages, all of them (a DM is for the user anyway): `●n`.
+                View::Dms if c.is_dm() && c.unread > 0 && !c.muted => {
+                    u.any = true;
+                    u.dms += c.unread;
                 }
                 View::Activity => u.mentions += c.mentions,
                 _ => {}
@@ -43,21 +42,20 @@ impl App {
         u
     }
 
-    /// What the workspaces other than the one shown hold unread.
-    pub fn other_workspaces_unread(&self) -> Unread {
-        let mut u = Unread::default();
-        for ws in (0..self.model.workspaces().len()).filter(|w| *w != self.shell.workspace) {
-            u.mentions += self.model.workspace_mentions(ws);
-            u.any |= self.model.workspace_unread(ws);
-        }
-        u
-    }
-
     /// The top bar as laid out now (`None` without a backend).
     pub fn nav_bar(&self) -> Option<Bar> {
         self.backend?;
         let ws = self.model.workspaces().get(self.shell.workspace)?;
-        let chip = Chip { name: ws.name.line().into_string(), mark: self.other_workspaces_unread().badge() };
+        let others = (0..self.model.workspaces().len())
+            .filter(|w| *w != self.shell.workspace)
+            .filter_map(|w| {
+                let u =
+                    Unread { mentions: self.model.workspace_mentions(w), dms: 0, any: self.model.workspace_unread(w) };
+                let letter = self.model.workspaces()[w].name.line().as_str().chars().next()?.to_uppercase().to_string();
+                u.badge().map(|m| (letter, m))
+            })
+            .collect();
+        let chip = Chip { name: ws.name.line().into_string(), others };
         let icons = self.settings.icons;
         let views: Vec<Item> = View::ALL
             .iter()
@@ -139,7 +137,8 @@ impl App {
             MouseEventKind::ScrollDown => self.switcher_key(ShellAction::SwitcherNext),
             MouseEventKind::ScrollUp => self.switcher_key(ShellAction::SwitcherPrev),
             MouseEventKind::Down(MouseButton::Left) if screen::inner(b).contains(at) => {
-                let ws = usize::from(at.y - b.y - 1);
+                let first = screen::switcher_first(self.switcher.unwrap_or(0), usize::from(screen::inner(b).height));
+                let ws = first + usize::from(at.y - b.y - 1);
                 if ws < self.model.workspaces().len() {
                     self.switch_to(ws);
                 }

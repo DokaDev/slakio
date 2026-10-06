@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/ux_flows.rs
 expression: d.snap()
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││                                                    │
 │   # backend            ││                                                    │
@@ -41,4 +41,4 @@ expression: d.snap()
 │   # feed-invoice-168   ││                                                    │
 │   # feed-latency-144   ││                                                    │
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home  │ Enter open · l peek · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A compa… › Home │ Enter open · t new tab · ? help · Space more │ demo

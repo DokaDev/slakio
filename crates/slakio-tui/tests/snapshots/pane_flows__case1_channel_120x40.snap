@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││                  ⤷ 8 replies · last 04:16                                                  │
 │▎  # backend            ││ DY Dana Yoon     Ok, monitoring                                                      04:17 │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │   # feed-invoice-168   │├─ Message #backend ─────────────────────────────────────────────────────────────────────────┤
 │   # feed-latency-144   ││ › Press i to write                                                                         │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #backend         │ i write · k messages · Esc list · Ctrl+R top bar · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #backend          │ i write · k messages · Esc list · Ctrl+R top bar · ? help · Space more │ demo

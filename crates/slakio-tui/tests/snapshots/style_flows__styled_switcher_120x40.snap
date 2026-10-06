@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [err/surf B 11..14] [bdr/surf 14..16] [/surf 16..17] [bdr/surf 17..18] [/surf2 B 18..23] [err/surf2 B 23..27] [/surf2 B 27..28] [mut/surf 28..32] [err/surf B 32..35] [mut/surf 35..45] [err/surf B 45..49] [mut/surf 49..64] [/surf 64..120]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [mut/surf 32..36] [/surf B 36..40] [mut/surf 40..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
 ╭ Workspaces ──────────────────╮───────────────────────────────────────────────────────────────────────────────────────╮
     [acc/surf 0..1] [/surf B 1..13] [acc/surf 13..32] [bdr 32..120]
 │ ▌A company               @28 │                                                                                       │
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [acc 0..1] [mut 4..5] [acc 25..26] [bdr 26..27] [bdr 119..120]
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
     [acc 0..26] [bdr 26..120]
- NORMAL  ▌A company › Home    │ Enter open · l peek · t new tab · : commands · ? help · Space more │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..29] [bdr/surf 29..32] [/surf B 32..37] [mut/surf 37..42] [dim/surf 42..45] [/surf B 45..46] [mut/surf 46..51] [dim/surf 51..54] [/surf B 54..55] [mut/surf 55..63] [dim/surf 63..66] [/surf B 66..67] [mut/surf 67..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › Home │ Enter open · l peek · t new tab · : commands · Ctrl+R top bar · ? help · Space more │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..26] [bdr/surf 26..29] [/surf B 29..34] [mut/surf 34..39] [dim/surf 39..42] [/surf B 42..43] [mut/surf 43..48] [dim/surf 48..51] [/surf B 51..52] [mut/surf 52..60] [dim/surf 60..63] [/surf B 63..64] [mut/surf 64..73] [dim/surf 73..76] [/surf B 76..82] [mut/surf 82..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

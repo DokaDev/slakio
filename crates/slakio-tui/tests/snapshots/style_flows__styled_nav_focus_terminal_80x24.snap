@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [ws 1..2] [ B 2..11] [err B R 11..14] [bdr 14..16] [bdr 17..18] [/bdr B 18..23] [err/bdr B R 23..27] [/bdr B 27..28] [mut 28..32] [err B R 32..35] [mut 35..45] [err B R 45..49] [mut 49..64]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [ R 0..1] [ws R 1..2] [ B R 2..11] [ R 11..16] [ B R 16..17] [err B 17..20] [ R 20..22] [/bdr B 22..27] [err/bdr B 27..31] [/bdr B 31..32] [ R 32..36] [ B R 36..40] [ R 40..50] [err B 50..54] [ R 54..80]
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..80]
 │ ▾ Favorites            ││                                                    │
@@ -48,5 +48,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 79..80]
 ╰────────────────────────╯╰────────────────────────────────────────────────────╯
     [bdr 0..80]
- NORMAL  ▌A compa… › Home │ Enter show · h/l move · ? help │  @37  DM 16 │ demo
-    [on/av B 0..8] [ws 9..10] [bdr 18..21] [bdr 25..28] [ B 28..33] [mut 33..38] [bdr 38..41] [ B 41..44] [mut 44..49] [bdr 49..52] [ B 52..53] [mut 53..58] [bdr 58..61] [on/err B 61..66] [ B 67..72] [bdr 72..75] [warm 75..79]
+ NORMAL  ▌A company › Home │ Enter show · h/l move · ? help · Space more │ demo
+    [on/av B 0..8] [ws 9..10] [bdr 19..22] [bdr 26..29] [ B 29..34] [mut 34..39] [bdr 39..42] [ B 42..45] [mut 45..50] [bdr 50..53] [ B 53..54] [mut 54..59] [bdr 59..62] [ B 62..67] [mut 67..72] [bdr 72..75] [warm 75..79]

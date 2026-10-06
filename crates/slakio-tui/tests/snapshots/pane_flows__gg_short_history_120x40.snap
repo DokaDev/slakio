@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭ ▌#feed-ticket-104 ─────────────────────────────────────────────────────────────────────────╮
 │   # feed-alert-134     ││                                                                                            │
 │   # feed-alert-8       ││ ─────────────────────────────────────── 2026-01-05 ─────────────────────────────────────── │
@@ -41,4 +41,4 @@ expression: mask_hangul(&d.screen())
 │   # feed-staging-91    │├─ Message #feed-ticket-104 ─────────────────────────────────────────────────────────────────┤
 │▎  # feed-ticket-104    ││ › Press i to write                                                                         │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A compa… › #feed-ticket-104 │ Enter thread · t new tab · i write · Esc deselect · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #feed-ticket-104   │ Enter thread · t new tab · V select · i write · Esc deselect · ? help │ demo

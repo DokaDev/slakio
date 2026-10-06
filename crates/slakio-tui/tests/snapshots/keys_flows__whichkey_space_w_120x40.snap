@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ▾ Favorites            ││                                                                                            │
 │   # backend            ││                                                                                            │
@@ -41,4 +41,4 @@ expression: s
 │ h  Move the focus left                 k  Move the focus up                   c  Close the pane, then its tab        │
 │ j  Move the focus down                 l  Move the focus right                                                       │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
- NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo
+ NORMAL  ▌A company › Home                                                                                       │ demo

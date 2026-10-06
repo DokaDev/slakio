@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
- ▌B side @28 ▾ │ Home @8  DMs @1  Activity @37  Files  Later
+ ▌B side ▾ · A @28 │ Home @8  DMs ●1  Activity @37  Files  Later
 ╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
 │ MK● Minsu Kim          ││                                                                                            │
 │ JP● Jiho Park          ││                                                                                            │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │                        ││                                                                                            │
 │                        ││                                                                                            │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › DMs │ Enter open · t new tab · : commands · Ctrl+R top bar · ? help · Space more │  @37  DM 1 │ demo
+ NORMAL  ▌B side › DMs  │ Enter open · l peek · t new tab · Tab next pane · Ctrl+R top bar · ? help · Space more │ demo

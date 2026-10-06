@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [err/surf B 11..14] [bdr/surf 14..16] [/surf 16..17] [bdr/surf 17..18] [/surf2 B 18..23] [err/surf2 B 23..27] [/surf2 B 27..28] [/sel 28..32] [err/sel B 32..35] [/sel 35..36] [mut/surf 36..45] [err/surf B 45..49] [mut/surf 49..64] [/surf 64..120]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [/sel 32..36] [/sel B 36..40] [/sel 40..41] [mut/surf 41..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
 ╭ Home ──────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..120]
 │ ▾ Favorites            ││                                                                                            │
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [mut 4..5] [bdr 25..27] [bdr 119..120]
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
     [bdr 0..120]
- NORMAL  ▌A company › Home                │ Enter show · h/l move · Esc back · ? help · Space more │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..41] [bdr/surf 41..44] [/surf B 44..49] [mut/surf 49..54] [dim/surf 54..57] [/surf B 57..60] [mut/surf 60..65] [dim/surf 65..68] [/surf B 68..71] [mut/surf 71..76] [dim/surf 76..79] [/surf B 79..80] [mut/surf 80..85] [dim/surf 85..88] [/surf B 88..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › Home                              │ Enter show · h/l move · Esc back · ? help · Space more │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..55] [bdr/surf 55..58] [/surf B 58..63] [mut/surf 63..68] [dim/surf 68..71] [/surf B 71..74] [mut/surf 74..79] [dim/surf 79..82] [/surf B 82..85] [mut/surf 85..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

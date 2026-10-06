@@ -189,6 +189,11 @@ pub fn switcher(size: Rect, x: u16, n: usize) -> Rect {
     Rect::new(x.min(size.width - w), size.y + 1, w, h)
 }
 
+/// The first workspace the switcher shows, `rows` of them at a time, so `cursor` stays in view.
+pub fn switcher_first(cursor: usize, rows: usize) -> usize {
+    cursor.saturating_sub(rows.max(1) - 1)
+}
+
 /// The most entries the command palette lists at once (the list scrolls).
 pub const PALETTE_ROWS: usize = 12;
 

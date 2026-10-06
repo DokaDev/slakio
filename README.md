@@ -28,11 +28,11 @@ images, and settings. This README only lists what works; it will grow with each 
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
-  - the top bar across the first row shows the workspace (its color band, its name, a mark when
-    another workspace wants you, `▾`) and the views Home, DMs, Activity, Files and Later (the
-    last three say they come in a later version) with their counts — `@3` mentions, `●2` a DM's
-    unread messages, `●` unread channels, as the list says them; the names shorten only on a
-    narrow screen; `Ctrl+R` or `Space r` (`:nav`) goes there from anywhere (and `Ctrl+R` back),
+  - the top bar across the first row shows the workspace (its color band, its name, `▾`, then
+    each other workspace that wants you by its letter and mark, `· B @9`) and the views Home,
+    DMs, Activity, Files and Later (the last three say they come in a later version) with their
+    counts — `@3` mentions (the only red ones), `●16` the DMs' unread messages, `●` unread
+    channels; the status line repeats no count; the names shorten only on a narrow screen; `Ctrl+R` or `Space r` (`:nav`) goes there from anywhere (and `Ctrl+R` back),
     `h` / `l` and `Enter` pick a view, `Esc` leaves; the workspace (or `Space W`, or a click on
     it) opens a switcher of the workspaces with their counts;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),

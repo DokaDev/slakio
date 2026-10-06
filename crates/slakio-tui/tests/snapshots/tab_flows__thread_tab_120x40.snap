@@ -2,7 +2,7 @@
 source: crates/slakio-tui/tests/tab_flows.rs
 expression: "demo::mask_hangul(&d.screen())"
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
 ╭ Home ──────────────────╮ 1 #long-threads ×  2 ⤷ For cache timeout tic… ×
 │ ▾ Favorites            │╭ ▌⤷ Thread · #long-threads ─────────────────────────────────────────────────────────────────╮
 │   # backend            ││ ─────────────────────────────────────── 2026-01-06 ─────────────────────────────────────── │
@@ -41,4 +41,4 @@ expression: "demo::mask_hangul(&d.screen())"
 │   # feed-invoice-168   │├─ Reply ────────────────────────────────────────────────────────────────────────────────────┤
 │   # feed-latency-144   ││ › Press i to reply                                                                         │
 ╰────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › #long-threads › ⤷ Thread      │ i reply · k messages · Ctrl+W close · ? help │  @37  DM 16 │ demo
+ NORMAL  ▌A company › #long-threads › ⤷ Thread         │ i reply · k messages · Esc list · Ctrl+W close · ? help │ demo

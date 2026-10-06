@@ -24,8 +24,9 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
     let title = app.i18n.label(Label::SwitcherTitle).to_string();
     let footer = app.i18n.label(Label::SwitcherKeys).to_string();
     let inner = modal(f, app, rect, &title, &footer);
-    for (i, w) in app.model.workspaces().iter().enumerate() {
-        let y = inner.y + i as u16;
+    let first = crate::screen::switcher_first(cursor, usize::from(inner.height));
+    for (i, w) in app.model.workspaces().iter().enumerate().skip(first) {
+        let y = inner.y + (i - first) as u16;
         if y >= inner.bottom() {
             break;
         }

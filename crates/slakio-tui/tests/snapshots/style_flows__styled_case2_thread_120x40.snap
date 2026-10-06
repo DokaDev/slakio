@@ -2,8 +2,8 @@
 source: crates/slakio-tui/tests/style_flows.rs
 expression: screen_styled(&d)
 ---
- ▌A company @9 ▾ │ Home @24  DMs @4  Activity @37  Files  Later
-    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [err/surf B 11..14] [bdr/surf 14..16] [/surf 16..17] [bdr/surf 17..18] [/surf2 B 18..23] [err/surf2 B 23..27] [/surf2 B 27..28] [mut/surf 28..32] [err/surf B 32..35] [mut/surf 35..45] [err/surf B 45..49] [mut/surf 49..64] [/surf 64..120]
+ ▌A company ▾ · B @9 │ Home @24  DMs ●11  Activity @37  Files  Later
+    [/surf 0..1] [ws/surf 1..2] [/surf B 2..11] [mut/surf 11..13] [/surf 13..16] [mut/surf B 16..17] [err/surf B 17..20] [/surf 20..21] [mut/surf 21..22] [/cl B 22..27] [err/cl B 27..31] [/cl B 31..32] [mut/surf 32..36] [/surf B 36..40] [mut/surf 40..50] [err/surf B 50..54] [mut/surf 54..69] [/surf 69..120]
 ╭ Home ──────────────────╮╭ ▌#long-threads ───────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ────────╮
     [bdr 0..1] [mut 1..7] [bdr 7..28] [ws 28..29] [mut 29..43] [bdr 43..83] [acc 83..85] [ws 85..86] [ B 86..111] [acc 111..120]
 │ ▾ Favorites            ││ ──────────────────── 2026-01-06 ───────────────────── ││    metrics done build build       │
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [bdr 0..1] [mut 4..5] [bdr 25..27] [dim 28..81] [bdr 82..83] [acc 83..84] [dim 85..118] [acc 119..120]
 ╰────────────────────────╯╰───────────────────────────────────────────────────────╯╰───────────────────────────────────╯
     [bdr 0..83] [acc 83..120]
- NORMAL  ▌A company › #long-threads › ⤷ Thread      │ i reply · k messages · Ctrl+W close · ? help │  @37  DM 16 │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..51] [bdr/surf 51..54] [/surf B 54..55] [mut/surf 55..61] [dim/surf 61..64] [/surf B 64..65] [mut/surf 65..74] [dim/surf 74..77] [/surf B 77..83] [mut/surf 83..89] [dim/surf 89..92] [/surf B 92..93] [mut/surf 93..98] [bdr/surf 98..101] [on/err B 101..106] [/surf 106..107] [/surf B 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › #long-threads › ⤷ Thread         │ i reply · k messages · Esc main · Ctrl+W close · ? help │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..54] [bdr/surf 54..57] [/surf B 57..58] [mut/surf 58..64] [dim/surf 64..67] [/surf B 67..68] [mut/surf 68..77] [dim/surf 77..80] [/surf B 80..83] [mut/surf 83..88] [dim/surf 88..91] [/surf B 91..97] [mut/surf 97..103] [dim/surf 103..106] [/surf B 106..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

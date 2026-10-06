@@ -172,7 +172,14 @@ fn a_short_status_line_keeps_the_place_tidy_and_apart_from_the_hints() {
     let mut d = Demo::new(80, 24);
     d.open("backend");
     let line = d.status_line();
-    assert!(line.contains("▌A company › #backend") && line.contains("│ i write") && line.contains("? help"), "{line}");
+    // The workspace's name gives way first (eight cells kept), never the place.
+    assert!(
+        line.contains("▌A compa")
+            && line.contains(" › #backend")
+            && line.contains("│ i write")
+            && line.contains("? help"),
+        "{line}"
+    );
     assert!(!line.contains("#…"), "the place is cut only after the hints: {line}");
 }
 
