@@ -38,7 +38,7 @@ expression: s
 │  ││   # feed-index-5    1  ││                                                                                        │
 │  ││   # feed-invoice-16    ││                                                                                        │
 ╭ Space w — Window ────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ h  Move the focus left       k  Move the focus up         c  Close the pane                                          │
-│ j  Move the focus down       l  Move the focus right                                                                 │
+│ h  Move the focus left                 k  Move the focus up                   c  Close the pane, then its tab        │
+│ j  Move the focus down                 l  Move the focus right                                                       │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                         │  @37  DM 16 │ demo

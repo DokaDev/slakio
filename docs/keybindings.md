@@ -39,7 +39,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space w j` | Move the focus down | `focus.down` |
 | `Space w k` | Move the focus up | `focus.up` |
 | `Space w l` | Move the focus right | `focus.right` |
-| `Space w c` | Close the pane | `pane.close` |
+| `Space w c` | Close the pane, then its tab | `pane.close` |
 | `Space h` | Show Home | `view.home` |
 | `Space d` | Show DMs | `view.dms` |
 | `Space a` | Show Activity | `view.activity` |
@@ -154,7 +154,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Left` | The panel to the left | `pane.left` |
 | `l` | The thread panel | `pane.right` |
 | `Right` | The thread panel | `pane.right` |
-| `Ctrl+W` | Close the pane | `pane.close` |
+| `Ctrl+W` | Close the pane, then its tab | `pane.close` |
 
 ## Command line (`cmdline`) **[text]**
 
@@ -240,7 +240,7 @@ Type `:` and the command, then `Enter`.
 
 | Command | Also | Action |
 |---|---|---|
-| `:qa` | `:qall` `:quitall` `:q` `:quit` | Quit |
+| `:qa` | `:qall` `:quitall` | Quit |
 | `:workspace` |  | Switch workspace |
 | `:help` |  | Keyboard help |
 | `:avatars` |  | Show or hide avatars (initials) |
@@ -251,7 +251,7 @@ Type `:` and the command, then `Enter`.
 | `:activity` |  | Show Activity |
 | `:files` |  | Show Files |
 | `:later` |  | Show Later |
-| `:close` |  | Close the pane |
+| `:q` | `:quit` `:close` | Close the pane, then its tab |
 | `:back` |  | Back to the conversation before |
 | `:forward` |  | Forward again |
 | `:tabnext` | `:tabn` | Next tab |

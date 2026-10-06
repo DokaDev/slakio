@@ -127,7 +127,7 @@ fn every_action_is_registered() {
 #[test]
 fn commands_find_their_action() {
     assert_eq!(by_command("qa"), Some(Action::App(AppAction::Quit)));
-    assert_eq!(by_command(" q "), Some(Action::App(AppAction::Quit)));
+    assert_eq!(by_command(" q "), Some(Action::Pane(PaneAction::Close)), ":q closes, as in vim");
     assert_eq!(by_command("dms"), Some(Action::Shell(ShellAction::Show(View::Dms))));
     assert_eq!(by_command("wq"), None);
     assert_eq!(by_command(""), None);

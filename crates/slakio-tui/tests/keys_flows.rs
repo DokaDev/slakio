@@ -231,7 +231,7 @@ fn arrows_pages_home_and_end_work_wherever_j_and_k_do() {
 
 #[test]
 fn ctrl_q_quits_everywhere_also_while_typing() {
-    for keys in ["ctrl+q", "space q", ": q enter", "i ctrl+q", "? ctrl+q", ": ctrl+q"] {
+    for keys in ["ctrl+q", "space q", ": q a enter", "i ctrl+q", "? ctrl+q", ": ctrl+q"] {
         let mut d = Demo::new(120, 40);
         d.open("backend");
         d.keys(keys);
@@ -240,6 +240,9 @@ fn ctrl_q_quits_everywhere_also_while_typing() {
     let mut d = Demo::new(120, 40);
     d.keys("q");
     assert!(!d.app.quit, "q alone never quits");
+    d.open("backend");
+    d.keys(": q enter");
+    assert!(!d.app.quit && d.app.open_target().is_none(), ":q closes the pane, never the app");
 }
 
 #[test]

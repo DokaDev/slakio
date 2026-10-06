@@ -19,7 +19,7 @@ use super::model::breadcrumb;
 use super::pane::Pane;
 use super::shell::Region;
 use super::{App, Focus};
-use crate::action::{Action, TabAction};
+use crate::action::{Action, AppAction, TabAction};
 use crate::keymap::Ctx;
 use crate::keymap::hints::key_label;
 use crate::tabbar::{self, Bar, Hit, Label as TabLabel};
@@ -132,6 +132,28 @@ impl App {
             (Some(id), true) => self.set_focus(Focus::on(id)),
             (None, true) => self.focus_list(closed),
             _ => {}
+        }
+    }
+
+    /// Close the work area's active pane (`Ctrl+W`, `:q`): its tab with its last pane, never the
+    /// app. From a pane the keyboard goes to the pane shown next, else to the list (on the
+    /// conversation closed); from the list or the rail it stays there. With nothing open, says
+    /// how to quit.
+    pub(super) fn close_pane(&mut self, now: Instant) {
+        if self.work.active().is_none() {
+            let keys = key_label(&self.keymap, Action::App(AppAction::Quit), Ctx::Root).unwrap_or_default();
+            return self.info(Msg::StatusNothingToClose { keys }, now);
+        }
+        let in_pane = self.focus().is_pane();
+        let (closed, next) = self.work.close();
+        if !in_pane {
+            return;
+        }
+        if let Some(id) = next {
+            self.set_focus(Focus::on(id));
+        }
+        if let Some(closed) = closed {
+            self.focus_list(Some(closed));
         }
     }
 

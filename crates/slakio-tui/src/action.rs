@@ -236,7 +236,7 @@ const fn dialog(a: DialogAction, id: &'static str, label: Label) -> ActionSpec {
 
 /// Every action, in the order the docs and the key help list them.
 pub const REGISTRY: &[ActionSpec] = &[
-    app(AppAction::Quit, "app.quit", Label::ActionQuit, &["qa", "qall", "quitall", "q", "quit"]),
+    app(AppAction::Quit, "app.quit", Label::ActionQuit, &["qa", "qall", "quitall"]),
     app(AppAction::Interrupt, "app.interrupt", Label::ActionInterrupt, &[]),
     app(AppAction::Palette, "palette.open", Label::ActionPalette, &[]),
     app(AppAction::ChooseWorkspace, "workspace.choose", Label::ActionWorkspaceChoose, &["workspace"]),
@@ -294,7 +294,8 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Escape, "pane.escape", Label::ActionPaneEscape, &[]),
     pane(PaneAction::Left, "pane.left", Label::ActionPaneLeft, &[]),
     pane(PaneAction::Right, "pane.right", Label::ActionPaneRight, &[]),
-    pane(PaneAction::Close, "pane.close", Label::ActionPaneClose, &["close"]),
+    // `:q` closes as in vim (the pane, then its tab), never the app: that is `:qa`.
+    pane(PaneAction::Close, "pane.close", Label::ActionPaneClose, &["q", "quit", "close"]),
     pane(PaneAction::Back, "history.back", Label::ActionHistoryBack, &["back"]),
     pane(PaneAction::Forward, "history.forward", Label::ActionHistoryForward, &["forward"]),
     tab(TabAction::Open, "tab.open", Label::ActionTabOpen, &[]),

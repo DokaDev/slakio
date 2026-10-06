@@ -29,7 +29,7 @@ expression: s
 │  ││   # │   Move the focus down                                                         Ctrl+J / Space w j │         │
 │  ││   # │   Move the focus up                                                           Ctrl+K / Space w k │         │
 │  ││   # │   Move the focus right                                                        Ctrl+L / Space w l │         │
-│  ││   # │   Close the pane                                                                       Space w c │         │
+│  ││   # │   Close the pane, then its tab                                                         Space w c │         │
 │  ││   # │   Show Home                                                                              Space h │         │
 │  ││   # │   Show DMs                                                                               Space d │         │
 │  ││   # │   Show Activity                                                                          Space a │         │

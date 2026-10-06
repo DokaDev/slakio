@@ -22,7 +22,7 @@ expression: d.snap()
 │  ││   # feed-alert-8  │  :activity             Show Activity                         Space a │                       │
 │  ││   # feed-budget-16│  :files                Show Files                            Space f │                       │
 │  ││   # feed-budget-33│  :later                Show Later                            Space l │                       │
-│  ││   # feed-build-50 │  :close                Close the pane                      Space w c │                       │
+│  ││   # feed-build-50 │  :q, :quit, :close     Close the pane, then its tab        Space w c │                       │
 │  ││   # feed-cache-119╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
 │  ││   # feed-customer-161  ││                         ?        Keyboard help                                         │
 │  ││   # feed-customer…  1  ││                         Ctrl+Q   Quit                                                  │

@@ -220,10 +220,10 @@ fn letters_in_order_find_an_entry_ranked_name_then_word_start_then_letters() {
 }
 
 #[test]
-fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
+fn a_click_on_quit_asks_first_and_qa_enter_still_quits() {
     let mut d = Demo::new(120, 40);
     d.keys(":");
-    d.type_text("qui");
+    d.type_text("qa");
     let b = d.app.palette_box().unwrap();
     assert_eq!(d.app.palette_rows()[0].label, "Quit");
     assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y));
@@ -238,15 +238,20 @@ fn a_click_on_quit_asks_first_and_q_enter_still_quits() {
     d.keys("i");
     d.type_text("half written");
     d.keys("esc ctrl+p");
-    d.type_text("qui");
+    d.type_text("qa");
     assert!(d.mouse(MouseEventKind::Down(MouseButton::Left), b.list.x + 4, b.list.y));
     assert_eq!(d.app.overlay(), Some(Overlay::Dialog(Question::Quit)));
     d.keys("y");
     assert!(d.app.quit, "y quits");
-    // Typed, `:q` Enter is asked for by name: it quits as in vim.
+    // Typed, `:qa` Enter is asked for by name: it quits as in vim; `:q` closes, never quits.
     let mut d = Demo::new(120, 40);
     d.keys(":");
     d.type_text("q");
+    assert_eq!(d.app.palette_rows()[0].label, "Close the pane, then its tab");
+    d.keys("enter");
+    assert!(!d.app.quit);
+    d.keys(":");
+    d.type_text("qa");
     d.keys("enter");
     assert!(d.app.quit);
 }

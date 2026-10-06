@@ -138,7 +138,7 @@
 "action.pane.copy" = "Copy the selected messages"
 "action.pane.escape" = "One step out (VISUAL, selection, thread, list)"
 "action.pane.insert" = "Write in the composer"
-"action.pane.close" = "Close the pane"
+"action.pane.close" = "Close the pane, then its tab"
 "action.history.back" = "Back to the conversation before"
 "action.history.forward" = "Forward again"
 "action.composer.send" = "Send"
@@ -293,3 +293,4 @@
 "palette.rename_auto" = "Name the tab after what it shows"
 "guide.tab_numbers" = "Show tab 1 to 9"
 "hint.new_tab" = "new tab"
+"status.nothing_to_close" = "Nothing to close; {keys} quits"

@@ -365,3 +365,20 @@ fn the_hint_line_and_which_key_teach_the_new_tab_key() {
     d.keys("n");
     assert_eq!(titles(&d).len(), 2, "Space t n opens the selected message's thread in a tab");
 }
+
+#[test]
+fn colon_q_closes_like_ctrl_w_and_only_colon_qa_quits() {
+    let mut d = two_tabs(120, 40);
+    d.command("q");
+    assert_eq!(titles(&d), ["#backend"], ":q closed the pane, so its tab");
+    assert!(!d.app.quit);
+    d.list_cursor_on("random");
+    d.command("quit");
+    assert!(titles(&d).is_empty(), "from the list too: the work area's pane");
+    assert_eq!(d.app.focus(), Focus::List);
+    d.command("q");
+    assert!(!d.app.quit, "nothing open: :q never quits");
+    assert!(d.status_line().contains("Nothing to close"), "{}", d.status_line());
+    d.command("qa");
+    assert!(d.app.quit, ":qa quits");
+}

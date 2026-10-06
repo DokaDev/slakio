@@ -70,7 +70,7 @@ images, and settings. This README only lists what works; it will grow with each 
   - the status line shows the keys worth knowing where you are, and every key is listed in
     [docs/keybindings.md](docs/keybindings.md).
 - `Ctrl+Q` quits from anywhere (it asks first when a message you wrote was not sent); so do
-  `Space q` and `:q` / `:qa`.
+  `Space q` and `:qa`. `:q` closes like `Ctrl+W` (the pane, then its tab) and never quits.
 - `Ctrl+P` (or `:`) opens the command palette: every command and action that works where you
   are, with its keys; type to filter (letters in order are enough: `thm` finds `:theme`),
   `Tab` / arrows to select, `Enter` to run, or click (a click on Quit asks first).
@@ -93,7 +93,7 @@ Six keys get you everywhere:
 | `Tab` | The next panel, the rail included (`Shift+Tab` the previous one) |
 | `Ctrl+P` | The command palette: every command and action by name, with its keys |
 | `Esc` | One step out; never closes anything |
-| `Ctrl+Q` | Quit |
+| `Ctrl+Q` | Quit (also `Space q`, `:qa`; `:q` and `Ctrl+W` only close the pane, then its tab) |
 - English and Korean interface text (`language = "auto" | "en" | "ko"` in the config file).
 
 ## Build from source

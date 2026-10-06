@@ -606,18 +606,7 @@ impl App {
                     self.set_focus(Focus::on(id));
                 }
             }
-            PaneAction::Close => {
-                if !self.focus().is_pane() {
-                    return;
-                }
-                let (closed, next) = self.work.close();
-                if let Some(id) = next {
-                    self.set_focus(Focus::on(id));
-                }
-                if let Some(closed) = closed {
-                    self.focus_list(Some(closed));
-                }
-            }
+            PaneAction::Close => self.close_pane(now),
         }
     }
 
