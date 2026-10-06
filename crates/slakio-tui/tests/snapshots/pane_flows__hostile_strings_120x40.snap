@@ -4,23 +4,23 @@ expression: mask_hangul(&s)
 ---
 ╭──╮╭ Home ──────────────────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────╮
 │▌A││ ▾ Favorites            ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
-│▌B││   # backend            ││ Park          beforeafter                                                        13:43 │
+│▌B││   # backend            ││ Jiho Park     beforeafter                                                        13:43 │
 │──││   # incidents       3  ││               :blink: 2                                                                │
-│H ││                        ││ Park          abc                                                                14:04 │
-│D●││ ▾ Ops                  ││ Minsu         red blinking and truecolor                                         14:19 │
-│A●││   # deploys            ││ Hyunwoo                                                                          14:48 │
-│F ││   # alerts             ││ Sam Rivera    visible (edited)                                                   15:22 │
+│H ││                        ││ Jiho Park     abc                                                                14:04 │
+│D●││ ▾ Ops                  ││ Jiyoung Lee   red blinking and truecolor                                         14:19 │
+│A●││   # deploys            ││ Hana                                                                             14:48 │
+│F ││   # alerts             ││ ＊＊＊        visible (edited)                                                   15:22 │
 │L ││   # partner-shared ext ││ Eve Bae                                                                          15:24 │
 │  ││▎  # hostile-strings    ││ Zoe Lim       docs.example.com                                                   15:55 │
 │  ││   # big-history        ││ Tom Ko        after dcs                                                          16:13 │
-│  ││   # long-threads       ││ Alex Morgan   after apc                                                          16:40 │
+│  ││   # long-threads       ││ Sam Rivera    after apc                                                          16:40 │
 │  ││                        ││ Ryan Oh       c1 red                                                             17:07 │
-│  ││ ▾ Channels             ││ ＊＊＊        dangling (edited)                                                  17:28 │
+│  ││ ▾ Channels             ││ Jiwon Han     dangling (edited)                                                  17:28 │
 │  ││   # announcements      ││               :tada: 4                                                                 │
 │  ││   # design-review      ││ Ava Shin      a�b�c�d�e�f�g                                                      17:51 │
 │  ││   # feed-alert-134     ││ Eve Bae       innocent text                                                      18:10 │
 │  ││   # feed-alert-8       ││               EVIL                                                                     │
-│  ││   # feed-budget-162    ││ Taylor Kim    col1    col2    col3                                               18:34 │
+│  ││   # feed-budget-162    ││ Chris Park    col1    col2    col3                                               18:34 │
 │  ││   # feed-budget-33     ││               line two                                                                 │
 │  ││   # feed-build-50      ││               line three                                                               │
 │  ││   # feed-cache-119     ││ Noah Han      invoice_fdp.exe attached                                           18:56 │
@@ -28,9 +28,9 @@ expression: mask_hangul(&s)
 │  ││   # feed-customer…  1  ││               :fire: 5  :pray: 3                                                       │
 │  ││   # feed-dashboard-22  ││ Amy Ryu       ab                                                                 19:33 │
 │  ││   # feed-dashboard-41  ││ Leo Kang      xy                                                                 20:07 │
-│  ││   # feed-design-34     ││ Seoyeon       é̶                                                                  20:16 │
-│  ││   # feed-design-83     ││ Robin Choi    ❤️                                                                 20:51 │
-│  ││   # feed-draft-142     ││ Chris Park    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 21:17 │
+│  ││   # feed-design-34     ││ ＊＊＊        é̶                                                                  20:16 │
+│  ││   # feed-design-83     ││ Jordan Lee    ❤️                                                                 20:51 │
+│  ││   # feed-draft-142     ││ ＊＊＊        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 21:17 │
 │  ││   # feed-draft-58      ││               xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
 │  ││   # feed-draft-84      ││               xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │
 │  ││   # feed-index-199  2  ││               xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx       │

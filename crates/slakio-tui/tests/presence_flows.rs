@@ -53,7 +53,9 @@ fn muted(d: &Demo, name: &str) -> bool {
     d.app.model.conversation(i).muted
 }
 
-const PEOPLE: [&str; 6] = ["Kim", "Park", "Lee", "Minsu", "Jiwon", "Seoyeon"];
+/// The first DMs: Latin and Korean names (escapes: no Hangul in source files).
+const PEOPLE: [&str; 6] =
+    ["Minsu Kim", "Jiho Park", "\u{C774}\u{C11C}\u{C5F0}", "Jiyoung Lee", "Alex Morgan", "\u{BC15}\u{C900}\u{D638}"];
 
 #[test]
 fn every_dm_shows_its_peers_presence_by_shape() {

@@ -3,20 +3,20 @@ source: crates/slakio-tui/tests/presence_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ ● Kim               1  ││                                                                                        │
-│▌B││ ● Park                 ││                                                                                        │
-│──││ ○ Lee                  ││                                                                                        │
-│H ││ ◐ Minsu                ││                                                                                        │
-│D●││ ● Jiwon                ││                                                                                        │
-│A●││ ○ Seoyeon              ││                                                                                        │
-│F ││ ● Hyunwoo           2  ││                                                                                        │
-│L ││ ● Alex Morgan       1  ││                                                                                        │
-│  ││ ○ Sam Rivera           ││                                                                                        │
-│  ││ ◐ Jordan Lee           ││                                                                                        │
-│  ││ ● Taylor Kim           ││                                                                                        │
-│  ││ ○ Chris Park        2  ││                                                                                        │
+│▌A││ ● Minsu Kim         1  ││                                                                                        │
+│▌B││ ● Jiho Park            ││                                                                                        │
+│──││ ○ ＊＊＊               ││                                                                                        │
+│H ││ ◐ Jiyoung Lee          ││                                                                                        │
+│D●││ ● Alex Morgan          ││                                                                                        │
+│A●││ ○ ＊＊＊               ││                                                                                        │
+│F ││ ● Hana              2  ││                                                                                        │
+│L ││ ● Sam Rivera        1  ││                                                                                        │
+│  ││ ○ ＊＊＊               ││                                                                                        │
+│  ││ ◐ Taylor Kim           ││                                                                                        │
+│  ││ ● Chris Park           ││                                                                                        │
+│  ││ ○ ＊＊＊            2  ││                                                                                        │
 │  ││ ◐ Mallory live         ││                                                                                        │
-│  ││ @ Park, Lee, Minsu  2  ││                                                                                        │
+│  ││ @ Jiho Park, ＊＊…  2  ││                                                                                        │
 │  ││                        ││                         No conversation open                                           │
 │  ││                        ││                         Pick one in the list and press Enter.                          │
 │  ││                        ││                                                                                        │

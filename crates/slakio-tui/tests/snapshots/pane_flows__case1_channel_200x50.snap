@@ -6,48 +6,48 @@ expression: mask_hangul(&s)
 │▌A││ ▾ Favorites                      ││ Ben Yu        Today retry design please branch still design index production maybe rollback we invoice                                                 02:54 │
 │▌B││▎  # backend                      ││               :+1: 2  :tada: 4  :eyes: 2                                                                                                                     │
 │──││   # incidents                 3  ││ Kate Nam      Confirmed                                                                                                                                02:55 │
-│H ││                                  ││ Dana Yoon     Tracing we branch is fine invoice today branch roadmap deploy customer alert deploy                                                      03:05 │
+│H ││                                  ││ Robin Choi    Tracing we branch is fine invoice today branch roadmap deploy customer alert deploy                                                      03:05 │
 │D●││ ▾ Ops                            ││ Lily Jeon     Meeting merge roadmap cache deploy for timeout latency (edited)                                                                          03:08 │
 │A●││   # deploys                      ││ Noah Han      ＊＊ ＊＊＊＊＊＊                                                                                                                        03:19 │
 │F ││   # alerts                       ││               :white_check_mark: 2                                                                                                                           │
 │L ││   # partner-shared ext           ││ Ivy Moon      Looks now tomorrow alert invoice again please deploy release index today looks deploy today meeting fine                                 03:22 │
-│  ││   # hostile-strings              ││ Taylor Kim    Can is fine                                                                                                                              03:30 │
-│  ││   # big-history                  ││ Jordan Lee    Should is design tomorrow broken queue merge migration invoice done broken we                                                            03:38 │
-│  ││   # long-threads                 ││ Dana Yoon     Can should someone someone deploy should                                                                                                 03:46 │
-│  ││                                  ││ Lee           Meeting moved to 3pm 👩‍💻                                                                                                                  03:56 │
+│  ││   # hostile-strings              ││ Chris Park    Can is fine                                                                                                                              03:30 │
+│  ││   # big-history                  ││ Taylor Kim    Should is design tomorrow broken queue merge migration invoice done broken we                                                            03:38 │
+│  ││   # long-threads                 ││ Robin Choi    Can should someone someone deploy should                                                                                                 03:46 │
+│  ││                                  ││ ＊＊＊        Meeting moved to 3pm 👩‍💻                                                                                                                  03:56 │
 │  ││ ▾ Channels                       ││ Owen Hwang    Meeting dashboard check index done still is ticket we can meeting should retry                                                           04:04 │
 │  ││   # announcements                ││               ⤷ 12 replies · last 04:16                                                                                                                      │
-│  ││   # design-review                ││ Robin Choi    ```                                                                                                                                      04:08 │
+│  ││   # design-review                ││ Jordan Lee    ```                                                                                                                                      04:08 │
 │  ││   # feed-alert-134               ││               SELECT count(*) FROM jobs WHERE state = 'stuck';                                                                                               │
 │  ││   # feed-alert-8                 ││               ```                                                                                                                                            │
 │  ││   # feed-budget-162              ││               ⤷ 8 replies · last 04:16                                                                                                                       │
-│  ││   # feed-budget-33               ││ ＊＊＊        Ok, monitoring                                                                                                                           04:17 │
+│  ││   # feed-budget-33               ││ Dana Yoon     Ok, monitoring                                                                                                                           04:17 │
 │  ││   # feed-build-50                ││ Ava Shin      On budget still the tracing design roadmap                                                                                               04:23 │
 │  ││   # feed-cache-119               ││ Mia Jang      Sprint fine timeout for merge for check rollback budget alert after pager review ticket retry                                            04:31 │
 │  ││   # feed-customer-161            ││ Eve Bae       On review maybe check today still is now maybe ticket                                                                                    04:39 │
-│  ││   # feed-customer-167         1  ││ Alex Morgan   Suspect the DB pool                                                                                                                      04:43 │
+│  ││   # feed-customer-167         1  ││ Sam Rivera    Suspect the DB pool                                                                                                                      04:43 │
 │  ││   # feed-dashboard-22            ││               ⤷ 10 replies · last 04:53                                                                                                                      │
-│  ││   # feed-dashboard-41            ││ Jiwon         Production tomorrow design                                                                                                               04:49 │
+│  ││   # feed-dashboard-41            ││ Alex Morgan   Production tomorrow design                                                                                                               04:49 │
 │  ││   # feed-design-34               ││ Kate Nam      Index roadmap is draft merge today done queue design fine tracing                                                                        04:59 │
 │  ││   # feed-design-83               ││ Max Baek      Looking into it                                                                                                                          05:02 │
-│  ││   # feed-draft-142               ││ Seoyeon       Alert timeout deploy latency looks should broken should production staging after timeout after alert roadmap                             05:12 │
+│  ││   # feed-draft-142               ││ ＊＊＊        Alert timeout deploy latency looks should broken should production staging after timeout after alert roadmap                             05:12 │
 │  ││   # feed-draft-58                ││ Owen Hwang    Again fine is branch customer draft on budget build                                                                                      05:19 │
 │  ││   # feed-draft-84                ││ Lily Jeon     Design index broken can lunch looks can today                                                                                            05:24 │
-│  ││   # feed-index-199            2  ││ Chris Park    PR is up                                                                                                                                 05:31 │
-│  ││   # feed-index-39                ││ Kim           For staging latency tomorrow index after staging                                                                                         05:43 │
-│  ││   # feed-index-5              1  ││ ＊＊＊        see https://docs.example.com/runbooks/latency                                                                                            05:48 │
-│  ││   # feed-invoice-16              ││ Park          Meeting for staging please someone someone on maybe timeout retry a we design can sprint production                                      05:51 │
-│  ││   # feed-invoice-168             ││ ＊＊＊        Rolling back                                                                                                                             05:58 │
-│  ││   # feed-latency-144             ││ ＊＊＊        Schema production after invoice cache is should                                                                                          06:05 │
+│  ││   # feed-index-199            2  ││ ＊＊＊        PR is up                                                                                                                                 05:31 │
+│  ││   # feed-index-39                ││ Minsu Kim     For staging latency tomorrow index after staging                                                                                         05:43 │
+│  ││   # feed-index-5              1  ││ Dana Yoon     see https://docs.example.com/runbooks/latency                                                                                            05:48 │
+│  ││   # feed-invoice-16              ││ Jiho Park     Meeting for staging please someone someone on maybe timeout retry a we design can sprint production                                      05:51 │
+│  ││   # feed-invoice-168             ││ Jiwon Han     Rolling back                                                                                                                             05:58 │
+│  ││   # feed-latency-144             ││ Hyunwoo Jung  Schema production after invoice cache is should                                                                                          06:05 │
 │  ││   # feed-meeting-82              ││ Kate Nam      Suspect the DB pool 🎉                                                                                                                   06:13 │
 │  ││   # feed-merge-192               ││ Lily Jeon     Dashboard schema budget draft please is now waiting fine a lunch production someone cache release done                                   06:19 │
 │  ││   # feed-merge-54                ││ Kate Nam      Check a customer should maybe                                                                                                            06:26 │
 │  ││   # feed-metrics-125             ││ Mia Jang      Budget metrics merge design rollback alert alert should draft after alert on staging tomorrow                                            06:35 │
 │  ││   # feed-metrics-13              ││ Tom Ko        On waiting migration someone index can staging should                                                                                    06:41 │
 │  ││   # feed-metrics-18              ││ Kate Nam      Production roadmap customer build alert now latency fine review latency roadmap broken should for                                        06:51 │
-│  ││   # feed-production-111          ││ Chris Park    Confirmed                                                                                                                                06:59 │
+│  ││   # feed-production-111          ││ ＊＊＊        Confirmed                                                                                                                                06:59 │
 │  ││   # feed-production-44           ││ Kate Nam      Ticket review pager pager production on build alert the on draft                                                                         07:05 │
-│  ││   # feed-queue-224               ││ Alex Morgan   Meeting moved to 3pm                                                                                                                     07:14 │
+│  ││   # feed-queue-224               ││ Sam Rivera    Meeting moved to 3pm                                                                                                                     07:14 │
 │  ││   # feed-retry-63                │├─ Message #backend ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ││   # feed-review-152              ││ › Press i to write                                                                                                                                           │
 ╰──╯╰──────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

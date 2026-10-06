@@ -3,12 +3,12 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭──╮╭ DMs ───────────────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│▌A││ ● Kim                  ││                                                                                        │
-│▌B││ ● Park                 ││                                                                                        │
-│──││ ○ Lee                  ││                                                                                        │
-│H ││ ◐ Minsu                ││                                                                                        │
-│D●││ ● Jiwon                ││                                                                                        │
-│A●││ @ Park, Lee, Minsu  1  ││                                                                                        │
+│▌A││ ● Minsu Kim            ││                                                                                        │
+│▌B││ ● Jiho Park            ││                                                                                        │
+│──││ ○ ＊＊＊               ││                                                                                        │
+│H ││ ◐ Jiyoung Lee          ││                                                                                        │
+│D●││ ● Alex Morgan          ││                                                                                        │
+│A●││ @ Jiho Park, ＊＊…  1  ││                                                                                        │
 │F ││                        ││                                                                                        │
 │L ││                        ││                                                                                        │
 │  ││                        ││                                                                                        │
