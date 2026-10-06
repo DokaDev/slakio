@@ -15,14 +15,14 @@ expression: d.snap()
 │  ││   # big-history   │  :help                 Keyboard help                          ? / F1 │                       │
 │  ││   # long-threads  │  :theme <theme>        Change the color theme                        │                       │
 │  ││                   │  :avatars              Show or hide avatars (initials)               │                       │
-│  ││ ▾ Channels        │  :rail                 Rail: workspaces and views   Ctrl+R / Space r │                       │
-│  ││   # announcements │  :list                 Show or hide the list panel           Space e │                       │
-│  ││   # design-review │  :home                 Show Home                             Space h │                       │
-│  ││   # feed-alert-134│  :dms                  Show DMs                              Space d │                       │
-│  ││   # feed-alert-8  │  :activity             Show Activity                         Space a │                       │
-│  ││   # feed-budget-16│  :files                Show Files                            Space f │                       │
-│  ││   # feed-budget-33│  :later                Show Later                            Space l │                       │
-│  ││   # feed-build-50 │  :q, :quit, :close     Close the pane, then its tab        Space w c │                       │
+│  ││ ▾ Channels        │  :icons                Show Nerd Font icons, or text instead         │                       │
+│  ││   # announcements │  :rail                 Rail: workspaces and views   Ctrl+R / Space r │                       │
+│  ││   # design-review │  :list                 Show or hide the list panel           Space e │                       │
+│  ││   # feed-alert-134│  :home                 Show Home                             Space h │                       │
+│  ││   # feed-alert-8  │  :dms                  Show DMs                              Space d │                       │
+│  ││   # feed-budget-16│  :activity             Show Activity                         Space a │                       │
+│  ││   # feed-budget-33│  :files                Show Files                            Space f │                       │
+│  ││   # feed-build-50 │  :later                Show Later                            Space l │                       │
 │  ││   # feed-cache-119╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
 │  ││   # feed-customer-161  ││                         ?        Keyboard help                                         │
 │  ││   # feed-customer…  1  ││                         Ctrl+Q   Quit                                                  │

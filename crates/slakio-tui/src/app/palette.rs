@@ -17,13 +17,13 @@
 //! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
 //! ```
 
-use super::{AVATAR_VALUES, App, avatars_arg, theme_arg};
+use super::{App, Effect};
 use crate::action::TabAction;
 use crate::action::{self, Action, AppAction, HelpAction, REGISTRY};
 use crate::keymap::keys;
 use crate::screen::{self, PaletteBox};
 use crate::text::wrap;
-use crate::theme::NAMES;
+use crate::theme::{self, NAMES};
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 use slakio_core::i18n::{Label, Msg};
@@ -53,6 +53,8 @@ pub enum Item {
     Avatars(usize),
     /// `:rename <name>`: name the tab shown that (nothing: after what it shows).
     Rename,
+    /// A value for `:icons <value>` (index into [`ICON_VALUES`]).
+    Icons(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
@@ -71,7 +73,7 @@ pub struct Row {
 fn offered(a: Action, backend: bool) -> bool {
     match a {
         Action::App(AppAction::Quit) => true,
-        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars)
+        Action::App(AppAction::ChooseWorkspace | AppAction::ToggleAvatars | AppAction::ToggleIcons)
         | Action::Shell(_)
         | Action::Pane(_)
         | Action::Tab(_) => backend,
@@ -128,6 +130,15 @@ impl App {
         }
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
+        }
+        if let Some(arg) = icons_arg(line) {
+            let mut hits: Vec<(u8, i32, usize)> = ICON_VALUES
+                .iter()
+                .enumerate()
+                .filter_map(|(i, v)| action::rank(arg, &[], &[v]).map(|(t, s)| (t, -s, i)))
+                .collect();
+            hits.sort_unstable();
+            return hits.into_iter().map(|(.., i)| Item::Icons(i)).collect();
         }
         if let Some(arg) = avatars_arg(line) {
             let mut hits: Vec<(u8, i32, usize)> = AVATAR_VALUES
@@ -211,6 +222,14 @@ impl App {
                 Item::Action(i) => {
                     Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
                 }
+                Item::Icons(i) => {
+                    let on = ICON_VALUES[i] == "on";
+                    Row {
+                        name: ICON_VALUES[i].to_string(),
+                        label: label(if on { Label::IconsOn } else { Label::IconsOff }),
+                        keys: if on == self.settings.icons { label(Label::PaletteCurrent) } else { String::new() },
+                    }
+                }
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -277,6 +296,12 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(Item::Icons(i)) => {
+                self.cmdline.close();
+                if let Err(msg) = self.set_icons(ICON_VALUES[i], now) {
+                    self.warn(msg, now);
+                }
+            }
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();
                 self.cmdline.close();
@@ -285,9 +310,12 @@ impl App {
                 }
             }
             None => {
-                let error = match (theme_arg(&text), avatars_arg(&text)) {
-                    (Some(name), _) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
-                    (_, Some(name)) => Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") },
+                let error = match (theme_arg(&text), avatars_arg(&text), icons_arg(&text)) {
+                    (Some(name), ..) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
+                    (_, Some(name), _) => {
+                        Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") }
+                    }
+                    (.., Some(name)) => Msg::IconsUnknown { name: name.to_string(), names: ICON_VALUES.join(", ") },
                     _ => {
                         let word = text.split_whitespace().next().unwrap_or_default().to_string();
                         if action::by_command(&word).is_some() {
@@ -330,5 +358,87 @@ impl App {
             _ => return false,
         }
         true
+    }
+}
+
+/// The values `:icons` takes (`icons = "ask"` stays for the first run).
+pub const ICON_VALUES: &[&str] = &["on", "off"];
+
+/// The value of `:icons <value>` (also `:set icons=<value>`).
+pub fn icons_arg(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        "icons" => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix("icons=").map(str::trim),
+        _ => None,
+    }
+}
+
+impl App {
+    /// `:theme <name>`: draw with theme `name` from now on and save it in the config file. A
+    /// name the setting does not take changes nothing and says which ones it takes.
+    pub fn set_theme(&mut self, name: &str, now: Instant) -> Result<(), Msg> {
+        let name = name.trim().to_ascii_lowercase();
+        if !theme::NAMES.contains(&name.as_str()) {
+            return Err(Msg::ThemeUnknown { name, names: theme::NAMES.join(", ") });
+        }
+        self.theme = self.look.theme(&name);
+        self.theme_setting.clone_from(&name);
+        self.effects.push(Effect::Save { key: "theme", value: name.clone() });
+        self.info(Msg::ThemeChanged { name }, now);
+        Ok(())
+    }
+
+    /// `:avatars <initials|off>`: picture people by their initials chip, or not, from now on,
+    /// and save it in the config file. Another value changes nothing and says which ones work.
+    pub fn set_avatars(&mut self, value: &str, now: Instant) -> Result<(), Msg> {
+        let value = value.trim().to_ascii_lowercase();
+        if !AVATAR_VALUES.contains(&value.as_str()) {
+            return Err(Msg::AvatarsUnknown { name: value, names: AVATAR_VALUES.join(", ") });
+        }
+        self.settings.avatars = value == "initials";
+        self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
+        self.info(Msg::AvatarsChanged { name: value }, now);
+        Ok(())
+    }
+
+    /// `:icons <on|off>`: draw Nerd Font icons, or text instead, from now on, and save it in the
+    /// config file. Another value changes nothing and says which ones work.
+    pub fn set_icons(&mut self, value: &str, now: Instant) -> Result<(), Msg> {
+        let value = value.trim().to_ascii_lowercase();
+        if !ICON_VALUES.contains(&value.as_str()) {
+            return Err(Msg::IconsUnknown { name: value, names: ICON_VALUES.join(", ") });
+        }
+        self.settings.icons = value == "on";
+        self.effects.push(Effect::Save { key: "icons", value: value.clone() });
+        self.info(Msg::IconsChanged { name: value }, now);
+        Ok(())
+    }
+}
+
+/// The values `:avatars` takes (the config file also keeps `image` for photos, later).
+pub const AVATAR_VALUES: &[&str] = &["initials", "off"];
+
+/// The value of `:avatars <value>` (also `:set avatars=<value>`).
+pub fn avatars_arg(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        "avatars" => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix("avatars=").map(str::trim),
+        _ => None,
+    }
+}
+
+/// The theme name of `:theme <name>` (also `:colorscheme`, `:colo` as in vim, and
+/// `:set theme=<name>`).
+pub fn theme_arg(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let (word, rest) = line.split_once(char::is_whitespace)?;
+    match word {
+        "theme" | "colorscheme" | "colo" => Some(rest.trim()),
+        "set" => rest.trim().strip_prefix("theme=").map(str::trim),
+        _ => None,
     }
 }

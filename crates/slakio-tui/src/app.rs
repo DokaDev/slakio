@@ -51,7 +51,7 @@ use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, Dialog
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
-use crate::theme::{self, Look, Theme};
+use crate::theme::{Look, Theme};
 use composer::Composer;
 use dialog::{Dialog, Question};
 use help::Help;
@@ -480,6 +480,11 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            AppAction::ToggleIcons => {
+                if let Err(msg) = self.set_icons(if self.settings.icons { "off" } else { "on" }, now) {
+                    self.warn(msg, now);
+                }
+            }
             AppAction::ChooseWorkspace => {
                 if self.backend.is_some() {
                     self.set_focus(Focus::Rail);
@@ -668,33 +673,6 @@ impl App {
         }
     }
 
-    /// `:theme <name>`: draw with theme `name` from now on and save it in the config file. A
-    /// name the setting does not take changes nothing and says which ones it takes.
-    pub fn set_theme(&mut self, name: &str, now: Instant) -> Result<(), Msg> {
-        let name = name.trim().to_ascii_lowercase();
-        if !theme::NAMES.contains(&name.as_str()) {
-            return Err(Msg::ThemeUnknown { name, names: theme::NAMES.join(", ") });
-        }
-        self.theme = self.look.theme(&name);
-        self.theme_setting.clone_from(&name);
-        self.effects.push(Effect::Save { key: "theme", value: name.clone() });
-        self.info(Msg::ThemeChanged { name }, now);
-        Ok(())
-    }
-
-    /// `:avatars <initials|off>`: picture people by their initials chip, or not, from now on,
-    /// and save it in the config file. Another value changes nothing and says which ones work.
-    pub fn set_avatars(&mut self, value: &str, now: Instant) -> Result<(), Msg> {
-        let value = value.trim().to_ascii_lowercase();
-        if !AVATAR_VALUES.contains(&value.as_str()) {
-            return Err(Msg::AvatarsUnknown { name: value, names: AVATAR_VALUES.join(", ") });
-        }
-        self.settings.avatars = value == "initials";
-        self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
-        self.info(Msg::AvatarsChanged { name: value }, now);
-        Ok(())
-    }
-
     fn answer(&mut self, a: DialogAction) {
         let Some(mut d) = self.dialog else { return };
         let yes = match a {
@@ -739,31 +717,5 @@ impl App {
             changed |= !self.keys.pending().is_empty();
         }
         changed
-    }
-}
-
-/// The values `:avatars` takes (the config file also keeps `image` for photos, later).
-pub const AVATAR_VALUES: &[&str] = &["initials", "off"];
-
-/// The value of `:avatars <value>` (also `:set avatars=<value>`).
-pub fn avatars_arg(line: &str) -> Option<&str> {
-    let line = line.trim_start();
-    let (word, rest) = line.split_once(char::is_whitespace)?;
-    match word {
-        "avatars" => Some(rest.trim()),
-        "set" => rest.trim().strip_prefix("avatars=").map(str::trim),
-        _ => None,
-    }
-}
-
-/// The theme name of `:theme <name>` (also `:colorscheme`, `:colo` as in vim, and
-/// `:set theme=<name>`).
-pub fn theme_arg(line: &str) -> Option<&str> {
-    let line = line.trim_start();
-    let (word, rest) = line.split_once(char::is_whitespace)?;
-    match word {
-        "theme" | "colorscheme" | "colo" => Some(rest.trim()),
-        "set" => rest.trim().strip_prefix("theme=").map(str::trim),
-        _ => None,
     }
 }

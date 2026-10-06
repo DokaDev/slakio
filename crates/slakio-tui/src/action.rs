@@ -35,6 +35,8 @@ pub enum AppAction {
     ChooseWorkspace,
     /// Picture people by their initials chip, or not (`:avatars`); saved in the config file.
     ToggleAvatars,
+    /// Nerd Font icons, or text instead (`:icons`); saved in the config file.
+    ToggleIcons,
 }
 
 /// Actions of the `:` command line.
@@ -242,6 +244,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::ChooseWorkspace, "workspace.choose", Label::ActionWorkspaceChoose, &["workspace"]),
     help(HelpAction::Open, "help.open", Label::ActionHelpOpen, &["help"]),
     app(AppAction::ToggleAvatars, "avatars.toggle", Label::ActionAvatars, &["avatars"]),
+    app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),

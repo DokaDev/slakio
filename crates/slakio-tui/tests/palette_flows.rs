@@ -269,3 +269,26 @@ fn the_help_opened_over_the_palette_is_drawn_on_top_and_takes_the_mouse() {
     d.mouse(MouseEventKind::ScrollDown, 60, 20);
     assert_eq!(d.app.cmdline.selected, selected, "the wheel goes to the help, not the palette under it");
 }
+
+#[test]
+fn icons_turn_on_and_off_while_running_and_are_saved() {
+    use slakio_tui::app::Effect;
+    let mut d = Demo::new(120, 40);
+    assert!(!d.app.settings.icons);
+    d.command("icons on");
+    assert!(d.app.settings.icons);
+    assert!(d.app.take_effects().contains(&Effect::Save { key: "icons", value: "on".to_string() }));
+    assert!(d.status_line().contains("Icons: on"), "{}", d.status_line());
+    d.keys(":");
+    d.type_text("icons ");
+    let rows = d.app.palette_rows();
+    assert!(rows.iter().any(|r| r.name == "off") && rows.iter().any(|r| r.name == "on"), "{rows:#?}");
+    d.keys("esc");
+    d.command("icons");
+    assert!(!d.app.settings.icons, ":icons alone toggles");
+    assert!(d.app.take_effects().contains(&Effect::Save { key: "icons", value: "off".to_string() }));
+    d.command("set icons=on");
+    assert!(d.app.settings.icons);
+    d.command("icons maybe");
+    assert!(d.app.settings.icons, "a value it does not take changes nothing");
+}

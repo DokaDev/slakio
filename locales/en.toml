@@ -294,3 +294,8 @@
 "guide.tab_numbers" = "Show tab 1 to 9"
 "hint.new_tab" = "new tab"
 "status.nothing_to_close" = "Nothing to close; {keys} quits"
+"action.icons" = "Show Nerd Font icons, or text instead"
+"icons.changed" = "Icons: {name}"
+"icons.unknown" = "Unknown icons setting {name} (one of {names})"
+"icons.on" = "Nerd Font icons (the font must have them)"
+"icons.off" = "Text and plain symbols only"

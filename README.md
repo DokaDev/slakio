@@ -74,6 +74,8 @@ images, and settings. This README only lists what works; it will grow with each 
 - `Ctrl+P` (or `:`) opens the command palette: every command and action that works where you
   are, with its keys; type to filter (letters in order are enough: `thm` finds `:theme`),
   `Tab` / arrows to select, `Enter` to run, or click (a click on Quit asks first).
+- `:icons on|off` (or `:icons` to switch) draws Nerd Font icons or text instead, while running,
+  and saves it; the first run asks once, showing the icons.
 - People are pictured by their initials on a color of their own: before a sender's name, before
   a DM in the list (with whether they are around at its corner) and in a DM's title;
   `:avatars` turns them off and on and saves it. Profile photos are not shown yet.

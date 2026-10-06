@@ -244,6 +244,7 @@ Type `:` and the command, then `Enter`.
 | `:workspace` |  | Switch workspace |
 | `:help` |  | Keyboard help |
 | `:avatars` |  | Show or hide avatars (initials) |
+| `:icons` |  | Show Nerd Font icons, or text instead |
 | `:rail` |  | Rail: workspaces and views |
 | `:list` |  | Show or hide the list panel |
 | `:home` |  | Show Home |
