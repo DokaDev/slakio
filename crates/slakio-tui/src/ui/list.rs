@@ -151,7 +151,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             };
             // A DM shows its peer's presence in place of `@`: the shape tells it, the color helps.
             let presence = match &c.kind {
-                ConversationKind::Dm { user } => app.model.user(user).and_then(|u| presence_mark(u.presence, icons)),
+                ConversationKind::Dm { user } => app.model.user(user).and_then(|u| presence_mark(u.presence)),
                 _ => None,
             };
             let prefix = match presence {

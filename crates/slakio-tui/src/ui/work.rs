@@ -71,7 +71,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, area: Rect, side: Side) {
     }
     spans.push(Span::styled(text, t.title(focused)));
     // A DM's title says whether its peer is around: `@Minsu Kim ● active`.
-    if let Some((mark, p)) = peer.and_then(|u| presence_mark(u.presence, app.settings.icons)) {
+    if let Some((mark, p)) = peer.and_then(|u| presence_mark(u.presence)) {
         let label = match p {
             Presence::Active => Label::PresenceActive,
             Presence::Away => Label::PresenceAway,

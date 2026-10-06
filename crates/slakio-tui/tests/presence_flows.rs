@@ -101,10 +101,11 @@ fn presence_has_a_color_of_its_own_in_a_theme_with_colors() {
 }
 
 #[test]
-fn icons_on_draw_do_not_disturb_as_a_moon() {
+fn icons_on_draw_do_not_disturb_as_the_same_half_disc() {
     let d = dms(Theme::no_color(), Settings { icons: true, ..Settings::default() });
     let name = PEOPLE.into_iter().find(|n| presence_of(&d, n) == Presence::Dnd).expect("someone in do not disturb");
-    assert_eq!(d.buffer()[mark_at(&d, name)].symbol(), "\u{F0594}");
+    // One set of marks of one weight (`●` `○` `◐`), icons or not.
+    assert_eq!(d.buffer()[mark_at(&d, name)].symbol(), "◐");
 }
 
 #[test]

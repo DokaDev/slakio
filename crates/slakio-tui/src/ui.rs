@@ -175,16 +175,15 @@ fn view_glyph(view: View, icons: bool) -> &'static str {
     }
 }
 
-/// A person's presence mark: `●` active, `○` away, `◐` (with icons, a moon) in do not
-/// disturb; none while unknown. Told apart by shape, so it reads without color.
-fn presence_mark(p: Presence, icons: bool) -> Option<(&'static str, Presence)> {
-    let mark = match (p, icons) {
-        (Presence::Active, _) => "●",
-        (Presence::Away, _) => "○",
-        (Presence::Dnd, false) => "◐",
-        // nf-md-weather_night
-        (Presence::Dnd, true) => "\u{F0594}",
-        (Presence::Unknown, _) => return None,
+/// A person's presence mark: `●` active, `○` away, `◐` in do not disturb; none while
+/// unknown. One set of one weight, icons or not; told apart by shape, so it reads without
+/// color.
+fn presence_mark(p: Presence) -> Option<(&'static str, Presence)> {
+    let mark = match p {
+        Presence::Active => "●",
+        Presence::Away => "○",
+        Presence::Dnd => "◐",
+        Presence::Unknown => return None,
     };
     Some((mark, p))
 }
