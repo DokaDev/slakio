@@ -1,6 +1,5 @@
-//! The styles of the two rows of peers: the tab bar (the work area's) and the view switcher (the
-//! list panel's first row), both on the background, and what is shown among the peers, raised
-//! alike in both.
+//! The styles of the tab bar (the work area's first row): on the background, the tab shown
+//! raised.
 
 use super::{Kind, Theme};
 use ratatui::style::{Color, Modifier, Style};
@@ -11,8 +10,8 @@ impl Theme {
         self.base()
     }
 
-    /// A tab's title (and the spaces of its label), or a view on the view switcher: the one shown
-    /// on the raised surface, in bold; the others muted.
+    /// A tab's title (and the spaces of its label): the one shown on the raised surface, in
+    /// bold; the others muted.
     pub fn tab(&self, shown: bool) -> Style {
         match (self.kind, shown) {
             (Kind::Truecolor, true) => self.bold().bg(self.raised()),
@@ -22,7 +21,7 @@ impl Theme {
         }
     }
 
-    /// The background of what is shown among its peers (the tab shown, the view shown): the
+    /// The background of what is shown among its peers (the tab shown): the
     /// unfocused selection's on a dark theme, unless the status line's surface or the background
     /// is that color already; the selection's on a light one (its unfocused one is too faint there).
     pub fn raised(&self) -> Color {
@@ -48,8 +47,7 @@ impl Theme {
         }
     }
 
-    /// A tab's or a view's unread count (`●3`, `@3`): a mention's color when one mentions the
-    /// user.
+    /// A tab's unread count (`●3`, `@3`): a mention's color when one mentions the user.
     pub fn tab_badge(&self, shown: bool, mention: bool) -> Style {
         let dot = self.dot(mention);
         match self.tab(shown).bg {

@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/palette_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                │
-├────────────────────────────┤│                                                │
-│ ▾ Favorites                ││                                                │
-│   # back╭ Commands ────────────────────────────────────────────────╮         │
-│   # inci│ : dm                                                     │         │
-│         ├──────────────────────────────────────────────────────────┤         │
-│ ▾ Ops   │  :dms  Show DMs                                  Space d │         │
-│   # depl╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯er.      │
-│   # alerts                 ││                                                │
-│   # partner-shared ext     ││     Enter    Open                              │
-│   # hostile-strings        ││     Space h  Home                              │
-│   # big-history            ││     Space d  DMs                               │
-│   # long-threads           ││     Ctrl+O   Back to the last one              │
-│                            ││     ?        Keyboard help                     │
-│ ▾ Channels                 ││     Ctrl+Q   Quit                              │
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @37 ││                                                │
+│ Files   ╭ Commands ────────────────────────────────────────────────╮         │
+│ Later   │ : dm                                                     │         │
+├─────────├──────────────────────────────────────────────────────────┤         │
+│ ▾ Favori│  :dms  Show DMs                                  Space d │         │
+│   # back╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯er.      │
+│   # incidents           3  ││                                                │
+│                            ││     Enter    Open                              │
+│ ▾ Ops                      ││     Space h  Home                              │
+│   # deploys                ││     Space d  DMs                               │
+│   # alerts                 ││     Ctrl+O   Back to the last one              │
+│   # partner-shared ext     ││     ?        Keyboard help                     │
+│   # hostile-strings        ││     Ctrl+Q   Quit                              │
+│   # big-history            ││                                                │
+│   # long-threads           ││                                                │
+│                            ││                                                │
+│ ▾ Channels                 ││                                                │
 │   # announcements          ││                                                │
 │   # design-review          ││                                                │
-│   # feed-alert-134         ││                                                │
-│   # feed-alert-8           ││                                                │
-│   # feed-budget-162        ││                                                │
-│   # feed-budget-33         ││                                                │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  COMMAND  ▌A company › Home                     │ Enter run · Esc cancel │ demo

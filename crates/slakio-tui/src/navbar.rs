@@ -1,24 +1,31 @@
 //! Navigation in the list panel, laid out once for drawing ([`crate::ui`]) and the mouse, so a
 //! click lands on exactly what was drawn there: the panel's title is the workspace chip (its
 //! color band, its name, `▾`, then each other workspace that wants attention by its letter and
-//! mark), the panel's first row the views with their counts (ui-ux-spec: `@n` mentions, `●n`
-//! a view's unread messages, `●` unread channels). Only the view shown spells its name.
+//! mark), the panel's first rows the views, one row each as in GUI Slack's sidebar, with their
+//! counts at the right (ui-ux-spec: `@n` mentions, `●n` a view's unread messages, `●` unread
+//! channels).
 //!
 //! ```text
 //! ╭ ▌A company ▾ · B @9 ──────╮
-//! │ 󰋜 Home  󰍡 ●11  󰂚 @37  󰈙  󰃀 │    icons on
-//! │ Home  D●11  A@37  F  L     │    icons off
-//! ├────────────────────────────┤
+//! │ 󰋜 Home                @24 │    icons on
+//! │ 󰍡 DMs                 ●11 │
+//! │ 󰂚 Activity            @37 │
+//! │ 󰈙 Files                   │
+//! │ 󰃀 Later                   │
+//! ├───────────────────────────┤
+//!
+//! │ ▸ 󰂚 Activity          @37 │    folded (`nav_rows = "collapsed"`): the view shown alone
+//! │ Activity              @37 │    icons off: the names alone
 //! ```
 //!
 //! A Nerd Font glyph is drawn as one cell followed by a blank one, and both cells are its slot
 //! ([`GLYPH_SLOT`]): a terminal that draws the glyph two cells wide (Ghostty does when the next
 //! cell is blank; a terminal set to treat ambiguous characters as wide always does) never
-//! covers the text after it, and a click on either cell is the glyph's.
+//! covers the text after it.
 //!
-//! When the switcher does not fit, the views go one cell apart instead of two, then their counts
-//! lose their numbers (`@`, `●`), then the row is cut (never inside a glyph). The chip's name is
-//! cut first, then its marks lose their numbers, then the name goes down to its letter.
+//! A count is never cut or dropped: when a row is short, the view's name is cut (`…`). The
+//! chip's name is cut first, then its marks lose their numbers, then the name goes down to its
+//! letter.
 
 use crate::text::{clip, width};
 use ratatui::layout::Rect;
@@ -37,12 +44,11 @@ pub struct Chip {
     pub others: Vec<(String, String)>,
 }
 
-/// A view on the switcher row: its glyph (icons on), its name, its letter, its count.
+/// A view's row: its glyph (icons on), its name, its count.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
     pub glyph: Option<&'static str>,
     pub label: String,
-    pub short: String,
     pub badge: Option<String>,
 }
 
@@ -58,6 +64,8 @@ pub enum Part {
     Other,
     /// That workspace's mark (`@9`, `●`).
     Mark,
+    /// `▸`: the views are folded to the one shown.
+    Fold,
     /// A Nerd Font glyph: one cell, then a blank one ([`GLYPH_SLOT`]).
     Glyph,
     Label,
@@ -65,8 +73,8 @@ pub enum Part {
     Blank,
 }
 
-/// A stretch of a line: whose (the view's index on the switcher row; `None` on the chip, which
-/// is one thing), which part, from column `x`, `width` cells.
+/// A stretch of a line: whose (the view's index into the views; `None` on the chip, which is
+/// one thing), which part, from column `x`, `width` cells.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Piece {
     pub item: Option<usize>,
@@ -84,16 +92,9 @@ pub struct Bar {
 }
 
 impl Bar {
-    /// The view at column `x` of the switcher row.
+    /// The view at column `x` of a view's row.
     pub fn hit(&self, x: u16) -> Option<usize> {
         self.pieces.iter().find(|p| x >= p.x && x < p.x + p.width).and_then(|p| p.item)
-    }
-
-    /// The columns view `item` covers, `[from, to)`.
-    pub fn span(&self, item: usize) -> Option<(u16, u16)> {
-        let mine = self.pieces.iter().filter(|p| p.item == Some(item));
-        let from = mine.clone().map(|p| p.x).min()?;
-        Some((from, mine.map(|p| p.x + p.width).max()?))
     }
 
     /// The columns the line covers.
@@ -190,46 +191,48 @@ pub fn chip(area: Rect, chip: &Chip) -> Bar {
     place(area, chip_parts(chip, &name, numbers))
 }
 
-/// The views' parts, `shown` the view the list shows (its name spelled), counts numbered or
-/// not, `gap` blank cells between two views (a glyph's slot ends with one of them).
-fn view_parts(views: &[Item], shown: usize, numbers: bool, gap: usize) -> Parts {
+/// One view's row in `row` (the row of the list panel it takes): a blank, `▸` before the view
+/// when the rows are folded to it (`fold`), its glyph's slot (icons on), its name, and its count
+/// at the right, one cell in from the edge. The count is never cut: the name is.
+fn view_row(row: Rect, item: usize, v: &Item, fold: bool) -> Bar {
     let mut out = Parts::new();
-    push(&mut out, None, Part::Blank, " ".into());
-    for (i, v) in views.iter().enumerate() {
-        let item = Some(i);
-        if i > 0 {
-            let bare = out.last().is_some_and(|p| p.1 == Part::Glyph);
-            let n = if bare { gap - 1 } else { gap };
-            if n > 0 {
-                push(&mut out, None, Part::Blank, " ".repeat(n));
-            }
-        }
-        if let Some(g) = v.glyph {
-            push(&mut out, item, Part::Glyph, g.to_string());
-        }
-        let text = if i == shown { Some(&v.label) } else { v.glyph.is_none().then_some(&v.short) };
-        if let Some(t) = text {
-            push(&mut out, item, Part::Label, t.clone());
-        }
-        if let Some(b) = &v.badge {
-            let b = if numbers { b.clone() } else { compact(b) };
-            // Apart from a name; right after a letter or a glyph's slot (`D●2`, `󰍡 ●2`).
-            let b = if i == shown { format!(" {b}") } else { b };
-            push(&mut out, item, Part::Badge, b);
-        }
+    let it = Some(item);
+    push(&mut out, it, Part::Blank, " ".into());
+    if fold {
+        push(&mut out, it, Part::Fold, "▸".into());
+        push(&mut out, it, Part::Blank, " ".into());
     }
-    out
+    if let Some(g) = v.glyph {
+        push(&mut out, it, Part::Glyph, g.to_string());
+    }
+    let badge = v.badge.as_deref().map_or(0, width);
+    // The name, a blank before the count (when there is one) and the blank after it.
+    let room = usize::from(row.width).saturating_sub(total(&out) + badge + usize::from(badge > 0) + 1);
+    let label = clip(&v.label, room);
+    let fill = room.saturating_sub(width(&label)) + usize::from(badge > 0);
+    push(&mut out, it, Part::Label, label);
+    push(&mut out, it, Part::Blank, " ".repeat(fill));
+    if let Some(b) = &v.badge {
+        push(&mut out, it, Part::Badge, b.clone());
+    }
+    push(&mut out, it, Part::Blank, " ".into());
+    place(row, out)
 }
 
-/// Lay the view switcher out in `area` (the list panel's first row): two cells between the
-/// views, then one, then counts without numbers, then cut.
-pub fn views(area: Rect, views: &[Item], shown: usize) -> Bar {
-    let room = usize::from(area.width);
-    let (numbers, gap) = [(true, 2), (true, 1), (false, 1)]
-        .into_iter()
-        .find(|&(n, g)| total(&view_parts(views, shown, n, g)) <= room)
-        .unwrap_or((false, 1));
-    place(area, view_parts(views, shown, numbers, gap))
+/// Lay the views out in `area` (the top of the list panel), one row each, `shown` the view the
+/// list shows; `folded`, a single row for the view shown (`▸`). A row is one view from edge to
+/// edge (a click anywhere on it is that view's); rows that do not fit in `area` are left out.
+pub fn views(area: Rect, views: &[Item], shown: usize, folded: bool) -> Vec<Bar> {
+    let row = |i: u16| Rect { y: area.y + i, height: 1, ..area };
+    if folded {
+        return views
+            .get(shown)
+            .filter(|_| area.height > 0)
+            .map(|v| view_row(row(0), shown, v, true))
+            .into_iter()
+            .collect();
+    }
+    views.iter().enumerate().take(usize::from(area.height)).map(|(i, v)| view_row(row(i as u16), i, v, false)).collect()
 }
 
 #[cfg(test)]

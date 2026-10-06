@@ -4,80 +4,80 @@ expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#long-threads ────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────╮
     [bdr 0..1] [mut 1..2] [ws 2..3] [mut 3..17] [mut B 17..18] [err B 18..21] [mut 21..22] [bdr 22..32] [ws 32..33] [mut 33..47] [bdr 47..84] [acc 84..86] [ws 86..87] [ B 87..112] [acc 112..120]
-│ Home @24  D●11  A@37  F  L ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
-    [bdr 0..1] [/cl B 2..6] [err/cl B 6..10] [mut 12..13] [err B 13..16] [mut 18..19] [err B 19..22] [mut 24..25] [mut 27..28] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [acc 119..120]
-├────────────────────────────┤│ JL  Jiyoung Lee  07:23                             ││     merge                        │
-    [bdr 0..31] [/cl 31..32] [av/av B 32..34] [/cl 34..36] [/cl B 36..47] [/cl 47..83] [bdr 83..84] [acc 84..85] [acc 119..120]
-│ ▾ Favorites                ││     We waiting waiting now index a the a the       ││                                  │
-    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # backend                ││     release                                        ││ JH  Jiwon Han  03:18             │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..99] [dim 101..106] [acc 119..120]
-│   # incidents           3  ││     ⤷ 1,200 replies · last 03:23                   ││     Budget should timeout        │
-    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [bdr 29..31] [/cl 31..36] [acc/cl 36..64] [/cl 64..83] [bdr 83..84] [acc 84..85] [acc 119..120]
-│                            ││                                                    ││     timeout after tomorrow       │
-    [bdr 0..1] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│ ▾ Ops                      ││ DC  Dan Cho  07:30                                 ││     budget meeting someone       │
-    [bdr 0..1] [dim 2..3] [mut B 4..7] [bdr 29..31] [av/av B 32..34] [ B 36..43] [dim 45..50] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # deploys                ││     Still index lunch index                        ││     production release           │
+│ Home                   @24 ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
+    [bdr 0..1] [/cl B 1..25] [err/cl B 25..28] [/cl B 28..29] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [acc 119..120]
+│ DMs                    ●11 ││ JL  Jiyoung Lee  07:23                             ││     merge                        │
+    [bdr 0..1] [err B 25..28] [bdr 29..31] [/cl 31..32] [av/av B 32..34] [/cl 34..36] [/cl B 36..47] [/cl 47..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+│ Activity               @37 ││     We waiting waiting now index a the a the       ││                                  │
+    [bdr 0..1] [err B 25..28] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+│ Files                      ││     release                                        ││ JH  Jiwon Han  03:18             │
+    [bdr 0..1] [bdr 29..31] [/cl 31..83] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..99] [dim 101..106] [acc 119..120]
+│ Later                      ││     ⤷ 1,200 replies · last 03:23                   ││     Budget should timeout        │
+    [bdr 0..1] [bdr 29..31] [/cl 31..36] [acc/cl 36..64] [/cl 64..83] [bdr 83..84] [acc 84..85] [acc 119..120]
+├────────────────────────────┤│                                                    ││     timeout after tomorrow       │
+    [bdr 0..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│ ▾ Favorites                ││ DC  Dan Cho  07:30                                 ││     budget meeting someone       │
+    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..31] [av/av B 32..34] [ B 36..43] [dim 45..50] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # backend                ││     Still index lunch index                        ││     production release           │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # alerts                 ││     ⤷ 6 replies · last 07:36                       ││                                  │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [acc 36..60] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # partner-shared ext     ││                                                    ││ TK  Tom Ko  03:19                │
-    [bdr 0..1] [mut 4..5] [dim 20..24] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..96] [dim 98..103] [acc 119..120]
-│   # hostile-strings        ││ OH  Owen Hwang  07:37                              ││     Draft draft is is customer   │
-    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 29..31] [av/av B 32..34] [ B 36..46] [dim 48..53] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # big-history            ││     Queue a after cache invoice on customer        ││     can retry dashboard          │
+│   # incidents           3  ││     ⤷ 6 replies · last 07:36                       ││                                  │
+    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [bdr 29..31] [acc 36..60] [bdr 83..84] [acc 84..85] [acc 119..120]
+│                            ││                                                    ││ TK  Tom Ko  03:19                │
+    [bdr 0..1] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..96] [dim 98..103] [acc 119..120]
+│ ▾ Ops                      ││ OH  Owen Hwang  07:37                              ││     Draft draft is is customer   │
+    [bdr 0..1] [dim 2..3] [mut B 4..7] [bdr 29..31] [av/av B 32..34] [ B 36..46] [dim 48..53] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # deploys                ││     Queue a after cache invoice on customer        ││     can retry dashboard          │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # long-threads           ││     metrics on maybe sprint                        ││                                  │
+│   # alerts                 ││     metrics on maybe sprint                        ││                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # partner-shared ext     ││     ⤷ 12 replies · last 07:49                      ││ NS  Nina Seo  03:20              │
+    [bdr 0..1] [mut 4..5] [dim 20..24] [bdr 29..31] [acc 36..61] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..98] [dim 100..105] [acc 119..120]
+│   # hostile-strings        ││                                                    ││     After ticket customer        │
+    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # big-history            ││ LJ  Lily Jeon  07:41                               ││     timeout queue again timeout  │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # long-threads           ││     Confirmed                                      ││     check sprint deploy review   │
     [bdr 0..1] [/cl 1..29] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│                            ││     ⤷ 12 replies · last 07:49                      ││ NS  Nina Seo  03:20              │
-    [bdr 0..1] [bdr 29..31] [acc 36..61] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..98] [dim 100..105] [acc 119..120]
-│ ▾ Channels                 ││                                                    ││     After ticket customer        │
-    [bdr 0..1] [dim 2..3] [mut B 4..12] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # announcements          ││ LJ  Lily Jeon  07:41                               ││     timeout queue again timeout  │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # design-review          ││     Confirmed                                      ││     check sprint deploy review   │
-    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-alert-134         ││                                                    ││     maybe is build tracing       │
+│                            ││                                                    ││     maybe is build tracing       │
+    [bdr 0..1] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│ ▾ Channels                 ││ LJ  Lily Jeon  07:54                               ││     latency                      │
+    [bdr 0..1] [dim 2..3] [mut B 4..12] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # announcements          ││     see https://docs.example.com/runbooks/latency  ││                                  │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-alert-8           ││ LJ  Lily Jeon  07:54                               ││     latency                      │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-budget-162        ││     see https://docs.example.com/runbooks/latency  ││                                  │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-budget-33         ││                                                    ││ MB  Max Baek  03:21              │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..98] [dim 100..105] [acc 119..120]
-│   # feed-build-50          ││ OH  Owen Hwang  08:00                              ││     Latency timeout should for   │
+│   # design-review          ││                                                    ││ MB  Max Baek  03:21              │
+    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..98] [dim 100..105] [acc 119..120]
+│   # feed-alert-134         ││ OH  Owen Hwang  08:00                              ││     Latency timeout should for   │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..46] [dim 48..53] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-cache-119         ││     Migration branch index queue should            ││     invoice on index roadmap a   │
+│   # feed-alert-8           ││     Migration branch index queue should            ││     invoice on index roadmap a   │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-customer-161      ││                                                    ││     budget tracing is queue      │
-    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-customer-167   1  ││ DY  Dana Yoon  08:05                               ││     index ticket                 │
-    [bdr 0..1] [dim 4..5] [dim 6..23] [on/err B 25..28] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-dashboard-22      ││     Tracing on we pager please looks budget        ││                                  │
+│   # feed-budget-162        ││                                                    ││     budget tracing is queue      │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-dashboard-41      ││     waiting merge budget queue still branch        ││ IM  Ivy Moon  03:22              │
+│   # feed-budget-33         ││ DY  Dana Yoon  08:05                               ││     index ticket                 │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-build-50          ││     Tracing on we pager please looks budget        ││                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-cache-119         ││     waiting merge budget queue still branch        ││ IM  Ivy Moon  03:22              │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..98] [dim 100..105] [acc 119..120]
-│   # feed-design-34         ││     metrics customer invoice                       ││     Draft broken can looks       │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-design-83         ││                                                    ││     staging done tracing now     │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-draft-142         ││ TK  Tom Ko  08:13                                  ││     lunch meeting invoice        │
+│   # feed-customer-161      ││     metrics customer invoice                       ││     Draft broken can looks       │
+    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-customer-167   1  ││                                                    ││     staging done tracing now     │
+    [bdr 0..1] [dim 4..5] [dim 6..23] [on/err B 25..28] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-dashboard-22      ││ TK  Tom Ko  08:13                                  ││     lunch meeting invoice        │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..42] [dim 44..49] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-draft-58          ││     ＊＊ ＊＊＊＊＊＊                              ││     migration done customer      │
-    [bdr 0..1] [ B 4..5] [ B 6..19] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-draft-84          ││                                                    ││     please                       │
+│   # feed-dashboard-41      ││     ＊＊ ＊＊＊＊＊＊                              ││     migration done customer      │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-index-199      2  ││ MK  Minsu Kim  08:21                               ││                                  │
-    [bdr 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-index-39          ││     Review lunch lunch design schema merge design  ││ EB  Eve Bae  03:23               │
-    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..97] [dim 99..104] [acc 119..120]
-│   # feed-index-5        1  ││     build the looks                                ││     ＊＊＊＊＊                   │
-    [bdr 0..1] [ B 4..5] [ B 6..18] [on/err B 25..28] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
-│   # feed-invoice-16        │├─ Message #long-threads ────────────────────────────┤├─ Reply ──────────────────────────┤
-    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 29..84] [acc 84..120]
-│   # feed-invoice-168       ││ › Press i to write                                 ││ › Press i to reply               │
-    [bdr 0..1] [mut 4..5] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [dim 86..118] [acc 119..120]
+│   # feed-design-34         ││                                                    ││     please                       │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-design-83         ││ MK  Minsu Kim  08:21                               ││                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [av/av B 32..34] [ B 36..45] [dim 47..52] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-draft-142         ││     Review lunch lunch design schema merge design  ││ EB  Eve Bae  03:23               │
+    [bdr 0..1] [mut 4..5] [bdr 29..31] [bdr 83..84] [acc 84..85] [av/av B 86..88] [ B 90..97] [dim 99..104] [acc 119..120]
+│   # feed-draft-58          ││     build the looks                                ││     ＊＊＊＊＊                   │
+    [bdr 0..1] [ B 4..5] [ B 6..19] [bdr 29..31] [bdr 83..84] [acc 84..85] [acc 119..120]
+│   # feed-draft-84          │├─ Message #long-threads ────────────────────────────┤├─ Reply ──────────────────────────┤
+    [bdr 0..1] [mut 4..5] [bdr 29..84] [acc 84..120]
+│   # feed-index-199      2  ││ › Press i to write                                 ││ › Press i to reply               │
+    [bdr 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [bdr 29..31] [dim 32..82] [bdr 83..84] [acc 84..85] [dim 86..118] [acc 119..120]
 ╰────────────────────────────╯╰────────────────────────────────────────────────────╯╰──────────────────────────────────╯
     [bdr 0..84] [acc 84..120]
  NORMAL  ▌A company › #long-threads › ⤷ Thread         │ i reply · k messages · Esc main · Ctrl+W close · ? help │ demo

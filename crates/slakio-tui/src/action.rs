@@ -60,16 +60,18 @@ pub enum ShellAction {
     /// No panel is above or below another yet (splits come later): says so.
     FocusUp,
     FocusDown,
-    /// The next panel: view switcher, list, main pane, thread panel, round again.
+    /// The next panel: the views, the list, main pane, thread panel, round again.
     FocusNext,
     FocusPrev,
-    /// Go to the view switcher (showing the list panel); from it, back to the list.
+    /// Go to the views' rows, on the view shown (showing the list panel); from them, back to
+    /// the list.
     FocusNav,
+    /// The next view's row; from the last, the list's first row.
     NavNext,
     NavPrev,
     NavFirst,
     NavLast,
-    /// Show the view under the view switcher's cursor in the list panel.
+    /// Show the view under the views' cursor in the list panel; on the folded row, unfold it.
     NavSelect,
     /// Back to the list panel, showing nothing new.
     NavLeave,
@@ -90,8 +92,7 @@ pub enum ShellAction {
     ListOpen,
     /// Open the conversation under the cursor and stay in the list, or unfold its section.
     ListPeek,
-    /// To the conversation's section header; fold the section; from a folded one, the view
-    /// switcher.
+    /// To the conversation's section header; fold the section; from a folded one, the views.
     ListLeft,
     ListSectionPrev,
     ListSectionNext,
@@ -100,6 +101,9 @@ pub enum ShellAction {
     ViewPrev,
     /// Show or hide the list panel.
     ToggleList,
+    /// Fold the views to one row, the view shown, or unfold them (`:navrows`); saved in the
+    /// config file (`nav_rows`).
+    ToggleNavRows,
     /// Show a view in the list panel.
     Show(View),
 }
@@ -296,6 +300,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::ViewNext, "view.next", Label::ActionViewNext, &[]),
     shell(ShellAction::ViewPrev, "view.prev", Label::ActionViewPrev, &[]),
     shell(ShellAction::ToggleList, "list.toggle_panel", Label::ActionListTogglePanel, &["list"]),
+    shell(ShellAction::ToggleNavRows, "nav.toggle_rows", Label::ActionNavRows, &["navrows"]),
     shell(ShellAction::Show(View::Home), "view.home", Label::ActionViewHome, &["home"]),
     shell(ShellAction::Show(View::Dms), "view.dms", Label::ActionViewDms, &["dms"]),
     shell(ShellAction::Show(View::Activity), "view.activity", Label::ActionViewActivity, &["activity"]),

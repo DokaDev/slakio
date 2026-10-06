@@ -3,15 +3,15 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                │
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @37 ││                                                │
+│ Files                      ││                                                │
+│ Later                      ││                                                │
 ├────────────────────────────┤│                                                │
-│ ▾ Favorites                ││                                                │
-│   # backend                ││                                                │
+│ ▾ Favorites                ││     No conversation open                       │
+│   # backend                ││     Pick one in the list and press Enter.      │
 │   # incidents           3  ││                                                │
-│                            ││                                                │
-│ ▾ Ops                      ││     No conversation open                       │
-│   # deploys                ││     Pick one in the list and press Enter.      │
-│   # alerts                 ││                                                │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────╮
 │ r    View switcher (in the list panel)                                       │
 │ h    Show Home                                                               │
@@ -20,9 +20,9 @@ expression: d.snap()
 │ f    Show Files                                                              │
 │ l    Show Later                                                              │
 │ e    Show or hide the list panel                                             │
+│ v    Fold the view switcher to the view shown, or unfold it                  │
 │ W    Switch workspace                                                        │
 │ [    Back to the conversation before                                         │
-│ ]    Forward again                                                           │
 │ …                                                                            │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo

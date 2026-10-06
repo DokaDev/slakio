@@ -52,6 +52,7 @@ fn every_action_is_registered() {
             ViewNext,
             ViewPrev,
             ToggleList,
+            ToggleNavRows,
         ]
         .into_iter()
         .chain(View::ALL.iter().map(|v| Show(*v)))

@@ -1,10 +1,14 @@
 //! Navigation in the list panel as the app routes it: what the workspace chip (the panel's
-//! title) and the view switcher (its first row) say, the workspace switcher the chip opens, and
-//! the mouse on both. The geometry is [`crate::navbar`]'s.
+//! title) and the views (its first rows, one per view, or one folded row) say, the workspace
+//! switcher the chip opens, and the mouse on both. The geometry is [`crate::navbar`]'s.
 //!
-//! The keyboard reaches the view switcher with `Ctrl+R` / `Space r` (`:nav`), or `Tab` round
-//! the panels; `h`/`l` and the arrows move along it, `Enter` shows the view under the cursor in
-//! the list panel, `Esc` goes back. In the list, `[` / `]` show the view before or after.
+//! The views' rows are the top of the list panel, with a keyboard cursor of their own (the
+//! focus region [`Focus::ViewSwitcher`]): `Ctrl+R` / `Space r` (`:nav`) or `Tab` round the
+//! panels put it on the view shown; `j`/`k` move down and up the rows and on into the list (`k`
+//! on the list's first row comes back up), `Enter` shows the view under the cursor (on the
+//! folded row: unfolds it), `Esc` goes back to the list. In the list, `[` / `]` show the view
+//! before or after. `Space v` (`:navrows`) folds the rows to the view shown or unfolds them
+//! (`nav_rows`, saved).
 //! `Space W` opens the workspace switcher from anywhere outside text; in it `j`/`k` move,
 //! `Enter` switches, `Esc` closes.
 //!
@@ -14,12 +18,14 @@
 
 use super::shell::View;
 use super::tabs::Unread;
-use super::{App, Focus};
+use super::{App, Effect, Focus};
 use crate::action::ShellAction;
 use crate::navbar::{self, Bar, Chip, Item, Part};
-use crate::screen;
+use crate::screen::{self, ListParts};
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
+use slakio_core::i18n::Msg;
+use std::time::Instant;
 
 impl App {
     /// What view `v` of workspace `ws` holds unread, counted as the list's pills count it.
@@ -51,7 +57,7 @@ impl App {
     /// or while the list panel is not shown).
     pub fn chip_bar(&self) -> Option<Bar> {
         self.backend?;
-        let list = self.areas().list?;
+        let title = self.list_parts()?.title;
         let ws = self.model.workspaces().get(self.shell.workspace)?;
         let others = (0..self.model.workspaces().len())
             .filter(|w| *w != self.shell.workspace)
@@ -66,26 +72,49 @@ impl App {
             })
             .collect();
         let chip = Chip { name: ws.name.line().into_string(), others };
-        Some(navbar::chip(screen::list_parts(list).title, &chip))
+        Some(navbar::chip(title, &chip))
     }
 
-    /// The view switcher as laid out now on the list panel's first row (`None` without a
-    /// backend or while the list panel is not shown).
-    pub fn view_switcher(&self) -> Option<Bar> {
-        self.backend?;
-        let list = self.areas().list?;
+    /// How many rows the views take at the top of the list panel: one each, or one folded.
+    pub fn nav_rows(&self) -> u16 {
+        if self.shell.nav_folded { 1 } else { View::ALL.len() as u16 }
+    }
+
+    /// The parts of the list panel as laid out now (`None` while it is not shown).
+    pub fn list_parts(&self) -> Option<ListParts> {
+        self.areas().list.map(|l| screen::list_parts(l, self.nav_rows()))
+    }
+
+    /// The views' rows as laid out now at the top of the list panel (empty without a backend or
+    /// while the list panel is not shown).
+    pub fn view_rows(&self) -> Vec<Bar> {
+        let Some(parts) = self.list_parts().filter(|_| self.backend.is_some()) else { return Vec::new() };
         let icons = self.settings.icons;
         let views: Vec<Item> = View::ALL
             .iter()
             .map(|v| Item {
-                glyph: icons.then(|| v.glyph(true)),
+                glyph: icons.then(|| v.glyph()),
                 label: self.i18n.label(v.label()).to_string(),
-                short: v.glyph(false).to_string(),
                 badge: self.view_unread(self.shell.workspace, *v).badge(),
             })
             .collect();
         let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
-        Some(navbar::views(screen::list_parts(list).views, &views, shown))
+        navbar::views(parts.views, &views, shown, self.shell.nav_folded)
+    }
+
+    /// Fold the views to one row, the view shown (`nav_rows = "collapsed"`), or unfold them.
+    pub fn fold_views(&mut self, folded: bool) {
+        self.shell.nav_folded = folded;
+        self.shell.nav_cursor = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
+    }
+
+    /// `Space v` (`:navrows`): fold the views to the view shown, or unfold them, and save it
+    /// in the config file (`nav_rows`).
+    pub(super) fn toggle_nav_rows(&mut self, now: Instant) {
+        self.fold_views(!self.shell.nav_folded);
+        let value = if self.shell.nav_folded { "collapsed" } else { "expanded" };
+        self.effects.push(Effect::Save { key: "nav_rows", value: value.to_string() });
+        self.info(Msg::NavRowsChanged { name: value.to_string() }, now);
     }
 
     /// Open the workspace switcher, its cursor on the workspace shown.
@@ -122,10 +151,10 @@ impl App {
         self.set_focus(Focus::List);
     }
 
-    /// A click on the list panel's title row or its view switcher at `at`: the chip opens the
-    /// workspace switcher, a view shows in the list panel, which gets the keyboard. `false`
-    /// when nothing is there.
-    pub(super) fn nav_click(&mut self, at: Position) -> bool {
+    /// A click on the list panel's title row or a view's row at `at`: the chip opens the
+    /// workspace switcher, a view shows in the list panel, which gets the keyboard; the folded
+    /// row unfolds. `false` when nothing is there.
+    pub(super) fn nav_click(&mut self, at: Position, now: Instant) -> bool {
         if let Some(chip) = self.chip_bar().filter(|b| b.area.y == at.y) {
             let (from, to) = chip.extent();
             if at.x >= from && at.x < to {
@@ -133,8 +162,10 @@ impl App {
             }
             return true;
         }
-        let Some(bar) = self.view_switcher().filter(|b| b.area.y == at.y) else { return false };
-        if let Some(&v) = bar.hit(at.x).and_then(|i| View::ALL.get(i)) {
+        let Some(row) = self.view_rows().into_iter().find(|b| b.area.y == at.y) else { return false };
+        if self.shell.nav_folded {
+            self.toggle_nav_rows(now);
+        } else if let Some(&v) = row.hit(at.x).and_then(|i| View::ALL.get(i)) {
             self.shell.select(v, &self.model);
             self.set_focus(Focus::List);
         }

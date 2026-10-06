@@ -21,17 +21,21 @@ fn the_regions_tile_the_screen_above_the_status_line_and_no_row_spans_it() {
 }
 
 #[test]
-fn the_list_panel_has_the_chip_the_view_switcher_a_rule_and_the_rows() {
-    let p = list_parts(Rect::new(0, 0, 26, 39));
-    assert_eq!(p.title, Rect::new(1, 0, 24, 1), "the top border between the corners");
-    assert_eq!(p.views, Rect::new(1, 1, 24, 1));
-    assert_eq!(p.rule, Some(2));
-    assert_eq!(p.rows, Rect::new(1, 3, 24, 35));
-    let low = list_parts(Rect::new(0, 0, 26, 4));
-    assert_eq!((low.views.height, low.rule, low.rows.height), (1, None, 1));
-    for h in 0..6 {
-        let p = list_parts(Rect::new(0, 0, 26, h));
-        assert!(p.rows.bottom() <= h.saturating_sub(1).max(p.rows.y), "{h}");
+fn the_list_panel_has_the_chip_the_views_a_rule_and_the_rows() {
+    let p = list_parts(Rect::new(0, 0, 30, 39), 5);
+    assert_eq!(p.title, Rect::new(1, 0, 28, 1), "the top border between the corners");
+    assert_eq!(p.views, Rect::new(1, 1, 28, 5), "a row per view");
+    assert_eq!(p.rule, Some(6));
+    assert_eq!(p.rows, Rect::new(1, 7, 28, 31));
+    let folded = list_parts(Rect::new(0, 0, 30, 39), 1);
+    assert_eq!((folded.views.height, folded.rule, folded.rows.y), (1, Some(2), 3), "folded: one row");
+    let low = list_parts(Rect::new(0, 0, 30, 8), 5);
+    assert_eq!((low.views.height, low.rule, low.rows.height), (5, None, 1));
+    for nav in [1, 5] {
+        for h in 0..10 {
+            let p = list_parts(Rect::new(0, 0, 30, h), nav);
+            assert!(p.rows.bottom() <= h.saturating_sub(1).max(p.rows.y), "{h}");
+        }
     }
 }
 

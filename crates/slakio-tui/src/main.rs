@@ -69,6 +69,7 @@ fn main() -> ExitCode {
         avatars: cfg.avatars != "off",
         compact: cfg.density == "compact",
     };
+    app.fold_views(cfg.nav_rows == "collapsed");
     // The one place that names a concrete backend.
     let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
     if let Some(b) = &backend {

@@ -3,42 +3,42 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #backend ×  2 #incidents ×
-│ Home @24  D●11  A@37  F  L │╭ ▌#incidents ───────────────────────────────────────────────────────────────────────────╮
-├────────────────────────────┤│       Timeout we release is                                                            │
-│ ▾ Favorites                ││                                                                                        │
-│   # backend                ││  AM   Alex Morgan  23:03                                                               │
-│▎  # incidents           3  ││       Check staging design                                                             │
-│                            ││                                                                                        │
-│ ▾ Ops                      ││  ＊   ＊＊＊  23:44                                                                    │
-│   # deploys                ││       Design design design draft sprint                                                │
+│▎Home                   @24 │╭ ▌#incidents ───────────────────────────────────────────────────────────────────────────╮
+│ DMs                    ●11 ││       Timeout we release is                                                            │
+│ Activity               @37 ││                                                                                        │
+│ Files                      ││  AM   Alex Morgan  23:03                                                               │
+│ Later                      ││       Check staging design                                                             │
+├────────────────────────────┤│                                                                                        │
+│ ▾ Favorites                ││  ＊   ＊＊＊  23:44                                                                    │
+│   # backend                ││       Design design design draft sprint                                                │
+│▎  # incidents           3  ││                                                                                        │
+│                            ││  KN   Kate Nam  23:56                                                                  │
+│ ▾ Ops                      ││       Review index we dashboard budget latency roadmap again please sprint cache fine  │
+│   # deploys                ││       metrics                                                                          │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││  KN   Kate Nam  23:56                                                                  │
-│   # hostile-strings        ││       Review index we dashboard budget latency roadmap again please sprint cache fine  │
-│   # big-history            ││       metrics                                                                          │
+│   # partner-shared ext     ││ ───────────────────────────────────── 2026-01-07 ───────────────────────────────────── │
+│   # hostile-strings        ││  G    Grafana  00:46                                                                   │
+│   # big-history            ││       Suspect the DB pool 🎉                                                           │
 │   # long-threads           ││                                                                                        │
-│                            ││ ───────────────────────────────────── 2026-01-07 ───────────────────────────────────── │
-│ ▾ Channels                 ││  G    Grafana  00:46                                                                   │
-│   # announcements          ││       Suspect the DB pool 🎉                                                           │
-│   # design-review          ││                                                                                        │
-│   # feed-alert-134         ││  JL   Jordan Lee  00:51                                                                │
-│   # feed-alert-8           ││       Thanks! (edited)                                                                 │
-│   # feed-budget-162        ││                                                                                        │
-│   # feed-budget-33         ││  RC   Robin Choi  01:49                                                                │
-│   # feed-build-50          ││       Thanks!                                                                          │
+│                            ││  JL   Jordan Lee  00:51                                                                │
+│ ▾ Channels                 ││       Thanks! (edited)                                                                 │
+│   # announcements          ││                                                                                        │
+│   # design-review          ││  RC   Robin Choi  01:49                                                                │
+│   # feed-alert-134         ││       Thanks!                                                                          │
+│   # feed-alert-8           ││                                                                                        │
+│   # feed-budget-162        ││  MJ   Mia Jang  02:18                                                                  │
+│   # feed-budget-33         ││       Still budget build latency rollback rollback retry sprint draft maybe lunch      │
+│   # feed-build-50          ││       waiting the budget                                                               │
 │   # feed-cache-119         ││                                                                                        │
-│   # feed-customer-161      ││  MJ   Mia Jang  02:18                                                                  │
-│   # feed-customer-167   1  ││       Still budget build latency rollback rollback retry sprint draft maybe lunch      │
-│   # feed-dashboard-22      ││       waiting the budget                                                               │
-│   # feed-dashboard-41      ││                                                                                        │
-│   # feed-design-34         ││  DY   Dana Yoon  02:38                                                                 │
-│   # feed-design-83         ││       Tomorrow ticket should merge waiting                                             │
-│   # feed-draft-142         ││                                                                                        │
-│   # feed-draft-58          ││  MK   Minsu Kim  02:52                                                                 │
-│   # feed-draft-84          ││       After check fine check branch metrics latency check                              │
-│   # feed-index-199      2  ││                                                                                        │
-│   # feed-index-39          ││  MJ   Mia Jang  03:33                                                                  │
-│   # feed-index-5        1  ││       Budget invoice on is schema can on deploy check now release tracing on invoice   │
-│   # feed-invoice-16        │├─ Message #incidents ───────────────────────────────────────────────────────────────────┤
-│   # feed-invoice-168       ││ › Press i to write                                                                     │
+│   # feed-customer-161      ││  DY   Dana Yoon  02:38                                                                 │
+│   # feed-customer-167   1  ││       Tomorrow ticket should merge waiting                                             │
+│   # feed-dashboard-22      ││                                                                                        │
+│   # feed-dashboard-41      ││  MK   Minsu Kim  02:52                                                                 │
+│   # feed-design-34         ││       After check fine check branch metrics latency check                              │
+│   # feed-design-83         ││                                                                                        │
+│   # feed-draft-142         ││  MJ   Mia Jang  03:33                                                                  │
+│   # feed-draft-58          ││       Budget invoice on is schema can on deploy check now release tracing on invoice   │
+│   # feed-draft-84          │├─ Message #incidents ───────────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Press i to write                                                                     │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #incidents          │ i write · k messages · Esc list · Ctrl+R views · ? help · Space more │ demo

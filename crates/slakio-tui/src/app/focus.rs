@@ -1,4 +1,4 @@
-//! Where the keyboard is: the view switcher, the list panel or the work area — one [`Region`] field of
+//! Where the keyboard is: the views' rows, the list panel or the work area — one [`Region`] field of
 //! the app, changed in one place ([`App::set_focus`]) and read by the key map, drawing and the
 //! mouse alike ([`App::focus`]). Which pane of the work area has it is not kept twice: it is the
 //! work area's active pane (the one the keyboard goes back to there), so the focus can never
@@ -76,9 +76,9 @@ impl App {
         }
     }
 
-    /// Move the focus to the next (`1`) or previous (`-1`) panel: view switcher, list, the panes
+    /// Move the focus to the next (`1`) or previous (`-1`) panel: the views, the list, the panes
     /// in reading order (the conversation, the thread panel beside it), round again. A hidden
-    /// list (and its view switcher) or a closed pane is skipped.
+    /// list (and its views) or a closed pane is skipped.
     pub(super) fn cycle(&mut self, step: isize) {
         let mut stops = Vec::new();
         if !self.shell.list_hidden {
@@ -127,7 +127,7 @@ impl App {
         }
     }
 
-    /// A shell action: the focus between the regions, the view switcher, the list panel (what the
+    /// A shell action: the focus between the regions, the views, the list panel (what the
     /// shell opens, the work area opens).
     pub(super) fn shell(&mut self, a: ShellAction, now: Instant) {
         if self.backend.is_none() {
@@ -146,6 +146,9 @@ impl App {
             | ShellAction::SwitcherPrev
             | ShellAction::SwitcherChoose
             | ShellAction::SwitcherClose => return self.switcher_key(a),
+            // Saved in the config file: the app's.
+            ShellAction::ToggleNavRows => return self.toggle_nav_rows(now),
+            ShellAction::NavSelect if self.shell.nav_folded => return self.toggle_nav_rows(now),
             _ => {}
         }
         let height = self.list_height();

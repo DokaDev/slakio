@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                │
-├────────────────────────────┤│ TK  Tom Ko  06:41                              │
-│ ▾ Favorites                ││     On waiting migration someone index can     │
-│▎  # backend                ││     staging should                             │
-│   # incidents           3  ││                                                │
-│                            ││ KN  Kate Nam  06:51                            │
-│ ▾ Ops                      ││     Production roadmap customer build alert    │
-│   # deploys                ││     now latency fine review latency roadmap    │
-│   # alerts                 ││     broken should for                          │
-│   # partner-shared ext     ││                                                │
-│   # hostile-strings        ││ ＊  ＊＊＊  06:59                              │
-│   # big-history            ││     Confirmed                                  │
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││ TK  Tom Ko  06:41                              │
+│ Activity               @37 ││     On waiting migration someone index can     │
+│ Files                      ││     staging should                             │
+│ Later                      ││                                                │
+├────────────────────────────┤│ KN  Kate Nam  06:51                            │
+│ ▾ Favorites                ││     Production roadmap customer build alert    │
+│▎  # backend                ││     now latency fine review latency roadmap    │
+│   # incidents           3  ││     broken should for                          │
+│                            ││                                                │
+│ ▾ Ops                      ││ ＊  ＊＊＊  06:59                              │
+│   # deploys                ││     Confirmed                                  │
+│   # alerts                 ││                                                │
+│   # partner-shared ext     ││ KN  Kate Nam  07:05                            │
+│   # hostile-strings        ││     Ticket review pager pager production on    │
+│   # big-history            ││     build alert the on draft                   │
 │   # long-threads           ││                                                │
-│                            ││ KN  Kate Nam  07:05                            │
-│ ▾ Channels                 ││     Ticket review pager pager production on    │
-│   # announcements          ││     build alert the on draft                   │
-│   # design-review          ││                                                │
-│   # feed-alert-134         ││ SR  Sam Rivera  07:14                          │
-│   # feed-alert-8           ││     Meeting moved to 3pm                       │
-│   # feed-budget-162        │├─ Message #backend ─────────────────────────────┤
-│   # feed-budget-33         ││ › Press i to write                             │
+│                            ││ SR  Sam Rivera  07:14                          │
+│ ▾ Channels                 ││     Meeting moved to 3pm                       │
+│   # announcements          │├─ Message #backend ─────────────────────────────┤
+│   # design-review          ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A compa… › #backend │ i write · Esc list · ? help · Space more │ demo

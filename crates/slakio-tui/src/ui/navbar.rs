@@ -1,7 +1,8 @@
-//! Navigation in the list panel: the workspace chip on its title and the view switcher on its
-//! first row, a rule under it joined to the border. The view the list shows is raised like the
-//! tab shown and spells its name; with the keyboard on the switcher its cursor is the selection
-//! bar. The geometry is [`crate::navbar`]'s, the same the mouse reads.
+//! Navigation in the list panel: the workspace chip on its title and the view switcher under
+//! it, a row per view (or one folded row), a rule under them joined to the border. The view the
+//! list shows has the selection bar, as the list's cursor row: the focused one while the
+//! keyboard is on the views' cursor there, else the unfocused one; the cursor on another view
+//! has the focused bar. The geometry is [`crate::navbar`]'s, the same the mouse reads.
 //!
 //! A Nerd Font glyph goes in one cell whose symbol is the glyph and a blank, so the cell after
 //! it is never written on its own: a terminal that draws the glyph two cells wide does not lose
@@ -11,7 +12,6 @@ use crate::app::App;
 use crate::app::Focus;
 use crate::app::shell::View;
 use crate::navbar::Part;
-use crate::screen;
 use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -21,7 +21,7 @@ use ratatui::style::Modifier;
 pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
     let t = &app.theme;
     let focused = matches!(app.focus(), Focus::List | Focus::ViewSwitcher);
-    let parts = screen::list_parts(list);
+    let Some(parts) = app.list_parts() else { return };
     if let Some(chip) = app.chip_bar() {
         let ws = app.model.workspaces().get(app.shell.workspace);
         let title = t.title(focused);
@@ -41,28 +41,33 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
         let line = format!("├{}┤", "─".repeat(usize::from(list.width.saturating_sub(2))));
         f.buffer_mut().set_string(list.x, rule, line, t.border(focused));
     }
-    let Some(bar) = app.view_switcher() else { return };
-    let y = bar.area.y;
-    let buf = f.buffer_mut();
-    for p in &bar.pieces {
-        let view = p.item.and_then(|i| View::ALL.get(i).copied());
-        let shown = view == Some(app.shell.view);
-        let red = view.is_some_and(|v| app.view_unread(app.shell.workspace, v).red());
-        let style = match p.part {
-            Part::Badge => t.tab_badge(shown, red),
-            _ if view.is_some() => t.tab(shown),
-            _ => t.base(),
+    let on_views = app.focus() == Focus::ViewSwitcher;
+    for row in app.view_rows() {
+        let Some(view) = row.pieces.first().and_then(|p| p.item).and_then(|i| View::ALL.get(i).copied()) else {
+            continue;
         };
-        if p.part == Part::Glyph {
-            super::glyph_cell(buf, p.x, y, &p.text, style);
-        } else {
-            buf.set_string(p.x, y, &p.text, style);
+        let shown = view == app.shell.view;
+        let red = app.view_unread(app.shell.workspace, view).red();
+        let buf = f.buffer_mut();
+        for p in &row.pieces {
+            let style = match p.part {
+                Part::Badge => t.dot(red),
+                Part::Fold => t.faint(),
+                _ if shown => t.bold(),
+                _ => t.text(),
+            };
+            if p.part == Part::Glyph {
+                super::glyph_cell(buf, p.x, row.area.y, &p.text, style);
+            } else {
+                buf.set_string(p.x, row.area.y, &p.text, style);
+            }
         }
-    }
-    if app.focus() == Focus::ViewSwitcher
-        && let Some((from, to)) = bar.span(app.shell.nav_cursor)
-    {
-        let row = Rect { x: from, y, width: to - from, height: 1 };
-        t.paint_selection(f.buffer_mut(), row, Selection::Focused);
+        let cursor = on_views && View::ALL.get(app.shell.nav_cursor) == Some(&view);
+        let how = match (cursor, shown) {
+            (true, _) => Selection::Focused,
+            (false, true) => Selection::Unfocused,
+            (false, false) => continue,
+        };
+        t.paint_selection(f.buffer_mut(), row.area, how);
     }
 }

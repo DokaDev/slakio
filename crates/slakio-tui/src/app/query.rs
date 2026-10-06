@@ -38,7 +38,7 @@ impl PaneHandle {
 /// Where the keyboard is, under any popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
-    /// The view switcher, the list panel's first row.
+    /// The view switcher, the list panel's first rows (a row per view).
     ViewSwitcher,
     List,
     Pane(PaneHandle),

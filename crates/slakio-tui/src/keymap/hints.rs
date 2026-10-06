@@ -92,8 +92,9 @@ pub fn entries(place: Place) -> &'static [Hint] {
         }
         Place::ViewSwitcher => &[
             One(Action::Shell(ShellAction::NavSelect), Label::HintShow),
-            Pair(Action::Shell(ShellAction::NavPrev), Action::Shell(ShellAction::NavNext), Label::HintMove),
+            Pair(Action::Shell(ShellAction::NavNext), Action::Shell(ShellAction::NavPrev), Label::HintMove),
             One(Action::Shell(ShellAction::NavLeave), Label::HintBack),
+            One(Action::Shell(ShellAction::ToggleNavRows), Label::HintFold),
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],

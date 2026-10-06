@@ -63,9 +63,10 @@ fn the_list_panel_shows_the_workspace_and_the_views() {
     let mut d = Demo::new(120, 40);
     let screen = d.screen();
     let mut lines = screen.lines();
-    let (top, views) = (lines.next().unwrap(), lines.next().unwrap());
+    let top = lines.next().unwrap();
     assert!(top.starts_with("╭ ▌A company ▾"), "{top}");
-    assert!(views.contains("Home") && views.contains("A@"), "{views}");
+    let views: Vec<&str> = lines.take(5).collect();
+    assert!(views[0].contains("Home") && views[2].contains("Activity") && views[2].contains('@'), "{views:?}");
     d.keys("ctrl+r");
     assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     insta::assert_snapshot!("demo_nav_focus_120x40", d.snap());
@@ -169,10 +170,10 @@ fn clicks_switch_workspace_and_open_a_conversation() {
     let b = d.app.switcher_box().expect("the switcher");
     d.mouse(MouseEventKind::Down(MouseButton::Left), b.x + 3, b.y + 2);
     assert_eq!(d.app.workspace(), 1);
-    // A list row opens it: row 4 is the first channel under the first section (row 0 is the
-    // chip on the list's border, 1 the view switcher, 2 its rule, 3 the section).
+    // A list row opens it: row 8 is the first channel under the first section (row 0 is the
+    // chip on the list's border, 1 to 5 the views, 6 their rule, 7 the section).
     let list = d.app.areas().list.unwrap();
-    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 4);
+    d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, 8);
     let open = d.app.open_target().expect("opened").clone();
     assert_eq!(d.app.model.target(&open).unwrap().workspace.as_str(), "TDEMOB");
     d.mouse(MouseEventKind::Down(MouseButton::Left), 100, 10);

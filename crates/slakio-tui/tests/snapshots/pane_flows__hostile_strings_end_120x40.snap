@@ -3,7 +3,11 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│▎Home                   @24 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│ DMs                    ●11 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│ Activity               @37 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│ Files                      ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│ Later                      ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 ├────────────────────────────┤│       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │ ▾ Favorites                ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │   # backend                ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
@@ -18,27 +22,23 @@ expression: mask_hangul(&d.screen())
 │   # long-threads           ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │                            ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │ ▾ Channels                 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│   # announcements          ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│   # design-review          ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│   # feed-alert-134         ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│   # feed-alert-8           ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│   # feed-budget-162        ││       … the rest of this message is not shown                                          │
-│   # feed-budget-33         ││                                                                                        │
-│   # feed-build-50          ││  ES   Ethan Song  21:18                                                                │
-│   # feed-cache-119         ││       ok ���( � end                                                                    │
-│   # feed-customer-161      ││                                                                                        │
-│   # feed-customer-167   1  ││  MJ   Mia Jang  21:58                                                                  │
-│   # feed-dashboard-22      ││       ����                                                                             │
-│   # feed-dashboard-41      ││                                                                                        │
-│   # feed-design-34         ││  EB   Eve Bae  22:05                                                                   │
-│   # feed-design-83         ││       one                                                                              │
-│   # feed-draft-142         ││       two                                                                              │
-│   # feed-draft-58          ││       three                                                                            │
-│   # feed-draft-84          ││       🙏 1   🎉 1   ✅ 5                                                               │
-│   # feed-index-199      2  ││                                                                                        │
-│   # feed-index-39          ││  ZL   Zoe Lim  22:46                                                                   │
-│   # feed-index-5        1  ││       ＊＊👩‍💻👍🏽🇰🇷                                                                       │
-│   # feed-invoice-16        │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────┤
-│   # feed-invoice-168       ││ › Press i to write                                                                     │
+│   # announcements          ││       … the rest of this message is not shown                                          │
+│   # design-review          ││                                                                                        │
+│   # feed-alert-134         ││  ES   Ethan Song  21:18                                                                │
+│   # feed-alert-8           ││       ok ���( � end                                                                    │
+│   # feed-budget-162        ││                                                                                        │
+│   # feed-budget-33         ││  MJ   Mia Jang  21:58                                                                  │
+│   # feed-build-50          ││       ����                                                                             │
+│   # feed-cache-119         ││                                                                                        │
+│   # feed-customer-161      ││  EB   Eve Bae  22:05                                                                   │
+│   # feed-customer-167   1  ││       one                                                                              │
+│   # feed-dashboard-22      ││       two                                                                              │
+│   # feed-dashboard-41      ││       three                                                                            │
+│   # feed-design-34         ││       🙏 1   🎉 1   ✅ 5                                                               │
+│   # feed-design-83         ││                                                                                        │
+│   # feed-draft-142         ││  ZL   Zoe Lim  22:46                                                                   │
+│   # feed-draft-58          ││       ＊＊👩‍💻👍🏽🇰🇷                                                                       │
+│   # feed-draft-84          │├─ Message #hostile-strings ─────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Press i to write                                                                     │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #hostile-strings   │ Enter thread · t new tab · V select · i write · Esc deselect · ? help │ demo

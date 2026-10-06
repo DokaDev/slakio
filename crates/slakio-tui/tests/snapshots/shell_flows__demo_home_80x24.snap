@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                │
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @37 ││                                                │
+│ Files                      ││                                                │
+│ Later                      ││                                                │
 ├────────────────────────────┤│                                                │
-│ ▾ Favorites                ││                                                │
-│   # backend                ││                                                │
+│ ▾ Favorites                ││     No conversation open                       │
+│   # backend                ││     Pick one in the list and press Enter.      │
 │   # incidents           3  ││                                                │
+│                            ││     Enter    Open                              │
+│ ▾ Ops                      ││     Space h  Home                              │
+│   # deploys                ││     Space d  DMs                               │
+│   # alerts                 ││     Ctrl+O   Back to the last one              │
+│   # partner-shared ext     ││     ?        Keyboard help                     │
+│   # hostile-strings        ││     Ctrl+Q   Quit                              │
+│   # big-history            ││                                                │
+│   # long-threads           ││                                                │
 │                            ││                                                │
-│ ▾ Ops                      ││     No conversation open                       │
-│   # deploys                ││     Pick one in the list and press Enter.      │
-│   # alerts                 ││                                                │
-│   # partner-shared ext     ││     Enter    Open                              │
-│   # hostile-strings        ││     Space h  Home                              │
-│   # big-history            ││     Space d  DMs                               │
-│   # long-threads           ││     Ctrl+O   Back to the last one              │
-│                            ││     ?        Keyboard help                     │
-│ ▾ Channels                 ││     Ctrl+Q   Quit                              │
+│ ▾ Channels                 ││                                                │
 │   # announcements          ││                                                │
 │   # design-review          ││                                                │
-│   # feed-alert-134         ││                                                │
-│   # feed-alert-8           ││                                                │
-│   # feed-budget-162        ││                                                │
-│   # feed-budget-33         ││                                                │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A compa… › Home │ Enter open · t new tab · ? help · Space more │ demo

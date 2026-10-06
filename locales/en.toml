@@ -57,7 +57,7 @@
 
 # The empty work area without a backend.
 
-# The views (the view switcher, the first row of the list panel).
+# The views (the view switcher, the first rows of the list panel).
 "nav.home" = "Home"
 "nav.dms" = "DMs"
 "nav.activity" = "Activity"
@@ -115,15 +115,16 @@
 "action.focus.left" = "Move the focus left"
 "action.focus.right" = "Move the focus right"
 "action.nav.focus" = "View switcher (in the list panel)"
-"action.nav.next" = "Next view on the view switcher"
+"action.nav.next" = "Next view on the view switcher (from the last, the list)"
 "action.nav.prev" = "Previous view on the view switcher"
-"action.nav.select" = "Show the view"
+"action.nav.select" = "Show the view (the folded row: unfold it)"
 "action.list.next" = "Next row"
 "action.list.prev" = "Previous row"
 "action.list.first" = "First row"
 "action.list.last" = "Last row"
 "action.list.open" = "Open the conversation, or fold the section"
 "action.list.toggle_panel" = "Show or hide the list panel"
+"action.nav_rows" = "Fold the view switcher to the view shown, or unfold it"
 "action.view.home" = "Show Home"
 "action.view.dms" = "Show DMs"
 "action.view.activity" = "Show Activity"
@@ -311,6 +312,7 @@
 "config.retired" = "{key} is no longer used (the rail became the view switcher); it can be removed from the config file"
 "action.density" = "Comfortable or compact messages"
 "density.changed" = "Density: {name}"
+"nav_rows.changed" = "View switcher: {name}"
 "density.unknown" = "Unknown density {name} (one of {names})"
 "density.comfortable" = "As in GUI Slack: an avatar block, the name over the text (default)"
 "density.compact" = "Columns: the name beside the text"

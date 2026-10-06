@@ -12,7 +12,6 @@ use slakio_core::model::{ConversationKind, Presence};
 use slakio_tui::app::Settings;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
-use slakio_tui::screen;
 use slakio_tui::theme::{Background, Theme, resolve};
 
 /// The demo on DMs, in `theme`.
@@ -43,7 +42,7 @@ fn index_of(d: &Demo, name: &str) -> usize {
 /// Where the mark of the DM named `name` is drawn: (x, y). DMs has no sections, so the mark is
 /// the first cell after the gutter, or the cell after the avatar chip there.
 fn mark_at(d: &Demo, name: &str) -> (u16, u16) {
-    let list = screen::list_parts(d.app.areas().list.expect("the list panel")).rows;
+    let list = d.app.list_parts().unwrap().rows;
     let y = list.y + (index_of(d, name) - d.app.list_top()) as u16;
     (list.x + if d.app.settings.avatars { 3 } else { 1 }, y)
 }

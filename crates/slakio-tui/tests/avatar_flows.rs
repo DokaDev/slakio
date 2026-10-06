@@ -145,7 +145,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
     let theme = tokyo();
     let d = dms(theme.clone(), true);
     let buf = d.buffer();
-    let list = screen::list_parts(d.app.areas().list.unwrap()).rows;
+    let list = d.app.list_parts().unwrap().rows;
     let rows = d.app.list_rows();
     let mut seen_group = false;
     for (k, row) in rows.iter().enumerate() {
@@ -192,7 +192,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
 fn without_colors_a_chip_is_reversed_and_presence_still_has_its_shape() {
     let d = dms(Theme::no_color(), true);
     let buf = d.buffer();
-    let list = screen::list_parts(d.app.areas().list.unwrap()).rows;
+    let list = d.app.list_parts().unwrap().rows;
     // A row not muted below the selected one (that one is reversed as a whole).
     let rows = d.app.list_rows();
     let k = (1..rows.len())

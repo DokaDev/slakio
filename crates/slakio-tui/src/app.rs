@@ -23,8 +23,8 @@
 //! | the view switcher | the list | |
 //! | the list | nothing | |
 //!
-//! The view switcher (the list panel's first row) is reached from anywhere outside text with
-//! `Ctrl+R` or `Space r` ([`nav`]), and is a stop of the `Tab` round (before the list). Tabs ([`tabs`]) keep their own panes; the mouse is
+//! The view switcher (the list panel's first rows) is reached from anywhere outside text with
+//! `Ctrl+R` or `Space r` ([`nav`]), is a stop of the `Tab` round, and runs on into the list. Tabs ([`tabs`]) keep their own panes; the mouse is
 //! [`mouse`]'s.
 
 pub mod cmdline;
@@ -283,7 +283,7 @@ impl App {
     fn list_height(&self) -> usize {
         let a = self.areas();
         let panel = a.list.unwrap_or(a.work);
-        usize::from(screen::list_parts(panel).rows.height).max(1)
+        usize::from(screen::list_parts(panel, self.nav_rows()).rows.height).max(1)
     }
 
     /// Rows of messages the focused pane shows.

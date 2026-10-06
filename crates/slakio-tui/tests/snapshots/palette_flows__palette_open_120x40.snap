@@ -3,29 +3,33 @@ source: crates/slakio-tui/tests/palette_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                                                        │
-├────────────────────────────┤│                                                                                        │
-│ ▾ Favorites                ││                                                                                        │
-│   # backend                ││                                                                                        │
-│   # incidents           3  ││                                                                                        │
-│                       ╭ Commands ────────────────────────────────────────────────────────────╮                       │
-│ ▾ Ops                 │ : type a command or an action name                                   │                       │
-│   # deploys           ├──────────────────────────────────────────────────────────────────────┤                       │
-│   # alerts            │  :workspace            Switch workspace                      Space W │                       │
-│   # partner-shared ext│  :help                 Keyboard help                          ? / F1 │                       │
-│   # hostile-strings   │  :theme <theme>        Change the color theme                        │                       │
-│   # big-history       │  :avatars              Show or hide avatars (initials)               │                       │
-│   # long-threads      │  :icons                Show Nerd Font icons, or text instead         │                       │
-│                       │  :density              Comfortable or compact messages               │                       │
-│ ▾ Channels            │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
-│   # announcements     │  :list                 Show or hide the list panel           Space e │                       │
-│   # design-review     │  :home                 Show Home                             Space h │                       │
-│   # feed-alert-134    │  :dms                  Show DMs                              Space d │                       │
-│   # feed-alert-8      │  :activity             Show Activity                         Space a │                       │
-│   # feed-budget-162   │  :files                Show Files                            Space f │                       │
-│   # feed-budget-33    ╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
-│   # feed-build-50          ││                         ?        Keyboard help                                         │
-│   # feed-cache-119         ││                         Ctrl+Q   Quit                                                  │
+│▎Home                   @24 ││                                                                                        │
+│ DMs                    ●11 ││                                                                                        │
+│ Activity               @37 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ Later                      ││                                                                                        │
+├───────────────────────╭ Commands ────────────────────────────────────────────────────────────╮                       │
+│ ▾ Favorites           │ : type a command or an action name                                   │                       │
+│   # backend           ├──────────────────────────────────────────────────────────────────────┤                       │
+│   # incidents         │  :workspace            Switch workspace                      Space W │                       │
+│                       │  :help                 Keyboard help                          ? / F1 │                       │
+│ ▾ Ops                 │  :theme <theme>        Change the color theme                        │                       │
+│   # deploys           │  :avatars              Show or hide avatars (initials)               │                       │
+│   # alerts            │  :icons                Show Nerd Font icons, or text instead         │                       │
+│   # partner-shared ext│  :density              Comfortable or compact messages               │                       │
+│   # hostile-strings   │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
+│   # big-history       │  :list                 Show or hide the list panel           Space e │                       │
+│   # long-threads      │  :navrows              Fold the view switcher to the view …  Space v │                       │
+│                       │  :home                 Show Home                             Space h │                       │
+│ ▾ Channels            │  :dms                  Show DMs                              Space d │                       │
+│   # announcements     │  :activity             Show Activity                         Space a │                       │
+│   # design-review     ╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
+│   # feed-alert-134         ││                         ?        Keyboard help                                         │
+│   # feed-alert-8           ││                         Ctrl+Q   Quit                                                  │
+│   # feed-budget-162        ││                                                                                        │
+│   # feed-budget-33         ││                                                                                        │
+│   # feed-build-50          ││                                                                                        │
+│   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││                                                                                        │
 │   # feed-customer-167   1  ││                                                                                        │
 │   # feed-dashboard-22      ││                                                                                        │
@@ -36,9 +40,5 @@ expression: d.snap()
 │   # feed-draft-58          ││                                                                                        │
 │   # feed-draft-84          ││                                                                                        │
 │   # feed-index-199      2  ││                                                                                        │
-│   # feed-index-39          ││                                                                                        │
-│   # feed-index-5        1  ││                                                                                        │
-│   # feed-invoice-16        ││                                                                                        │
-│   # feed-invoice-168       ││                                                                                        │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  COMMAND  ▌A company › Home                                                             │ Enter run · Esc cancel │ demo

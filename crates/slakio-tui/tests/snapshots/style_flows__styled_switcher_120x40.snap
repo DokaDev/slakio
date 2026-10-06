@@ -5,13 +5,21 @@ expression: screen_styled(&d)
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
     [acc 0..1] [ B 1..2] [ws 2..3] [ B 3..12] [mut 12..14] [ B 14..17] [mut B 17..18] [err B 18..21] [ B 21..22] [acc 22..30] [bdr 30..120]
 │ ╭ Workspaces ──────────────────╮                                                                                     │
-    [acc 0..1] [acc/surf 2..3] [/surf B 3..15] [acc/surf 15..34] [bdr 119..120]
-├─│ ▌A company               @28 │                                                                                     │
-    [acc 0..2] [acc/surf 2..3] [/surf 3..4] [ws/surf 4..5] [acc/sel B 5..14] [/sel 14..29] [err/sel B 29..32] [/sel 32..33] [acc/surf 33..34] [bdr 119..120]
+    [acc 0..1] [/cl B 1..2] [acc/surf 2..3] [/surf B 3..15] [acc/surf 15..34] [bdr 119..120]
+│ │ ▌A company               @28 │                                                                                     │
+    [acc 0..1] [acc/surf 2..3] [/surf 3..4] [ws/surf 4..5] [acc/sel B 5..14] [/sel 14..29] [err/sel B 29..32] [/sel 32..33] [acc/surf 33..34] [bdr 119..120]
 │ │ ▌B side                   @9 │                                                                                     │
     [acc 0..1] [acc/surf 2..3] [/surf 3..4] [ws/surf 4..5] [/surf 5..30] [err/surf B 30..32] [/surf 32..33] [acc/surf 33..34] [bdr 119..120]
 │ ╰──── Enter switch · Esc close ╯                                                                                     │
-    [acc 0..1] [/sel 1..2] [acc/surf 2..7] [mut/surf 7..33] [acc/surf 33..34] [bdr 119..120]
+    [acc 0..1] [acc/surf 2..7] [mut/surf 7..33] [acc/surf 33..34] [bdr 119..120]
+│ Later                      ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+├────────────────────────────┤│                                                                                        │
+    [acc 0..30] [bdr 30..31] [bdr 119..120]
+│ ▾ Favorites                ││                                                                                        │
+    [acc 0..1] [dim 2..3] [mut B 4..13] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   # backend                ││                                                                                        │
+    [acc 0..1] [/sel 1..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # incidents           3  ││                                                                                        │
     [acc 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │                            ││                                                                                        │
@@ -24,32 +32,32 @@ expression: screen_styled(&d)
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # partner-shared ext     ││                                                                                        │
     [acc 0..1] [mut 4..5] [dim 20..24] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # hostile-strings        ││                                                                                        │
-    [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # big-history            ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   # hostile-strings        ││                         No conversation open                                           │
+    [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
+│   # big-history            ││                         Pick one in the list and press Enter.                          │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
 │   # long-threads           ││                                                                                        │
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│                            ││                                                                                        │
-    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│ ▾ Channels                 ││                         No conversation open                                           │
-    [acc 0..1] [dim 2..3] [mut B 4..12] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
-│   # announcements          ││                         Pick one in the list and press Enter.                          │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
-│   # design-review          ││                                                                                        │
-    [acc 0..1] [dim 4..5] [dim 6..19] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # feed-alert-134         ││                         Enter    Open                                                  │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..61] [bdr 119..120]
-│   # feed-alert-8           ││                         Space h  Home                                                  │
+│                            ││                         Enter    Open                                                  │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [warm B 56..61] [bdr 119..120]
+│ ▾ Channels                 ││                         Space h  Home                                                  │
+    [acc 0..1] [dim 2..3] [mut B 4..12] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+│   # announcements          ││                         Space d  DMs                                                   │
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
-│   # feed-budget-162        ││                         Space d  DMs                                                   │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
-│   # feed-budget-33         ││                         Ctrl+O   Back to the last one                                  │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
-│   # feed-build-50          ││                         ?        Keyboard help                                         │
+│   # design-review          ││                         Ctrl+O   Back to the last one                                  │
+    [acc 0..1] [dim 4..5] [dim 6..19] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│   # feed-alert-134         ││                         ?        Keyboard help                                         │
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..57] [bdr 119..120]
-│   # feed-cache-119         ││                         Ctrl+Q   Quit                                                  │
+│   # feed-alert-8           ││                         Ctrl+Q   Quit                                                  │
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│   # feed-budget-162        ││                                                                                        │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   # feed-budget-33         ││                                                                                        │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   # feed-build-50          ││                                                                                        │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   # feed-cache-119         ││                                                                                        │
+    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-customer-161      ││                                                                                        │
     [acc 0..1] [dim 4..5] [dim 6..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-customer-167   1  ││                                                                                        │
@@ -70,14 +78,6 @@ expression: screen_styled(&d)
     [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-index-199      2  ││                                                                                        │
     [acc 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # feed-index-39          ││                                                                                        │
-    [acc 0..1] [dim 4..5] [dim 6..19] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # feed-index-5        1  ││                                                                                        │
-    [acc 0..1] [ B 4..5] [ B 6..18] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # feed-invoice-16        ││                                                                                        │
-    [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # feed-invoice-168       ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
     [acc 0..30] [bdr 30..120]
  NORMAL  ▌A company › Home   │ Enter open · l peek · t new tab · Tab next pane · [/] views · ? help · Space more │ demo

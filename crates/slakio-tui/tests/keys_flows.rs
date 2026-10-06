@@ -123,8 +123,8 @@ fn h_and_l_and_arrows_move_between_neighbours_where_nothing_moves_sideways() {
     assert!(d.screen().contains("▸ Ops"), "folded");
     d.keys("h");
     assert_eq!(d.app.focus(), Focus::ViewSwitcher);
-    d.keys("j");
-    assert_eq!(d.app.focus(), Focus::List, "down from the bar, back to the list");
+    d.keys("esc");
+    assert_eq!(d.app.focus(), Focus::List, "Esc, back to the list");
     d.keys("l");
     assert!(d.screen().contains("▾ Ops"), "l unfolds");
     // { and } jump between section headers.
@@ -201,7 +201,7 @@ fn arrows_pages_home_and_end_work_wherever_j_and_k_do() {
     // The view switcher: five views.
     d.keys("ctrl+h end");
     assert_eq!(d.app.nav_cursor(), 4);
-    d.keys("home right");
+    d.keys("home down");
     assert_eq!(d.app.nav_cursor(), 1);
     d.keys("esc");
     // The list.
@@ -399,7 +399,7 @@ fn the_hint_line_fits_where_the_keyboard_is_and_its_keys_work() {
     d.keys("g g");
     assert!(hints(&d).contains("Enter fold · j/k move"), "{}", hints(&d));
     d.keys("ctrl+h");
-    assert!(hints(&d).contains("Enter show · h/l move · Esc back"), "{}", hints(&d));
+    assert!(hints(&d).contains("Enter show · j/k move · Esc back · Space v fold"), "{}", hints(&d));
     d.keys("esc");
     d.open("long-threads");
     assert!(hints(&d).contains("i write · k messages · Esc list · Ctrl+R views"), "{}", hints(&d));

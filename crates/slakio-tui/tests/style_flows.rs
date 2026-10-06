@@ -134,7 +134,7 @@ fn unfocused_text_keeps_its_color() {
         let mut d = demo(&t, 120, 40);
         d.keys("l");
         let list = d.app.areas().list.unwrap();
-        let cursor_y = screen::list_parts(list).rows.y + (d.app.list_cursor() - d.app.list_top()) as u16;
+        let cursor_y = d.app.list_parts().unwrap().rows.y + (d.app.list_cursor() - d.app.list_top()) as u16;
         assert_eq!(d.app.focus(), Focus::List);
         let focused = inside(&d.buffer(), list, Some(cursor_y));
         d.keys("tab");
@@ -144,26 +144,27 @@ fn unfocused_text_keeps_its_color() {
     }
 }
 
-// ③ The view switcher (the list panel's first row) and the tab bar (the work area's) are both on
-// the background; the view shown is raised like the tab shown, the others muted. No row is on the
-// status line's surface but the status line.
+// The view switcher is a block of rows on the background, the view shown with the list's
+// selection bar: the unfocused one while the keyboard is in the list, the focused one with the
+// views' cursor on it. No row is on the status line's surface but the status line.
 #[test]
-fn the_view_switcher_and_the_tab_bar_read_alike_on_the_background() {
+fn the_view_shown_has_the_selection_bar_of_the_list() {
     for t in themes().into_iter().filter(|t| t.kind == Kind::Truecolor) {
-        let d = tabs(&t);
+        let mut d = demo(&t, 120, 40);
         let buf = d.buffer();
-        let tabs_row = d.app.areas().tabs.unwrap().y;
-        assert_eq!(buf[(119, tabs_row)].bg, t.bg, "{}: the tab bar on the background", t.name);
-        let bar = d.app.view_switcher().unwrap();
-        let y = bar.area.y;
-        let home = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(0)).unwrap();
-        let cell = &buf[(home.x, y)];
-        assert_eq!((cell.bg, cell.modifier.contains(Modifier::BOLD)), (t.raised(), true), "{}: Home is shown", t.name);
-        let files = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(3)).unwrap();
-        assert_eq!((buf[(files.x, y)].fg, buf[(files.x, y)].bg), (t.fg_muted, t.bg), "{}", t.name);
+        let rows = d.app.view_rows();
+        let label = |i: usize| rows[i].pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label).unwrap().x;
+        let home = &buf[(label(0), rows[0].area.y)];
+        assert_eq!((home.bg, home.modifier.contains(Modifier::BOLD)), (t.cursor_line, true), "{}: Home shown", t.name);
+        let files = &buf[(label(3), rows[3].area.y)];
+        assert_eq!((files.fg, files.bg), (t.fg, t.bg), "{}: the others plain on the background", t.name);
         for x in 0..120 {
             assert_ne!(buf[(x, 0)].bg, t.surface, "{}: no top bar on the surface (column {x})", t.name);
         }
+        d.keys("ctrl+r j");
+        let buf = d.buffer();
+        let (home, dms) = (&buf[(label(0), rows[0].area.y)], &buf[(label(1), rows[1].area.y)]);
+        assert_eq!((dms.bg, home.bg), (t.selection, t.cursor_line), "{}: the cursor's bar, the view shown's", t.name);
     }
 }
 
@@ -185,8 +186,7 @@ fn one_accent_border() {
 fn the_selection_is_a_bar_across_the_row() {
     for t in themes().into_iter().filter(|t| t.kind != Kind::NoColor) {
         let d = demo(&t, 120, 40);
-        let list = d.app.areas().list.unwrap();
-        let inner = screen::list_parts(list).rows;
+        let inner = d.app.list_parts().unwrap().rows;
         let y = inner.y + (d.app.list_cursor() - d.app.list_top()) as u16;
         let buf = d.buffer();
         for x in inner.left()..inner.right() {
@@ -204,7 +204,7 @@ fn the_selection_is_a_bar_across_the_row() {
     }
     // Without color: reversed.
     let d = demo(&Theme::no_color(), 120, 40);
-    let inner = screen::list_parts(d.app.areas().list.unwrap()).rows;
+    let inner = d.app.list_parts().unwrap().rows;
     let y = inner.y + d.app.list_cursor() as u16;
     assert!(d.buffer()[(inner.x + 4, y)].modifier.contains(Modifier::REVERSED));
 }
@@ -397,31 +397,29 @@ fn the_overflow_marks_carry_what_the_hidden_tabs_hold() {
     assert_ne!(cell.fg, t.error, "the tabs on the right mention nobody");
 }
 
-// The view shown and the tab shown share one style in every theme: with truecolor one raised
-// background that stands out of the background, without it reversed and bold; `▾` on the chip
-// is quiet.
+// The view shown takes the list's selection bar in every theme, focused or not as the list's
+// cursor row does; `▾` on the chip is quiet.
 #[test]
-fn the_view_shown_and_the_tab_shown_read_alike_in_every_theme() {
+fn the_view_shown_reads_as_the_list_cursor_in_every_theme() {
     for t in themes() {
-        let d = tabs(&t);
-        let buf = d.buffer();
-        let bar = d.app.view_switcher().unwrap();
+        let mut d = demo(&t, 120, 40);
+        let look = |d: &Demo, x: u16, y: u16| {
+            let c = &d.buffer()[(x, y)];
+            (c.bg, c.modifier.contains(Modifier::REVERSED))
+        };
+        let home = d.app.view_rows()[0].area;
+        let list = d.app.list_parts().unwrap().rows;
+        let cursor_y = list.y + (d.app.list_cursor() - d.app.list_top()) as u16;
+        let (view_unfocused, list_focused) = (look(&d, home.x, home.y), look(&d, list.x, cursor_y));
+        d.keys("ctrl+r");
+        let (view_focused, list_unfocused) = (look(&d, home.x, home.y), look(&d, list.x, cursor_y));
+        assert_eq!((view_focused, view_unfocused), (list_focused, list_unfocused), "{}: as the list's", t.name);
+        assert_ne!(view_focused, look(&d, home.x, home.y + 3), "{}: the bar shows", t.name);
         let chip = d.app.chip_bar().unwrap();
-        let tabs_bar = d.app.tab_bar().unwrap();
-        let home = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Label && p.item == Some(0)).unwrap();
         let caret = chip.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Caret).unwrap();
         let name = chip.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Name).unwrap();
-        let shown_tab = tabs_bar.pieces.iter().find(|p| p.tab == 1 && p.part == Part::Title).unwrap();
-        let (h, c) = (&buf[(home.x, bar.area.y)], &buf[(caret.x + 1, chip.area.y)]);
-        let st = &buf[(shown_tab.x, tabs_bar.area.y)];
-        assert_eq!((h.bg, h.modifier), (st.bg, st.modifier), "{}: one style for what is shown", t.name);
-        match t.kind {
-            Kind::Truecolor => {
-                assert_eq!(h.bg, t.raised(), "{}: the raised background", t.name);
-                assert!(t.raised() != t.bg, "{}: it stands out", t.name);
-                assert_eq!(c.fg, t.fg_muted, "{}: the caret is quiet", t.name);
-            }
-            _ => assert!(h.modifier.contains(Modifier::REVERSED | Modifier::BOLD), "{}", t.name),
+        if t.kind == Kind::Truecolor {
+            assert_eq!(d.buffer()[(caret.x + 1, chip.area.y)].fg, t.fg_muted, "{}: the caret is quiet", t.name);
         }
         // Nothing between the name shown and its caret: the other workspaces' marks follow it.
         assert_eq!(name.x + name.width, caret.x, "{}", t.name);
@@ -437,7 +435,7 @@ fn red_means_a_mention_and_the_dm_counts_add_up() {
     let t = resolve("tokyo-night", true, Background::Dark);
     let mut d = demo(&t, 160, 60);
     d.keys("space d");
-    let list = screen::list_parts(d.app.areas().list.unwrap()).rows;
+    let list = d.app.list_parts().unwrap().rows;
     let buf = d.buffer();
     let mut sum = 0u32;
     for (k, row) in d.app.list_rows().iter().enumerate().skip(d.app.list_top()).take(usize::from(list.height)) {
@@ -455,9 +453,9 @@ fn red_means_a_mention_and_the_dm_counts_add_up() {
     }
     let rows_all = d.app.list_rows().len();
     assert!(rows_all <= usize::from(list.height), "every DM row is on screen for the sum");
-    let views = d.app.view_switcher().unwrap();
-    let row: String = (0..views.area.right()).map(|x| buf[(x, views.area.y)].symbol().to_string()).collect();
-    assert!(row.contains(&format!("DMs ●{sum}")), "{row}");
+    let dms = d.app.view_rows()[1].area;
+    let row: String = (dms.x..dms.right()).map(|x| buf[(x, dms.y)].symbol().to_string()).collect();
+    assert!(row.contains("DMs") && row.trim_end().ends_with(&format!("●{sum}")), "{row}");
     // Tabs and the view switcher: red only where a mention is.
     let mut d = demo(&t, 160, 40);
     d.keys("space d");
@@ -477,7 +475,7 @@ fn red_means_a_mention_and_the_dm_counts_add_up() {
     let badge = tabs.pieces.iter().find(|p| p.tab == 0 && p.part == Part::Badge).expect("the DM tab's mark");
     assert!(badge.text.trim().starts_with('●'), "{:?}: a DM's unread, never @", badge.text);
     assert_ne!(buf[(badge.x + 1, tabs.area.y)].fg, t.error, "no mention: not red");
-    for bar in [d.app.chip_bar().unwrap(), d.app.view_switcher().unwrap()] {
+    for bar in std::iter::once(d.app.chip_bar().unwrap()).chain(d.app.view_rows()) {
         let y = bar.area.y;
         let marks = bar.pieces.iter();
         for p in marks.filter(|p| matches!(p.part, slakio_tui::navbar::Part::Badge | slakio_tui::navbar::Part::Mark)) {
@@ -491,15 +489,15 @@ fn red_means_a_mention_and_the_dm_counts_add_up() {
     }
 }
 
-// Without truecolor a mention on the view switcher is bold in the mention color, out of the
-// reversed view shown; a light theme raises the view shown clearly.
+// Without truecolor a mention on the view switcher is bold, never reversed; a light theme raises
+// the tab shown clearly.
 #[test]
 fn marks_on_the_view_switcher_read_without_truecolor_and_light_themes_raise_clearly() {
     let t = resolve("terminal", false, Background::Dark);
     let d = demo(&t, 160, 40);
     let buf = d.buffer();
-    let bar = d.app.view_switcher().unwrap();
-    let activity = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Badge && p.item == Some(2)).unwrap();
+    let bar = d.app.view_rows().remove(2);
+    let activity = bar.pieces.iter().find(|p| p.part == slakio_tui::navbar::Part::Badge).unwrap();
     let cell = &buf[(activity.x + 1, bar.area.y)];
     assert!(cell.modifier.contains(Modifier::BOLD) && !cell.modifier.contains(Modifier::REVERSED), "Activity @n");
     for name in ["light", "catppuccin-latte"] {

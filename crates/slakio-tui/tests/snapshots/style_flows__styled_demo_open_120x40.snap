@@ -4,80 +4,80 @@ expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..1] [mut 1..2] [ws 2..3] [mut 3..17] [mut B 17..18] [err B 18..21] [mut 21..22] [bdr 22..30] [acc 30..32] [ws 32..33] [ B 33..42] [acc 42..120]
-│ Home @24  D●11  A@37  F  L ││  JH   Jiwon Han  05:58                                                                 │
-    [bdr 0..1] [/cl B 2..6] [err/cl B 6..10] [mut 12..13] [err B 13..16] [mut 18..19] [err B 19..22] [mut 24..25] [mut 27..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..47] [dim 49..54] [acc 119..120]
-├────────────────────────────┤│       Rolling back                                                                     │
-    [bdr 0..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│ ▾ Favorites                ││                                                                                        │
-    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # backend                ││  HJ   Hyunwoo Jung  06:05                                                              │
-    [bdr 0..1] [/cl 1..29] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..50] [dim 52..57] [acc 119..120]
-│   # incidents           3  ││       Schema production after invoice cache is should                                  │
-    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│                            ││                                                                                        │
-    [bdr 0..1] [bdr 29..30] [acc 30..31] [acc 119..120]
-│ ▾ Ops                      ││  KN   Kate Nam  06:13                                                                  │
-    [bdr 0..1] [dim 2..3] [mut B 4..7] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
-│   # deploys                ││       Suspect the DB pool 🎉                                                           │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│ Home                   @24 ││  JH   Jiwon Han  05:58                                                                 │
+    [bdr 0..1] [/cl B 1..25] [err/cl B 25..28] [/cl B 28..29] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..47] [dim 49..54] [acc 119..120]
+│ DMs                    ●11 ││       Rolling back                                                                     │
+    [bdr 0..1] [err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│ Activity               @37 ││                                                                                        │
+    [bdr 0..1] [err B 25..28] [bdr 29..30] [acc 30..31] [acc 119..120]
+│ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
+    [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..50] [dim 52..57] [acc 119..120]
+│ Later                      ││       Schema production after invoice cache is should                                  │
+    [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+├────────────────────────────┤│                                                                                        │
+    [bdr 0..30] [acc 30..31] [acc 119..120]
+│ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
+    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│   # backend                ││       Suspect the DB pool 🎉                                                           │
+    [bdr 0..1] [/cl 1..29] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # incidents           3  ││                                                                                        │
+    [bdr 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [bdr 29..30] [acc 30..31] [acc 119..120]
+│                            ││  LJ   Lily Jeon  06:19                                                                 │
+    [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..47] [dim 49..54] [acc 119..120]
+│ ▾ Ops                      ││       Dashboard schema budget draft please is now waiting fine a lunch production      │
+    [bdr 0..1] [dim 2..3] [mut B 4..7] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # deploys                ││       someone cache release done                                                       │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
 │   # alerts                 ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # partner-shared ext     ││  LJ   Lily Jeon  06:19                                                                 │
-    [bdr 0..1] [mut 4..5] [dim 20..24] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..47] [dim 49..54] [acc 119..120]
-│   # hostile-strings        ││       Dashboard schema budget draft please is now waiting fine a lunch production      │
+│   # partner-shared ext     ││  KN   Kate Nam  06:26                                                                  │
+    [bdr 0..1] [mut 4..5] [dim 20..24] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│   # hostile-strings        ││       Check a customer should maybe                                                    │
     [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # big-history            ││       someone cache release done                                                       │
+│   # big-history            ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # long-threads           ││                                                                                        │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│                            ││  KN   Kate Nam  06:26                                                                  │
-    [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
-│ ▾ Channels                 ││       Check a customer should maybe                                                    │
-    [bdr 0..1] [dim 2..3] [mut B 4..12] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # long-threads           ││  MJ   Mia Jang  06:35                                                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│                            ││       Budget metrics merge design rollback alert alert should draft after alert on     │
+    [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│ ▾ Channels                 ││       staging tomorrow                                                                 │
+    [bdr 0..1] [dim 2..3] [mut B 4..12] [bdr 29..30] [acc 30..31] [acc 119..120]
 │   # announcements          ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # design-review          ││  MJ   Mia Jang  06:35                                                                  │
-    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
-│   # feed-alert-134         ││       Budget metrics merge design rollback alert alert should draft after alert on     │
+│   # design-review          ││  TK   Tom Ko  06:41                                                                    │
+    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..44] [dim 46..51] [acc 119..120]
+│   # feed-alert-134         ││       On waiting migration someone index can staging should                            │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # feed-alert-8           ││       staging tomorrow                                                                 │
+│   # feed-alert-8           ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-budget-162        ││                                                                                        │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-budget-33         ││  TK   Tom Ko  06:41                                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..44] [dim 46..51] [acc 119..120]
-│   # feed-build-50          ││       On waiting migration someone index can staging should                            │
+│   # feed-budget-162        ││  KN   Kate Nam  06:51                                                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│   # feed-budget-33         ││       Production roadmap customer build alert now latency fine review latency roadmap  │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # feed-build-50          ││       broken should for                                                                │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
 │   # feed-cache-119         ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-customer-161      ││  KN   Kate Nam  06:51                                                                  │
-    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
-│   # feed-customer-167   1  ││       Production roadmap customer build alert now latency fine review latency roadmap  │
+│   # feed-customer-161      ││  ＊   ＊＊＊  06:59                                                                    │
+    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..30] [acc 30..31] [av/av B 32..34] [av/av B 35..36] [ B 38..39] [ B 40..41] [ B 42..43] [dim 46..51] [acc 119..120]
+│   # feed-customer-167   1  ││       Confirmed                                                                        │
     [bdr 0..1] [dim 4..5] [dim 6..23] [on/err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # feed-dashboard-22      ││       broken should for                                                                │
+│   # feed-dashboard-22      ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-dashboard-41      ││                                                                                        │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-design-34         ││  ＊   ＊＊＊  06:59                                                                    │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..34] [av/av B 35..36] [ B 38..39] [ B 40..41] [ B 42..43] [dim 46..51] [acc 119..120]
-│   # feed-design-83         ││       Confirmed                                                                        │
+│   # feed-dashboard-41      ││  KN   Kate Nam  07:05                                                                  │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│   # feed-design-34         ││       Ticket review pager pager production on build alert the on draft                 │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # feed-draft-142         ││                                                                                        │
+│   # feed-design-83         ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-draft-58          ││  KN   Kate Nam  07:05                                                                  │
-    [bdr 0..1] [ B 4..5] [ B 6..19] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
-│   # feed-draft-84          ││       Ticket review pager pager production on build alert the on draft                 │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # feed-index-199      2  ││                                                                                        │
-    [bdr 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [bdr 29..30] [acc 30..31] [acc 119..120]
-│   # feed-index-39          ││  SR   Sam Rivera  07:14                                                                │
-    [bdr 0..1] [dim 4..5] [dim 6..19] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..48] [dim 50..55] [acc 119..120]
-│   # feed-index-5        1  ││       Meeting moved to 3pm                                                             │
-    [bdr 0..1] [ B 4..5] [ B 6..18] [on/err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│   # feed-invoice-16        │├─ Message #backend ─────────────────────────────────────────────────────────────────────┤
-    [bdr 0..1] [ B 4..5] [ B 6..21] [bdr 29..30] [acc 30..120]
-│   # feed-invoice-168       ││ › Press i to write                                                                     │
-    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [dim 32..118] [acc 119..120]
+│   # feed-draft-142         ││  SR   Sam Rivera  07:14                                                                │
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..48] [dim 50..55] [acc 119..120]
+│   # feed-draft-58          ││       Meeting moved to 3pm                                                             │
+    [bdr 0..1] [ B 4..5] [ B 6..19] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # feed-draft-84          │├─ Message #backend ─────────────────────────────────────────────────────────────────────┤
+    [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..120]
+│   # feed-index-199      2  ││ › Press i to write                                                                     │
+    [bdr 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [bdr 29..30] [acc 30..31] [dim 32..118] [acc 119..120]
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
     [bdr 0..30] [acc 30..120]
  NORMAL  ▌A company › #backend            │ i write · k messages · Esc list · Ctrl+R views · ? help · Space more │ demo

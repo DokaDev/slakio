@@ -11,7 +11,6 @@ use ratatui::crossterm::event::MouseEventKind;
 use ratatui::style::Modifier;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::{Focus, Mode, PaneKind};
-use slakio_tui::screen;
 
 fn list_row_of(d: &Demo, name: &str) -> usize {
     d.app
@@ -72,7 +71,7 @@ fn the_list_starts_at_the_top_left_corner_and_its_borders_run_down() {
     let buf = d.buffer();
     // Focused, the view switcher covers nothing: the list's borders show on every row, joined
     // by the rule under the switcher.
-    let rule = screen::list_parts(list).rule.unwrap();
+    let rule = d.app.list_parts().unwrap().rule.unwrap();
     for y in list.y + 1..list.bottom() - 1 {
         let (l, r) = if y == rule { ("├", "┤") } else { ("│", "│") };
         assert_eq!(buf[(0, y)].symbol(), l, "row {y}");

@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #backend ×  2 #incidents ×
-│ Home @24  D●11  A@37  F  L │╭ ▌#incidents ───────────────────────────────────╮
-├────────────────────────────┤│ RC  Robin Choi  01:49                          │
-│ ▾ Favorites                ││     Thanks!                                    │
-│   # backend                ││                                                │
-│▎  # incidents           3  ││ MJ  Mia Jang  02:18                            │
-│                            ││     Still budget build latency rollback        │
-│ ▾ Ops                      ││     rollback retry sprint draft maybe lunch    │
-│   # deploys                ││     waiting the budget                         │
-│   # alerts                 ││                                                │
-│   # partner-shared ext     ││ DY  Dana Yoon  02:38                           │
-│   # hostile-strings        ││     Tomorrow ticket should merge waiting       │
+│▎Home                   @24 │╭ ▌#incidents ───────────────────────────────────╮
+│ DMs                    ●11 ││ RC  Robin Choi  01:49                          │
+│ Activity               @37 ││     Thanks!                                    │
+│ Files                      ││                                                │
+│ Later                      ││ MJ  Mia Jang  02:18                            │
+├────────────────────────────┤│     Still budget build latency rollback        │
+│ ▾ Favorites                ││     rollback retry sprint draft maybe lunch    │
+│   # backend                ││     waiting the budget                         │
+│▎  # incidents           3  ││                                                │
+│                            ││ DY  Dana Yoon  02:38                           │
+│ ▾ Ops                      ││     Tomorrow ticket should merge waiting       │
+│   # deploys                ││                                                │
+│   # alerts                 ││ MK  Minsu Kim  02:52                           │
+│   # partner-shared ext     ││     After check fine check branch metrics      │
+│   # hostile-strings        ││     latency check                              │
 │   # big-history            ││                                                │
-│   # long-threads           ││ MK  Minsu Kim  02:52                           │
-│                            ││     After check fine check branch metrics      │
-│ ▾ Channels                 ││     latency check                              │
-│   # announcements          ││                                                │
-│   # design-review          ││ MJ  Mia Jang  03:33                            │
-│   # feed-alert-134         ││     Budget invoice on is schema can on deploy  │
-│   # feed-alert-8           ││     check now release tracing on invoice       │
-│   # feed-budget-162        │├─ Message #incidents ───────────────────────────┤
-│   # feed-budget-33         ││ › Press i to write                             │
+│   # long-threads           ││ MJ  Mia Jang  03:33                            │
+│                            ││     Budget invoice on is schema can on deploy  │
+│ ▾ Channels                 ││     check now release tracing on invoice       │
+│   # announcements          │├─ Message #incidents ───────────────────────────┤
+│   # design-review          ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #incidents         │ i write · ? help · Space more │ demo

@@ -9,6 +9,7 @@
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
 //! avatars = "initials"     # a person's initials on a colored chip, or "off"
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
+//! nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" to the view shown
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -44,6 +45,9 @@ pub struct Config {
     pub avatars: String,
     /// How messages are laid out: `comfortable` or `compact` ([`DENSITIES`]).
     pub density: String,
+    /// The view switcher a row per view (`expanded`) or folded to the view shown
+    /// (`collapsed`) ([`NAV_ROWS`]).
+    pub nav_rows: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -59,6 +63,7 @@ impl Default for Config {
             icons: "ask".to_string(),
             avatars: "initials".to_string(),
             density: "comfortable".to_string(),
+            nav_rows: "expanded".to_string(),
             path: None,
             retired: Vec::new(),
         }
@@ -96,6 +101,9 @@ pub const AVATARS: &[&str] = &["initials", "off", "image"];
 
 /// The values `density` takes.
 pub const DENSITIES: &[&str] = &["comfortable", "compact"];
+
+/// The values `nav_rows` takes.
+pub const NAV_ROWS: &[&str] = &["expanded", "collapsed"];
 
 /// Keys an older version had: ignored, never an error ([`Config::retired`]).
 pub const RETIRED: &[&str] = &["rail_expand"];
@@ -156,6 +164,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             k if RETIRED.contains(&k) => cfg.retired.push(k.to_string()),
             "avatars" => cfg.avatars = one_of(item, AVATARS).ok_or_else(|| bad(AVATARS.join(", ")))?,
             "density" => cfg.density = one_of(item, DENSITIES).ok_or_else(|| bad(DENSITIES.join(", ")))?,
+            "nav_rows" => cfg.nav_rows = one_of(item, NAV_ROWS).ok_or_else(|| bad(NAV_ROWS.join(", ")))?,
             "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
             "icons" => {
                 cfg.icons = match item.as_bool() {
@@ -177,8 +186,8 @@ fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
 
 /// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
 /// order of what is there and the comment after the old value; a missing file is created. Used
-/// for what the app saves itself (`icons` after asking, `theme`, `avatars`, `icons` and `density`
-/// when changed while running).
+/// for what the app saves itself (`icons` after asking, `theme`, `avatars`, `icons`, `density`
+/// and `nav_rows` when changed while running).
 /// A file that cannot be read or parsed is left alone.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
     let text = match std::fs::read_to_string(path) {

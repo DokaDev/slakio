@@ -3,8 +3,9 @@
 //!
 //! ```text
 //! ╭ ▌A company ▾ ──╮╭ main pane ─────────╮╭ thread ──────╮   the chip: the list's title
-//! │ 󰋜  Home  󰍡  ●2 ││                    ││              │   the view switcher
-//! ├────────────────┤│                    ││              │   (crate::navbar)
+//! │ 󰋜 Home      @3 ││                    ││              │   the views, a row each
+//! │ 󰍡 DMs       ●2 ││                    ││              │   (crate::navbar)
+//! ├────────────────┤│                    ││              │
 //! │ # backend      ││                    ││              │
 //! │                │├─ Message #backend ─┤├─ Reply ──────┤
 //! │                ││ › Press i to write ││ ›            │
@@ -60,8 +61,7 @@ pub struct Shape {
     pub tabs: bool,
 }
 
-/// The width of the list panel on a screen `width` wide: a fifth or so, 30 to 36 cells (from
-/// 30 the view switcher has room for its counts with icons on).
+/// The width of the list panel on a screen `width` wide: a fifth or so, 30 to 36 cells.
 pub fn list_width(width: u16) -> u16 {
     (width * 22 / 100).clamp(30, 36)
 }
@@ -83,8 +83,8 @@ pub fn areas(size: Rect, s: Shape) -> Areas {
     Areas { list: (list_w > 0).then_some(list), tabs, work, status }
 }
 
-/// The parts of the list panel: the workspace chip on its top border, the view switcher (its
-/// first row), the rule under that (joined to the border) and the rows of the list.
+/// The parts of the list panel: the workspace chip on its top border, the views (its first
+/// rows), the rule under them (joined to the border) and the rows of the list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ListParts {
     /// The title: the top border between its corners.
@@ -95,13 +95,13 @@ pub struct ListParts {
     pub rows: Rect,
 }
 
-/// The parts of list panel `list`.
-pub fn list_parts(list: Rect) -> ListParts {
+/// The parts of list panel `list` whose views take `nav` rows (one each, or one folded).
+pub fn list_parts(list: Rect, nav: u16) -> ListParts {
     let inner = inner(list);
     let title = Rect { x: list.x + 1, y: list.y, width: list.width.saturating_sub(2), height: 1.min(list.height) };
-    let views = Rect { height: inner.height.min(1), ..inner };
-    let rule = (inner.height >= 3).then_some(inner.y + 1);
-    let skip = if rule.is_some() { 2 } else { views.height };
+    let views = Rect { height: inner.height.min(nav), ..inner };
+    let rule = (inner.height >= nav + 2).then_some(inner.y + nav);
+    let skip = if rule.is_some() { nav + 1 } else { views.height };
     let rows = Rect { y: inner.y + skip, height: inner.height - skip, ..inner };
     ListParts { title, views, rule, rows }
 }

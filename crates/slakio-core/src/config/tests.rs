@@ -44,6 +44,9 @@ fn the_settings_are_read() {
     assert_eq!(Config::default().density, "comfortable");
     assert_eq!(parse("density = \"Compact\"").unwrap().density, "compact");
     assert!(parse("density = \"cozy\"").is_err());
+    assert_eq!(Config::default().nav_rows, "expanded");
+    assert_eq!(parse("nav_rows = \"Collapsed\"").unwrap().nav_rows, "collapsed");
+    assert!(parse("nav_rows = \"folded\"").is_err());
     assert_eq!(parse("").unwrap(), Config::default());
     let d = Config::default();
     assert_eq!((d.icons.as_str(), d.theme.as_str()), ("ask", "auto"));

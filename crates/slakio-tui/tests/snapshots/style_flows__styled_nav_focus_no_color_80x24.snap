@@ -4,49 +4,49 @@ expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
     [ B 0..30]
-│ Home @24  D●11  A@37  F  L ││                                                │
-    [ B 0..1] [ B R 2..10] [ B 13..16] [ B 19..22] [ B 29..30]
+│ Home                   @24 ││                                                │
+    [ B 0..1] [ B R 1..29] [ B 29..30]
+│ DMs                    ●11 ││                                                │
+    [ B 0..1] [ B 25..28] [ B 29..30]
+│ Activity               @37 ││                                                │
+    [ B 0..1] [ B 25..28] [ B 29..30]
+│ Files                      ││                                                │
+    [ B 0..1] [ B 29..30]
+│ Later                      ││                                                │
+    [ B 0..1] [ B 29..30]
 ├────────────────────────────┤│                                                │
     [ B 0..30]
-│ ▾ Favorites                ││                                                │
-    [ B 0..1] [ D 2..3] [ B 4..13] [ B 29..30]
-│▎  # backend                ││                                                │
+│ ▾ Favorites                ││     No conversation open                       │
+    [ B 0..1] [ D 2..3] [ B 4..13] [ B 29..30] [ B 36..56]
+│▎  # backend                ││     Pick one in the list and press Enter.      │
     [ B 0..1] [ B 29..30]
 │   # incidents           3  ││                                                │
     [ B 0..1] [ B 4..5] [ B 6..15] [ B R 25..28] [ B 29..30]
+│                            ││     Enter    Open                              │
+    [ B 0..1] [ B 29..30] [ B 36..41]
+│ ▾ Ops                      ││     Space h  Home                              │
+    [ B 0..1] [ D 2..3] [ B 4..7] [ B 29..30] [ B 36..43]
+│   # deploys                ││     Space d  DMs                               │
+    [ B 0..1] [ B 29..30] [ B 36..43]
+│   # alerts                 ││     Ctrl+O   Back to the last one              │
+    [ B 0..1] [ B 29..30] [ B 36..42]
+│   # partner-shared ext     ││     ?        Keyboard help                     │
+    [ B 0..1] [ D 20..24] [ B 29..30] [ B 36..37]
+│   # hostile-strings        ││     Ctrl+Q   Quit                              │
+    [ B 0..1] [ B 4..5] [ B 6..21] [ B 29..30] [ B 36..42]
+│   # big-history            ││                                                │
+    [ B 0..1] [ B 29..30]
+│   # long-threads           ││                                                │
+    [ B 0..1] [ B 29..30]
 │                            ││                                                │
     [ B 0..1] [ B 29..30]
-│ ▾ Ops                      ││     No conversation open                       │
-    [ B 0..1] [ D 2..3] [ B 4..7] [ B 29..30] [ B 36..56]
-│   # deploys                ││     Pick one in the list and press Enter.      │
-    [ B 0..1] [ B 29..30]
-│   # alerts                 ││                                                │
-    [ B 0..1] [ B 29..30]
-│   # partner-shared ext     ││     Enter    Open                              │
-    [ B 0..1] [ D 20..24] [ B 29..30] [ B 36..41]
-│   # hostile-strings        ││     Space h  Home                              │
-    [ B 0..1] [ B 4..5] [ B 6..21] [ B 29..30] [ B 36..43]
-│   # big-history            ││     Space d  DMs                               │
-    [ B 0..1] [ B 29..30] [ B 36..43]
-│   # long-threads           ││     Ctrl+O   Back to the last one              │
-    [ B 0..1] [ B 29..30] [ B 36..42]
-│                            ││     ?        Keyboard help                     │
-    [ B 0..1] [ B 29..30] [ B 36..37]
-│ ▾ Channels                 ││     Ctrl+Q   Quit                              │
-    [ B 0..1] [ D 2..3] [ B 4..12] [ B 29..30] [ B 36..42]
+│ ▾ Channels                 ││                                                │
+    [ B 0..1] [ D 2..3] [ B 4..12] [ B 29..30]
 │   # announcements          ││                                                │
     [ B 0..1] [ B 29..30]
 │   # design-review          ││                                                │
     [ B 0..1] [ D 4..5] [ D 6..19] [ B 29..30]
-│   # feed-alert-134         ││                                                │
-    [ B 0..1] [ B 29..30]
-│   # feed-alert-8           ││                                                │
-    [ B 0..1] [ B 29..30]
-│   # feed-budget-162        ││                                                │
-    [ B 0..1] [ B 29..30]
-│   # feed-budget-33         ││                                                │
-    [ B 0..1] [ B 29..30]
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
     [ B 0..30]
- NORMAL  ▌A company › Home │ Enter show · h/l move · ? help · Space more │ demo
+ NORMAL  ▌A company › Home │ Enter show · j/k move · ? help · Space more │ demo
     [ B R 0..8] [ D 19..22] [ B 29..34] [ D 39..42] [ B 42..45] [ D 50..53] [ B 53..54] [ D 59..62] [ B 62..67]

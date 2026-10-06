@@ -3,15 +3,19 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: "demo::mask_hangul(&d.screen())"
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #long-threads ×  2 ⤷ For cache timeout tic… ×
-│ Home @24  D●11  A@37  F  L │╭ ▌⤷ Thread · #long-threads ─────────────────────────────────────────────────────────────╮
-├────────────────────────────┤│ ───────────────────────────────────── 2026-01-06 ───────────────────────────────────── │
-│ ▾ Favorites                ││  H    Hana  08:35                                                                      │
-│   # backend                ││       For cache timeout ticket migration pager rollback branch tracing after a done on │
-│   # incidents           3  ││       tomorrow broken schema                                                           │
-│                            ││       👍 3                                                                             │
-│ ▾ Ops                      ││ ────────────────────────────────────── 1 reply ─────────────────────────────────────── │
-│   # deploys                ││  TK   Tom Ko  08:36                                                                    │
-│   # alerts                 ││       Metrics tracing again release invoice for meeting staging                        │
+│▎Home                   @24 │╭ ▌⤷ Thread · #long-threads ─────────────────────────────────────────────────────────────╮
+│ DMs                    ●11 ││ ───────────────────────────────────── 2026-01-06 ───────────────────────────────────── │
+│ Activity               @37 ││  H    Hana  08:35                                                                      │
+│ Files                      ││       For cache timeout ticket migration pager rollback branch tracing after a done on │
+│ Later                      ││       tomorrow broken schema                                                           │
+├────────────────────────────┤│       👍 3                                                                             │
+│ ▾ Favorites                ││ ────────────────────────────────────── 1 reply ─────────────────────────────────────── │
+│   # backend                ││  TK   Tom Ko  08:36                                                                    │
+│   # incidents           3  ││       Metrics tracing again release invoice for meeting staging                        │
+│                            ││                                                                                        │
+│ ▾ Ops                      ││                                                                                        │
+│   # deploys                ││                                                                                        │
+│   # alerts                 ││                                                                                        │
 │   # partner-shared ext     ││                                                                                        │
 │   # hostile-strings        ││                                                                                        │
 │   # big-history            ││                                                                                        │
@@ -34,11 +38,7 @@ expression: "demo::mask_hangul(&d.screen())"
 │   # feed-design-83         ││                                                                                        │
 │   # feed-draft-142         ││                                                                                        │
 │   # feed-draft-58          ││                                                                                        │
-│   # feed-draft-84          ││                                                                                        │
-│   # feed-index-199      2  ││                                                                                        │
-│   # feed-index-39          ││                                                                                        │
-│   # feed-index-5        1  ││                                                                                        │
-│   # feed-invoice-16        │├─ Reply ────────────────────────────────────────────────────────────────────────────────┤
-│   # feed-invoice-168       ││ › Press i to reply                                                                     │
+│   # feed-draft-84          │├─ Reply ────────────────────────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Press i to reply                                                                     │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › #long-threads › ⤷ Thread         │ i reply · k messages · Esc list · Ctrl+W close · ? help │ demo

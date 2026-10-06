@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&narrow.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────╮
-│ H@24  DMs ●11  A@37  F  L  ││    still pager review done lunch someone       │
-├────────────────────────────┤│    ⤷ 12 replies · last 04:02                   │
+│ Home                   @24 ││    still pager review done lunch someone       │
+│▎DMs                    ●11 ││    ⤷ 12 replies · last 04:02                   │
+│ Activity               @37 ││                                                │
+│ Files                      ││ M  Me · 04:08                                  │
+│ Later                      ││    Rolling back                                │
+├────────────────────────────┤│    🎉 3                                        │
 │▎MK● Minsu Kim           3  ││                                                │
-│ JP● Jiho Park              ││ M  Me · 04:08                                  │
-│ ＊○ ＊＊＊                 ││    Rolling back                                │
-│ JL◐ Jiyoung Lee            ││    🎉 3                                        │
+│ JP● Jiho Park              ││ MK Minsu Kim · 05:26                           │
+│ ＊○ ＊＊＊                 ││    Done schema for please today deploy looks   │
+│ JL◐ Jiyoung Lee            ││    fine timeout retry maybe looks              │
 │ AM● Alex Morgan            ││                                                │
-│ ＊○ ＊＊＊                 ││ MK Minsu Kim · 05:26                           │
-│ H ● Hana                4  ││    Done schema for please today deploy looks   │
-│ SR● Sam Rivera          1  ││    fine timeout retry maybe looks              │
-│ ＊○ ＊＊＊                 ││                                                │
-│ TK◐ Taylor Kim             ││ MK Minsu Kim · 06:17                           │
-│ CP● Chris Park             ││    For looks maybe rollback                    │
-│ ＊○ ＊＊＊              2  ││                                                │
-│ ML◐ Mallory live           ││ M  Me · 07:27                                  │
-│ 3   Jiho Park, ＊＊＊…  2  ││    Metrics staging dashboard index design      │
-│                            ││    today lunch review review migration again   │
-│                            ││    on branch                                   │
-│                            ││    👍 1                                        │
-│                            │├─ Message @Minsu Kim ───────────────────────────┤
+│ ＊○ ＊＊＊                 ││ MK Minsu Kim · 06:17                           │
+│ H ● Hana                4  ││    For looks maybe rollback                    │
+│ SR● Sam Rivera          1  ││                                                │
+│ ＊○ ＊＊＊                 ││ M  Me · 07:27                                  │
+│ TK◐ Taylor Kim             ││    Metrics staging dashboard index design      │
+│ CP● Chris Park             ││    today lunch review review migration again   │
+│ ＊○ ＊＊＊              2  ││    on branch                                   │
+│ ML◐ Mallory live           ││    👍 1                                        │
+│ 3   Jiho Park, ＊＊＊…  2  │├─ Message @Minsu Kim ───────────────────────────┤
 │                            ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › @Minsu Kim         │ i write · ? help · Space more │ demo

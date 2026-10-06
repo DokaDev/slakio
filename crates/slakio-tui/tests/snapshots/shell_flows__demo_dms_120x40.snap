@@ -3,7 +3,11 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭ ▌B side ▾ · A @28 ─────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ H@8  DMs ●1  A@37  F  L    ││                                                                                        │
+│ Home                    @8 ││                                                                                        │
+│▎DMs                     ●1 ││                                                                                        │
+│ Activity               @37 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ Later                      ││                                                                                        │
 ├────────────────────────────┤│                                                                                        │
 │ MK● Minsu Kim              ││                                                                                        │
 │ JP● Jiho Park              ││                                                                                        │
@@ -11,10 +15,6 @@ expression: mask_hangul(&s)
 │ JL◐ Jiyoung Lee            ││                                                                                        │
 │ AM● Alex Morgan            ││                                                                                        │
 │ 3   Jiho Park, ＊＊＊…  1  ││                                                                                        │
-│                            ││                                                                                        │
-│                            ││                                                                                        │
-│                            ││                                                                                        │
-│                            ││                                                                                        │
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 │                            ││                         No conversation open                                           │

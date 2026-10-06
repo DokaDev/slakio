@@ -1,11 +1,13 @@
-//! The shell: the regions the focus moves between (the view switcher, the list panel, the work
-//! area), the view switcher's cursor, the workspace and the view the list panel shows, the list's
+//! The shell: the regions the focus moves between (the views' rows, the list panel, the work
+//! area), the views' cursor and whether they are folded, the workspace and the view the list panel shows, the list's
 //! cursor and scroll, and folded sections. It owns its update ([`Shell::update`]), which hands
 //! back a conversation to open (the work area opens it); the rows come from the read model.
 //!
 //! ```text
 //! ╭ ▌A company ▾ ───╮
-//! │ 󰋜  Home  󰍡  ●2  │   the view switcher            work area
+//! │ 󰋜 Home       @3 │   the views, one row each      work area
+//! │ 󰍡 DMs        ●2 │   (j/k run on into the list)
+//! │ …               │
 //! ├─────────────────┤
 //! │ ▾ Favorites     │   the list
 //! │   # backend   3 │
@@ -25,8 +27,8 @@ pub struct Open {
 }
 use std::collections::HashSet;
 
-/// The regions of the main screen, in reading order: the view switcher (the list panel's first
-/// row), the list, the work area.
+/// The regions of the main screen, in reading order: the views (the list panel's first rows),
+/// the list, the work area.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Region {
     ViewSwitcher,
@@ -34,7 +36,7 @@ pub enum Region {
     Work,
 }
 
-/// What the list panel shows, picked on the view switcher.
+/// What the list panel shows, picked on the views' rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum View {
     Home,
@@ -45,10 +47,10 @@ pub enum View {
 }
 
 impl View {
-    /// In the view switcher's order.
+    /// In the order of the views' rows.
     pub const ALL: &'static [View] = &[View::Home, View::Dms, View::Activity, View::Files, View::Later];
 
-    /// The view's name (the view switcher, the breadcrumb).
+    /// The view's name (its row, the breadcrumb).
     pub fn label(self) -> Label {
         match self {
             View::Home => Label::NavHome,
@@ -59,19 +61,14 @@ impl View {
         }
     }
 
-    /// Its Nerd Font glyph (`icons`), else its letter.
-    pub fn glyph(self, icons: bool) -> &'static str {
-        match (self, icons) {
-            (View::Home, false) => "H",
-            (View::Dms, false) => "D",
-            (View::Activity, false) => "A",
-            (View::Files, false) => "F",
-            (View::Later, false) => "L",
-            (View::Home, true) => "\u{F02DC}",
-            (View::Dms, true) => "\u{F0361}",
-            (View::Activity, true) => "\u{F009A}",
-            (View::Files, true) => "\u{F0219}",
-            (View::Later, true) => "\u{F00C0}",
+    /// Its Nerd Font glyph (icons on).
+    pub fn glyph(self) -> &'static str {
+        match self {
+            View::Home => "\u{F02DC}",
+            View::Dms => "\u{F0361}",
+            View::Activity => "\u{F009A}",
+            View::Files => "\u{F0219}",
+            View::Later => "\u{F00C0}",
         }
     }
 
@@ -84,8 +81,10 @@ impl View {
 
 #[derive(Clone, Debug)]
 pub struct Shell {
-    /// The view switcher's cursor: index into [`View::ALL`].
+    /// The views' cursor: index into [`View::ALL`].
     pub nav_cursor: usize,
+    /// The views are folded to one row, the view shown (`nav_rows = "collapsed"`).
+    pub nav_folded: bool,
     /// The workspace the list panel shows.
     pub workspace: usize,
     pub view: View,
@@ -104,6 +103,7 @@ impl Default for Shell {
         Self {
             // On the view shown (Home).
             nav_cursor: 0,
+            nav_folded: false,
             workspace: 0,
             view: View::Home,
             list_cursor: 0,
@@ -123,6 +123,7 @@ impl Shell {
     /// Apply `action`. `list_height` is the number of rows the list panel shows (for scrolling
     /// and paging); `here` is the region with the focus, which the action may move (the app
     /// moves the focus there). The conversation to open, when the action opens one.
+    #[expect(clippy::too_many_lines, reason = "one arm per shell action")]
     pub fn update(
         &mut self,
         action: ShellAction,
@@ -151,8 +152,13 @@ impl Shell {
             | ShellAction::SwitcherNext
             | ShellAction::SwitcherPrev
             | ShellAction::SwitcherChoose
-            | ShellAction::SwitcherClose => self.nav(action, model, here),
+            | ShellAction::SwitcherClose
+            | ShellAction::ToggleNavRows => self.nav(action, model, here),
             ShellAction::ListNext => self.list_cursor = step(&list, self.list_cursor, 1),
+            // On the list's first row, `k` goes up onto the views.
+            ShellAction::ListPrev if step(&list, self.list_cursor, -1) == self.list_cursor => {
+                self.nav(action, model, here)
+            }
             ShellAction::ListPrev => self.list_cursor = step(&list, self.list_cursor, -1),
             ShellAction::ListHalfDown => self.list_cursor = step(&list, self.list_cursor, (page / 2).max(1)),
             ShellAction::ListHalfUp => self.list_cursor = step(&list, self.list_cursor, -(page / 2).max(1)),
@@ -211,12 +217,14 @@ impl Shell {
         open
     }
 
-    /// The view switcher's keys and `[` / `]` (the workspace switcher's are the app's).
+    /// The views' keys, `[` / `]` and `k` up onto the views (the workspace switcher's are the
+    /// app's, and so are `Space v` and `Enter` on the folded row, which unfold it and save that).
     fn nav(&mut self, action: ShellAction, model: &Model, here: &mut Region) {
-        let last_item = View::ALL.len() - 1;
+        let last_item = if self.nav_folded { self.view_index() } else { View::ALL.len() - 1 };
+        let first_item = if self.nav_folded { last_item } else { 0 };
         match action {
             ShellAction::FocusNav if *here == Region::ViewSwitcher => *here = self.leave_nav(),
-            // The view switcher is the list panel's: it shows again.
+            // The views are the list panel's: it shows again.
             ShellAction::FocusNav => {
                 self.list_hidden = false;
                 self.nav_cursor = self.view_index();
@@ -226,20 +234,32 @@ impl Shell {
                 let by = if action == ShellAction::ViewNext { 1 } else { last_item };
                 self.select(View::ALL[(self.view_index() + by) % View::ALL.len()], model);
             }
+            // Down from the last row, on into the list: its first row.
+            ShellAction::NavNext if self.nav_cursor >= last_item && !self.list_hidden => {
+                let rows = self.rows(model);
+                self.list_cursor = rows.iter().position(|r| r.is_selectable()).unwrap_or(0);
+                *here = Region::List;
+            }
             ShellAction::NavNext => self.nav_cursor = (self.nav_cursor + 1).min(last_item),
-            ShellAction::NavPrev => self.nav_cursor = self.nav_cursor.saturating_sub(1),
-            ShellAction::NavFirst => self.nav_cursor = 0,
+            ShellAction::NavPrev => self.nav_cursor = self.nav_cursor.saturating_sub(1).max(first_item),
+            ShellAction::NavFirst => self.nav_cursor = first_item,
             ShellAction::NavLast => self.nav_cursor = last_item,
             ShellAction::NavSelect => {
                 self.select(View::ALL[self.nav_cursor.min(last_item)], model);
                 *here = Region::List;
             }
             ShellAction::NavLeave => *here = self.leave_nav(),
-            // The app keeps the switcher.
+            // Up from the list's first row: the row right above it.
+            ShellAction::ListPrev => {
+                self.nav_cursor = last_item;
+                *here = Region::ViewSwitcher;
+            }
+            // The app keeps the switcher, and folds the views and saves it.
             ShellAction::SwitcherNext
             | ShellAction::SwitcherPrev
             | ShellAction::SwitcherChoose
-            | ShellAction::SwitcherClose => {}
+            | ShellAction::SwitcherClose
+            | ShellAction::ToggleNavRows => {}
             _ => {}
         }
     }
@@ -359,14 +379,14 @@ impl Shell {
         View::ALL.iter().position(|v| *v == self.view).unwrap_or(0)
     }
 
-    /// Where the focus goes from the view switcher without picking anything: the list, or the
-    /// work area when the list is hidden.
+    /// Where the focus goes from the views without picking anything: the list, or the work
+    /// area when the list is hidden.
     fn leave_nav(&self) -> Region {
         if self.list_hidden { Region::Work } else { Region::List }
     }
 
     /// The region `step` places before (-1) or after (1) `here`, skipping a hidden list panel
-    /// (and its view switcher).
+    /// (and its views).
     fn neighbour(&self, here: Region, step: i8) -> Region {
         let order: Vec<Region> = [Region::ViewSwitcher, Region::List, Region::Work]
             .into_iter()

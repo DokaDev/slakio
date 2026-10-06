@@ -117,9 +117,8 @@ fn the_list_panel_marks_the_workspace_with_its_band_and_mentions_only_in_red() {
     let t = d.app.theme.clone();
     assert_eq!(buf[(2, 0)].symbol(), "▌", "the chip on the list panel's title");
     assert_eq!(Some(buf[(2, 0)].fg), t.workspace(d.app.model.workspaces()[0].color).fg, "the workspace's color");
-    let chip = d.app.chip_bar().unwrap();
-    let views = d.app.view_switcher().unwrap();
-    for (bar, y) in [(chip, 0), (views, 1)] {
+    let bars = std::iter::once(d.app.chip_bar().unwrap()).chain(d.app.view_rows());
+    for (bar, y) in bars.map(|b| (b.clone(), b.area.y)) {
         for p in bar
             .pieces
             .iter()
@@ -144,7 +143,7 @@ fn the_which_key_popup_dims_the_screen_and_hides_the_hints() {
     d.now = t0 + WHICH_KEY_DELAY;
     d.app.on_tick(d.now);
     let after = d.buffer();
-    let list = screen::list_parts(d.app.areas().list.unwrap()).rows;
+    let list = d.app.list_parts().unwrap().rows;
     let (x, y) = (list.x + 3, list.y);
     assert_ne!(after[(x, y)].fg, before[(x, y)].fg, "the list behind the popup is dimmed");
     assert!(!d.status_line().contains("Enter open"), "{}", d.status_line());

@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││                                                │
-├────────────────────────────┤│ TK  Tom Ko  06:41                              │
-│ ▾ Favorites                ││     On waiting migration someone index can     │
-│▎  # backend                ││     staging should                             │
-│   # incidents           3  ││                                                │
-│                            ││ KN  Kate Nam  06:51                            │
-│ ▾ Ops                      ││     Production roadmap customer build alert    │
-│   # depl╭ Quit slakio? ────────────────────────────────────────────╮admap    │
-│   # aler│ A message you wrote has not been sent; quitting loses    │         │
-│   # part│ it.                                                      │         │
-│   # host│                                                          │         │
-│   # big-│                    [ Stay ]   [ Quit ]                   │         │
-│   # long╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
-│                            ││ KN  Kate Nam  07:05                            │
-│ ▾ Channels                 ││     Ticket review pager pager production on    │
-│   # announcements          ││     build alert the on draft                   │
-│   # design-review          ││                                                │
-│   # feed-alert-134         ││ SR  Sam Rivera  07:14                          │
-│   # feed-alert-8           ││     Meeting moved to 3pm                       │
-│   # feed-budget-162        │├─ Message #backend ─────────────────────────────┤
-│   # feed-budget-33         ││ › half written                                 │
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││ TK  Tom Ko  06:41                              │
+│ Activity               @37 ││     On waiting migration someone index can     │
+│ Files                      ││     staging should                             │
+│ Later                      ││                                                │
+├────────────────────────────┤│ KN  Kate Nam  06:51                            │
+│ ▾ Favorites                ││     Production roadmap customer build alert    │
+│▎  # back╭ Quit slakio? ────────────────────────────────────────────╮admap    │
+│   # inci│ A message you wrote has not been sent; quitting loses    │         │
+│         │ it.                                                      │         │
+│ ▾ Ops   │                                                          │         │
+│   # depl│                    [ Stay ]   [ Quit ]                   │         │
+│   # aler╰────────────────────────── y Quit · n Stay · Enter choose ╯         │
+│   # partner-shared ext     ││ KN  Kate Nam  07:05                            │
+│   # hostile-strings        ││     Ticket review pager pager production on    │
+│   # big-history            ││     build alert the on draft                   │
+│   # long-threads           ││                                                │
+│                            ││ SR  Sam Rivera  07:14                          │
+│ ▾ Channels                 ││     Meeting moved to 3pm                       │
+│   # announcements          │├─ Message #backend ─────────────────────────────┤
+│   # design-review          ││ › half written                                 │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #backend                                           │ demo

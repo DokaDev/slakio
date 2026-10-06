@@ -3,26 +3,26 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
-│ Home @24  D●11  A@37  F  L ││ ───────────────── 2026-01-05 ───────────────── │
-├────────────────────────────┤│ KN  Kate Nam  10:21                            │
-│ ▾ Favorites                ││     Staging customer again cache maybe waiting │
-│   # backend                ││     timeout draft after                        │
-│   # incidents           3  ││     ⤷ 9 replies · last 10:30                   │
+│▎Home                   @24 ││ ───────────────── 2026-01-05 ───────────────── │
+│ DMs                    ●11 ││ KN  Kate Nam  10:21                            │
+│ Activity               @37 ││     Staging customer again cache maybe waiting │
+│ Files                      ││     timeout draft after                        │
+│ Later                      ││     ⤷ 9 replies · last 10:30                   │
+├────────────────────────────┤│                                                │
+│ ▾ Favorites                ││ MB  Max Baek  10:26                            │
+│   # backend                ││     Broken done dashboard broken review pager  │
+│   # incidents           3  ││     🎉 5   🙏 3                                │
 │                            ││                                                │
-│ ▾ Ops                      ││ MB  Max Baek  10:26                            │
-│▎  # deploys                ││     Broken done dashboard broken review pager  │
-│   # alerts                 ││     🎉 5   🙏 3                                │
+│ ▾ Ops                      ││ ＊  ＊＊＊  11:32                              │
+│▎  # deploys                ││     The is latency looks staging meeting build │
+│   # alerts                 ││     migration                                  │
 │   # partner-shared ext     ││                                                │
-│   # hostile-strings        ││ ＊  ＊＊＊  11:32                              │
-│   # big-history            ││     The is latency looks staging meeting build │
-│   # long-threads           ││     migration                                  │
-│                            ││                                                │
-│ ▾ Channels                 ││ MJ  Mia Jang  12:03                            │
-│   # announcements          ││     Done draft cache now index we for pager    │
-│   # design-review          ││     latency tracing draft roadmap              │
-│   # feed-alert-134         ││     ✅ 5   👍 3   🔥 2                         │
-│   # feed-alert-8           ││                                                │
-│   # feed-budget-162        │├─ Message #deploys ─────────────────────────────┤
-│   # feed-budget-33         ││ › Press i to write                             │
+│   # hostile-strings        ││ MJ  Mia Jang  12:03                            │
+│   # big-history            ││     Done draft cache now index we for pager    │
+│   # long-threads           ││     latency tracing draft roadmap              │
+│                            ││     ✅ 5   👍 3   🔥 2                         │
+│ ▾ Channels                 ││                                                │
+│   # announcements          │├─ Message #deploys ─────────────────────────────┤
+│   # design-review          ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › #deploys       │ Enter thread · t new tab · ? help │ demo

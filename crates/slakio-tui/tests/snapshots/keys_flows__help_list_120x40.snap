@@ -3,27 +3,27 @@ source: crates/slakio-tui/tests/keys_flows.rs
 expression: s
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
-│ Home @24╭ Keys — List panel ───────────────────────────────────────────────────────────────────────────────╮         │
-├─────────│ / Type / to search                                                                               │         │
-│ ▾ Favori│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
-│   # back│ ▾ List panel                                                                                     │         │
-│   # inci│   Next row                                                                              j / Down │         │
-│         │   Previous row                                                                            k / Up │         │
-│ ▾ Ops   │   First row                                                                           g g / Home │         │
-│   # depl│   Last row                                                                               G / End │         │
-│   # aler│   Half a page down                                                                        Ctrl+D │         │
-│   # part│   Half a page up                                                                          Ctrl+U │         │
-│   # host│   A page down                                                                           PageDown │         │
-│   # big-│   A page up                                                                               PageUp │         │
-│   # long│   Open the conversation, or fold the section                                               Enter │         │
-│         │   Open, staying in the list (or unfold)                                                l / Right │         │
-│ ▾ Channe│   To the section header, fold it, then the view switcher                                h / Left │         │
-│   # anno│   Previous section                                                                             { │         │
-│   # desi│   Next section                                                                                 } │         │
-│   # feed│   Show the previous view                                                                       [ │         │
-│   # feed│   Show the next view                                                                           ] │         │
-│   # feed│   Open in a new tab (a message: its thread)                                                    t │         │
-│   # feed│ ▾ Main screen                                                                                    │         │
+│▎Home    ╭ Keys — List panel ───────────────────────────────────────────────────────────────────────────────╮         │
+│ DMs     │ / Type / to search                                                                               │         │
+│ Activity│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│ Files   │ ▾ List panel                                                                                     │         │
+│ Later   │   Next row                                                                              j / Down │         │
+├─────────│   Previous row                                                                            k / Up │         │
+│ ▾ Favori│   First row                                                                           g g / Home │         │
+│   # back│   Last row                                                                               G / End │         │
+│   # inci│   Half a page down                                                                        Ctrl+D │         │
+│         │   Half a page up                                                                          Ctrl+U │         │
+│ ▾ Ops   │   A page down                                                                           PageDown │         │
+│   # depl│   A page up                                                                               PageUp │         │
+│   # aler│   Open the conversation, or fold the section                                               Enter │         │
+│   # part│   Open, staying in the list (or unfold)                                                l / Right │         │
+│   # host│   To the section header, fold it, then the view switcher                                h / Left │         │
+│   # big-│   Previous section                                                                             { │         │
+│   # long│   Next section                                                                                 } │         │
+│         │   Show the previous view                                                                       [ │         │
+│ ▾ Channe│   Show the next view                                                                           ] │         │
+│   # anno│   Open in a new tab (a message: its thread)                                                    t │         │
+│   # desi│ ▾ Main screen                                                                                    │         │
 │   # feed│   Next panel                                                                            Tab / F6 │         │
 │   # feed│   Previous panel                                                            Shift+Tab / Shift+F6 │         │
 │   # feed│   View switcher (in the list panel)                                             Ctrl+R / Space r │         │
@@ -38,7 +38,7 @@ expression: s
 │   # feed│   Show Files                                                                             Space f │         │
 │   # feed│   Show Later                                                                             Space l │         │
 │   # feed│   Show or hide the list panel                                                            Space e │         │
-│   # feed│   Switch workspace                                                                       Space W │         │
+│   # feed│   Fold the view switcher to the view shown, or unfold it                                 Space v │         │
 │   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                                       │ demo

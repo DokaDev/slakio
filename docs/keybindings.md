@@ -46,6 +46,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space f` | Show Files | `view.files` |
 | `Space l` | Show Later | `view.later` |
 | `Space e` | Show or hide the list panel | `list.toggle_panel` |
+| `Space v` | Fold the view switcher to the view shown, or unfold it | `nav.toggle_rows` |
 | `Space W` | Switch workspace | `workspace.choose` |
 | `Ctrl+O` | Back to the conversation before | `history.back` |
 | `Alt+Left` | Back to the conversation before | `history.back` |
@@ -89,18 +90,16 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 
 | Keys | Action | Id |
 |---|---|---|
-| `l` | Next view on the view switcher | `nav.next` |
-| `Right` | Next view on the view switcher | `nav.next` |
-| `h` | Previous view on the view switcher | `nav.prev` |
-| `Left` | Previous view on the view switcher | `nav.prev` |
+| `j` | Next view on the view switcher (from the last, the list) | `nav.next` |
+| `Down` | Next view on the view switcher (from the last, the list) | `nav.next` |
+| `k` | Previous view on the view switcher | `nav.prev` |
+| `Up` | Previous view on the view switcher | `nav.prev` |
 | `g g` | First view on the view switcher | `nav.first` |
 | `Home` | First view on the view switcher | `nav.first` |
 | `G` | Last view on the view switcher | `nav.last` |
 | `End` | Last view on the view switcher | `nav.last` |
-| `Enter` | Show the view | `nav.select` |
+| `Enter` | Show the view (the folded row: unfold it) | `nav.select` |
 | `Esc` | Back to the list | `nav.leave` |
-| `j` | Back to the list | `nav.leave` |
-| `Down` | Back to the list | `nav.leave` |
 
 ## List panel (`list`)
 
@@ -263,6 +262,7 @@ Type `:` and the command, then `Enter`.
 | `:density` |  | Comfortable or compact messages |
 | `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
+| `:navrows` |  | Fold the view switcher to the view shown, or unfold it |
 | `:home` |  | Show Home |
 | `:dms` |  | Show DMs |
 | `:activity` |  | Show Activity |

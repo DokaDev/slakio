@@ -53,7 +53,7 @@ pub enum Ctx {
     Root,
     /// The non-text regions of the main screen.
     Shell,
-    /// The view switcher: the list panel's first row, the views.
+    /// The view switcher: the list panel's first rows, a row per view.
     ViewSwitcher,
     /// The list panel: sections, channels, DMs.
     List,
@@ -226,8 +226,8 @@ pub const DEFAULTS: &[Binding] = &[
     help(Ctx::Root, "?", HelpAction::Open),
     app(Ctx::Root, "ctrl+c", AppAction::Interrupt),
     // Between the panels. `Tab` goes round the view switcher, list, main pane and thread panel.
-    // `Ctrl+R` and `Space r` go straight to the view switcher and
-    // `Ctrl+R` back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
+    // `Ctrl+R` and `Space r` go straight to the view switcher (on the view shown) and `Ctrl+R`
+    // back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
     // `Backspace` as `^H`; `Space w h` works everywhere.
     shell(Ctx::Shell, "tab", ShellAction::FocusNext),
     shell(Ctx::Shell, "f6", ShellAction::FocusNext),
@@ -251,6 +251,7 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space f", ShellAction::Show(View::Files)),
     shell(Ctx::Shell, "space l", ShellAction::Show(View::Later)),
     shell(Ctx::Shell, "space e", ShellAction::ToggleList),
+    shell(Ctx::Shell, "space v", ShellAction::ToggleNavRows),
     app(Ctx::Shell, "space W", AppAction::ChooseWorkspace),
     // Back and forward through what the work area showed. `Ctrl+I` is `Tab` without the kitty
     // keyboard protocol, so it is bound only with it; `Alt` needs Option-as-Alt on macOS;
@@ -293,19 +294,18 @@ pub const DEFAULTS: &[Binding] = &[
     help(Ctx::Shell, "space ?", HelpAction::Open),
     cmdline(Ctx::Shell, "space /", CommandLineAction::Open),
     app(Ctx::Shell, "space q", AppAction::Quit),
-    // The view switcher runs left to right; down (or Esc) goes back to the list under it.
-    shell(Ctx::ViewSwitcher, "l", ShellAction::NavNext),
-    shell(Ctx::ViewSwitcher, "right", ShellAction::NavNext),
-    shell(Ctx::ViewSwitcher, "h", ShellAction::NavPrev),
-    shell(Ctx::ViewSwitcher, "left", ShellAction::NavPrev),
+    // The view switcher runs top to bottom, the list under it: down from its last row is the
+    // list's first, and `k` there comes back up. `Esc` goes back to the list as it was.
+    shell(Ctx::ViewSwitcher, "j", ShellAction::NavNext),
+    shell(Ctx::ViewSwitcher, "down", ShellAction::NavNext),
+    shell(Ctx::ViewSwitcher, "k", ShellAction::NavPrev),
+    shell(Ctx::ViewSwitcher, "up", ShellAction::NavPrev),
     shell(Ctx::ViewSwitcher, "g g", ShellAction::NavFirst),
     shell(Ctx::ViewSwitcher, "home", ShellAction::NavFirst),
     shell(Ctx::ViewSwitcher, "G", ShellAction::NavLast),
     shell(Ctx::ViewSwitcher, "end", ShellAction::NavLast),
     shell(Ctx::ViewSwitcher, "enter", ShellAction::NavSelect),
     shell(Ctx::ViewSwitcher, "esc", ShellAction::NavLeave),
-    shell(Ctx::ViewSwitcher, "j", ShellAction::NavLeave),
-    shell(Ctx::ViewSwitcher, "down", ShellAction::NavLeave),
     // The workspace switcher (a popup).
     shell(Ctx::Switcher, "j", ShellAction::SwitcherNext),
     shell(Ctx::Switcher, "down", ShellAction::SwitcherNext),
