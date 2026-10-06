@@ -63,7 +63,11 @@ images, and settings. This README only lists what works; it will grow with each 
 - `Ctrl+Q` quits from anywhere (it asks first when a message you wrote was not sent); so do
   `Space q` and `:q` / `:qa`.
 - `Ctrl+P` (or `:`) opens the command palette: every command and action that works where you
-  are, with its keys; type to filter, `Tab` / arrows to select, `Enter` to run, or click.
+  are, with its keys; type to filter (letters in order are enough: `thm` finds `:theme`),
+  `Tab` / arrows to select, `Enter` to run, or click (a click on Quit asks first).
+- People are pictured by their initials on a color of their own: before a sender's name, before
+  a DM in the list (with whether they are around at its corner) and in a DM's title;
+  `:avatars` turns them off and on and saves it. Profile photos are not shown yet.
 - Themes: the terminal's own colors, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
   `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
@@ -107,13 +111,16 @@ theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast",
                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
+avatars = "initials"     # a person's initials on a colored chip, or "off"
 rail_expand = "overlay"  # the focused rail opens over the list panel, or "push"es it aside
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
 is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also
 `:colorscheme`, or `:set theme=<name>`) switches the theme while slakio runs and saves it here,
-keeping your comments. With `icons = "ask"`, `slakio
+keeping your comments. `:avatars` (or `:set avatars=off`) does the same for `avatars`;
+`avatars = "image"` is kept for profile photos, which come in a later version, and draws
+initials until then. With `icons = "ask"`, `slakio
 --demo` asks once whether your font shows the icons (the rail previews the answer) and saves
 the answer in the config file. `rail_expand` is temporary: both ways exist until one is chosen.
 
