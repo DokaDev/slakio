@@ -2,7 +2,8 @@
 //! (every target names its workspace), whatever number of panes show it: two panes on one
 //! conversation share its messages and load them once. Pages arrive newest first, then older
 //! ones (sanitised on arrival into [`Shown`] messages); the page asked for and not answered yet
-//! is recorded by its request id, so a late answer is told from the awaited one.
+//! is recorded by its request id, so a late answer is told from the awaited one. Messages are
+//! kept in timestamp order.
 //!
 //! A timeline lives while a pane shows its target: the work area drops the others, and opening
 //! the target again loads it afresh.
@@ -37,7 +38,14 @@ impl Timeline {
 
     /// The index of the message at `ts`, when loaded.
     pub fn position(&self, ts: Ts) -> Option<usize> {
-        self.items.iter().position(|m| m.ts == ts)
+        self.items.binary_search_by_key(&ts, |m| m.ts).ok()
+    }
+
+    /// The index of the message at `ts`, or, if it is not there (any more), of the next newer
+    /// one (the newest past the end); `None` while nothing is loaded.
+    pub fn index_near(&self, ts: Ts) -> Option<usize> {
+        let last = self.items.len().checked_sub(1)?;
+        Some(self.items.binary_search_by_key(&ts, |m| m.ts).unwrap_or_else(|i| i.min(last)))
     }
 }
 

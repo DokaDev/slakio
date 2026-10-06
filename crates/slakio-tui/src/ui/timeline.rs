@@ -245,8 +245,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         laid.entry(i).or_insert_with(|| rows(app, pane, tl, i, w)).len()
     };
     // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
-    let mut bottom = pane.bottom.get().unwrap_or(n - 1).min(n - 1);
-    if let Some(sel) = pane.selected.map(|s| s.min(n - 1)) {
+    let selected = pane.selected_index(tl);
+    let mut bottom = pane.bottom.get().and_then(|ts| tl.index_near(ts)).unwrap_or(n - 1).min(n - 1);
+    if let Some(sel) = selected.map(|s| s.min(n - 1)) {
         if sel > bottom {
             bottom = sel;
         } else {
@@ -281,7 +282,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         }
     }
     // At the newest, new messages stay in view; elsewhere the view stays put.
-    pane.bottom.set((bottom != n - 1).then_some(bottom));
+    pane.bottom.set((bottom != n - 1).then(|| tl.items[bottom].ts));
     // From the bottom message upwards until the area is full.
     let mut shown: Vec<(usize, Vec<Laid>)> = Vec::new();
     let mut total = 0;
@@ -308,9 +309,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         shown.push((i, rows));
         i += 1;
     }
-    let range = pane.range();
+    let range = pane.range(tl);
     let how = |i: usize| match (focused, pane.visual.is_some()) {
-        (_, true) if pane.selected != Some(i) => Selection::Visual,
+        (_, true) if selected != Some(i) => Selection::Visual,
         (true, _) => Selection::Focused,
         (false, _) => Selection::Unfocused,
     };

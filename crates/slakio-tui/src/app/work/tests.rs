@@ -75,7 +75,7 @@ fn enter_opens_the_thread_panel_and_another_thread_replaces_it() {
     let mut w = Work::default();
     w.open(conversation(&m, "long-threads"));
     pump(&mut w, &m, &mut b);
-    w.with_pane(|p, _| p.selected = Some(0));
+    w.with_pane(|p, tl| p.select_index(0, tl));
     w.open_thread();
     pump(&mut w, &m, &mut b);
     assert_eq!(w.side, Side::Thread);
@@ -83,7 +83,7 @@ fn enter_opens_the_thread_panel_and_another_thread_replaces_it() {
     assert!(thread.is_thread() && w.timeline(thread).items.len() >= 200);
     let first = thread.target.clone();
     assert!(w.focus_side(-1));
-    w.with_pane(|p, _| p.selected = Some(1));
+    w.with_pane(|p, tl| p.select_index(1, tl));
     w.open_thread();
     assert_ne!(w.thread.as_ref().unwrap().target, first, "replaced");
     w.close();
@@ -151,19 +151,20 @@ fn two_panes_on_one_target_share_its_messages_and_load_them_once() {
     let n = w.timeline(w.main.as_ref().unwrap()).items.len();
     assert_eq!(w.timeline(w.thread.as_ref().unwrap()).items.len(), n);
     // Both panes select messages near the top; one older page comes, both keep their messages.
-    w.with_pane(|p, _| p.selected = Some(3));
-    w.main.as_mut().unwrap().selected = Some(5);
-    let asked = w.take_requests();
-    assert_eq!(asked.len(), 1, "one request for the target");
+    w.with_pane(|p, tl| p.select_index(3, tl));
     let (ts3, ts5) = {
         let tl = w.timeline(w.main.as_ref().unwrap());
         (tl.items[3].ts, tl.items[5].ts)
     };
+    w.main.as_mut().unwrap().selected = Some(ts5);
+    let asked = w.take_requests();
+    assert_eq!(asked.len(), 1, "one request for the target");
     answer(&mut w, &m, &mut b, asked);
     let tl = w.timeline(w.main.as_ref().unwrap());
-    let thread = w.thread.as_ref().unwrap();
-    assert_eq!(tl.items[thread.selected.unwrap()].ts, ts3);
-    assert_eq!(tl.items[w.main.as_ref().unwrap().selected.unwrap()].ts, ts5);
+    let (main, thread) = (w.main.as_ref().unwrap(), w.thread.as_ref().unwrap());
+    assert!(tl.items.len() > n, "older messages arrived");
+    assert_eq!(tl.items[thread.selected_index(tl).unwrap()].ts, ts3);
+    assert_eq!(tl.items[main.selected_index(tl).unwrap()].ts, ts5);
     // One draft for the target: written in one pane, it is there in the other.
     w.with_draft(|c| c.insert("hi"));
     assert_eq!(w.draft(w.main.as_ref().unwrap()).text(), "hi");

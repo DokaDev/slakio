@@ -516,8 +516,8 @@ impl App {
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
         self.work.set_insert(parts.input.contains(at));
         let Some(hit) = hit else { return };
-        self.work.with_pane(|p, _| {
-            p.selected = Some(hit.message);
+        self.work.with_pane(|p, tl| {
+            p.select_index(hit.message, tl);
             p.visual = None;
         });
         if (hit.link || double) && side == Side::Main {
@@ -698,7 +698,7 @@ impl App {
             PaneAction::PageDown => self.work.step(page),
             PaneAction::PageUp => self.work.step(-page),
             PaneAction::First => self.work.with_pane(|p, tl| p.select_oldest(tl)),
-            PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl.items.len())),
+            PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl)),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
                 Some(p) if p.selected.is_none() || self.work.side == Side::Thread => self.work.set_insert(true),
@@ -708,7 +708,7 @@ impl App {
             PaneAction::Visual => self.work.with_pane(|p, tl| {
                 if p.visual.take().is_none() {
                     if p.selected.is_none() {
-                        p.select_newest(tl.items.len());
+                        p.select_newest(tl);
                     }
                     p.visual = p.selected;
                 }
@@ -771,7 +771,7 @@ impl App {
     /// message alone as its text, a range as `time  author: text` lines. Sanitised text only.
     fn copy(&mut self, now: Instant) {
         let Some(p) = self.work.focused() else { return };
-        let Some((a, b)) = p.range() else { return };
+        let Some((a, b)) = p.range(self.work.timeline(p)) else { return };
         let one = a == b && p.visual.is_none();
         let items = &self.work.timeline(p).items[a..=b];
         let text = if one {

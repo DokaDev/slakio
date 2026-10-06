@@ -4,6 +4,9 @@
 //! target's draft ([`super::drafts`]). A pane asks for older messages as its selection nears
 //! the top; drawing lays out only the rows on screen.
 //!
+//! The selection, the VISUAL range and the anchor name messages by their timestamp, so they stay
+//! on their messages whatever arrives before or after them.
+//!
 //! The view is anchored at the bottom: `bottom` is the message on the last row, or the newest
 //! while nothing is selected (so new messages stay in view). Drawing moves `bottom` to keep the
 //! selection on screen; it is a `Cell` because only drawing knows the rows' heights. At the top
@@ -74,12 +77,12 @@ pub struct Hit {
 #[derive(Clone, Debug)]
 pub struct Pane {
     pub target: Target,
-    /// The selected message (index into the timeline); `None` until the user moves.
-    pub selected: Option<usize>,
+    /// The selected message, by its timestamp; `None` until the user moves.
+    pub selected: Option<Ts>,
     /// The other end of the VISUAL range, while selecting one.
-    pub visual: Option<usize>,
+    pub visual: Option<Ts>,
     /// The message on the last row (`None`: the newest). Kept by drawing.
-    pub bottom: Cell<Option<usize>>,
+    pub bottom: Cell<Option<Ts>>,
     /// `gg` was pressed before the oldest message was loaded: keep loading, then select it.
     pub to_oldest: bool,
     /// Its composer is being written in (Insert mode); only the pane with the keyboard is.
@@ -123,40 +126,45 @@ impl Pane {
             return None;
         }
         let Some(first) = tl.items.first() else { return Some(None) };
-        let near_top = self.selected.is_some_and(|s| s < PREFETCH);
+        let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
         near_top.then_some(Some(first.ts))
     }
 
-    /// `n` older messages were put before the loaded ones of `tl` (this pane's timeline): the
-    /// selection stays on its messages, and `gg` keeps the oldest selected until it is loaded.
-    pub fn prepended(&mut self, n: usize, tl: &Timeline) {
-        if n > 0 {
-            let shift = |i: Option<usize>| i.map(|i| i + n);
-            self.selected = shift(self.selected);
-            self.visual = shift(self.visual);
-            self.bottom.set(shift(self.bottom.get()));
-        }
+    /// A page arrived in `tl` (this pane's timeline): `gg` keeps the oldest selected until it
+    /// is loaded. (The selection names its message, so it stays on it.)
+    pub fn arrived(&mut self, tl: &Timeline) {
         if self.to_oldest {
-            self.selected = (!tl.items.is_empty()).then_some(0);
+            self.selected = tl.items.first().map(|m| m.ts);
             self.to_oldest = !tl.complete;
         }
     }
 
-    /// Select the next (`1`) or previous (`-1`) of `len` messages; the first move selects the
-    /// newest.
-    pub fn step(&mut self, by: isize, len: usize) {
-        self.to_oldest = false;
-        let Some(last) = len.checked_sub(1) else { return };
-        self.selected = Some(match self.selected {
-            None => last,
-            Some(s) => s.saturating_add_signed(by).min(last),
-        });
+    /// The selected message's index in `tl` (this pane's timeline).
+    pub fn selected_index(&self, tl: &Timeline) -> Option<usize> {
+        self.selected.and_then(|ts| tl.index_near(ts))
     }
 
-    /// Select the newest of `len` messages.
-    pub fn select_newest(&mut self, len: usize) {
+    /// Select message `i` of `tl` (this pane's timeline).
+    pub fn select_index(&mut self, i: usize, tl: &Timeline) {
+        self.selected = tl.items.get(i).map(|m| m.ts);
+    }
+
+    /// Select the next (`1`) or previous (`-1`) message of `tl` (this pane's timeline); the
+    /// first move selects the newest.
+    pub fn step(&mut self, by: isize, tl: &Timeline) {
         self.to_oldest = false;
-        self.selected = len.checked_sub(1);
+        let Some(last) = tl.items.len().checked_sub(1) else { return };
+        let i = match self.selected_index(tl) {
+            None => last,
+            Some(s) => s.saturating_add_signed(by).min(last),
+        };
+        self.select_index(i, tl);
+    }
+
+    /// Select the newest message of `tl` (this pane's timeline).
+    pub fn select_newest(&mut self, tl: &Timeline) {
+        self.to_oldest = false;
+        self.selected = tl.items.last().map(|m| m.ts);
     }
 
     /// The message this thread pane is the thread of, when loaded in `tl` (its timeline).
@@ -175,14 +183,15 @@ impl Pane {
         if tl.items.is_empty() {
             return;
         }
-        self.selected = Some(0);
+        self.select_index(0, tl);
         self.to_oldest = !tl.complete;
     }
 
-    /// The selected messages: the VISUAL range, or the selected one.
-    pub fn range(&self) -> Option<(usize, usize)> {
-        let s = self.selected?;
-        let v = self.visual.unwrap_or(s);
+    /// The selected messages of `tl` (this pane's timeline): the VISUAL range, or the selected
+    /// one, as indices.
+    pub fn range(&self, tl: &Timeline) -> Option<(usize, usize)> {
+        let s = self.selected_index(tl)?;
+        let v = self.visual.and_then(|ts| tl.index_near(ts)).unwrap_or(s);
         Some((s.min(v), s.max(v)))
     }
 

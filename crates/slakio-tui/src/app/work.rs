@@ -240,7 +240,8 @@ impl Work {
             return;
         }
         let Some(main) = self.main.as_ref() else { return };
-        let Some(m) = main.selected.and_then(|i| self.timeline(main).items.get(i)) else { return };
+        let tl = self.timeline(main);
+        let Some(m) = main.selected_index(tl).and_then(|i| tl.items.get(i)) else { return };
         let target = main.thread_target(m.ts);
         if self.thread.as_ref().is_some_and(|t| t.target == target) {
             self.turn(Side::Thread);
@@ -270,9 +271,9 @@ impl Work {
                 self.side = Side::Main;
                 if let (Some(t), Some(main)) = (closed, self.main.as_mut())
                     && let Target::Thread { thread, .. } = t.target
-                    && let Some(i) = self.timelines.get(&main.target).and_then(|tl| tl.position(thread))
+                    && self.timelines.get(&main.target).is_some_and(|tl| tl.position(thread).is_some())
                 {
-                    main.selected = Some(i);
+                    main.selected = Some(thread);
                 }
                 None
             }
@@ -304,14 +305,14 @@ impl Work {
 
     /// A page of messages arrived. `true` when a timeline took it; an answer to an older
     /// request or for a target no pane shows is dropped. Every pane on the target keeps its
-    /// selection on its messages.
+    /// selection on its messages (it names them by timestamp).
     pub fn on_page(&mut self, generation: Generation, page: &Page, model: &Model) -> bool {
         let Some(tl) = self.timelines.awaiting(&page.target, generation) else { return false };
         let shown = page.messages.iter().map(|m| shown(model, &page.target, m)).collect();
-        let n = tl.add_page(page, shown);
+        tl.add_page(page, shown);
         for pane in [self.main.as_mut(), self.thread.as_mut()].into_iter().flatten() {
             if pane.target == page.target {
-                pane.prepended(n, tl);
+                pane.arrived(tl);
             }
         }
         self.fill();
@@ -332,7 +333,7 @@ impl Work {
 
     /// Move the focused pane's selection by `by` messages.
     pub fn step(&mut self, by: isize) {
-        self.with_pane(|p, tl| p.step(by, tl.items.len()));
+        self.with_pane(|p, tl| p.step(by, tl));
     }
 
     /// Move the selection of the pane in `slot`, if any, by `by` messages (the mouse wheel).
@@ -343,7 +344,7 @@ impl Work {
             None => None,
         };
         if let Some(p) = pane {
-            p.step(by, self.timelines.get(&p.target).map_or(0, |tl| tl.items.len()));
+            p.step(by, self.timelines.get(&p.target).unwrap_or(&EMPTY));
         }
         self.fill();
     }

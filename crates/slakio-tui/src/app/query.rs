@@ -81,12 +81,12 @@ impl<'a> PaneRef<'a> {
 
     /// The selected message (index into [`Self::messages`]).
     pub fn selected(self) -> Option<usize> {
-        self.pane.selected
+        self.pane.selected_index(self.timeline)
     }
 
     /// The selected messages: the VISUAL range, or the selected one.
     pub fn range(self) -> Option<(usize, usize)> {
-        self.pane.range()
+        self.pane.range(self.timeline)
     }
 
     /// The rows drawn last, top down: (message, screen row) for each row of a message.
@@ -217,9 +217,11 @@ impl App {
         if self.shell.focus != Region::Work {
             return;
         }
-        let Some(len) = self.work.focused().map(|p| self.work.timeline(p).items.len()) else { return };
-        if let (Some(p), Some(last)) = (self.work.focused_mut(), len.checked_sub(1)) {
-            p.selected = Some(index.min(last));
+        let Some(p) = self.work.focused() else { return };
+        let tl = self.work.timeline(p);
+        let Some(ts) = tl.items.len().checked_sub(1).map(|last| tl.items[index.min(last)].ts) else { return };
+        if let Some(p) = self.work.focused_mut() {
+            p.selected = Some(ts);
         }
     }
 
