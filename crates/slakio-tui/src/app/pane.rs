@@ -1,5 +1,6 @@
 //! A pane: a view of one conversation or thread — the selection, a VISUAL range, Insert mode,
-//! where the view is anchored, the rows drawn last and the thread panel it opened. The messages are not the pane's: they are the
+//! where the view is anchored, the rows drawn last, the thread panel it opened and what it showed
+//! before and after (its back/forward [`History`]). The messages are not the pane's: they are the
 //! target's [`Timeline`], shared by every pane that shows it, and what is being written is the
 //! target's draft ([`super::drafts`]). A pane asks for older messages as its selection nears
 //! the top; drawing lays out only the rows on screen.
@@ -18,6 +19,47 @@ use slakio_core::layout::PaneId;
 use slakio_core::model::{Message, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Safe;
 use std::cell::{Cell, RefCell};
+
+/// Targets a pane's back history keeps.
+pub const HISTORY: usize = 50;
+
+/// What a pane showed before (`Ctrl+O`) and after (`Ctrl+I`) what it shows now.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct History {
+    pub back: Vec<Target>,
+    pub forward: Vec<Target>,
+}
+
+impl History {
+    /// `from` was left for something new: it is the last one back, and nothing is forward.
+    pub fn left(&mut self, from: Target) {
+        self.back.push(from);
+        if self.back.len() > HISTORY {
+            self.back.remove(0);
+        }
+        self.forward.clear();
+    }
+
+    /// Back from `from`: the target to show, if any (`from` goes forward).
+    pub fn back(&mut self, from: &Target) -> Option<Target> {
+        let to = self.back.pop()?;
+        self.forward.push(from.clone());
+        Some(to)
+    }
+
+    /// Forward from `from`: the target to show, if any (`from` goes back).
+    pub fn forward(&mut self, from: &Target) -> Option<Target> {
+        let to = self.forward.pop()?;
+        self.back.push(from.clone());
+        Some(to)
+    }
+
+    /// Keep only the targets `keep` says still exist.
+    pub fn retain(&mut self, keep: impl Fn(&Target) -> bool) {
+        self.back.retain(&keep);
+        self.forward.retain(&keep);
+    }
+}
 
 /// Messages asked for at a time.
 pub const PAGE: u32 = 200;
@@ -90,6 +132,8 @@ pub struct Pane {
     pub insert: bool,
     /// The auto thread panel this pane opened beside it, while open.
     pub thread: Option<PaneId>,
+    /// What it showed before and after.
+    pub history: History,
     /// The rows drawn last, by drawing (only it knows the rows' heights).
     pub hits: RefCell<Vec<Hit>>,
 }
@@ -104,8 +148,16 @@ impl Pane {
             to_oldest: false,
             insert: false,
             thread: None,
+            history: History::default(),
             hits: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Show `target` instead, from scratch: no selection, the newest in view. Its history stays
+    /// (the caller says where `target` came from).
+    pub fn show(&mut self, target: Target) {
+        let history = std::mem::take(&mut self.history);
+        *self = Self { history, ..Self::new(target) };
     }
 
     /// The thread under `ts` in this pane's conversation.

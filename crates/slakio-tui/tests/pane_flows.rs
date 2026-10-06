@@ -299,6 +299,11 @@ fn back_and_forward_return_to_the_conversations_before() {
     d.app.keymap = slakio_tui::keymap::Keymap::new(true);
     d.keys("ctrl+i");
     assert_eq!(at(&d), "incidents");
+    // Closed, the conversation comes back with Back, with its own history.
+    d.keys("ctrl+w ctrl+o");
+    assert_eq!(at(&d), "incidents", "the one closed last");
+    d.keys("ctrl+o");
+    assert_eq!(at(&d), "backend");
 }
 
 #[test]

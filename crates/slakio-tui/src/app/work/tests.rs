@@ -301,3 +301,43 @@ fn closing_a_pane_closes_the_thread_panel_it_opened() {
     assert!(closed.is_some() && next.is_none());
     assert!(w.pane(panel).is_none() && w.ids().is_empty(), "the panel went with its owner");
 }
+
+#[test]
+fn the_history_is_the_panes_and_stays_with_it_when_it_shows_something_else() {
+    let m = model();
+    let mut w = Work::default();
+    let [backend, incidents, general] = ["backend", "incidents", "general"].map(|n| conversation(&m, n));
+    let id = w.open(backend.clone()).unwrap();
+    assert_eq!(w.open(incidents.clone()), Some(id), "the same pane shows the next conversation");
+    w.open(general.clone());
+    let p = w.pane(id).unwrap();
+    assert_eq!(p.history.back, vec![backend.clone(), incidents.clone()]);
+    assert!(p.history.forward.is_empty());
+    assert_eq!(w.back(), Some(id));
+    assert_eq!(w.pane(id).unwrap().history.forward, vec![general.clone()]);
+    // Closed, the work area keeps the pane's history: Back opens it again where it was.
+    w.close();
+    assert!(w.ids().is_empty());
+    assert!(w.forward().is_none(), "nothing forward of an empty work area");
+    let again = w.back().expect("the pane closed last");
+    let p = w.pane(again).unwrap();
+    assert_eq!(p.target, incidents);
+    assert_eq!((p.history.back.clone(), p.history.forward.clone()), (vec![backend], vec![general]));
+    assert!(w.back().is_some() && w.back().is_none(), "one step back, then nothing");
+}
+
+#[test]
+fn a_history_keeps_its_last_fifty_and_drops_what_is_gone() {
+    let mut h = crate::app::pane::History::default();
+    let m = model();
+    let names = ["backend", "incidents"];
+    for i in 0..60 {
+        h.left(conversation(&m, names[i % 2]));
+    }
+    assert_eq!(h.back.len(), crate::app::pane::HISTORY);
+    let gone =
+        Target::Conversation { workspace: WorkspaceId::new("TDEMOA"), conversation: ConversationId::new("CNOPE") };
+    h.forward.push(gone.clone());
+    h.retain(|t| *t != gone);
+    assert!(h.forward.is_empty());
+}

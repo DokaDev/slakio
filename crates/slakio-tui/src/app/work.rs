@@ -1,6 +1,7 @@
 //! The work area in the default (GUI Slack) mode: the conversation open in the main pane, the
-//! auto thread panel beside it, which of the two has the keyboard, whether its composer is
-//! being written in, and the back/forward history of the main pane.
+//! auto thread panel beside it, which of the two has the keyboard and whether its composer is
+//! being written in. Each pane keeps its own back/forward history; the history of the pane closed
+//! last stays, so `Ctrl+O` in an empty work area opens it again.
 //!
 //! ```text
 //! ╭ #backend ───────────────╮╭ ⤷ Thread ─────────╮
@@ -31,7 +32,7 @@
 use super::composer::Composer;
 use super::drafts::DraftStore;
 use super::model::Model;
-use super::pane::{PAGE, Pane, Shown, echo};
+use super::pane::{History, PAGE, Pane, Shown, echo};
 use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
 use crate::screen::THREAD_SHARE;
@@ -40,9 +41,6 @@ use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
 use std::collections::HashMap;
-
-/// Targets the back history keeps.
-const HISTORY: usize = 50;
 
 #[derive(Clone, Debug, Default)]
 pub struct Work {
@@ -53,8 +51,8 @@ pub struct Work {
     active: Option<PaneId>,
     /// The last pane id handed out.
     last: u64,
-    back: Vec<Target>,
-    forward: Vec<Target>,
+    /// The pane closed last, while the work area is empty: what it showed and its history.
+    closed: Option<(Target, History)>,
     /// The messages of the targets the panes show.
     pub timelines: TimelineStore,
     /// What is being written to the targets the panes show.
@@ -225,50 +223,64 @@ impl Work {
         self.drafts.retain(|t, c| shown.contains(t) || !c.is_empty());
     }
 
-    /// Open the conversation `target` (or find it open already); the pane to focus.
+    /// Open the conversation `target` (or find it open already) in the pane the list opens into,
+    /// which remembers what it showed; the pane to focus.
     pub fn open(&mut self, target: Target) -> Option<PaneId> {
-        if let Some(current) = self.home().map(|p| p.target.clone()) {
-            if current == target {
-                return self.home_id();
-            }
-            self.back.push(current);
-            if self.back.len() > HISTORY {
-                self.back.remove(0);
-            }
+        let Some(id) = self.home_id() else { return Some(self.first(target, History::default())) };
+        let pane = self.panes.get_mut(&id)?;
+        if pane.target != target {
+            pane.history.left(pane.target.clone());
+            self.retarget(id, target);
         }
-        self.forward.clear();
-        Some(self.show(target))
+        Some(id)
     }
 
-    fn show(&mut self, target: Target) -> PaneId {
-        self.panes.clear();
-        self.layout = None;
-        self.active = None;
-        self.prune();
-        let id = self.add(Pane::new(target));
+    /// The first pane of an empty work area, showing `target` with `history`.
+    fn first(&mut self, target: Target, history: History) -> PaneId {
+        self.closed = None;
+        let id = self.add(Pane { history, ..Pane::new(target) });
         self.layout = Some(Node::Leaf(id));
         self.active = Some(id);
+        self.prune();
         self.fill();
         self.check();
         id
     }
 
-    /// Back to the conversation before (`Ctrl+O`); its pane, `None` when there is none.
-    pub fn back(&mut self) -> Option<PaneId> {
-        let to = self.back.pop()?;
-        if let Some(p) = self.home() {
-            self.forward.push(p.target.clone());
+    /// Pane `id` shows `target` instead of what it showed, from scratch; its thread panel closes.
+    fn retarget(&mut self, id: PaneId, target: Target) {
+        if let Some(panel) = self.panes.get_mut(&id).and_then(|p| p.thread.take()) {
+            self.remove(panel);
         }
-        Some(self.show(to))
+        if let Some(p) = self.panes.get_mut(&id) {
+            p.show(target);
+        }
+        self.active = Some(id);
+        self.prune();
+        self.fill();
+        self.check();
     }
 
-    /// Forward again (`Ctrl+I`); its pane, `None` when there is none.
+    /// Back to what the pane the list opens into showed before (`Ctrl+O`); in an empty work area,
+    /// the pane closed last again. The pane, `None` when there is nothing back.
+    pub fn back(&mut self) -> Option<PaneId> {
+        let Some(id) = self.home_id() else {
+            let (target, history) = self.closed.take()?;
+            return Some(self.first(target, history));
+        };
+        let pane = self.panes.get_mut(&id)?;
+        let to = pane.history.back(&pane.target)?;
+        self.retarget(id, to);
+        Some(id)
+    }
+
+    /// Forward again (`Ctrl+I`); the pane, `None` when there is nothing forward.
     pub fn forward(&mut self) -> Option<PaneId> {
-        let to = self.forward.pop()?;
-        if let Some(p) = self.home() {
-            self.back.push(p.target.clone());
-        }
-        Some(self.show(to))
+        let id = self.home_id()?;
+        let pane = self.panes.get_mut(&id)?;
+        let to = pane.history.forward(&pane.target)?;
+        self.retarget(id, to);
+        Some(id)
     }
 
     /// The thread of the selected message of the active pane's conversation, in the pane's
@@ -329,13 +341,17 @@ impl Work {
             self.check();
             return (None, Some(owner));
         }
-        let closed = self.close_pane(active).map(|p| p.target);
+        let closed = self.close_pane(active);
         self.active = self.ids().first().copied();
         self.prune();
         self.check();
-        match self.active {
-            Some(next) => (None, Some(next)),
-            None => (closed, None),
+        match (self.active, closed) {
+            (Some(next), _) => (None, Some(next)),
+            (None, Some(p)) => {
+                self.closed = Some((p.target.clone(), p.history));
+                (Some(p.target), None)
+            }
+            (None, None) => (None, None),
         }
     }
 
@@ -447,8 +463,16 @@ impl Work {
         self.prune();
         self.check();
         let gone = !gone.is_empty();
-        self.back.retain(|t| model.target(t).is_some());
-        self.forward.retain(|t| model.target(t).is_some());
+        let exists = |t: &Target| model.target(t).is_some();
+        for p in self.panes.values_mut() {
+            p.history.retain(exists);
+        }
+        if let Some((target, history)) = &mut self.closed {
+            history.retain(exists);
+            if !exists(target) {
+                self.closed = None;
+            }
+        }
         // A draft of a conversation that is gone stays (quitting still asks about it): text the
         // user wrote is never dropped silently.
         gone

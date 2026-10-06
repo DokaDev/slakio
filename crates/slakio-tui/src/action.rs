@@ -120,7 +120,7 @@ pub enum PaneAction {
     Left,
     /// The thread panel from the main pane.
     Right,
-    /// The conversation open before (back/forward history of the work area).
+    /// What the pane showed before (each pane has its own back/forward history).
     Back,
     Forward,
 }
