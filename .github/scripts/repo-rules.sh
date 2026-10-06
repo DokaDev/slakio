@@ -4,6 +4,7 @@
 #   2. No name of the project this one took its infrastructure from (written below in two
 #      parts, so this file does not trip the rule itself).
 #   3. No absolute paths of someone's home directory (`/Users/<name>`, `C:\Users\<name>`).
+#   4. No Rust file grows past the size limit, and the longer ones only shrink (file-size.sh).
 # Binary files are skipped. Prints every offending line and fails when there is one.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -38,4 +39,5 @@ while (my $file = <STDIN>) {
 }
 exit $failed;
 '
+bash .github/scripts/file-size.sh
 echo "repository rules: ok"
