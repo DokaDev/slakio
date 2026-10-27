@@ -37,14 +37,21 @@ pub(super) fn tokens(dir: &Path) -> Result<BTreeMap<String, Zeroizing<String>>, 
     read_tokens(tmp.path())
 }
 
+/// The LevelDB reader runs under `catch_unwind`: a damaged or hostile file that makes it panic
+/// is reported as [`DesktopError::Io`] and never takes the program down.
 fn read_tokens(db_dir: &Path) -> Result<BTreeMap<String, Zeroizing<String>>, DesktopError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| read_tokens_unguarded(db_dir)))
+        .unwrap_or(Err(DesktopError::Io))
+}
+
+fn read_tokens_unguarded(db_dir: &Path) -> Result<BTreeMap<String, Zeroizing<String>>, DesktopError> {
     let opt = Options { create_if_missing: false, ..Options::default() };
     let mut db = DB::open(db_dir, opt).map_err(|_| DesktopError::Io)?;
     let mut iter = db.new_iter().map_err(|_| DesktopError::Io)?;
     let mut out: BTreeMap<String, Zeroizing<String>> = BTreeMap::new();
     iter.seek_to_first();
     while iter.valid() {
-        let (mut key, mut val) = (Vec::new(), Vec::new());
+        let (mut key, mut val) = (Vec::new(), Zeroizing::new(Vec::new()));
         if iter.current(&mut key, &mut val) && key.ends_with(LOCAL_CONFIG_KEY.as_bytes()) {
             let json = Zeroizing::new(decode_ls_value(&val));
             if let Ok(cfg) = serde_json::from_str::<LocalConfig>(&json) {
@@ -69,7 +76,8 @@ fn read_tokens(db_dir: &Path) -> Result<BTreeMap<String, Zeroizing<String>>, Des
 fn decode_ls_value(v: &[u8]) -> String {
     match v.first() {
         Some(0x00) => {
-            let u16s: Vec<u16> = v[1..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+            let u16s: Zeroizing<Vec<u16>> =
+                Zeroizing::new(v[1..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect());
             String::from_utf16_lossy(&u16s)
         }
         Some(0x01) => v[1..].iter().map(|&b| b as char).collect(),
@@ -77,35 +85,28 @@ fn decode_ls_value(v: &[u8]) -> String {
     }
 }
 
-/// A removed-on-drop directory.
-struct TempDir(std::path::PathBuf);
+/// The most read of the LevelDB directory: per file, and in all (a real one is a few megabytes).
+const FILE_MAX: u64 = 64 * 1024 * 1024;
+const TOTAL_MAX: u64 = 256 * 1024 * 1024;
 
-impl TempDir {
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
-
-/// Copy the regular files of `src` into a fresh temp directory. LevelDB directories are shallow
-/// (a handful of files), so copying the regular files is enough.
-fn copy_dir_to_temp(src: &Path) -> Result<TempDir, DesktopError> {
-    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
-    let dst = std::env::temp_dir().join(format!("slakio-ls-{}-{}", std::process::id(), nonce));
-    std::fs::create_dir_all(&dst).map_err(|_| DesktopError::Io)?;
-    let guard = TempDir(dst.clone());
+/// Copy the regular files of `src` into a private temp directory (removed with them when
+/// dropped). LevelDB directories are shallow (a handful of files), so the regular files are
+/// enough. Each file is read into a buffer wiped when dropped (the values hold tokens).
+fn copy_dir_to_temp(src: &Path) -> Result<tempfile::TempDir, DesktopError> {
+    let dst = super::private_dir()?;
+    let mut total = 0u64;
     for entry in std::fs::read_dir(src).map_err(|_| DesktopError::Io)? {
         let entry = entry.map_err(|_| DesktopError::Io)?;
         if entry.file_type().map_err(|_| DesktopError::Io)?.is_file() {
-            std::fs::copy(entry.path(), dst.join(entry.file_name())).map_err(|_| DesktopError::Io)?;
+            let bytes = super::read_capped(&entry.path(), FILE_MAX).map_err(|_| DesktopError::Io)?;
+            total += bytes.len() as u64;
+            if total > TOTAL_MAX {
+                return Err(DesktopError::Io);
+            }
+            std::fs::write(dst.path().join(entry.file_name()), bytes.as_slice()).map_err(|_| DesktopError::Io)?;
         }
     }
-    Ok(guard)
+    Ok(dst)
 }
 
 #[cfg(test)]
@@ -170,6 +171,19 @@ mod tests {
         db.flush().unwrap();
         drop(db);
         assert_eq!(tokens(&dir).unwrap_err(), DesktopError::NotSignedIn);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_corrupt_leveldb_is_an_error_not_a_panic() {
+        let dir = scratch("corrupt");
+        let ldb = dir.join("Local Storage").join("leveldb");
+        std::fs::create_dir_all(&ldb).unwrap();
+        std::fs::write(ldb.join("CURRENT"), b"MANIFEST-000002\n").unwrap();
+        std::fs::write(ldb.join("MANIFEST-000002"), [0xffu8; 300]).unwrap();
+        std::fs::write(ldb.join("000003.log"), [0x5au8; 4096]).unwrap();
+        std::fs::write(ldb.join("000004.ldb"), b"not a table").unwrap();
+        assert!(tokens(&dir).is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 
