@@ -7,8 +7,9 @@
 //!   ([`error::SlackError`], worded by the core's `FailKind`);
 //! * [`governor`] — the process-wide rails: the kill switch, the request cap, at most eight
 //!   requests in flight;
-//! * `http` (crate-private) — the wire (this version reaches a server on this machine only:
-//!   no TLS, so no Slack);
+//! * `http` (crate-private) — the wire: TLS to the workspace's own Slack hosts only, or plain
+//!   HTTP to a server on this machine (the tests' fake Slack);
+//! * [`login`] — whether credentials sign in (one `client.userBoot`);
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
 //!   behind the UI's handle.
 //!
@@ -34,6 +35,7 @@ pub mod client;
 pub mod error;
 pub mod governor;
 pub(crate) mod http;
+pub mod login;
 pub mod method;
 pub mod request;
 pub mod response;

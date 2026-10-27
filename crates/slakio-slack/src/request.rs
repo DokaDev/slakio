@@ -19,13 +19,43 @@ const CHROME_MAJOR: &str = "150";
 /// The `_x_version_ts` sent until Slack names a newer build.
 pub const DEFAULT_VERSION_TS: &str = "1785403654";
 
-/// Where requests go. This version reaches a server on this machine only (the tests' fake
-/// Slack): there is no way to name another address.
+/// Where requests go: one workspace's Slack hosts, over TLS ([`Endpoints::workspace`]), or a
+/// server on this machine (the tests' fake Slack, [`Endpoints::local`]). There is no way to
+/// name any other address.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Endpoints {
     api: String,
     edge: String,
-    pub(crate) addr: SocketAddr,
+    pub(crate) server: Server,
+}
+
+/// The server behind [`Endpoints`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Server {
+    /// Plain HTTP to a loopback address.
+    Local(std::net::SocketAddr),
+    /// TLS to the workspace's host (the API) and the edge cache's.
+    Slack { api_host: String },
+}
+
+/// The edge cache's host.
+pub const EDGE_HOST: &str = "edgeapi.slack.com";
+
+/// Host names under `slack.com` that are Slack's own, never a workspace's.
+const NOT_WORKSPACES: &[&str] = &["app", "api", "edgeapi", "files", "status", "www", "slack", "my", "join"];
+
+/// `host` is a workspace's: `<name>.slack.com` or `<name>.enterprise.slack.com`, `<name>` one
+/// lowercase label that is not one of Slack's own hosts.
+pub fn workspace_host(host: &str) -> bool {
+    let name = host.strip_suffix(".enterprise.slack.com").or_else(|| host.strip_suffix(".slack.com"));
+    name.is_some_and(|n| {
+        !n.is_empty()
+            && n.len() <= 63
+            && n.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            && !n.starts_with('-')
+            && !n.ends_with('-')
+            && !NOT_WORKSPACES.contains(&n)
+    })
 }
 
 impl Endpoints {
@@ -34,7 +64,17 @@ impl Endpoints {
         addr.ip().is_loopback().then(|| Self {
             api: format!("http://{addr}/api/"),
             edge: format!("http://{addr}"),
-            addr,
+            server: Server::Local(addr),
+        })
+    }
+
+    /// The workspace at `host` (`example.slack.com`), over TLS; `None` for a host that is not a
+    /// workspace's ([`workspace_host`]).
+    pub fn workspace(host: &str) -> Option<Self> {
+        workspace_host(host).then(|| Self {
+            api: format!("https://{host}/api/"),
+            edge: format!("https://{EDGE_HOST}"),
+            server: Server::Slack { api_host: host.to_string() },
         })
     }
 }
@@ -272,7 +312,11 @@ pub(crate) fn prepare(
     };
     let mut headers = browser_headers(os);
     headers.push(("Content-Type", content_type.to_string()));
-    headers.push(("Cookie", format!("d={}", credentials.cookie())));
+    let cookie = match credentials.cookie_ds() {
+        Some(ds) => format!("d={}; d-s={ds}", credentials.cookie()),
+        None => format!("d={}", credentials.cookie()),
+    };
+    headers.push(("Cookie", cookie));
     Ok(Prepared { url, headers, body })
 }
 

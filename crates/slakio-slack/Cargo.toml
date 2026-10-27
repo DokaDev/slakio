@@ -17,12 +17,16 @@ bytes.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 slakio-core.workspace = true
 tokio = { workspace = true, features = ["net", "rt", "sync", "time", "macros"] }
+tokio-rustls.workspace = true
 
 [dev-dependencies]
+rcgen.workspace = true
 slakio-fake.workspace = true
 slakio-world.workspace = true
 

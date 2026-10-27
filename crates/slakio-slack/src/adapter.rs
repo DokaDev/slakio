@@ -4,6 +4,11 @@
 //! `History` for the same target supersedes one still in flight: the older one is dropped
 //! unanswered, since the UI no longer waits for it. When the UI is gone the task ends, and
 //! what it had in flight with it.
+//!
+//! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
+//! first, and at most one is under way: a newer open cancels the older one — before it is
+//! sent, or by dropping its answer — and the older one is answered `Failed(Busy)`, so a pane
+//! that still shows it can be retried instead of waiting.
 
 use crate::client::Client;
 use crate::error::SlackError;
@@ -22,7 +27,7 @@ use slakio_core::model::{
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::{AbortHandle, JoinSet};
 
 /// How many requests, and how many events, wait in the handle's channels at most.
@@ -30,6 +35,10 @@ pub const BOUND: usize = 64;
 
 /// The most messages one page asks for: what the web client shows first.
 pub const PAGE_MAX: u32 = 28;
+
+/// How long an open waits before its conversation is fetched: moving quickly through
+/// conversations fetches only the one the user stops on.
+pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };
@@ -48,6 +57,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
     let me: Me = Arc::default();
     let mut tasks = JoinSet::new();
     let mut in_flight: HashMap<Target, AbortHandle> = HashMap::new();
+    // The open under way, to cancel when a newer one comes.
+    let mut open: Option<oneshot::Sender<()>> = None;
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -67,8 +78,30 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
                     older.abort();
                 }
                 let key = target.clone();
+                let opening = before.is_none() && matches!(target, Target::Conversation { .. });
+                let cancelled = opening.then(|| {
+                    if let Some(older) = open.take() {
+                        let _ = older.send(());
+                    }
+                    let (cancel, cancelled) = oneshot::channel();
+                    open = Some(cancel);
+                    cancelled
+                });
                 let task = tasks.spawn(async move {
-                    let page = history(&client, &me, target, before, limit).await;
+                    let fetch = async {
+                        if opening {
+                            tokio::time::sleep(OPEN_DEBOUNCE).await;
+                        }
+                        history(&client, &me, target, before, limit).await
+                    };
+                    let page = match cancelled {
+                        Some(cancelled) => tokio::select! {
+                            biased;
+                            _ = cancelled => Err(SlackError::Superseded),
+                            page = fetch => page,
+                        },
+                        None => fetch.await,
+                    };
                     answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
                 });
                 in_flight.insert(key, task);
@@ -98,15 +131,7 @@ async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Even
 /// The workspace from `client.userBoot` (it cannot do without), its unread marks from
 /// `client.counts` (it can).
 async fn boot(client: &Client, me: &Me) -> Result<Event, SlackError> {
-    let call = Call::form(
-        Method::ClientUserBoot,
-        &[
-            ("version_all_channels", "false"),
-            ("return_all_relevant_mpdms", "true"),
-            ("omit_extras", "feature_usage_data,plan_info,salesforce_features"),
-        ],
-    );
-    let boot: wire::UserBoot = client.call(&call, Priority::User).await?;
+    let boot: wire::UserBoot = client.call(&crate::login::user_boot(), Priority::User).await?;
     let (Some(team), Some(self_)) = (boot.team, boot.me) else {
         return Err(SlackError::Network { detail: "the start answer has no team or user".to_string() });
     };
