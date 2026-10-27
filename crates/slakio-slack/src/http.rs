@@ -43,7 +43,9 @@ async fn exchange(endpoints: &Endpoints, request: &Prepared) -> Result<Raw, Slac
     let stream = TcpStream::connect(endpoints.addr).await.map_err(|_| net("could not connect"))?;
     let (mut sender, conn) =
         hyper::client::conn::http1::handshake(TokioIo::new(stream)).await.map_err(|_| net("handshake failed"))?;
-    let conn = tokio::spawn(conn);
+    // The connection's task ends with this function, however it ends: an error, the timeout,
+    // or the kill switch dropping the call.
+    let _conn = AbortOnDrop(tokio::spawn(conn));
 
     let mut builder = hyper::Request::post(path).header("Host", endpoints.addr.to_string());
     for (name, value) in &request.headers {
@@ -57,6 +59,14 @@ async fn exchange(endpoints: &Endpoints, request: &Prepared) -> Result<Raw, Slac
     let status = answer.status().as_u16();
     let retry_after = answer.headers().get("retry-after").and_then(|v| v.to_str().ok()).map(str::to_string);
     let body = Limited::new(answer.into_body(), BODY_MAX).collect().await.map_err(|_| net("answer cut off"))?;
-    conn.abort();
     Ok(Raw { status, retry_after, body: body.to_bytes().to_vec() })
+}
+
+/// A task aborted when this is dropped.
+struct AbortOnDrop<T>(tokio::task::JoinHandle<T>);
+
+impl<T> Drop for AbortOnDrop<T> {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }

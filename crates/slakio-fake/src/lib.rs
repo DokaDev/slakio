@@ -51,13 +51,15 @@ pub enum Fault {
     Api(String),
     /// A body that is not JSON.
     Malformed,
-    /// Never answer (the connection stays open).
+    /// Never answer: the connection stays open until the client closes it
+    /// ([`FakeSlack::hangs_closed`] counts those).
     Hang,
 }
 
 #[derive(Default)]
 struct Shared {
     log: Vec<Logged>,
+    hangs_closed: usize,
     faults: HashMap<String, VecDeque<Fault>>,
 }
 
@@ -106,6 +108,11 @@ impl FakeSlack {
         self.log().iter().map(|l| l.method().to_string()).collect()
     }
 
+    /// How many requests answered with [`Fault::Hang`] the client has closed.
+    pub fn hangs_closed(&self) -> usize {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).hangs_closed
+    }
+
     /// Answer the next request for `method` with `fault` (faults queue up per method).
     pub fn fail_next(&self, method: &str, fault: Fault) {
         let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -123,7 +130,9 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, shared: Arc<Mutex<Share
     };
     let (status, extra, body) = match fault {
         Some(Fault::Hang) => {
-            std::future::pending::<()>().await;
+            let mut byte = [0u8; 1];
+            while stream.read(&mut byte).await.is_ok_and(|n| n > 0) {}
+            shared.lock().unwrap_or_else(PoisonError::into_inner).hangs_closed += 1;
             return;
         }
         Some(Fault::Status { status, retry_after }) => {

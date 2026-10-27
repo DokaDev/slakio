@@ -110,6 +110,14 @@ fn switching_the_network_off_ends_a_request_in_flight() {
         };
         let (answer, ()) = tokio::join!(call, stop);
         assert_eq!(answer.unwrap_err().kind(), FailKind::Offline);
+        // The connection is closed at once, not left to a task until the server answers.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while fake.hangs_closed() == 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the hung connection was closed");
         assert!(client.call_named("client.counts", &[], Priority::User).await.is_err());
         assert_eq!(fake.log().len(), 1);
     });
