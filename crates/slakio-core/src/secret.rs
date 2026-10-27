@@ -63,17 +63,30 @@ pub trait SecretStore: Send + Sync {
 }
 
 /// What signs the client in to one workspace, as the web client holds it: the session token
-/// (`xoxc`) and the `d` cookie. Their text never shows in a `Debug` print, so neither reaches a
-/// log or a panic message by accident.
+/// (`xoxc`), the `d` cookie and, when the browser had one, the `d-s` cookie. Their text never
+/// shows in a `Debug` print, so none reaches a log or a panic message by accident.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Credentials {
     token: String,
     cookie: String,
+    cookie_ds: Option<String>,
 }
 
 impl Credentials {
     pub fn new(token: impl Into<String>, cookie: impl Into<String>) -> Self {
-        Self { token: token.into(), cookie: cookie.into() }
+        Self { token: token.into(), cookie: cookie.into(), cookie_ds: None }
+    }
+
+    /// With the `d-s` cookie's value too.
+    #[must_use]
+    pub fn with_ds(mut self, value: impl Into<String>) -> Self {
+        self.cookie_ds = Some(value.into());
+        self
+    }
+
+    /// The `d-s` cookie's value, when there is one.
+    pub fn cookie_ds(&self) -> Option<&str> {
+        self.cookie_ds.as_deref()
     }
 
     pub fn token(&self) -> &str {

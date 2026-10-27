@@ -84,6 +84,11 @@ impl Paths {
         self.config.as_ref().map(|c| c.join("config.toml"))
     }
 
+    /// `<config>/workspaces.toml`: the signed-in workspaces, without any secret.
+    pub fn workspaces_file(&self) -> Option<PathBuf> {
+        self.config.as_ref().map(|c| c.join("workspaces.toml"))
+    }
+
     /// `<state>/notices.toml`: notices that are shown once per machine.
     pub fn notices_file(&self) -> Option<PathBuf> {
         self.state.as_ref().map(|s| s.join("notices.toml"))
