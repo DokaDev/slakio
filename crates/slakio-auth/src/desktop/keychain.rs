@@ -26,13 +26,12 @@ impl SafeStorage for SystemKeychain {
     fn keys(&self, sandboxed: bool) -> Result<Vec<Zeroizing<Vec<u8>>>, DesktopError> {
         let accounts = order_accounts(dump_accounts(), sandboxed);
         let mut out: Vec<Zeroizing<Vec<u8>>> = Vec::new();
-        let mut seen: Vec<Vec<u8>> = Vec::new();
         for acct in &accounts {
+            // Compared against the keys already kept, so no extra copy of a key is made.
             if let Some(pw) = find_password(Some(acct))
-                && !seen.contains(&pw)
+                && !out.contains(&pw)
             {
-                seen.push(pw.clone());
-                out.push(Zeroizing::new(pw));
+                out.push(pw);
             }
         }
         if !out.is_empty() {
@@ -41,15 +40,15 @@ impl SafeStorage for SystemKeychain {
         // Enumeration told us nothing (dump-keychain unavailable or an unrecognised shape): fall
         // back to the service-only lookup, correct whenever only one item exists.
         match find_password(None) {
-            Some(pw) => Ok(vec![Zeroizing::new(pw)]),
+            Some(pw) => Ok(vec![pw]),
             None => Err(DesktopError::NoSecretService),
         }
     }
 }
 
 /// Read one secret. `security find-generic-password -w` prints just the password on stdout. No
-/// account means "match on the service alone".
-fn find_password(account: Option<&str>) -> Option<Vec<u8>> {
+/// account means "match on the service alone". The output is held in a buffer wiped when dropped.
+fn find_password(account: Option<&str>) -> Option<Zeroizing<Vec<u8>>> {
     let mut cmd = Command::new(SECURITY);
     cmd.args(["find-generic-password", "-w", "-s", SERVICE]);
     if let Some(a) = account {
@@ -59,7 +58,7 @@ fn find_password(account: Option<&str>) -> Option<Vec<u8>> {
     if !out.status.success() {
         return None;
     }
-    let mut s = out.stdout;
+    let mut s = Zeroizing::new(out.stdout);
     while matches!(s.last(), Some(b'\n' | b'\r')) {
         s.pop();
     }
