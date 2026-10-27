@@ -79,17 +79,23 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
 - One action registry (`action.rs`) gives every action its id, label and `:` commands; the key
   map, the command line and `docs/keybindings.md` all read it.
 - State does no I/O. The binary owns the terminal and a single `tokio::select!` loop over
-  input, signals and the app's next deadline; it redraws only after something changed and
+  input, signals, the backend's events and the app's next deadline; it redraws only after something changed and
   sleeps when nothing happens (the idle wakeups are a performance budget).
 - The UI talks to a backend only through the protocol of `slakio_core::backend`: the app
-  queues commands, the binary's loop delivers them and hands the events back
-  (`exchange.rs`, until neither side has more: an answer may ask for the next page), and an
-  event for an older request (an older generation) or for a target no pane shows is dropped.
+  queues requests (each with its id and the workspace it is about), the binary's loop delivers
+  them through a `BackendHandle` (bounded channels; the backend runs on its own task) and hands
+  the events back whenever they arrive (`exchange.rs`; an answer may ask for the next page),
+  and an event for an older request (an older generation) or for a target no pane shows is
+  dropped. A request can fail (`Event::Failed`, its kind as data): whatever waited for it stops
+  waiting and says so, never "Loading" for ever. A read-only backend (`Capabilities::read_only`)
+  refuses a change before sending anything, and the UI offers none. Saved items a backend cannot
+  tell are `None` (To-dos is unavailable, not empty).
   Messages come in pages (`Command::History`), newest first, older ones as the selection nears
   the top.
   A saved item (a to-do, or a message in Home's Saved) changes by `Command::Save`; nothing
   changes on screen until the answer, every saved item after the change, replaces them. The
-  snapshot says when it was taken: reminders due before then are overdue.
+  snapshot, and every answer about saved items, says when it was taken (the backend's clock):
+  reminders due before then are overdue.
 - What only the binary can do is an `Effect` the loop carries out: copying is OSC 52, so no
   clipboard library or helper process is involved; saving an answer the app asked for (the
   icons question) goes into the config file, keeping its comments. `slakio --demo` uses `DemoBackend`
