@@ -5,14 +5,18 @@
 //! * at most [`Limits::in_flight`] requests in flight, and at most [`Limits::waiting`] waiting
 //!   for a slot (more are refused as busy);
 //! * a **request cap** per minute, with a share that background work cannot use, so what the
-//!   user asked for goes first; and a cap for the life of the process that, once reached,
-//!   stops all network until the program is started again.
+//!   user asked for goes first; a budget per hour; and a ceiling for the life of the process
+//!   that, once reached, stops all network until the program is started again;
+//! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
+//!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
+//!   one); the others go on.
 //!
 //! The defaults are far above what the client needs (its start is three requests, opening a
 //! conversation one): they are ceilings that stop a bug from flooding Slack, not a pace.
 
 use crate::error::SlackError;
-use std::collections::VecDeque;
+use crate::method::Method;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -37,6 +41,12 @@ pub fn network_on(env: Option<&str>, config: &str) -> Result<bool, String> {
 /// The window of the per-minute cap.
 pub const WINDOW: Duration = Duration::from_secs(60);
 
+/// The window of the hourly budget.
+pub const HOUR: Duration = Duration::from_secs(3600);
+
+/// How long a method waits after Slack asked to slow down without saying for how long.
+pub const DEFAULT_PAUSE: Duration = Duration::from_secs(30);
+
 /// How much may be sent, and how much at once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -44,7 +54,10 @@ pub struct Limits {
     pub per_minute: u32,
     /// Of those, the most background work may use: the rest is kept for the user.
     pub background_per_minute: u32,
-    /// Requests for the life of the process; reaching it stops all network.
+    /// Requests in any [`HOUR`], all priorities together.
+    pub per_hour: u32,
+    /// Requests for the life of the process: a safety ceiling far above any real use;
+    /// reaching it stops all network until the program starts again.
     pub per_process: u32,
     /// Requests in flight at once.
     pub in_flight: usize,
@@ -54,7 +67,14 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Self {
-        Self { per_minute: 120, background_per_minute: 90, per_process: 5000, in_flight: 8, waiting: 64 }
+        Self {
+            per_minute: 120,
+            background_per_minute: 90,
+            per_hour: 1500,
+            per_process: 10_000,
+            in_flight: 8,
+            waiting: 64,
+        }
     }
 }
 
@@ -107,8 +127,10 @@ impl Clock for FakeClock {
 
 #[derive(Debug, Default)]
 struct Counts {
-    /// When each request of the current window was let through, oldest first.
+    /// When each request of the last hour was let through, oldest first.
     window: VecDeque<Duration>,
+    /// Methods Slack asked to slow down, and until when.
+    paused: HashMap<Method, Duration>,
     total: u32,
     /// The per-process cap was reached: nothing more is sent.
     tripped: bool,
@@ -165,12 +187,31 @@ impl Governor {
         let _ = rx.wait_for(|on| !on).await;
     }
 
-    /// Let a request of `priority` through, waiting for a slot when all are taken: nothing may
-    /// be sent without it.
-    pub async fn admit(&self, priority: Priority) -> Result<Admitted, SlackError> {
+    /// Slack asked to slow down on `method`: it is not sent again for `retry_after`
+    /// ([`DEFAULT_PAUSE`] when Slack did not say).
+    pub fn pause(&self, method: Method, retry_after: Option<Duration>) {
+        let until = self.clock.now() + retry_after.unwrap_or(DEFAULT_PAUSE);
+        let mut c = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let at = c.paused.entry(method).or_default();
+        *at = (*at).max(until);
+    }
+
+    /// How long `method` is still paused, if it is.
+    fn paused(&self, method: Method) -> Option<Duration> {
+        let now = self.clock.now();
+        let c = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        c.paused.get(&method).filter(|until| **until > now).map(|until| *until - now)
+    }
+
+    /// Let a request for `method` of `priority` through, waiting for a slot when all are
+    /// taken: nothing may be sent without it.
+    pub async fn admit(&self, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
         let off = || SlackError::Offline { why: "the network is switched off" };
         if !self.is_on() {
             return Err(off());
+        }
+        if let Some(left) = self.paused(method) {
+            return Err(SlackError::RateLimited { retry_after: Some(left) });
         }
         if self.waiting.fetch_add(1, Ordering::SeqCst) >= self.limits.waiting {
             self.waiting.fetch_sub(1, Ordering::SeqCst);
@@ -199,12 +240,16 @@ impl Governor {
         if c.tripped {
             return Err(SlackError::CapReached { why: "the request cap of this run is reached" });
         }
-        while c.window.front().is_some_and(|at| now.saturating_sub(*at) >= WINDOW) {
+        while c.window.front().is_some_and(|at| now.saturating_sub(*at) >= HOUR) {
             c.window.pop_front();
         }
-        // Background work stops once the window holds its share, whoever sent those: the rest
-        // of the window stays free for the user.
-        let used = u32::try_from(c.window.len()).unwrap_or(u32::MAX);
+        if u32::try_from(c.window.len()).unwrap_or(u32::MAX) >= self.limits.per_hour {
+            return Err(SlackError::CapReached { why: "the hourly request budget is reached" });
+        }
+        // Background work stops once the minute holds its share, whoever sent those: the rest
+        // of the minute stays free for the user.
+        let used = c.window.iter().rev().take_while(|at| now.saturating_sub(**at) < WINDOW).count();
+        let used = u32::try_from(used).unwrap_or(u32::MAX);
         let over = match priority {
             Priority::User => used >= self.limits.per_minute,
             Priority::Background => used >= self.limits.background_per_minute.min(self.limits.per_minute),

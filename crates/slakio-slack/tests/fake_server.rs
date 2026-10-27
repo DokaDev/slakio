@@ -142,14 +142,15 @@ fn slacks_errors_reach_the_ui_as_failure_kinds() {
     rt().block_on(async {
         let (fake, client, _) = setup(Limits::default(), true).await;
         let cases = [
-            (
-                Fault::Status { status: 429, retry_after: Some("7".into()) },
-                FailKind::RateLimited { retry_after: Some(Duration::from_secs(7)) },
-            ),
             (Fault::Api("invalid_auth".into()), FailKind::Auth),
             (Fault::Api("channel_not_found".into()), FailKind::Api { code: "channel_not_found".into() }),
             (Fault::Status { status: 502, retry_after: None }, FailKind::Network),
             (Fault::Malformed, FailKind::Network),
+            // Last: after it the method waits its Retry-After.
+            (
+                Fault::Status { status: 429, retry_after: Some("7".into()) },
+                FailKind::RateLimited { retry_after: Some(Duration::from_secs(7)) },
+            ),
         ];
         for (fault, kind) in cases {
             fake.fail_next("client.counts", fault.clone());
@@ -260,5 +261,19 @@ fn a_newer_page_of_the_same_target_supersedes_one_in_flight() {
             tokio::time::timeout(Duration::from_millis(200), handle.rx.recv()).await.is_err(),
             "the older one is dropped"
         );
+    });
+}
+
+#[test]
+fn after_a_429_the_method_is_not_sent_again_until_retry_after() {
+    rt().block_on(async {
+        let (fake, client, _) = setup(Limits::default(), true).await;
+        fake.fail_next("client.counts", Fault::Status { status: 429, retry_after: Some("30".into()) });
+        assert!(client.call_named("client.counts", &[], Priority::User).await.is_err());
+        let e = client.call_named("client.counts", &[], Priority::User).await.unwrap_err();
+        assert!(matches!(e, SlackError::RateLimited { retry_after: Some(_) }), "{e:?}");
+        assert_eq!(fake.methods(), ["client.counts"], "the second never reached the server");
+        // Another method goes on.
+        let _: serde_json::Value = client.call_named("client.userBoot", &[], Priority::User).await.unwrap();
     });
 }

@@ -159,9 +159,12 @@ every rail sits in the transport, below the backend, so no caller can go around 
    sent. A value of the variable that is not `on` or `off` stops the program (exit code 2).
    `Governor::stop` turns it off while running and ends what is in flight.
 3. **Request cap**, for the whole process: 120 requests a minute, of which background work
-   (counts, lookups) may use 90, so what the user waits for always has room; 5,000 for a run,
-   after which all network stops until the program starts again. Over the cap a request fails
-   with `CapReached` and is not sent.
+   (counts, lookups) may use 90, so what the user waits for always has room; 1,500 an hour;
+   and a safety ceiling of 10,000 for a run, after which all network stops until the program
+   starts again. Over a cap a request fails with `CapReached` and is not sent.
+   When Slack asks to slow down (HTTP 429 or `ratelimited`), that method is paused for its
+   `Retry-After` (30 seconds when Slack does not say); a paused method fails with
+   `RateLimited` without being sent, and the other methods go on.
 4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
    `Busy`.
 5. **Format.** Requests look like the official web client's (the browser's header set in its

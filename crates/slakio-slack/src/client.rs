@@ -34,7 +34,7 @@ impl Client {
     /// Call `call` and decode its answer as `T`. With the network off, or the cap reached,
     /// nothing is sent; switching the network off while it is in flight ends it.
     pub async fn call<T: DeserializeOwned>(&self, call: &Call, priority: Priority) -> Result<T, SlackError> {
-        let _slot = self.governor.admit(priority).await?;
+        let _slot = self.governor.admit(call.method, priority).await?;
         let prepared = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;
@@ -45,7 +45,11 @@ impl Client {
             raw = crate::http::send(&self.endpoints, &prepared) => raw?,
             () = self.governor.stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
         };
-        decode(&raw)
+        let answer = decode(&raw);
+        if let Err(SlackError::RateLimited { retry_after }) = &answer {
+            self.governor.pause(call.method, *retry_after);
+        }
+        answer
     }
 
     /// Call the method named `name` with form parameters `params`: a name that is not on the
