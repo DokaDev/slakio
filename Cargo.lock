@@ -2223,6 +2223,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "slakio-core",
+ "tempfile",
  "toml_edit",
  "zeroize",
 ]

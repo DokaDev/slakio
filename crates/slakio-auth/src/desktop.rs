@@ -236,5 +236,37 @@ pub fn scan_dir(_dir: &std::path::Path) -> Result<Found, DesktopError> {
     Err(DesktopError::NotSupported)
 }
 
+/// A fresh private directory for the temp copies: created `0700` with an unpredictable name, and
+/// removed with everything in it when dropped.
+#[cfg(target_os = "macos")]
+fn private_dir() -> Result<tempfile::TempDir, DesktopError> {
+    use std::os::unix::fs::PermissionsExt;
+    tempfile::Builder::new()
+        .prefix("slakio-desktop-")
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .map_err(|_| DesktopError::Io)
+}
+
+/// The bytes of the file at `path`, refused (`FileTooLarge`) when longer than `max`, in a buffer
+/// wiped when dropped (the files hold secrets). Allocated once, so no unwiped copy is left behind
+/// by a reallocation.
+#[cfg(target_os = "macos")]
+fn read_capped(path: &std::path::Path, max: u64) -> std::io::Result<Zeroizing<Vec<u8>>> {
+    use std::io::Read;
+    let too_large = || std::io::Error::from(std::io::ErrorKind::FileTooLarge);
+    let file = std::fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    if len > max {
+        return Err(too_large());
+    }
+    let mut buf = Zeroizing::new(Vec::with_capacity(usize::try_from(len).map_err(|_| too_large())? + 1));
+    file.take(max + 1).read_to_end(&mut buf)?;
+    if buf.len() as u64 > max {
+        return Err(too_large());
+    }
+    Ok(buf)
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod tests;

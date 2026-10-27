@@ -45,7 +45,7 @@ pub(super) fn cookies(
 
 /// A cookie row: the plaintext value (usually empty) and the encrypted blob.
 struct Row {
-    plain: String,
+    plain: Zeroizing<String>,
     enc: Vec<u8>,
 }
 
@@ -54,7 +54,7 @@ fn read_row(conn: &rusqlite::Connection, name: &str) -> Result<Option<Row>, Desk
     let row = stmt
         .query_row([name], |r| {
             Ok(Row {
-                plain: r.get::<_, String>(0).unwrap_or_default(),
+                plain: Zeroizing::new(r.get::<_, String>(0).unwrap_or_default()),
                 enc: r.get::<_, Vec<u8>>(1).unwrap_or_default(),
             })
         })
@@ -68,46 +68,45 @@ fn read_row(conn: &rusqlite::Connection, name: &str) -> Result<Option<Row>, Desk
 /// The usable value of a row: the plaintext when Slack stored one, otherwise the decrypted blob.
 fn value_of(row: Row, keys: &[Zeroizing<Vec<u8>>]) -> Result<Zeroizing<String>, DesktopError> {
     if !row.plain.is_empty() {
-        return Ok(Zeroizing::new(row.plain));
+        return Ok(row.plain);
     }
     decrypt_cookie(&row.enc, keys)
 }
 
-/// A removed-on-drop copy of `src`.
-struct TempFile(std::path::PathBuf);
+/// The largest Cookies database read (a real one is well under a megabyte).
+const COOKIES_MAX: u64 = 64 * 1024 * 1024;
 
-impl TempFile {
+/// A copy of the Cookies database in a private temp directory, removed with it when dropped.
+struct TempCopy {
+    _dir: tempfile::TempDir,
+    path: std::path::PathBuf,
+}
+
+impl TempCopy {
     fn path(&self) -> &Path {
-        &self.0
+        &self.path
     }
 }
 
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-    }
-}
-
-fn copy_to_temp(src: &Path) -> Result<TempFile, DesktopError> {
-    let bytes = match std::fs::read(src) {
-        Ok(b) => b,
-        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return Err(DesktopError::CookieLocked),
-        Err(_) => return Err(DesktopError::CookieMissing),
-    };
-    let name = format!("slakio-cookies-{}-{}.db", std::process::id(), nonce());
-    let path = std::env::temp_dir().join(name);
-    std::fs::write(&path, &bytes).map_err(|_| DesktopError::Io)?;
-    Ok(TempFile(path))
-}
-
-/// A small per-call nonce so two imports in the same process do not collide.
-fn nonce() -> u128 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos())
+fn copy_to_temp(src: &Path) -> Result<TempCopy, DesktopError> {
+    let bytes = super::read_capped(src, COOKIES_MAX).map_err(|e| match e.kind() {
+        std::io::ErrorKind::PermissionDenied => DesktopError::CookieLocked,
+        std::io::ErrorKind::NotFound => DesktopError::CookieMissing,
+        _ => DesktopError::Io,
+    })?;
+    let dir = super::private_dir()?;
+    let path = dir.path().join("Cookies");
+    std::fs::write(&path, bytes.as_slice()).map_err(|_| DesktopError::Io)?;
+    Ok(TempCopy { _dir: dir, path })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn nonce() -> u128 {
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos())
+    }
 
     /// A fake Safe Storage that returns one fixed key (never the owner's keychain).
     struct FakeStorage(Vec<u8>);
@@ -196,6 +195,21 @@ mod tests {
         let dir = scratch();
         std::fs::write(dir.join("Cookies"), b"this is not a sqlite database").unwrap();
         assert_eq!(cookies(&dir, &FakeStorage(b"k".to_vec()), false).unwrap_err(), DesktopError::Io);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_copy_is_private_unpredictable_and_removed_on_drop() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch();
+        std::fs::write(dir.join("Cookies"), b"x").unwrap();
+        let copy = copy_to_temp(&dir.join("Cookies")).unwrap();
+        let parent = copy.path().parent().unwrap().to_path_buf();
+        assert_ne!(parent, std::env::temp_dir(), "a directory of its own");
+        assert_eq!(std::fs::metadata(&parent).unwrap().permissions().mode() & 0o777, 0o700);
+        assert!(!parent.to_string_lossy().contains(&std::process::id().to_string()), "{parent:?}");
+        drop(copy);
+        assert!(!parent.exists(), "removed with the copy");
         std::fs::remove_dir_all(&dir).ok();
     }
 
