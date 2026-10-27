@@ -185,7 +185,11 @@ The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one 
 is refused before any request, and a newer page of the same conversation supersedes one in
 flight. Opening a conversation waits 200 ms first and at most one open is under way: a newer
 one cancels it (before it is sent, or by dropping its answer), and the cancelled one is answered
-`Busy`. The binary runs it for the signed-in workspace; the tests run it against
+`Busy`. People are named by id lookups, never a directory listing: a view brings some of its
+authors along, the rest (and the DMs' people at the start) are asked of the edge cache's
+`users/info` in batches of 80, each id once a session (kept in memory); until then an id shows.
+A read-only backend offers no composer: nothing is ever shown as sent. The binary runs it for
+the signed-in workspace; the tests run it against
 `slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
 
 ## Signing in
