@@ -41,9 +41,15 @@ fn parse(data: &[u8]) -> Result<Vec<DesktopWorkspace>, DesktopError> {
     Ok(out)
 }
 
-/// Read and parse the desktop app's signed-in workspace list from `dir`.
+/// The largest `root-state.json` read (a real one is a few kilobytes).
+const ROOT_STATE_MAX: u64 = 4 * 1024 * 1024;
+
+/// Read and parse the desktop app's signed-in workspace list from `dir`. A file longer than
+/// [`ROOT_STATE_MAX`] is refused ([`DesktopError::Io`]) without being read.
 pub(super) fn workspaces(dir: &Path) -> Result<Vec<DesktopWorkspace>, DesktopError> {
-    let data = std::fs::read(dir.join("storage").join("root-state.json")).map_err(|_| DesktopError::NotSignedIn)?;
+    let data = super::read_capped(&dir.join("storage").join("root-state.json"), ROOT_STATE_MAX).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::FileTooLarge { DesktopError::Io } else { DesktopError::NotSignedIn }
+    })?;
     parse(&data)
 }
 
@@ -76,6 +82,17 @@ mod tests {
         let got = parse(json).unwrap();
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].team, "T1");
+    }
+
+    #[test]
+    fn an_oversized_root_state_is_refused() {
+        let dir = std::env::temp_dir().join(format!("slakio-ws-test-big-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("storage")).unwrap();
+        let mut json = br#"{"workspaces":{"a":{"name":"A","domain":"a","id":"T1"}}}"#.to_vec();
+        json.resize(json.len() + usize::try_from(ROOT_STATE_MAX).unwrap(), b' ');
+        std::fs::write(dir.join("storage/root-state.json"), &json).unwrap();
+        assert_eq!(workspaces(&dir).unwrap_err(), DesktopError::Io);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
