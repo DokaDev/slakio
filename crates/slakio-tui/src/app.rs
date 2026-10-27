@@ -9,8 +9,7 @@
 //! answers handed in ([`App::on_backend`]); what only the binary can do (put text on the
 //! clipboard, save a setting) is queued as an [`Effect`] ([`App::take_effects`]). The binary's
 //! loop delivers both and also reads [`App::quit`] and [`App::deadline`]. Without a backend
-//! (`slakio` without `--demo`, for now) the work area only says how to quit and how to try the
-//! demo.
+//! (`slakio` not signed in yet) the work area says how to sign in ([`signin`]).
 //!
 //! Where the focus lands, and what `Esc` does, one step at a time:
 //!
@@ -45,6 +44,7 @@ pub mod pane;
 pub mod query;
 pub(crate) mod requests;
 pub mod shell;
+pub mod signin;
 pub mod status;
 mod tabs;
 pub(crate) mod timelines;
@@ -141,6 +141,7 @@ pub struct App {
     pub(crate) dialog: Option<Dialog>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
+    sign_in: Option<signin::SignIn>,
     /// The generation of the last boot request (older answers are dropped), and why it failed.
     boot: (Generation, Option<slakio_core::backend::FailKind>),
     effects: Vec<Effect>,
@@ -176,6 +177,7 @@ impl App {
             help: None,
             dialog: None,
             backend: None,
+            sign_in: None,
             boot: (Generation::default(), None),
             effects: Vec::new(),
             last_click: None,
@@ -299,20 +301,7 @@ impl App {
                 true
             }
             Event::Paste(text) => {
-                match self.key_context() {
-                    Ctx::ComposerInsert => {
-                        if let Some(c) = self.work.draft_mut() {
-                            c.insert(&text);
-                        }
-                    }
-                    Ctx::HelpFilter => {
-                        if let Some(h) = self.help.as_mut() {
-                            h.filter.extend(text.chars().filter(|c| !c.is_control()));
-                            h.cursor = 0;
-                        }
-                    }
-                    _ => self.cmdline.insert(&text),
-                }
+                self.paste(text);
                 true
             }
             Event::Resize(w, h) => {

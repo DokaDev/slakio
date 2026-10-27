@@ -1,4 +1,5 @@
-//! Drawing a frame of [`App`]. Without a backend: the welcome text and the status line. With
+//! Drawing a frame of [`App`]. Without a backend: the sign-in screen ([`signin`]) and the status
+//! line. With
 //! one: the shell — the list panel (navigation: the workspace, the views, the list) and the work
 //! area — over the status line (see [`crate::screen`] for the geometry), or, on a terminal too small for it, only how much room it needs. Popups
 //! go on top: the which-key popup above the status line, the keyboard help, the command palette
@@ -21,6 +22,7 @@ mod help;
 mod list;
 mod navbar;
 mod palette;
+mod signin;
 mod statusline;
 mod switcher;
 mod tabbar;
@@ -49,7 +51,9 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
     let area = f.area();
     f.buffer_mut().set_style(area, app.theme.base());
     let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
-    if app.backend.is_none() {
+    if let (None, Some(state)) = (app.backend, app.sign_in()) {
+        signin::draw(f, app, body, state);
+    } else if app.backend.is_none() {
         draw_welcome(f, app, body);
     } else if screen::too_small(area) {
         draw_too_small(f, app, area);

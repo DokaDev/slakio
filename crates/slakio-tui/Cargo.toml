@@ -25,6 +25,8 @@ emojis.workspace = true
 futures.workspace = true
 lexopt.workspace = true
 ratatui.workspace = true
+# Signing in (the binary's wiring only, as the transport).
+slakio-auth.workspace = true
 slakio-core.workspace = true
 # Named by the binary's wiring only (src/main.rs); the library reaches a backend through the
 # core's protocol.
@@ -38,6 +40,9 @@ unicode-width.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+# The binary signing in against the tests' fake Slack.
+slakio-fake.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "net"] }
 
 [lints]
 workspace = true

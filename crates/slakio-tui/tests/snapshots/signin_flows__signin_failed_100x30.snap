@@ -1,0 +1,34 @@
+---
+source: crates/slakio-tui/tests/signin_flows.rs
+expression: "screen(&app, 100, 30, now)"
+---
+
+
+
+
+
+            Sign in to Slack
+
+            1. Open your workspace in a browser and sign in as usual.
+            2. Open the developer tools (Cmd+Option+I), choose the Network tab and
+            reload the page.
+            3. Right-click any request whose address has /api/ and choose Copy > Copy as
+            cURL.
+            4. Paste it here (Cmd+V).
+
+            The token and the cookies go to the macOS Keychain and nowhere else. slakio
+            only reads: it sends no message and marks nothing as read.
+
+            No d cookie in the paste. Copy the request again from the Network tab with
+            Copy as cURL.
+
+            Ctrl+Q  Quit
+            ?       Keyboard help
+
+
+
+
+
+
+
+ NORMAL                                                         │ Ctrl+Q quit · ? help · : commands

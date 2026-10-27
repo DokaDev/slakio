@@ -9,7 +9,7 @@
 "mode.visual" = "VISUAL"
 
 # The empty work area of step zero.
-"welcome.status" = "Early development: nothing connects to Slack yet."
+"welcome.status" = "Not signed in: run slakio login to sign in."
 
 # The command line.
 "command.unknown" = "Not a command: {name}"
@@ -360,7 +360,7 @@
 # A request the backend did not carry out.
 "fail.read_only" = "Read only: nothing can be changed here"
 "fail.network" = "Network error: Slack could not be reached"
-"fail.auth" = "Signed out: sign in again"
+"fail.auth" = "Signed out: run slakio login to sign in again"
 "fail.rate_limited" = "Slack asked to slow down"
 "fail.cap_reached" = "Request limit reached: nothing more is sent for now"
 "fail.offline" = "Offline: Slack is not being asked"
@@ -382,3 +382,30 @@
 "sort.due_short" = "Due"
 "sort.oldest_short" = "Oldest"
 "sort.newest_short" = "Newest"
+
+# Signing in: the screen without a workspace (`slakio`, `slakio login`), and the command line's
+# `slakio login` / `slakio logout`.
+"signin.title" = "Sign in to Slack"
+"signin.step1" = "1. Open your workspace in a browser and sign in as usual."
+"signin.step2" = "2. Open the developer tools (Cmd+Option+I), choose the Network tab and reload the page."
+"signin.step3" = "3. Right-click any request whose address has /api/ and choose Copy > Copy as cURL."
+"signin.step4" = "4. Paste it here (Cmd+V)."
+"signin.note" = "The token and the cookies go to the macOS Keychain and nowhere else. slakio only reads: it sends no message and marks nothing as read."
+"signin.checking" = "Checking the sign-in with Slack…"
+"signin.signed_in" = "Signed in to {workspace}"
+"signin.empty" = "Nothing was pasted. Copy the request again and paste it here."
+"signin.too_long" = "That is not one request. Copy a single request as cURL."
+"signin.no_address" = "No workspace address in the paste. Copy a request to https://<workspace>.slack.com/api/…"
+"signin.not_workspace" = "That request does not go to your workspace's own address. Pick one whose address starts with your workspace's name."
+"signin.no_token" = "No session token in the paste. Pick a request to /api/ (a POST) and copy it as cURL."
+"signin.no_cookie" = "No d cookie in the paste. Copy the request again from the Network tab with Copy as cURL."
+"signin.ambiguous" = "The paste holds more than one sign-in. Copy one request only."
+"signin.refused" = "Slack did not accept this sign-in. Sign in to Slack in the browser again, then copy a new request."
+"signin.network" = "Could not reach Slack. Check the connection and paste again."
+"signin.offline" = "The network is off (--offline, SLAKIO_NETWORK or network = \"off\"): the sign-in cannot be checked."
+"signin.failed" = "Slack did not answer as expected. Try again in a minute."
+"signin.store_failed" = "Could not save the sign-in to the keychain. Nothing was kept; paste again to retry."
+"signin.store_read" = "Could not read the sign-in from the keychain. Paste a new request to sign in again."
+"logout.done" = "Signed out of {workspace}: its credentials are removed from the keychain"
+"logout.none" = "Not signed in"
+"logout.failed" = "Could not sign out: the keychain or the workspaces file could not be changed"

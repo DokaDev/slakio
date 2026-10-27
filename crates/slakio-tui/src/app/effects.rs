@@ -1,5 +1,6 @@
 //! What only the binary can do, queued by the app and done by its loop.
 
+use super::signin::Pasted;
 use slakio_core::fault::Fault;
 
 /// Something only the binary can do, done by its loop.
@@ -12,4 +13,6 @@ pub enum Effect {
     Save { key: &'static str, value: String },
     /// Append `fault` to the error log, as having happened while `context`.
     Record { context: &'static str, fault: Fault },
+    /// Sign in with a pasted request ([`super::signin`]).
+    SignIn(Pasted),
 }

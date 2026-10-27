@@ -11,12 +11,12 @@ expression: "screen(&app, 80, 24, now)"
           ├──────────────────────────────────────────────────────────┤
           │  No matching commands                                    │
           ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯
-               Early development: nothing connects to Slack yet.
+                Not signed in: run slakio login to sign in.
 
-               Ctrl+Q  Quit
-               ?       Keyboard help
+                Ctrl+Q  Quit
+                ?       Keyboard help
 
-               Run slakio --demo to try it with invented data.
+                Run slakio --demo to try it with invented data.
 
 
 
