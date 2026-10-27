@@ -14,6 +14,7 @@
 //! ```
 
 use super::model::{Model, Row};
+use super::todos::{Group, TodoView};
 use crate::action::ShellAction;
 use slakio_core::i18n::Label;
 use slakio_core::model::{SectionId, Target};
@@ -43,12 +44,14 @@ pub enum View {
     Dms,
     Activity,
     Files,
-    Later,
+    /// Slack's To-dos (formerly Later): saved messages with a reminder or none, in progress or
+    /// completed.
+    Todos,
 }
 
 impl View {
     /// In the order of the views' rows.
-    pub const ALL: &'static [View] = &[View::Home, View::Dms, View::Activity, View::Files, View::Later];
+    pub const ALL: &'static [View] = &[View::Home, View::Dms, View::Activity, View::Files, View::Todos];
 
     /// The view's name (its row, the breadcrumb).
     pub fn label(self) -> Label {
@@ -57,7 +60,7 @@ impl View {
             View::Dms => Label::NavDms,
             View::Activity => Label::NavActivity,
             View::Files => Label::NavFiles,
-            View::Later => Label::NavLater,
+            View::Todos => Label::NavTodos,
         }
     }
 
@@ -68,14 +71,15 @@ impl View {
             View::Dms => "\u{F0361}",
             View::Activity => "\u{F009A}",
             View::Files => "\u{F0219}",
-            View::Later => "\u{F00C0}",
+            // `nf-md-check_circle_outline`.
+            View::Todos => "\u{F05E1}",
         }
     }
 
     /// Built in a later version: the list panel shows a placeholder, never invented data that
     /// could pass for the real thing.
     pub fn is_placeholder(self) -> bool {
-        matches!(self, View::Activity | View::Files | View::Later)
+        matches!(self, View::Activity | View::Files)
     }
 }
 
@@ -93,6 +97,10 @@ pub struct Shell {
     /// The first row on screen.
     pub list_top: usize,
     pub collapsed: HashSet<SectionId>,
+    /// Folded groups of saved items.
+    pub groups: HashSet<Group>,
+    /// How To-dos are filtered and ordered, and its changes waiting for the backend.
+    pub todo: TodoView,
     pub list_hidden: bool,
     /// The list cursor goes to the first conversation once the rows are known.
     pending_home: bool,
@@ -109,6 +117,8 @@ impl Default for Shell {
             list_cursor: 0,
             list_top: 0,
             collapsed: HashSet::new(),
+            groups: HashSet::new(),
+            todo: TodoView::default(),
             list_hidden: false,
             pending_home: true,
         }
@@ -117,7 +127,7 @@ impl Default for Shell {
 
 impl Shell {
     pub fn rows(&self, model: &Model) -> Vec<Row> {
-        model.rows(self.workspace, self.view, &self.collapsed)
+        model.rows(self.workspace, self.view, &self.collapsed, &self.groups, &self.todo)
     }
 
     /// Apply `action`. `list_height` is the number of rows the list panel shows (for scrolling
@@ -133,7 +143,6 @@ impl Shell {
     ) -> Option<Open> {
         let mut open = None;
         let list = self.rows(model);
-        let rows = list.len();
         let page = list_height.max(1) as isize;
         match action {
             ShellAction::FocusLeft => *here = self.neighbour(*here, -1),
@@ -165,20 +174,23 @@ impl Shell {
             ShellAction::ListPageDown => self.list_cursor = step(&list, self.list_cursor, page),
             ShellAction::ListPageUp => self.list_cursor = step(&list, self.list_cursor, -page),
             ShellAction::ListFirst => self.list_cursor = 0,
-            ShellAction::ListLast => self.list_cursor = rows.saturating_sub(1),
+            ShellAction::ListLast => self.list_cursor = list.iter().rposition(|r| r.is_selectable()).unwrap_or(0),
             ShellAction::ListOpen => open = self.open_row(model).map(|target| Open { target, focus: true }),
             ShellAction::ListPeek => match list.get(self.list_cursor) {
                 Some(Row::Section(i)) => {
                     self.collapsed.remove(&model.section(*i).id);
                 }
-                Some(Row::Conversation(_)) => {
+                Some(Row::Group(g)) => {
+                    self.groups.remove(g);
+                }
+                Some(Row::Conversation(_) | Row::Item(_)) => {
                     open = self.open_row(model).map(|target| Open { target, focus: false });
                 }
                 _ => {}
             },
             ShellAction::ListLeft => match list.get(self.list_cursor) {
-                Some(Row::Conversation(_)) => {
-                    match list[..self.list_cursor].iter().rposition(|r| matches!(r, Row::Section(_))) {
+                Some(Row::Conversation(_) | Row::Item(_)) => {
+                    match list[..self.list_cursor].iter().rposition(|r| r.is_header()) {
                         Some(header) => self.list_cursor = header,
                         None => *here = Region::ViewSwitcher,
                     }
@@ -189,10 +201,15 @@ impl Shell {
                         *here = Region::ViewSwitcher;
                     }
                 }
+                Some(Row::Group(g)) => {
+                    if !self.groups.insert(*g) {
+                        *here = Region::ViewSwitcher;
+                    }
+                }
                 _ => *here = Region::ViewSwitcher,
             },
             ShellAction::ListSectionPrev | ShellAction::ListSectionNext => {
-                let header = |r: &Row| matches!(r, Row::Section(_));
+                let header = |r: &Row| r.is_header();
                 let to = if action == ShellAction::ListSectionPrev {
                     list[..self.list_cursor].iter().rposition(header)
                 } else {
@@ -212,8 +229,20 @@ impl Shell {
                 self.select(view, model);
                 *here = Region::List;
             }
+            // The app's: they ask the backend or open the palette.
+            ShellAction::TodoToggle
+            | ShellAction::TodoMove
+            | ShellAction::TodoClear
+            | ShellAction::TodoFilter
+            | ShellAction::TodoSort => {}
         }
         self.scroll(list_height);
+        // An item's second line shows with it.
+        if matches!(list.get(self.list_cursor + 1), Some(Row::ItemMeta(_)))
+            && self.list_cursor + 1 >= self.list_top + list_height.max(1)
+        {
+            self.list_top += 1;
+        }
         open
     }
 
@@ -325,11 +354,13 @@ impl Shell {
                 }
                 None
             }
-            Some(Row::Conversation(i)) => {
-                let c = model.conversation(*i);
-                Some(Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() })
+            Some(Row::Group(g)) => {
+                if !self.groups.remove(g) {
+                    self.groups.insert(*g);
+                }
+                None
             }
-            Some(Row::Spacer) | None => None,
+            _ => self.target_at_cursor(model),
         }
     }
 
@@ -340,15 +371,33 @@ impl Shell {
                 let c = model.conversation(*i);
                 Some(Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() })
             }
+            // A saved message: its thread when it has one, else its conversation.
+            Some(Row::Item(i)) => {
+                let s = model.saved(*i);
+                let (workspace, conversation) = (s.workspace.clone(), s.conversation.clone());
+                Some(if s.thread {
+                    Target::Thread { workspace, conversation, thread: s.ts }
+                } else {
+                    Target::Conversation { workspace, conversation }
+                })
+            }
             _ => None,
         }
     }
 
-    /// Put the list cursor on the first conversation (a view just shown starts there, not on a
-    /// section header).
+    /// The saved item under the cursor, if the cursor is on one (index into the saved items).
+    pub fn item_at_cursor(&self, model: &Model) -> Option<usize> {
+        match self.rows(model).get(self.list_cursor) {
+            Some(Row::Item(i)) => Some(*i),
+            _ => None,
+        }
+    }
+
+    /// Put the list cursor on the first conversation or item (a view just shown starts there,
+    /// not on a section header).
     pub fn home_cursor(&mut self, model: &Model) {
         let rows = self.rows(model);
-        self.list_cursor = rows.iter().position(|r| matches!(r, Row::Conversation(_))).unwrap_or(0);
+        self.list_cursor = rows.iter().position(|r| matches!(r, Row::Conversation(_) | Row::Item(_))).unwrap_or(0);
         self.list_top = 0;
     }
 

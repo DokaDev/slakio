@@ -4,7 +4,9 @@
 //! wheel). Popups take the mouse first ([`super::overlay`]). Where things are comes from the
 //! frame's one layout ([`crate::screen`]), as drawn.
 
+use super::model::Row;
 use super::{App, DOUBLE_CLICK, Focus, Guide, Overlay, WHEEL_ROWS};
+use crate::action::ShellAction;
 use crate::screen;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
@@ -63,13 +65,7 @@ impl App {
                     let rows = screen::list_parts(list, self.nav_rows()).rows;
                     if !self.nav_click(at, now) && rows.contains(at) {
                         let row = self.shell.list_top + usize::from(at.y - rows.y);
-                        if self.shell.rows(&self.model).get(row).is_some_and(|r| r.is_selectable()) {
-                            self.set_focus(Focus::List);
-                            self.shell.list_cursor = row;
-                            if let Some(t) = self.shell.open_row(&self.model) {
-                                self.open(t, true);
-                            }
-                        }
+                        self.click_list(row, at.x - rows.x, now);
                     }
                 } else if on_tabs {
                     self.tab_bar_mouse(m, double);
@@ -79,6 +75,29 @@ impl App {
                 true
             }
             _ => false,
+        }
+    }
+
+    /// A click on row `row` of the list, `x` cells from its left edge: a conversation or an
+    /// item opens (a to-do's second line is its item's), a header folds, the filter row opens
+    /// the values of the part clicked.
+    fn click_list(&mut self, row: usize, x: u16, now: Instant) {
+        let rows = self.shell.rows(&self.model);
+        let row = if matches!(rows.get(row), Some(Row::ItemMeta(_))) { row - 1 } else { row };
+        if !rows.get(row).is_some_and(|r| r.is_selectable()) {
+            return;
+        }
+        self.set_focus(Focus::List);
+        self.shell.list_cursor = row;
+        match rows[row] {
+            Row::Filter if x >= self.filter_row().sort_x => self.todo(ShellAction::TodoSort, now),
+            Row::Filter => self.todo(ShellAction::TodoFilter, now),
+            Row::Item(_) => self.open_item(true),
+            _ => {
+                if let Some(t) = self.shell.open_row(&self.model) {
+                    self.open(t, true);
+                }
+            }
         }
     }
 

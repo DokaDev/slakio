@@ -64,7 +64,8 @@ fn colon_opens_the_same_palette_and_typing_filters_it() {
     d.type_text("dm");
     let rows = d.app.palette_rows();
     assert_eq!(rows[0].name, ":dms", "a command the word starts comes first: {rows:?}");
-    assert!(rows.iter().skip(1).all(|r| r.name.is_empty()), "then actions found by their words: {rows:?}");
+    // Then what its letters find: actions, and commands found by their words (`:filter`).
+    assert!(rows.iter().skip(1).all(|r| !r.name.starts_with(":dm")), "{rows:?}");
     insta::assert_snapshot!("palette_filter_80x24", d.snap());
     d.keys("enter");
     assert_eq!((d.app.view(), d.app.mode()), (View::Dms, Mode::Normal));

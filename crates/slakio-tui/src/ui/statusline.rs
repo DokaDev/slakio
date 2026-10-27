@@ -38,7 +38,10 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::Root => Place::Welcome,
         Ctx::ViewSwitcher => Place::ViewSwitcher,
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
-            Some(Row::Section(_)) => Place::ListSection,
+            Some(Row::Section(_) | Row::Group(_)) => Place::ListSection,
+            Some(Row::Filter) => Place::ListFilter,
+            Some(Row::Item(_)) if app.shell.view == crate::app::shell::View::Todos => Place::ListTodo,
+            Some(Row::Item(_)) => Place::ListSaved,
             Some(_) => Place::ListConversation,
             None => Place::ListEmpty,
         },

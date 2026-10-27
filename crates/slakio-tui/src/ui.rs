@@ -25,6 +25,7 @@ mod statusline;
 mod switcher;
 mod tabbar;
 pub mod timeline;
+mod todos;
 mod work;
 
 use crate::app::Layer;

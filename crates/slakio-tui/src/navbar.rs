@@ -11,11 +11,11 @@
 //! │ 󰍡 DMs                 ●11 │
 //! │ 󰂚 Activity            @37 │
 //! │ 󰈙 Files                   │
-//! │ 󰃀 Later                   │
+//! │ 󰗡 To-dos                3 │    to-dos in progress (overdue: the warning color)
 //! ├─▾─────────────────────────┤    the handle that folds them
 //!
-//! │▎▸ 󰋜 Home       @24 · @37 │    folded (`nav_rows = "collapsed"`): the view shown and the
-//! ├───────────────────────────┤    strongest mark of the others
+//! │▎▸ 󰋜 Home    @24 · 󰂚 @37 │    folded (`nav_rows = "collapsed"`): the view shown and the
+//! ├───────────────────────────┤    strongest mark of the others, after its view's glyph
 //! ```
 //!
 //! The handle `▾` on the rule is in the column of the folded row's `▸` ([`FOLD_X`]); icons off,
@@ -58,6 +58,15 @@ pub struct Item {
     pub badge: Option<String>,
 }
 
+/// On the folded views' row, the strongest mark of a view it hides, after that view's glyph
+/// (icons on) or its letter (` · 󰂚 @37`, ` · A @37`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Other {
+    pub glyph: Option<&'static str>,
+    pub letter: String,
+    pub mark: String,
+}
+
 /// A part of a line as drawn.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Part {
@@ -74,9 +83,18 @@ pub enum Part {
     Fold,
     /// A Nerd Font glyph: one cell, then a blank one ([`GLYPH_SLOT`]).
     Glyph,
+    /// The glyph of the hidden view whose mark follows (a glyph's slot too).
+    MarkGlyph,
     Label,
     Badge,
     Blank,
+}
+
+impl Part {
+    /// Drawn as a Nerd Font glyph in its slot.
+    pub fn is_glyph(self) -> bool {
+        matches!(self, Part::Glyph | Part::MarkGlyph)
+    }
 }
 
 /// A stretch of a line: whose (the view's index into the views; `None` on the chip, which is
@@ -131,7 +149,7 @@ fn cut_name(name: &str, cells: usize) -> String {
 type Parts = Vec<(Option<usize>, Part, String, u16)>;
 
 fn push(out: &mut Parts, item: Option<usize>, part: Part, text: String) {
-    let w = if part == Part::Glyph { GLYPH_SLOT } else { width(&text) as u16 };
+    let w = if part.is_glyph() { GLYPH_SLOT } else { width(&text) as u16 };
     out.push((item, part, text, w));
 }
 
@@ -150,10 +168,10 @@ fn place(area: Rect, parts: Parts) -> Bar {
             break;
         }
         let left = end - x;
-        if part == Part::Glyph && w > left {
+        if part.is_glyph() && w > left {
             break;
         }
-        let (text, w) = if part == Part::Glyph || w <= left {
+        let (text, w) = if part.is_glyph() || w <= left {
             (text, w)
         } else {
             let t = clip(&text, usize::from(left));
@@ -200,8 +218,9 @@ pub fn chip(area: Rect, chip: &Chip) -> Bar {
 /// One view's row in `row` (the row of the list panel it takes): a blank (the view shown's
 /// marker goes there), `▸` before the view when the rows are folded to it (`fold`), its glyph's
 /// slot (icons on), its name, and its count at the right, one cell in from the edge, then
-/// `other`, another view's mark (` · @37`). The counts are never cut: the name is.
-fn view_row(row: Rect, item: usize, v: &Item, fold: bool, other: Option<&str>) -> Bar {
+/// `other`, another view's mark after its glyph or letter (` · 󰂚 @37`). The counts are never
+/// cut: the name is.
+fn view_row(row: Rect, item: usize, v: &Item, fold: bool, other: Option<&Other>) -> Bar {
     let mut out = Parts::new();
     let mut tail = Parts::new();
     let it = Some(item);
@@ -216,10 +235,17 @@ fn view_row(row: Rect, item: usize, v: &Item, fold: bool, other: Option<&str>) -
     if let Some(b) = &v.badge {
         push(&mut tail, it, Part::Badge, b.clone());
     }
-    if let Some(m) = other {
+    if let Some(o) = other {
         let dot = if tail.is_empty() { "· " } else { " · " };
         push(&mut tail, it, Part::Blank, dot.into());
-        push(&mut tail, it, Part::Mark, m.to_string());
+        match o.glyph {
+            Some(g) => push(&mut tail, it, Part::MarkGlyph, g.to_string()),
+            None => {
+                push(&mut tail, it, Part::Other, o.letter.clone());
+                push(&mut tail, it, Part::Blank, " ".into());
+            }
+        }
+        push(&mut tail, it, Part::Mark, o.mark.clone());
     }
     let counts = total(&tail);
     // The name, a blank before the counts (when there are any) and the blank after them.
@@ -237,7 +263,7 @@ fn view_row(row: Rect, item: usize, v: &Item, fold: bool, other: Option<&str>) -
 /// list shows; `folded`, a single row for the view shown (`▸`) with `other`, the strongest mark
 /// of the views it hides. A row is one view from edge to edge (a click anywhere on it is that
 /// view's); rows that do not fit in `area` are left out.
-pub fn views(area: Rect, views: &[Item], shown: usize, folded: bool, other: Option<&str>) -> Vec<Bar> {
+pub fn views(area: Rect, views: &[Item], shown: usize, folded: bool, other: Option<&Other>) -> Vec<Bar> {
     let row = |i: u16| Rect { y: area.y + i, height: 1, ..area };
     if folded {
         let v = views.get(shown).filter(|_| area.height > 0);

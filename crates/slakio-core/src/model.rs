@@ -52,6 +52,10 @@ string_id!(
     /// A sidebar section of one workspace.
     SectionId
 );
+string_id!(
+    /// A saved item: a to-do, or a message kept in Home's Saved section.
+    SavedId
+);
 
 /// One of the theme's workspace colours. The colour belongs to the workspace, not to the theme:
 /// the workspace chip, list stripes, pane titles and the status line all use the same slot.
@@ -158,7 +162,7 @@ impl Conversation {
 
 /// A Slack message timestamp (`1767603600.000100`), which is also the message's id within its
 /// conversation: microseconds since the Unix epoch.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Ts(pub u64);
 
 impl Ts {
@@ -199,6 +203,36 @@ pub struct Message {
     pub thread: Option<ThreadSummary>,
     pub reactions: Vec<Reaction>,
     pub edited: bool,
+}
+
+/// Where a saved item is: a to-do in progress or completed (the To-dos view), or kept without
+/// being one (Home's Saved section; Slack moved reminder-less and archived "Later" items there).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SavedState {
+    InProgress,
+    Completed,
+    Saved,
+}
+
+/// A message the user saved: a to-do (with a reminder, its due date, or none) or a message kept
+/// in Saved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SavedItem {
+    pub id: SavedId,
+    pub workspace: WorkspaceId,
+    pub conversation: ConversationId,
+    /// The message saved.
+    pub ts: Ts,
+    /// The message is a thread's own message: opening the item opens the thread.
+    pub thread: bool,
+    pub author: UserId,
+    /// The message's text, as its sender wrote it.
+    pub text: Remote,
+    /// When it was saved.
+    pub created: Ts,
+    /// When its reminder is due, if it has one.
+    pub due: Option<Ts>,
+    pub state: SavedState,
 }
 
 /// What a pane shows, named by ids only so a saved layout restores with any backend.

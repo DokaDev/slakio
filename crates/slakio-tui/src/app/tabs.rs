@@ -41,6 +41,10 @@ pub struct Unread {
     pub any: bool,
     /// A DM of those mentions the user: its `●n` is red.
     pub dm_mention: bool,
+    /// To-dos in progress (`n`, a view's count only), and whether one is overdue (the warning
+    /// color, never a mention's red).
+    pub todos: u32,
+    pub overdue: bool,
 }
 
 impl Unread {
@@ -51,6 +55,7 @@ impl Unread {
             Unread { mentions: m, .. } if m > 0 => Some(format!("@{m}")),
             Unread { dms: d, .. } if d > 0 => Some(format!("●{d}")),
             Unread { any: true, .. } => Some("●".to_string()),
+            Unread { todos: n, .. } if n > 0 => Some(n.to_string()),
             _ => None,
         }
     }

@@ -7,11 +7,11 @@ expression: d.snap()
 │ DMs                    ●11 ││                                                │
 │ Activity               @37 ││                                                │
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
-│ Later   │ : dm                                                     │         │
+│ To-dos  │ : dm                                                     │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
-│ ▾ Favori│  :dms  Show DMs                                  Space d │         │
-│   # back╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯er.      │
-│   # incidents           3  ││                                                │
+│ ▾ Favori│  :dms     Show DMs                               Space d │         │
+│   # back│  :filter  Filter To-dos by state or reminder           f │er.      │
+│   # inci╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
 │                            ││     Enter    Open                              │
 │ ▾ Ops                      ││     Space h  Home                              │
 │   # deploys                ││     Space d  DMs                               │

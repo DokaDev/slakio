@@ -14,13 +14,16 @@
 //!
 //! Counts (ui-ux-spec §H.1): Home `@n` the mentions in its channels, else `●` when a channel is
 //! unread; DMs `●n` the unread messages of its DMs; Activity `@n` the mentions of every
-//! workspace. Only mentions are `@` and red. Another workspace's mark follows `▾` with its letter.
+//! workspace; To-dos `n` its to-dos in progress, in the warning color when one is overdue (never
+//! red: that is a mention's). Only mentions are `@` and red. Another workspace's mark follows `▾`
+//! with its letter; folded, the views' row adds the strongest mark of the views it hides, after
+//! that view's glyph (or letter).
 
 use super::shell::View;
 use super::tabs::Unread;
 use super::{App, Effect, Focus};
 use crate::action::ShellAction;
-use crate::navbar::{self, Bar, Chip, Item, Part};
+use crate::navbar::{self, Bar, Chip, Item, Other, Part};
 use crate::screen::{self, ListParts};
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
@@ -31,6 +34,10 @@ impl App {
     /// What view `v` of workspace `ws` holds unread, counted as the list's pills count it.
     pub fn view_unread(&self, ws: usize, v: View) -> Unread {
         let Some(w) = self.model.workspaces().get(ws) else { return Unread::default() };
+        if v == View::Todos {
+            let (todos, overdue) = self.model.todo_count(ws);
+            return Unread { todos, overdue, ..Unread::default() };
+        }
         let mut u = Unread::default();
         for c in self.model.conversations().iter().filter(|c| v == View::Activity || c.workspace == w.id) {
             match v {
@@ -99,15 +106,23 @@ impl App {
             })
             .collect();
         let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
-        // Folded, the strongest mark of the views it hides: a mention first, the most of them.
-        let other = View::ALL
+        let other = self.hidden_mark().and_then(|(v, u)| {
+            let label = self.i18n.label(v.label()).to_string();
+            let letter = label.chars().next()?.to_uppercase().to_string();
+            Some(Other { glyph: icons.then(|| v.glyph()), letter, mark: u.badge()? })
+        });
+        navbar::views(parts.views, &views, shown, self.shell.nav_folded, other.as_ref())
+    }
+
+    /// The strongest mark of the views the folded row hides, and whose: a mention first, the
+    /// most of them; unread before to-dos.
+    pub fn hidden_mark(&self) -> Option<(View, Unread)> {
+        View::ALL
             .iter()
             .filter(|v| **v != self.shell.view)
-            .map(|v| self.view_unread(self.shell.workspace, *v))
-            .filter(|u| u.badge().is_some())
-            .max_by_key(|u| (u.level(), u.mentions))
-            .and_then(|u| u.badge());
-        navbar::views(parts.views, &views, shown, self.shell.nav_folded, other.as_deref())
+            .map(|v| (*v, self.view_unread(self.shell.workspace, *v)))
+            .filter(|(_, u)| u.badge().is_some())
+            .max_by_key(|(_, u)| (u.level(), u.mentions, u.overdue))
     }
 
     /// Fold the views to one row, the view shown (`nav_rows = "collapsed"`), or unfold them.

@@ -2,7 +2,8 @@
 //! listed under it, generated from the action registry with the keys of each. With nothing
 //! typed it lists every command and every action that works where the keyboard is; a word
 //! lists the commands it starts (an exact name first), then the actions its letters find
-//! ([`crate::action::search`]); `:theme ` lists the themes; `:rename <name>` names the tab shown. `Enter` runs the selected entry (a
+//! ([`crate::action::search`]); `:theme ` lists the themes, `:filter ` and `:sort ` To-dos'
+//! filters and orders; `:rename <name>` names the tab shown. `Enter` runs the selected entry (a
 //! command that needs its argument is completed into the input instead); an empty line, or
 //! text that matches nothing, runs nothing: the first closes, the second says why under the
 //! list and the palette stays.
@@ -17,6 +18,7 @@
 //! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
 //! ```
 
+use super::todos::{FILTER_VALUES, SORT_VALUES};
 use super::{App, Effect};
 use crate::action::TabAction;
 use crate::action::{self, Action, AppAction, HelpAction, REGISTRY};
@@ -57,13 +59,17 @@ pub enum Item {
     Icons(usize),
     /// A value for `:density <value>` (index into [`DENSITY_VALUES`]).
     Density(usize),
+    /// A value for `:filter <value>` (index into [`FILTER_VALUES`]).
+    TodoFilter(usize),
+    /// A value for `:sort <value>` (index into [`SORT_VALUES`]).
+    TodoSort(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
 
 /// An entry ready to draw: what it completes to (empty for an action), what it does, and its
 /// keys where the keyboard is.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Row {
     pub name: String,
     pub label: String,
@@ -137,6 +143,12 @@ impl App {
         }
         if let Some(arg) = setting_arg(line, "density") {
             return ranked(DENSITY_VALUES, arg).into_iter().map(Item::Density).collect();
+        }
+        if let Some(arg) = setting_arg(line, "filter").filter(|_| self.backend.is_some()) {
+            return ranked(FILTER_VALUES, arg).into_iter().map(Item::TodoFilter).collect();
+        }
+        if let Some(arg) = setting_arg(line, "sort").filter(|_| self.backend.is_some()) {
+            return ranked(SORT_VALUES, arg).into_iter().map(Item::TodoSort).collect();
         }
         if let Some(arg) = icons_arg(line) {
             let mut hits: Vec<(u8, i32, usize)> = ICON_VALUES
@@ -249,6 +261,7 @@ impl App {
                         },
                     }
                 }
+                Item::TodoFilter(_) | Item::TodoSort(_) => self.todo_palette_row(item).unwrap_or_default(),
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -327,6 +340,10 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(item @ (Item::TodoFilter(_) | Item::TodoSort(_))) => {
+                self.cmdline.close();
+                self.run_todo_item(item, now);
+            }
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();
                 self.cmdline.close();
@@ -344,6 +361,14 @@ impl App {
                     _ if setting_arg(&text, "density").is_some() => Msg::DensityUnknown {
                         name: setting_arg(&text, "density").unwrap_or_default().to_string(),
                         names: DENSITY_VALUES.join(", "),
+                    },
+                    _ if setting_arg(&text, "filter").is_some() => Msg::FilterUnknown {
+                        name: setting_arg(&text, "filter").unwrap_or_default().to_string(),
+                        names: FILTER_VALUES.join(", "),
+                    },
+                    _ if setting_arg(&text, "sort").is_some() => Msg::SortUnknown {
+                        name: setting_arg(&text, "sort").unwrap_or_default().to_string(),
+                        names: SORT_VALUES.join(", "),
                     },
                     _ => {
                         let word = text.split_whitespace().next().unwrap_or_default().to_string();

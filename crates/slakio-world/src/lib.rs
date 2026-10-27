@@ -12,18 +12,22 @@
 //! Everything is invented. Hostile strings appear as message text, and also where a remote party
 //! names things: a person's display name (and so a DM's name), a section's name, a reaction's
 //! name. All of it is [`slakio_core::sanitize::Remote`] text, drawn only through the sanitiser.
+//!
+//! Saved messages and to-dos ([`saved`]) come with it, with a clock of the world's own (the
+//! snapshot's `taken`) so a reminder is overdue or upcoming the same way on every run.
 
 mod hostile;
 mod rng;
+mod saved;
 mod text;
 
 pub use hostile::{Hostile, all as hostile_strings};
 
 use rng::Rng;
-use slakio_core::backend::Snapshot;
+use slakio_core::backend::{SavedChange, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, Section, SectionId, SectionKind,
-    ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
+    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, SavedId, Section, SectionId,
+    SectionKind, ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
@@ -194,7 +198,15 @@ impl World {
         for (n, spec) in SPECS.iter().enumerate() {
             w.add_workspace(n, spec);
         }
+        w.snapshot.saved = saved::items(&w);
+        w.snapshot.taken = saved::now(&w);
         w
+    }
+
+    /// Apply `change` to saved item `id`, as Slack would; `false` when there is no such item or
+    /// the change does not apply to it. The snapshot holds the result.
+    pub fn change_saved(&mut self, id: &SavedId, change: SavedChange) -> bool {
+        saved::change(&mut self.snapshot.saved, id, change)
     }
 
     /// The demo world.

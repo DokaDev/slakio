@@ -53,7 +53,7 @@ fn the_view_switcher_and_the_brackets_select_views() {
     for _ in 0..20 {
         s.update(ShellAction::NavNext, &m, 10, &mut f);
     }
-    assert_eq!(View::ALL[s.nav_cursor], View::Later, "stops at the last view");
+    assert_eq!(View::ALL[s.nav_cursor], View::Todos, "stops at the last view");
     s.update(ShellAction::NavLeave, &m, 10, &mut f);
     assert_eq!((f, s.view), (Region::List, View::Dms), "back, showing nothing new");
     s.update(ShellAction::ViewNext, &m, 10, &mut f);
@@ -61,14 +61,14 @@ fn the_view_switcher_and_the_brackets_select_views() {
     for _ in 0..3 {
         s.update(ShellAction::ViewPrev, &m, 10, &mut f);
     }
-    assert_eq!(s.view, View::Later, "round again");
+    assert_eq!(s.view, View::Todos, "round again");
     s.update(ShellAction::ViewNext, &m, 10, &mut f);
     assert_eq!(s.view, View::Home);
     s.select_workspace(1, &m);
     assert_eq!((s.workspace, s.view, s.nav_cursor), (1, View::Home, 0));
     s.update(ShellAction::Show(View::Dms), &m, 10, &mut f);
     assert_eq!(View::ALL[s.nav_cursor], View::Dms, "the view switcher follows");
-    assert!(View::Later.is_placeholder() && !View::Dms.is_placeholder());
+    assert!(View::Files.is_placeholder() && !View::Todos.is_placeholder());
 }
 
 #[test]

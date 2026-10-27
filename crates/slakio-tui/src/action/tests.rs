@@ -53,6 +53,11 @@ fn every_action_is_registered() {
             ViewPrev,
             ToggleList,
             ToggleNavRows,
+            TodoToggle,
+            TodoMove,
+            TodoClear,
+            TodoFilter,
+            TodoSort,
         ]
         .into_iter()
         .chain(View::ALL.iter().map(|v| Show(*v)))
@@ -136,6 +141,8 @@ fn commands_find_their_action() {
     assert_eq!(by_command("qa"), Some(Action::App(AppAction::Quit)));
     assert_eq!(by_command(" q "), Some(Action::Pane(PaneAction::Close)), ":q closes, as in vim");
     assert_eq!(by_command("dms"), Some(Action::Shell(ShellAction::Show(View::Dms))));
+    assert_eq!(by_command("todos"), Some(Action::Shell(ShellAction::Show(View::Todos))));
+    assert_eq!(by_command("later"), Some(Action::Shell(ShellAction::Show(View::Todos))), "Later's name before");
     assert_eq!(by_command("wq"), None);
     assert_eq!(by_command(""), None);
 }

@@ -5,7 +5,7 @@
 //! The UI state never calls a backend: it queues commands, and the binary's loop delivers them
 //! and hands the events back. Only one wiring file of the UI names a concrete backend.
 
-use crate::model::{Conversation, Message, Section, Target, Ts, User, Workspace};
+use crate::model::{Conversation, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace};
 
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
 /// drops events of an older one.
@@ -33,6 +33,24 @@ pub enum Command {
     /// Up to `limit` messages of `target` older than `before` (the newest when `None`). Answered
     /// with [`Event::History`].
     History { target: Target, before: Option<Ts>, limit: u32 },
+    /// Change saved item `item` (Slack's `saved.update` / `saved.delete`). Answered with
+    /// [`Event::Saved`], every saved item after the change.
+    Save { item: SavedId, change: SavedChange },
+}
+
+/// A change to a saved item.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SavedChange {
+    /// A to-do in progress is completed.
+    Complete,
+    /// A completed to-do is in progress again.
+    Reopen,
+    /// Out of To-dos into Saved; its reminder goes.
+    MoveToSaved,
+    /// Out of Saved into To-dos, in progress.
+    MoveToTodos,
+    /// Gone from To-dos and Saved.
+    Clear,
 }
 
 /// A page of messages: the answer to [`Command::History`].
@@ -55,6 +73,10 @@ pub struct Snapshot {
     pub sections: Vec<Section>,
     /// Per section, in sidebar order.
     pub conversations: Vec<Conversation>,
+    /// The to-dos and saved messages of every workspace.
+    pub saved: Vec<SavedItem>,
+    /// When the backend took this snapshot: reminders due before it are overdue.
+    pub taken: Ts,
 }
 
 /// Something the backend tells the UI.
@@ -62,6 +84,8 @@ pub struct Snapshot {
 pub enum Event {
     Booted(Box<Snapshot>),
     History(Box<Page>),
+    /// Every saved item, after a [`Command::Save`].
+    Saved(Vec<SavedItem>),
 }
 
 /// An event with the generation of the request it answers.

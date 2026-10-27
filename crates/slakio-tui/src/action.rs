@@ -106,6 +106,16 @@ pub enum ShellAction {
     ToggleNavRows,
     /// Show a view in the list panel.
     Show(View),
+    /// The to-do under the cursor completed, or a completed one in progress again.
+    TodoToggle,
+    /// The saved item under the cursor out of To-dos into Saved, or back (in progress).
+    TodoMove,
+    /// The saved item under the cursor cleared (asks first).
+    TodoClear,
+    /// Filter To-dos by state or reminder (`:filter <value>`; alone, the values to pick).
+    TodoFilter,
+    /// Order To-dos (`:sort <value>`; alone, the orders to pick).
+    TodoSort,
 }
 
 /// Actions of the work area's panes (Normal and VISUAL mode) and its history.
@@ -305,7 +315,13 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::Show(View::Dms), "view.dms", Label::ActionViewDms, &["dms"]),
     shell(ShellAction::Show(View::Activity), "view.activity", Label::ActionViewActivity, &["activity"]),
     shell(ShellAction::Show(View::Files), "view.files", Label::ActionViewFiles, &["files"]),
-    shell(ShellAction::Show(View::Later), "view.later", Label::ActionViewLater, &["later"]),
+    // `:later` is To-dos' name before Slack renamed it.
+    shell(ShellAction::Show(View::Todos), "view.todos", Label::ActionViewTodos, &["todos", "later"]),
+    shell(ShellAction::TodoToggle, "todo.toggle", Label::ActionTodoToggle, &[]),
+    shell(ShellAction::TodoMove, "todo.move", Label::ActionTodoMove, &[]),
+    shell(ShellAction::TodoClear, "todo.clear", Label::ActionTodoClear, &[]),
+    shell(ShellAction::TodoFilter, "todo.filter", Label::ActionTodoFilter, &["filter"]),
+    shell(ShellAction::TodoSort, "todo.sort", Label::ActionTodoSort, &["sort"]),
     pane(PaneAction::Next, "pane.next", Label::ActionPaneNext, &[]),
     pane(PaneAction::Prev, "pane.prev", Label::ActionPanePrev, &[]),
     pane(PaneAction::First, "pane.first", Label::ActionPaneFirst, &[]),

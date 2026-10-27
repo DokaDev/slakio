@@ -11,12 +11,13 @@
 
 use crate::app::App;
 use crate::app::Focus;
+use crate::app::Unread;
 use crate::app::shell::View;
 use crate::navbar::{self, Part};
 use crate::theme::{GUTTER, Selection};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
+use ratatui::style::{Modifier, Style};
 
 /// Draw the chip, the view switcher and the rule of list panel `list`.
 pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
@@ -52,19 +53,21 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
             continue;
         };
         let shown = view == app.shell.view;
-        let red = app.view_unread(app.shell.workspace, view).red();
+        let own = app.view_unread(app.shell.workspace, view);
+        let hidden = app.hidden_mark();
         let buf = f.buffer_mut();
         for p in &row.pieces {
             let style = match p.part {
-                Part::Badge => t.dot(red),
-                // A hidden view's mark on the folded row: only a mention is red.
-                Part::Mark => t.dot(p.text.starts_with('@')),
+                Part::Badge => count_style(t, own),
+                // A hidden view's mark on the folded row, styled as its own row would be.
+                Part::Mark => hidden.map_or_else(|| t.bold(), |(_, u)| count_style(t, u)),
+                Part::MarkGlyph | Part::Other => t.muted(),
                 Part::Fold => t.faint(),
                 Part::Glyph if shown => t.current(),
                 _ if shown => t.bold(),
                 _ => t.text(),
             };
-            if p.part == Part::Glyph {
+            if p.part.is_glyph() {
                 super::glyph_cell(buf, p.x, row.area.y, &p.text, style);
             } else {
                 buf.set_string(p.x, row.area.y, &p.text, style);
@@ -82,5 +85,20 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
             }
             cell.set_symbol(GUTTER).modifier.insert(Modifier::BOLD);
         }
+    }
+}
+
+/// A view's count: only a mention is red; to-dos are muted, in the warning color when one is
+/// overdue.
+fn count_style(t: &crate::theme::Theme, u: Unread) -> Style {
+    match u {
+        Unread { todos: n, overdue, .. } if n > 0 && u.level() == 0 => {
+            if overdue {
+                t.warning()
+            } else {
+                t.muted()
+            }
+        }
+        _ => t.dot(u.red()),
     }
 }

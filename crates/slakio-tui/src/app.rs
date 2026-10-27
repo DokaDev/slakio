@@ -46,9 +46,10 @@ pub mod shell;
 pub mod status;
 mod tabs;
 pub(crate) mod timelines;
+pub mod todos;
 pub(crate) mod work;
 
-use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, DialogAction, PaneAction};
+use crate::action::{Action, AppAction, CommandLineAction, ComposerAction, PaneAction};
 use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
@@ -227,6 +228,7 @@ impl App {
             }
             BackendEvent::Booted(_) => false,
             BackendEvent::History(page) => self.work.on_page(envelope.generation, &page, &self.model),
+            BackendEvent::Saved(items) => self.on_saved(envelope.generation, items),
         }
     }
 
@@ -451,7 +453,7 @@ impl App {
             Action::Tab(a) => self.tab(a, now),
             Action::Composer(a) => self.composer(a, now),
             Action::Help(a) => self.help(a, now),
-            Action::Dialog(a) => self.answer(a),
+            Action::Dialog(a) => self.answer(a, now),
         }
     }
 
@@ -633,32 +635,6 @@ impl App {
             CommandLineAction::Run => self.palette_run(now),
             CommandLineAction::Next => self.palette_step(1),
             CommandLineAction::Prev => self.palette_step(-1),
-        }
-    }
-
-    fn answer(&mut self, a: DialogAction) {
-        let Some(mut d) = self.dialog else { return };
-        let yes = match a {
-            DialogAction::Yes => true,
-            DialogAction::No => false,
-            DialogAction::Choose => d.yes,
-            DialogAction::Toggle => {
-                d.yes = !d.yes;
-                if d.question == Question::Icons {
-                    // The view switcher shows the answer that has the focus.
-                    self.settings.icons = d.yes;
-                }
-                self.dialog = Some(d);
-                return;
-            }
-        };
-        self.dialog = None;
-        match d.question {
-            Question::Quit | Question::QuitConfirm => self.quit = yes,
-            Question::Icons => {
-                self.settings.icons = yes;
-                self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });
-            }
         }
     }
 

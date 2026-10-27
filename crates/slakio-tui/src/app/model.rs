@@ -3,8 +3,11 @@
 //! UI never changes it on its own.
 
 use super::shell::View;
+use super::todos::{Due, DueFilter, Group, Sort, StatusFilter, TodoView};
 use slakio_core::backend::Snapshot;
-use slakio_core::model::{Conversation, Section, SectionId, Target, User, UserId, Workspace, WorkspaceId};
+use slakio_core::model::{
+    Conversation, SavedItem, SavedState, Section, SectionId, Target, User, UserId, Workspace, WorkspaceId,
+};
 use std::collections::{HashMap, HashSet};
 
 /// How a conversation is named in titles, tabs and the status line: `#backend`, `@Minsu`.
@@ -22,12 +25,26 @@ pub enum Row {
     Conversation(usize),
     /// The blank row between two sections: never under the cursor.
     Spacer,
+    /// A group of saved items: Home's Saved, To-dos' In progress and Completed.
+    Group(Group),
+    /// A saved item (index into the saved items): its text.
+    Item(usize),
+    /// A to-do's second line, who wrote it where and when: never under the cursor (the
+    /// cursor on its item covers it).
+    ItemMeta(usize),
+    /// To-dos' first row: the filter and the order (`Enter`: the filter).
+    Filter,
 }
 
 impl Row {
     /// The cursor can stop here.
     pub fn is_selectable(self) -> bool {
-        self != Row::Spacer
+        !matches!(self, Row::Spacer | Row::ItemMeta(_))
+    }
+
+    /// A header that folds: a section or a group.
+    pub fn is_header(self) -> bool {
+        matches!(self, Row::Section(_) | Row::Group(_))
     }
 }
 
@@ -86,8 +103,98 @@ impl Model {
         self.workspace(id).map(|w| &w.me)
     }
 
-    /// The rows of `view` in workspace `ws`, sections in `collapsed` folded.
-    pub fn rows(&self, ws: usize, view: View, collapsed: &HashSet<SectionId>) -> Vec<Row> {
+    /// When the backend took its snapshot (its clock for reminders).
+    pub fn taken(&self) -> slakio_core::model::Ts {
+        self.snapshot.taken
+    }
+
+    pub fn saved(&self, i: usize) -> &SavedItem {
+        &self.snapshot.saved[i]
+    }
+
+    /// Every saved item, after a change the backend made.
+    pub fn set_saved(&mut self, items: Vec<SavedItem>) {
+        self.snapshot.saved = items;
+    }
+
+    /// Whether item `s`'s reminder is overdue (only a to-do in progress is), upcoming or none,
+    /// by the backend's clock.
+    pub fn due(&self, s: &SavedItem) -> Due {
+        match s.due {
+            None => Due::None,
+            Some(d) if d < self.snapshot.taken && s.state == SavedState::InProgress => Due::Overdue,
+            Some(d) if d < self.snapshot.taken => Due::Past,
+            Some(_) => Due::Upcoming,
+        }
+    }
+
+    /// The to-dos of workspace `ws` in progress, and whether one is overdue (the view's count).
+    pub fn todo_count(&self, ws: usize) -> (u32, bool) {
+        let Some(w) = self.snapshot.workspaces.get(ws) else { return (0, false) };
+        let open = self.snapshot.saved.iter().filter(|s| s.workspace == w.id && s.state == SavedState::InProgress);
+        open.fold((0, false), |(n, late), s| (n + 1, late || self.due(s) == Due::Overdue))
+    }
+
+    /// The items of group `g` in workspace `ws` that `opts` lets through, in its order.
+    pub fn group_items(&self, ws: usize, g: Group, opts: &TodoView) -> Vec<usize> {
+        let Some(w) = self.snapshot.workspaces.get(ws) else { return vec![] };
+        let state = match g {
+            Group::Saved => SavedState::Saved,
+            Group::InProgress => SavedState::InProgress,
+            Group::Completed => SavedState::Completed,
+        };
+        let todo = g != Group::Saved;
+        let due_ok = |s: &SavedItem| match (opts.due, self.due(s)) {
+            (DueFilter::Any, _) | (DueFilter::Overdue, Due::Overdue) | (DueFilter::Upcoming, Due::Upcoming) => true,
+            (DueFilter::NoReminder, d) => d == Due::None,
+            _ => false,
+        };
+        let mut out: Vec<usize> = (0..self.snapshot.saved.len())
+            .filter(|&i| {
+                let s = &self.snapshot.saved[i];
+                s.workspace == w.id && s.state == state && (!todo || due_ok(s))
+            })
+            .collect();
+        let key = |i: &usize| self.snapshot.saved[*i].created;
+        match opts.sort {
+            _ if !todo => out.sort_by_key(|i| std::cmp::Reverse(key(i))),
+            Sort::Due => {
+                out.sort_by_key(|i| (self.snapshot.saved[*i].due.is_none(), self.snapshot.saved[*i].due, key(i)))
+            }
+            Sort::Oldest => out.sort_by_key(key),
+            Sort::Newest => out.sort_by_key(|i| std::cmp::Reverse(key(i))),
+        }
+        out
+    }
+
+    /// The rows of To-dos: the filter row, then In progress and Completed (as `opts` lets
+    /// them through), each a header and two rows per item unless folded (`groups`).
+    fn todo_rows(&self, ws: usize, groups: &HashSet<Group>, opts: &TodoView) -> Vec<Row> {
+        let mut rows = vec![Row::Filter];
+        let shown = [(Group::InProgress, StatusFilter::Completed), (Group::Completed, StatusFilter::InProgress)];
+        for (g, hidden_by) in shown {
+            if opts.status == hidden_by {
+                continue;
+            }
+            rows.push(Row::Spacer);
+            rows.push(Row::Group(g));
+            if !groups.contains(&g) {
+                rows.extend(self.group_items(ws, g, opts).into_iter().flat_map(|i| [Row::Item(i), Row::ItemMeta(i)]));
+            }
+        }
+        rows
+    }
+
+    /// The rows of `view` in workspace `ws`, sections in `collapsed` and groups in `groups`
+    /// folded, To-dos as `opts` filters and orders them.
+    pub fn rows(
+        &self,
+        ws: usize,
+        view: View,
+        collapsed: &HashSet<SectionId>,
+        groups: &HashSet<Group>,
+        opts: &TodoView,
+    ) -> Vec<Row> {
         let Some(w) = self.snapshot.workspaces.get(ws) else { return vec![] };
         let convs = self.snapshot.conversations.iter().enumerate().filter(|(_, c)| c.workspace == w.id);
         match view {
@@ -104,11 +211,21 @@ impl Model {
                         );
                     }
                 }
+                // Saved messages, after the sections (Slack's Home "Saved").
+                let saved = self.group_items(ws, Group::Saved, opts);
+                if !saved.is_empty() {
+                    rows.push(Row::Spacer);
+                    rows.push(Row::Group(Group::Saved));
+                    if !groups.contains(&Group::Saved) {
+                        rows.extend(saved.into_iter().map(Row::Item));
+                    }
+                }
                 rows
             }
+            View::Todos => self.todo_rows(ws, groups, opts),
             View::Dms => convs.filter(|(_, c)| c.is_dm()).map(|(i, _)| Row::Conversation(i)).collect(),
             // Not built yet: the list panel says so.
-            View::Activity | View::Files | View::Later => vec![],
+            View::Activity | View::Files => vec![],
         }
     }
 

@@ -36,6 +36,11 @@ impl Backend for DemoBackend {
                 };
                 Event::History(Box::new(Page { target, messages, complete }))
             }
+            // A change that does not apply changes nothing; the answer is the list as it is.
+            Command::Save { item, change } => {
+                self.world.change_saved(&item, change);
+                Event::Saved(self.world.snapshot().saved.clone())
+            }
         };
         self.ready.push_back(Envelope { generation, event });
     }

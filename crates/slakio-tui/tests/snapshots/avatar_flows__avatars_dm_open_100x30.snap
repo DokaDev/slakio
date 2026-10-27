@@ -7,7 +7,7 @@ expression: mask_hangul(&small.snap())
 │▎DMs                    ●11 ││ MK Minsu Kim     Waiting on deploy alert staging lunch       00:44 │
 │ Activity               @37 ││                                                                    │
 │ Files                      ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
-│ Later                      ││                  tomorrow sprint review on tracing                 │
+│ To-dos                   6 ││                  tomorrow sprint review on tracing                 │
 ├─▾──────────────────────────┤│                  production                                        │
 │▎MK● Minsu Kim           3  ││                                                                    │
 │ JP● Jiho Park              ││ M  Me            Ok, monitoring                              02:16 │

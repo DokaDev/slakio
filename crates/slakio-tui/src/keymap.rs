@@ -249,7 +249,9 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space d", ShellAction::Show(View::Dms)),
     shell(Ctx::Shell, "space a", ShellAction::Show(View::Activity)),
     shell(Ctx::Shell, "space f", ShellAction::Show(View::Files)),
-    shell(Ctx::Shell, "space l", ShellAction::Show(View::Later)),
+    // To-dos: `o` from to-dos (`t` starts the tab keys); `l`, from Later, still works.
+    shell(Ctx::Shell, "space o", ShellAction::Show(View::Todos)),
+    shell(Ctx::Shell, "space l", ShellAction::Show(View::Todos)),
     shell(Ctx::Shell, "space e", ShellAction::ToggleList),
     shell(Ctx::Shell, "space v", ShellAction::ToggleNavRows),
     app(Ctx::Shell, "space W", AppAction::ChooseWorkspace),
@@ -337,6 +339,12 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::List, "[", ShellAction::ViewPrev),
     shell(Ctx::List, "]", ShellAction::ViewNext),
     tab(Ctx::List, "t", TabAction::Open),
+    // On a to-do or a saved message (To-dos, Home's Saved).
+    shell(Ctx::List, "x", ShellAction::TodoToggle),
+    shell(Ctx::List, "m", ShellAction::TodoMove),
+    shell(Ctx::List, "d", ShellAction::TodoClear),
+    shell(Ctx::List, "f", ShellAction::TodoFilter),
+    shell(Ctx::List, "s", ShellAction::TodoSort),
     pane(Ctx::PaneNormal, "j", PaneAction::Next),
     pane(Ctx::PaneNormal, "down", PaneAction::Next),
     pane(Ctx::PaneNormal, "k", PaneAction::Prev),

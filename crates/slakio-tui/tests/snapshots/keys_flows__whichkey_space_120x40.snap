@@ -7,7 +7,7 @@ expression: s
 │ DMs                    ●11 ││                                                                                        │
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││                                                                                        │
-│ Later                      ││                                                                                        │
+│ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││                                                                                        │
 │   # backend                ││                                                                                        │
@@ -31,14 +31,14 @@ expression: s
 │   # feed-build-50          ││                                                                                        │
 │   # feed-cache-119         ││                                                                                        │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ r    View switcher (in the list panel)                     [    Back to the conversation before                      │
-│ h    Show Home                                             ]    Forward again                                        │
-│ d    Show DMs                                              1…9  Show tab 1 to 9                                      │
-│ a    Show Activity                                         ?    Keyboard help                                        │
-│ f    Show Files                                            /    Open the command line                                │
-│ l    Show Later                                            q    Quit                                                 │
+│ r    View switcher (in the list panel)                     W    Switch workspace                                     │
+│ h    Show Home                                             [    Back to the conversation before                      │
+│ d    Show DMs                                              ]    Forward again                                        │
+│ a    Show Activity                                         1…9  Show tab 1 to 9                                      │
+│ f    Show Files                                            ?    Keyboard help                                        │
+│ o    Show To-dos                                           /    Open the command line                                │
+│ l    Show To-dos                                           q    Quit                                                 │
 │ e    Show or hide the list panel                           w    +Window                                              │
 │ v    Fold the view switcher to the view shown, or unfold…  t    +Tab                                                 │
-│ W    Switch workspace                                                                                                │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

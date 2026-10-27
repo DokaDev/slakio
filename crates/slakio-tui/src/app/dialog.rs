@@ -1,7 +1,11 @@
 //! A question with two answers, over the screen: quit (with a message not sent, or after a
-//! click), or use Nerd
-//! Font icons (asked once). The safe answer has the focus, so `Enter` alone never does the risky
+//! click), use Nerd
+//! Font icons (asked once), or clear a saved item. The safe answer has the focus, so `Enter` alone never does the risky
 //! thing; `y` and `n` answer directly.
+
+use super::{App, Effect};
+use crate::action::DialogAction;
+use std::time::Instant;
 
 /// What is asked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,6 +16,8 @@ pub enum Question {
     QuitConfirm,
     /// Does the terminal's font show Nerd Font icons? (The answer is saved.)
     Icons,
+    /// Clear the saved item under the cursor? (It leaves To-dos and Saved.)
+    Clear,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,5 +30,35 @@ pub struct Dialog {
 impl Dialog {
     pub fn new(question: Question) -> Self {
         Self { question, yes: false }
+    }
+}
+
+impl App {
+    /// An answer to the question asked (`Tab` moves the focus between the answers).
+    pub(super) fn answer(&mut self, a: DialogAction, now: Instant) {
+        let Some(mut d) = self.dialog else { return };
+        let yes = match a {
+            DialogAction::Yes => true,
+            DialogAction::No => false,
+            DialogAction::Choose => d.yes,
+            DialogAction::Toggle => {
+                d.yes = !d.yes;
+                if d.question == Question::Icons {
+                    // The view switcher shows the answer that has the focus.
+                    self.settings.icons = d.yes;
+                }
+                self.dialog = Some(d);
+                return;
+            }
+        };
+        self.dialog = None;
+        match d.question {
+            Question::Quit | Question::QuitConfirm => self.quit = yes,
+            Question::Clear => self.answer_clear(yes, now),
+            Question::Icons => {
+                self.settings.icons = yes;
+                self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });
+            }
+        }
     }
 }

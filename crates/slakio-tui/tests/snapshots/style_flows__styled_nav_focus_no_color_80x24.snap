@@ -12,8 +12,8 @@ expression: screen_styled(&d)
     [ B 0..1] [ B 25..28] [ B 29..30]
 │ Files                      ││                                                │
     [ B 0..1] [ B 29..30]
-│ Later                      ││                                                │
-    [ B 0..1] [ B 29..30]
+│ To-dos                   6 ││                                                │
+    [ B 0..1] [ B 27..28] [ B 29..30]
 ├─▾──────────────────────────┤│                                                │
     [ B 0..2] [ B D 2..3] [ B 3..30]
 │ ▾ Favorites                ││     No conversation open                       │

@@ -44,7 +44,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space d` | Show DMs | `view.dms` |
 | `Space a` | Show Activity | `view.activity` |
 | `Space f` | Show Files | `view.files` |
-| `Space l` | Show Later | `view.later` |
+| `Space o` | Show To-dos | `view.todos` |
+| `Space l` | Show To-dos | `view.todos` |
 | `Space e` | Show or hide the list panel | `list.toggle_panel` |
 | `Space v` | Fold the view switcher to the view shown, or unfold it | `nav.toggle_rows` |
 | `Space W` | Switch workspace | `workspace.choose` |
@@ -127,6 +128,11 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `[` | Show the previous view | `view.prev` |
 | `]` | Show the next view | `view.next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
+| `x` | Complete the to-do, or reopen it | `todo.toggle` |
+| `m` | Move the item to Saved, or back to To-dos | `todo.move` |
+| `d` | Clear the saved item (asks first) | `todo.clear` |
+| `f` | Filter To-dos by state or reminder | `todo.filter` |
+| `s` | Order To-dos | `todo.sort` |
 
 ## Work area (Normal mode) (`pane.normal`)
 
@@ -267,7 +273,9 @@ Type `:` and the command, then `Enter`.
 | `:dms` |  | Show DMs |
 | `:activity` |  | Show Activity |
 | `:files` |  | Show Files |
-| `:later` |  | Show Later |
+| `:todos` | `:later` | Show To-dos |
+| `:filter` |  | Filter To-dos by state or reminder |
+| `:sort` |  | Order To-dos |
 | `:q` | `:quit` `:close` | Close the pane, then its tab |
 | `:back` |  | Back to the conversation before |
 | `:forward` |  | Forward again |

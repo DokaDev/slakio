@@ -91,7 +91,7 @@ fn the_switcher_changes_workspace_and_the_keys_the_view() {
 #[test]
 fn views_of_a_later_version_say_so_and_show_no_invented_rows() {
     let mut d = Demo::new(120, 40);
-    for (keys, view) in [("space a", View::Activity), ("space f", View::Files), ("space l", View::Later)] {
+    for (keys, view) in [("space a", View::Activity), ("space f", View::Files)] {
         d.keys(keys);
         assert_eq!(d.app.view(), view);
         let s = d.screen();

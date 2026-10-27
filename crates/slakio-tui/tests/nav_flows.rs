@@ -119,7 +119,7 @@ fn down_the_switcher_j_k_and_enter_show_a_view_and_run_on_into_the_list() {
     d.keys("ctrl+r G j");
     assert_eq!((d.app.focus(), d.app.list_cursor()), (Focus::List, 0), "on into the list, its first row");
     d.keys("k");
-    assert_eq!((d.app.focus(), d.app.nav_cursor()), (Focus::ViewSwitcher, 4), "back up onto Later");
+    assert_eq!((d.app.focus(), d.app.nav_cursor()), (Focus::ViewSwitcher, 4), "back up onto To-dos");
     d.keys("k k");
     assert_eq!(d.app.nav_cursor(), 2);
     d.keys("esc");
@@ -127,7 +127,7 @@ fn down_the_switcher_j_k_and_enter_show_a_view_and_run_on_into_the_list() {
     d.keys("]");
     assert_eq!((d.app.view(), d.app.focus()), (View::Dms, Focus::List), "] the next view");
     d.keys("[ [");
-    assert_eq!(d.app.view(), View::Later, "[ the one before, round again");
+    assert_eq!(d.app.view(), View::Todos, "[ the one before, round again");
     d.keys("]");
     d.keys("space W");
     assert_eq!(d.app.switcher(), Some(0), "Space W, on the workspace shown");
@@ -147,7 +147,10 @@ fn space_v_folds_the_switcher_to_the_view_shown_and_saves_it() {
     click(&mut d, 2, rule);
     assert_eq!(d.app.view_rows().len(), 1, "a click on the handle folds");
     let folded = in_list(&d, 1);
-    assert!(folded.contains("▸ Home") && folded.contains("@24 · @37"), "the strongest other mark too: {folded}");
+    assert!(
+        folded.contains("▸ Home") && folded.contains("@24 · A @37"),
+        "the strongest other mark too, with its view's letter: {folded}"
+    );
     d.keys("space v space a space v");
     assert_eq!(d.app.view_rows().len(), 1, "one row");
     assert!(in_list(&d, 1).contains("▸ Activity"), "{}", in_list(&d, 1));

@@ -7,7 +7,7 @@ expression: mask_hangul(&d.screen())
 │ DMs                    ●11 ││                                                                                        │
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
-│ Later                      ││ ＊ ＊＊＊        Suspect the DB pool                                             09:28 │
+│ To-dos                   6 ││ ＊ ＊＊＊        Suspect the DB pool                                             09:28 │
 ├─▾──────────────────────────┤│                  ✅ 2                                                                  │
 │ ▾ Favorites                ││                                                                                        │
 │   # backend                ││ AR Amy Ryu       Queue the merge today rollback                                  10:34 │

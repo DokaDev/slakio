@@ -19,6 +19,12 @@ pub enum Place {
     ListSection,
     /// The list panel with nothing to list (a view of a later version).
     ListEmpty,
+    /// To-dos on a to-do.
+    ListTodo,
+    /// Home on a saved message.
+    ListSaved,
+    /// To-dos on its filter row.
+    ListFilter,
     /// The view switcher.
     ViewSwitcher,
     /// The work area with nothing open.
@@ -83,6 +89,34 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(OPEN, Label::HintFold),
             Pair(Action::Shell(ShellAction::ListNext), Action::Shell(ShellAction::ListPrev), Label::HintMove),
             One(NEXT_PANE, Label::HintNextPane),
+            VIEWS,
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
+        Place::ListTodo => &[
+            One(OPEN, Label::HintOpen),
+            One(Action::Shell(ShellAction::TodoToggle), Label::HintTodoDone),
+            One(Action::Shell(ShellAction::TodoMove), Label::HintTodoSave),
+            One(Action::Shell(ShellAction::TodoClear), Label::HintTodoClear),
+            One(Action::Shell(ShellAction::TodoFilter), Label::HintTodoFilter),
+            One(Action::Shell(ShellAction::TodoSort), Label::HintTodoSort),
+            VIEWS,
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
+        Place::ListSaved => &[
+            One(OPEN, Label::HintOpen),
+            One(Action::Shell(ShellAction::TodoMove), Label::HintTodoBack),
+            One(Action::Shell(ShellAction::TodoClear), Label::HintTodoClear),
+            One(NEW_TAB, Label::HintNewTab),
+            VIEWS,
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
+        Place::ListFilter => &[
+            One(OPEN, Label::HintTodoFilter),
+            One(Action::Shell(ShellAction::TodoSort), Label::HintTodoSort),
+            Pair(Action::Shell(ShellAction::ListNext), Action::Shell(ShellAction::ListPrev), Label::HintMove),
             VIEWS,
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
@@ -196,6 +230,9 @@ mod tests {
             (Place::ListConversation, Ctx::List),
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),
+            (Place::ListTodo, Ctx::List),
+            (Place::ListSaved, Ctx::List),
+            (Place::ListFilter, Ctx::List),
             (Place::ViewSwitcher, Ctx::ViewSwitcher),
             (Place::WorkEmpty, Ctx::PaneNormal),
             (Place::Pane, Ctx::PaneNormal),

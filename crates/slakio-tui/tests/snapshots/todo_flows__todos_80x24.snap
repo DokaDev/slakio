@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/todo_flows.rs
+expression: mask_hangul(&s)
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+│ Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @37 ││                                                │
+│ Files                      ││                                                │
+│▎To-dos                   6 ││                                                │
+├─▾──────────────────────────┤│                                                │
+│ All ▾ · Due date ▾         ││     No conversation open                       │
+│                            ││     Pick one in the list and press Enter.      │
+│ ▾ In progress            6 ││                                                │
+│ MJ Budget invoice… Overdue ││     Enter    Open                              │
+│    #incidents · 01-07      ││     Space h  Home                              │
+│ KN Ticket review … Overdue ││     Space d  DMs                               │
+│    #backend · 01-06        ││     Ctrl+O   Back to the last one              │
+│ DB Again is after … in 20h ││     ?        Keyboard help                     │
+│    #deploys · 01-11        ││     Ctrl+Q   Quit                              │
+│ TK Someone migratio… in 4d ││                                                │
+│    #frontend · 01-06       ││                                                │
+│ ZL ＊＊👩‍💻👍🏽🇰🇷              ││                                                │
+│    #hostile-strin… · 01-05 ││                                                │
+│ LK Draft roadmap timeout   ││                                                │
+│    #general · 01-13        ││                                                │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A compa… › To-dos │ Enter open · d clear · ? help · Space more │ demo

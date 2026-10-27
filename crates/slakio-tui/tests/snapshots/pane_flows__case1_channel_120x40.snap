@@ -7,7 +7,7 @@ expression: mask_hangul(&s)
 │ DMs                    ●11 ││       Rolling back                                                                     │
 │ Activity               @37 ││                                                                                        │
 │ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
-│ Later                      ││       Schema production after invoice cache is should                                  │
+│ To-dos                   6 ││       Schema production after invoice cache is should                                  │
 ├─▾──────────────────────────┤│                                                                                        │
 │ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
 │▎  # backend                ││       Suspect the DB pool 🎉                                                           │

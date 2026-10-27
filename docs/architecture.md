@@ -63,7 +63,8 @@ rows drawn, the thread panel it opened: a pane's role is this relation, never it
 back/forward history), the messages of each target a pane shows, held once however many panes show it
 (`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
 `app/composer.rs`); every request to the backend gets its id from one allocator
-(`app/requests.rs`), the read model of the workspaces (`app/model.rs`), the
+(`app/requests.rs`), the read model of the workspaces (`app/model.rs`), To-dos' filter and
+order and the changes to saved items it waits for (`app/todos.rs`), the
 keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); splits of a
 tab join as they are built. Where the keyboard is is one field of the app — the view switcher, the list panel or the work area,
 whose active pane has it (`app/focus.rs`; the pane is never kept twice, so the focus cannot name
@@ -86,6 +87,9 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   event for an older request (an older generation) or for a target no pane shows is dropped.
   Messages come in pages (`Command::History`), newest first, older ones as the selection nears
   the top.
+  A saved item (a to-do, or a message in Home's Saved) changes by `Command::Save`; nothing
+  changes on screen until the answer, every saved item after the change, replaces them. The
+  snapshot says when it was taken: reminders due before then are overdue.
 - What only the binary can do is an `Effect` the loop carries out: copying is OSC 52, so no
   clipboard library or helper process is involved; saving an answer the app asked for (the
   icons question) goes into the config file, keeping its comments. `slakio --demo` uses `DemoBackend`

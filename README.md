@@ -32,22 +32,33 @@ images, and settings. This README only lists what works; it will grow with each 
   - the left column navigates, the right one is the work: the list panel's title is the
     workspace (its color band, its name, `▾`, then each other workspace that wants you by its
     letter and mark, `· B @9`), its first rows the view switcher as in GUI Slack's sidebar — a
-    row each for Home, DMs, Activity, Files and Later (the last three say they come in a later
-    version), an icon (icons on) and the name, the count at the right, the view shown marked
+    row each for Home, DMs, Activity, Files and To-dos (Activity and Files say they come in a
+    later version; To-dos counts its to-dos in progress, in the warning color when one is
+    overdue), an icon (icons on) and the name, the count at the right, the view shown marked
     with an accent `▎` (bars are for cursors only) — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
     switcher alike (a DM's pill counts its unread messages, red when one mentions you); the
     status line repeats no count; `[` / `]` in the list show the view before or after;
     `Ctrl+R` or `Space r` (`:nav`) goes to the switcher from anywhere (and `Ctrl+R` back),
     `j` / `k` move down it and on into the list (and back up), `Enter` picks a view, `Esc`
     leaves; `Space v` (`:navrows`, or a click on `▾` on the rule under it) folds it to one row, the view
-    shown (`▸`) with the strongest mark of the others (`@24 · @37`), and unfolds it; the workspace (or `Space W`, or a click on
+    shown (`▸`) with the strongest mark of the others after that view's icon or letter (`@24 · A @37`), and unfolds it; the workspace (or `Space W`, or a click on
     it) opens a switcher of the workspaces with their counts; when the list panel makes room
     for a thread on a narrow screen, the status line names the workspace and the view;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
     in the list and in the conversation's title;
   - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
     with mention counts; `Enter` or a click opens the conversation in the work area and moves
-    there, `l` opens it and stays in the list;
+    there, `l` opens it and stays in the list; Home ends with Saved, the messages kept without
+    a reminder;
+  - To-dos (`Space o`, also `Space l` and `:later`, Later's names before Slack renamed it)
+    lists a filter row, then In progress and Completed (each folds with `Enter`): each to-do
+    shows its author's chip, its text and its reminder (`Overdue` in the warning color, or `in
+    20h`), then where and when it was written; `x` completes or reopens it, `m` moves it to
+    Saved (and a saved message back to To-dos), `d` clears it after asking; `f` (`:filter`)
+    filters by state or reminder (overdue, upcoming, no reminder), `s` (`:sort`) orders by due
+    date or by when it was saved, and a click on the filter row opens either; `Enter` opens the
+    message, selected (a thread's own message: its thread). The demo's to-dos are invented,
+    like the rest of it;
   - the conversation shows its messages as in GUI Slack (`density = "comfortable"`): the
     sender's initials in a 4 × 2 block, the name and time over the text, a sender's messages
     within five minutes grouped under one header (their time shows when selected), one blank

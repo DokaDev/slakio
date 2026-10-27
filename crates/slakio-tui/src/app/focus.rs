@@ -149,6 +149,15 @@ impl App {
             // Saved in the config file: the app's.
             ShellAction::ToggleNavRows => return self.toggle_nav_rows(now),
             ShellAction::NavSelect if self.shell.nav_folded => return self.toggle_nav_rows(now),
+            ShellAction::TodoToggle
+            | ShellAction::TodoMove
+            | ShellAction::TodoClear
+            | ShellAction::TodoFilter
+            | ShellAction::TodoSort => return self.todo(a, now),
+            ShellAction::ListOpen | ShellAction::ListPeek if self.shell.item_at_cursor(&self.model).is_some() => {
+                return self.open_item(a == ShellAction::ListOpen);
+            }
+            ShellAction::ListOpen if self.on_filter_row() => return self.todo(ShellAction::TodoFilter, now),
             _ => {}
         }
         let height = self.list_height();

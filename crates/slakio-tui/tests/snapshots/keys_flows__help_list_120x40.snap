@@ -7,7 +7,7 @@ expression: s
 │ DMs     │ / Type / to search                                                                               │         │
 │ Activity│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │ Files   │ ▾ List panel                                                                                     │         │
-│ Later   │   Next row                                                                              j / Down │         │
+│ To-dos  │   Next row                                                                              j / Down │         │
 ├─▾───────│   Previous row                                                                            k / Up │         │
 │ ▾ Favori│   First row                                                                           g g / Home │         │
 │   # back│   Last row                                                                               G / End │         │
@@ -23,7 +23,12 @@ expression: s
 │         │   Show the previous view                                                                       [ │         │
 │ ▾ Channe│   Show the next view                                                                           ] │         │
 │   # anno│   Open in a new tab (a message: its thread)                                                    t │         │
-│   # desi│ ▾ Main screen                                                                                    │         │
+│   # desi│   Complete the to-do, or reopen it                                                             x │         │
+│   # feed│   Move the item to Saved, or back to To-dos                                                    m │         │
+│   # feed│   Clear the saved item (asks first)                                                            d │         │
+│   # feed│   Filter To-dos by state or reminder                                                           f │         │
+│   # feed│   Order To-dos                                                                                 s │         │
+│   # feed│ ▾ Main screen                                                                                    │         │
 │   # feed│   Next panel                                                                            Tab / F6 │         │
 │   # feed│   Previous panel                                                            Shift+Tab / Shift+F6 │         │
 │   # feed│   View switcher (in the list panel)                                             Ctrl+R / Space r │         │
@@ -34,11 +39,6 @@ expression: s
 │   # feed│   Close the pane, then its tab                                                         Space w c │         │
 │   # feed│   Show Home                                                                              Space h │         │
 │   # feed│   Show DMs                                                                               Space d │         │
-│   # feed│   Show Activity                                                                          Space a │         │
-│   # feed│   Show Files                                                                             Space f │         │
-│   # feed│   Show Later                                                                             Space l │         │
-│   # feed│   Show or hide the list panel                                                            Space e │         │
-│   # feed│   Fold the view switcher to the view shown, or unfold it                                 Space v │         │
 │   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                                       │ demo

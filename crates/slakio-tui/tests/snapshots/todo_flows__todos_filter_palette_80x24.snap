@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/todo_flows.rs
+expression: "{ let mut small = Demo::new(80, 24); small.keys(\"space o f\"); small.snap() }"
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+│ Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @37 ││                                                │
+│ Files   ╭ Commands ────────────────────────────────────────────────╮         │
+│▎To-dos  │ : filter                                                 │         │
+├─▾───────├──────────────────────────────────────────────────────────┤         │
+│ All ▾ · │  all          All                                current │         │
+│         │  in-progress  In progress                                │er.      │
+│ ▾ In pro│  completed    Completed                                  │         │
+│ MJ Budge│  overdue      Overdue                                    │         │
+│    #inci│  upcoming     Upcoming                                   │         │
+│ KN Ticke│  no-reminder  No reminder                                │         │
+│    #back╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
+│ DB Again is after … in 20h ││     ?        Keyboard help                     │
+│    #deploys · 01-11        ││     Ctrl+Q   Quit                              │
+│ TK Someone migratio… in 4d ││                                                │
+│    #frontend · 01-06       ││                                                │
+│ ZL ＊＊👩‍💻👍🏽🇰🇷              ││                                                │
+│    #hostile-strin… · 01-05 ││                                                │
+│ LK Draft roadmap timeout   ││                                                │
+│    #general · 01-13        ││                                                │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ COMMAND  ▌A company › To-dos                   │ Enter run · Esc cancel │ demo

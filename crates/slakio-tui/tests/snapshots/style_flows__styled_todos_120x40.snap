@@ -1,0 +1,84 @@
+---
+source: crates/slakio-tui/tests/style_flows.rs
+expression: screen_styled(&d)
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+    [acc 0..1] [ B 1..2] [ws 2..3] [ B 3..12] [mut 12..14] [ B 14..17] [mut B 17..18] [err B 18..21] [ B 21..22] [acc 22..30] [bdr 30..120]
+│ Home                   @24 ││                                                                                        │
+    [acc 0..1] [err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ DMs                    ●11 ││                                                                                        │
+    [acc 0..1] [err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ Activity               @37 ││                                                                                        │
+    [acc 0..1] [err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ Files                      ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│▎To-dos                   6 ││                                                                                        │
+    [acc 0..1] [acc B 1..2] [ B 2..27] [warn B 27..28] [ B 28..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
+├─▾──────────────────────────┤│                                                                                        │
+    [acc 0..2] [dim 2..3] [acc 3..30] [bdr 30..31] [bdr 119..120]
+│ All ▾ · Due date ▾         ││                                                                                        │
+    [acc 0..1] [dim 7..10] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ ▾ In progress            6 ││                                                                                        │
+    [acc 0..1] [dim 2..3] [mut B 4..15] [mut 27..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ MJ Budget invoice… Overdue ││                                                                                        │
+    [acc 0..1] [/sel 1..2] [av/av B 2..4] [/sel 4..21] [warn/sel B 21..28] [/sel 28..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│    #incidents · 01-07      ││                                                                                        │
+    [acc 0..1] [/sel 1..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ KN Ticket review … Overdue ││                                                                                        │
+    [acc 0..1] [av/av B 2..4] [warn B 21..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│    #backend · 01-06        ││                                                                                        │
+    [acc 0..1] [mut 5..13] [dim 13..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ DB Again is after … in 20h ││                                                                                        │
+    [acc 0..1] [av/av B 2..4] [mut 22..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│    #deploys · 01-11        ││                         No conversation open                                           │
+    [acc 0..1] [mut 5..13] [dim 13..21] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
+│ TK Someone migratio… in 4d ││                         Pick one in the list and press Enter.                          │
+    [acc 0..1] [av/av B 2..4] [mut 23..28] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
+│    #frontend · 01-06       ││                                                                                        │
+    [acc 0..1] [mut 5..14] [dim 14..22] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ ZL ＊＊👩‍💻👍🏽🇰🇷              ││                         Enter    Open                                                  │
+    [acc 0..1] [av/av B 2..4] [acc 29..30] [bdr 30..31] [warm B 56..61] [bdr 119..120]
+│    #hostile-strin… · 01-05 ││                         Space h  Home                                                  │
+    [acc 0..1] [mut 5..20] [dim 20..28] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+│ LK Draft roadmap timeout   ││                         Space d  DMs                                                   │
+    [acc 0..1] [av/av B 2..4] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+│    #general · 01-13        ││                         Ctrl+O   Back to the last one                                  │
+    [acc 0..1] [mut 5..13] [dim 13..21] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│                            ││                         ?        Keyboard help                                         │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [warm B 56..57] [bdr 119..120]
+│ ▾ Completed              2 ││                         Ctrl+Q   Quit                                                  │
+    [acc 0..1] [dim 2..3] [mut B 4..13] [mut 27..28] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+│ TK ✓ After timeout for pr… ││                                                                                        │
+    [acc 0..1] [av/av B 2..4] [mut 5..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│    #announcements · 01-12  ││                                                                                        │
+    [acc 0..1] [mut 5..19] [dim 19..27] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ EB ✓ ＊＊ ＊＊＊＊＊＊     ││                                                                                        │
+    [acc 0..1] [av/av B 2..4] [mut 5..8] [mut 9..10] [mut 11..13] [mut 14..15] [mut 16..17] [mut 18..19] [mut 20..21] [mut 22..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│    #design-review · 01-07  ││                                                                                        │
+    [acc 0..1] [mut 5..19] [dim 19..27] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│                            ││                                                                                        │
+    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+    [acc 0..30] [bdr 30..120]
+ NORMAL  ▌A company › To-dos       │ Enter open · x done · m to Saved · d clear · f filter · ? help · Space more │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..34] [bdr/surf 34..37] [/surf B 37..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..51] [mut/surf 51..56] [dim/surf 56..59] [/surf B 59..60] [mut/surf 60..69] [dim/surf 69..72] [/surf B 72..73] [mut/surf 73..79] [dim/surf 79..82] [/surf B 82..83] [mut/surf 83..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

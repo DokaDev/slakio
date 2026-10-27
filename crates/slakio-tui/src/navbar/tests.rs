@@ -1,9 +1,9 @@
 use super::*;
 
-const ICONS: [&str; 5] = ["\u{F02DC}", "\u{F0361}", "\u{F009A}", "\u{F0219}", "\u{F00C0}"];
+const ICONS: [&str; 5] = ["\u{F02DC}", "\u{F0361}", "\u{F009A}", "\u{F0219}", "\u{F05E1}"];
 
 fn items(icons: bool) -> Vec<Item> {
-    let names = ["Home", "DMs", "Activity", "Files", "Later"];
+    let names = ["Home", "DMs", "Activity", "Files", "To-dos"];
     let badges = [Some("@24"), Some("●11"), Some("@37"), None, None];
     (0..5)
         .map(|i| Item {
@@ -22,7 +22,7 @@ fn ws() -> Chip {
 fn text(b: &Bar) -> String {
     let mut s = String::new();
     for p in &b.pieces {
-        s.push_str(if p.part == Part::Glyph { "G_" } else { &p.text });
+        s.push_str(if p.part.is_glyph() { "G_" } else { &p.text });
     }
     s
 }
@@ -40,7 +40,7 @@ fn a_row_per_view_its_count_at_the_right() {
             " G_DMs                  ●11 ",
             " G_Activity             @37 ",
             " G_Files                    ",
-            " G_Later                    ",
+            " G_To-dos                   ",
         ]
     );
     assert_eq!(rows(28, false, 2, false)[2], " Activity               @37 ", "icons off: the names alone");
@@ -79,11 +79,18 @@ fn a_count_is_never_cut_the_name_is() {
 }
 
 #[test]
-fn folded_the_row_adds_the_strongest_mark_of_the_hidden_views() {
-    let r = |w: u16, shown: usize| text(&views(Rect::new(0, 1, w, 1), &items(true), shown, true, Some("@37"))[0]);
-    assert_eq!(r(28, 0), " ▸ G_Home         @24 · @37 ");
-    assert_eq!(r(28, 3), " ▸ G_Files            · @37 ", "without a count of its own");
-    assert_eq!(r(18, 0), " ▸ G_H… @24 · @37 ", "the name is cut, never a mark");
+fn folded_the_row_adds_the_strongest_mark_of_the_hidden_views_after_their_glyph_or_letter() {
+    let other = |icons: bool| Other { glyph: icons.then_some(ICONS[2]), letter: "A".into(), mark: "@37".into() };
+    let r = |w: u16, shown: usize, icons: bool| {
+        text(&views(Rect::new(0, 1, w, 1), &items(icons), shown, true, Some(&other(icons)))[0])
+    };
+    assert_eq!(r(30, 0, true), " ▸ G_Home         @24 · G_@37 ");
+    assert_eq!(r(30, 3, true), " ▸ G_Files            · G_@37 ", "without a count of its own");
+    assert_eq!(r(20, 0, true), " ▸ G_H… @24 · G_@37 ", "the name is cut, never a mark");
+    assert_eq!(r(30, 0, false), " ▸ Home           @24 · A @37 ", "icons off: the view's letter");
+    let b = views(Rect::new(0, 1, 30, 1), &items(true), 0, true, Some(&other(true)));
+    let g = b[0].pieces.iter().find(|p| p.part == Part::MarkGlyph).unwrap();
+    assert_eq!(g.width, GLYPH_SLOT, "the hidden view's glyph has a slot too");
 }
 
 #[test]

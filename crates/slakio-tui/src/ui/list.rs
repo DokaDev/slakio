@@ -1,7 +1,8 @@
 //! The list panel: under its workspace chip and views ([`super::navbar`]), the view picked
 //! there. Home lists the workspace's sidebar sections
 //! (folded with `Enter`) and their conversations, a blank row between two sections; DMs lists
-//! the DMs. Views built in a later version say so and how to get back.
+//! the DMs, To-dos its to-dos and Home ends with the saved messages ([`super::todos`]). Views
+//! built in a later version say so and how to get back.
 //!
 //! ```text
 //! ╭ ▌A company ▾ ─────────────╮
@@ -70,6 +71,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         let y = inner.y + (k - app.shell.list_top) as u16;
         let area = Rect { y, height: 1, ..inner };
         let mark = draw_row(f, app, row, area);
+        // A to-do's second line is under the cursor with its first.
+        let on_item = matches!(row, Row::ItemMeta(_)) && k == app.shell.list_cursor + 1;
+        if on_item {
+            highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });
+        }
         if k == app.shell.list_cursor && row.is_selectable() {
             highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });
             // A presence mark keeps its color on the bar where it reads there.
@@ -117,6 +123,10 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
     let t = &app.theme;
     match row {
         Row::Spacer => None,
+        Row::Filter | Row::Group(_) | Row::Item(_) | Row::ItemMeta(_) => {
+            super::todos::draw(f, app, row, area);
+            None
+        }
         Row::Section(i) => {
             let s = app.model.section(i);
             let folded = app.shell.collapsed.contains(&s.id);

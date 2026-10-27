@@ -20,7 +20,7 @@ use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 
 /// The glyphs the icons question shows (the view switcher's and the list's).
-const PREVIEW: &str = "\u{F02DC}  \u{F0361}  \u{F009A}  \u{F0219}  \u{F00C0}  \u{F033E}  \u{F0339}";
+const PREVIEW: &str = "\u{F02DC}  \u{F0361}  \u{F009A}  \u{F0219}  \u{F05E1}  \u{F033E}  \u{F0339}";
 
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
@@ -32,6 +32,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         }
         Question::Icons => {
             (Label::DialogIconsTitle, Label::DialogIconsText, Label::DialogIconsNo, Label::DialogIconsYes)
+        }
+        Question::Clear => {
+            (Label::DialogClearTitle, Label::DialogClearText, Label::DialogClearNo, Label::DialogClearYes)
         }
     };
     let (no, yes) = (app.i18n.label(no).to_string(), app.i18n.label(yes).to_string());

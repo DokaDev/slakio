@@ -12,8 +12,8 @@ expression: screen_styled(&d)
     [acc 0..1] [err B 25..28] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │ Files                      ││                                                │
     [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 79..80]
-│ Later                      ││                                                │
-    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 79..80]
+│ To-dos                   6 ││                                                │
+    [acc 0..1] [warn B 27..28] [acc 29..30] [bdr 30..31] [bdr 79..80]
 ├─▾──────────────────────────┤│                                                │
     [acc 0..2] [bdr 2..3] [acc 3..30] [bdr 30..31] [bdr 79..80]
 │ ▾ Favorites                ││     No conversation open                       │

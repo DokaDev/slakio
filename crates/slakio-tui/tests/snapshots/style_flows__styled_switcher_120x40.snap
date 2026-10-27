@@ -12,8 +12,8 @@ expression: screen_styled(&d)
     [acc 0..1] [acc/surf 2..3] [/surf 3..4] [ws/surf 4..5] [/surf 5..30] [err/surf B 30..32] [/surf 32..33] [acc/surf 33..34] [bdr 119..120]
 │ ╰──── Enter switch · Esc close ╯                                                                                     │
     [acc 0..1] [acc/surf 2..7] [mut/surf 7..33] [acc/surf 33..34] [bdr 119..120]
-│ Later                      ││                                                                                        │
-    [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ To-dos                   6 ││                                                                                        │
+    [acc 0..1] [warn B 27..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ├─▾──────────────────────────┤│                                                                                        │
     [acc 0..2] [dim 2..3] [acc 3..30] [bdr 30..31] [bdr 119..120]
 │ ▾ Favorites                ││                                                                                        │

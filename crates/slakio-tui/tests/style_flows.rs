@@ -358,6 +358,48 @@ fn styled_snapshots_in_tokyo_night() {
     d.keys("ctrl+r");
     insta::assert_snapshot!("styled_nav_focus_no_color_80x24", screen_styled(&d));
     insta::assert_snapshot!("styled_tabs_120x40", screen_styled(&tabs(&t)));
+    let mut d = demo(&t, 120, 40);
+    d.keys("space o");
+    insta::assert_snapshot!("styled_todos_120x40", screen_styled(&d));
+}
+
+/// Where `text` starts on the screen, each time, top to bottom (one cell per character).
+fn find_all(buf: &Buffer, text: &str) -> Vec<(u16, u16)> {
+    let chars: Vec<String> = text.chars().map(String::from).collect();
+    let a = buf.area;
+    let mut out = Vec::new();
+    for y in a.top()..a.bottom() {
+        for x in a.left()..a.right().saturating_sub(chars.len() as u16) {
+            if chars.iter().enumerate().all(|(k, c)| buf[(x + k as u16, y)].symbol() == c) {
+                out.push((x, y));
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn an_overdue_to_do_reads_as_a_warning_never_as_a_mention_in_every_theme() {
+    for theme in themes() {
+        let mut d = demo(&theme, 120, 40);
+        d.keys("space o");
+        let buf = d.buffer();
+        // The second overdue item: the first is under the cursor's bar.
+        let badge = find_all(&buf, "Overdue")[1];
+        let (_, row) = find_all(&buf, "To-dos")[0];
+        // The view's count, at the end of its row inside the border.
+        let count = (screen::list_width(120) - 3, row);
+        assert_eq!(buf[count].symbol(), "6", "{}", theme.name);
+        for at in [badge, count] {
+            let c = &buf[at];
+            if theme.kind == Kind::NoColor {
+                assert!(c.modifier.contains(Modifier::BOLD), "{}: {at:?} bold", theme.name);
+            } else {
+                assert_eq!(c.fg, theme.warning, "{}: {at:?} the warning color", theme.name);
+                assert_ne!(c.fg, theme.error, "{}: {at:?} never a mention's red", theme.name);
+            }
+        }
+    }
 }
 
 /// A conversation of workspace A, not muted, that `pick` takes.
