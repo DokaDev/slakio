@@ -51,6 +51,17 @@ pub enum Command {
     Save { item: SavedId, change: SavedChange },
 }
 
+impl Command {
+    /// The command asks the backend to change something (a read-only backend refuses it). Every
+    /// command is named here, so a new one is classified when it is added.
+    pub fn changes(&self) -> bool {
+        match self {
+            Command::Boot | Command::History { .. } => false,
+            Command::Save { .. } => true,
+        }
+    }
+}
+
 /// A change to a saved item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SavedChange {
@@ -145,7 +156,7 @@ impl Envelope {
 /// What a read-only backend answers instead of carrying out `request`: a change is refused before
 /// anything is sent anywhere. `None` for a request that changes nothing.
 pub fn refuse_change(request: &Request) -> Option<Envelope> {
-    matches!(request.command, Command::Save { .. }).then(|| Envelope::failed(request.id, FailKind::ReadOnly, ""))
+    request.command.changes().then(|| Envelope::failed(request.id, FailKind::ReadOnly, ""))
 }
 
 /// A source of workspace data that answers in turn (the demo, tests): the binary runs it behind
@@ -197,3 +208,6 @@ impl BackendHandle {
         })
     }
 }
+
+#[cfg(test)]
+mod tests;
