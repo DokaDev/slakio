@@ -1536,7 +1536,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "slakio-bench"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "serde_json",
  "toml",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "slakio-core"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "proptest",
  "tokio",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "slakio-fake"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "serde_json",
  "slakio-core",
@@ -1564,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "slakio-slack"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "bytes",
  "http-body-util",
@@ -1580,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "slakio-tui"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "crossterm",
  "emojis",
@@ -1599,7 +1599,7 @@ dependencies = [
 
 [[package]]
 name = "slakio-world"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "slakio-core",
 ]
