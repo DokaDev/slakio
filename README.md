@@ -16,8 +16,9 @@ messages (older ones and threads load as you scroll up or open them, still rough
 reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
 updates (open a conversation again to see new messages) and no local cache yet. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.5, signs in to one workspace and reads it (no realtime updates yet);
-earlier releases ran in demo mode only. Sign-in works on macOS only (the credentials go to the
+([Install](#install)); the latest release, 0.0.6, signs in from the Slack desktop app (or a pasted
+request) to one workspace and reads it (no realtime updates or cache yet); 0.0.5 signed in by
+paste only, and earlier releases ran in demo mode only. Sign-in works on macOS only (the credentials go to the
 macOS Keychain); it reads the session from the Slack desktop app, or you paste a browser request.
 Nothing here is ready for daily use.
 
