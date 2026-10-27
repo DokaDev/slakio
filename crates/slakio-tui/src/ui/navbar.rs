@@ -62,6 +62,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
                 // A hidden view's mark on the folded row, styled as its own row would be.
                 Part::Mark => hidden.map_or_else(|| t.bold(), |(_, u)| count_style(t, u)),
                 Part::MarkGlyph | Part::Other => t.muted(),
+                Part::Blank if p.text.contains('·') => t.muted(),
                 Part::Fold => t.faint(),
                 Part::Glyph if shown => t.current(),
                 _ if shown => t.bold(),

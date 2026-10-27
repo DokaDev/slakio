@@ -26,11 +26,11 @@ expression: screen_styled(&d)
     [acc 0..1] [/sel 1..2] [av/av B 2..4] [/sel 4..21] [warn/sel B 21..28] [/sel 28..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │    #incidents · 01-07      ││                                                                                        │
     [acc 0..1] [/sel 1..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│ KN Ticket review … Overdue ││                                                                                        │
+│ KN Ticket review…  Overdue ││                                                                                        │
     [acc 0..1] [av/av B 2..4] [warn B 21..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │    #backend · 01-06        ││                                                                                        │
     [acc 0..1] [mut 5..13] [dim 13..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│ DB Again is after … in 20h ││                                                                                        │
+│ DB Again is after…  in 20h ││                                                                                        │
     [acc 0..1] [av/av B 2..4] [mut 22..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │    #deploys · 01-11        ││                         No conversation open                                           │
     [acc 0..1] [mut 5..13] [dim 13..21] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
@@ -80,5 +80,5 @@ expression: screen_styled(&d)
     [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
     [acc 0..30] [bdr 30..120]
- NORMAL  ▌A company › To-dos       │ Enter open · x done · m to Saved · d clear · f filter · ? help · Space more │ demo
-    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..34] [bdr/surf 34..37] [/surf B 37..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..51] [mut/surf 51..56] [dim/surf 56..59] [/surf B 59..60] [mut/surf 60..69] [dim/surf 69..72] [/surf B 72..73] [mut/surf 73..79] [dim/surf 79..82] [/surf B 82..83] [mut/surf 83..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]
+ NORMAL  ▌A company › To-dos       │ Enter open · x done · m to Saved · f filter · d clear · ? help · Space more │ demo
+    [on/acc B 0..8] [/surf 8..9] [ws/surf 9..10] [/surf 10..19] [dim/surf 19..22] [/surf 22..34] [bdr/surf 34..37] [/surf B 37..42] [mut/surf 42..47] [dim/surf 47..50] [/surf B 50..51] [mut/surf 51..56] [dim/surf 56..59] [/surf B 59..60] [mut/surf 60..69] [dim/surf 69..72] [/surf B 72..73] [mut/surf 73..80] [dim/surf 80..83] [/surf B 83..84] [mut/surf 84..90] [dim/surf 90..93] [/surf B 93..94] [mut/surf 94..99] [dim/surf 99..102] [/surf B 102..107] [mut/surf 107..112] [bdr/surf 112..115] [warm/surf 115..119] [/surf 119..120]

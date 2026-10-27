@@ -583,3 +583,15 @@ fn marks_on_the_view_switcher_read_without_truecolor_and_light_themes_raise_clea
         assert_eq!(t.raised(), t.selection, "{name}: the selection's color, clearly apart from the background");
     }
 }
+
+#[test]
+fn the_folded_rows_separator_is_muted_as_on_the_filter_row() {
+    for theme in themes() {
+        let mut d = demo(&theme, 120, 40);
+        d.keys("space v");
+        let buf = d.buffer();
+        let (x, y) = find_all(&buf, "·").into_iter().find(|(_, y)| *y == 1).expect("the folded row's separator");
+        assert_eq!(buf[(x, y)].style().fg, theme.muted().fg, "{}", theme.name);
+        assert!(!buf[(x, y)].modifier.contains(Modifier::BOLD), "{}", theme.name);
+    }
+}

@@ -14,7 +14,7 @@ expression: small.snap()
 │   # inci│  dark               Dark, truecolor                      │         │
 │         │  light              Light, truecolor                     │         │
 │ ▾ Ops   │  high-contrast      White on black with strong marks     │         │
-│   # depl│  catppuccin         Catppuccin: Latte or Mocha, by the … │         │
+│   # depl│  catppuccin         Catppuccin: Latte or Mocha, by the…  │         │
 │   # aler│  catppuccin-latte   Catppuccin Latte (light)             │         │
 │   # part│  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
 │   # host│  tokyo-night        Tokyo Night: Day or Night, by the t… │         │

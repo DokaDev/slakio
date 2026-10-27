@@ -16,7 +16,7 @@ expression: "{ let mut small = Demo::new(80, 24); small.keys(\"space o f\"); sma
 │    #inci│  upcoming     Upcoming                                   │         │
 │ KN Ticke│  no-reminder  No reminder                                │         │
 │    #back╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
-│ DB Again is after … in 20h ││     ?        Keyboard help                     │
+│ DB Again is after…  in 20h ││     ?        Keyboard help                     │
 │    #deploys · 01-11        ││     Ctrl+Q   Quit                              │
 │ TK Someone migratio… in 4d ││                                                │
 │    #frontend · 01-06       ││                                                │

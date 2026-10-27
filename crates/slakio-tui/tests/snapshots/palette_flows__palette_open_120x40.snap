@@ -19,7 +19,7 @@ expression: d.snap()
 │   # partner-shared ext│  :density              Comfortable or compact messages               │                       │
 │   # hostile-strings   │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
 │   # big-history       │  :list                 Show or hide the list panel           Space e │                       │
-│   # long-threads      │  :navrows              Fold the view switcher to the view …  Space v │                       │
+│   # long-threads      │  :navrows              Fold the view switcher to the view…   Space v │                       │
 │                       │  :home                 Show Home                             Space h │                       │
 │ ▾ Channels            │  :dms                  Show DMs                              Space d │                       │
 │   # announcements     │  :activity             Show Activity                         Space a │                       │

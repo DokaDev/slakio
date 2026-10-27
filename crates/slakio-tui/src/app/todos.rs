@@ -21,7 +21,7 @@ use super::palette::{Item, Row as PaletteRow};
 use super::shell::View;
 use super::{App, Focus};
 use crate::action::ShellAction;
-use crate::text::width;
+use crate::text::{clip, width};
 use slakio_core::backend::{Command, Generation, SavedChange};
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::{SavedId, SavedItem, SavedState};
@@ -116,6 +116,11 @@ fn sort_label(s: Sort) -> Label {
 }
 
 impl TodoView {
+    /// Something filters To-dos.
+    pub fn is_filtered(&self) -> bool {
+        self.status != StatusFilter::All || self.due != DueFilter::Any
+    }
+
     /// The `:filter` values in effect (`all` when nothing filters).
     fn filters(&self) -> Vec<&'static str> {
         let status = match self.status {
@@ -143,12 +148,29 @@ pub struct FilterRow {
 }
 
 impl App {
-    /// The filter row of To-dos.
+    /// The filter row of To-dos: the filter (two of them as their count, `2 filters`), then the
+    /// order, which always stays: short of room the order takes its short name, then the filter
+    /// is cut, then the order.
     pub fn filter_row(&self) -> FilterRow {
         let label = |l: Label| self.i18n.label(l).to_string();
-        let filter = self.shell.todo.filters().iter().map(|v| label(filter_label(v))).collect::<Vec<_>>().join(", ");
-        let filter = format!("{filter} ▾");
-        let sort = format!("{} ▾", label(sort_label(self.shell.todo.sort)));
+        let on = self.shell.todo.filters();
+        let filter = match on.as_slice() {
+            [one] => label(filter_label(one)),
+            _ => self.i18n.msg(&Msg::FilterCount { count: on.len() as u64 }).to_string(),
+        };
+        // The row's cells inside its gutter and right padding, less ` ▾ · ` and ` ▾`.
+        let room = self.list_parts().map_or(28, |p| usize::from(p.rows.width)).saturating_sub(2 + 5 + 2);
+        let mut sort = label(sort_label(self.shell.todo.sort));
+        if width(&filter) + width(&sort) > room {
+            sort = label(match self.shell.todo.sort {
+                Sort::Due => Label::SortDueShort,
+                Sort::Oldest => Label::SortOldestShort,
+                Sort::Newest => Label::SortNewestShort,
+            });
+        }
+        let sort = clip(&sort, room.saturating_sub(width(&filter).min(4)));
+        let filter = clip(&filter, room.saturating_sub(width(&sort)));
+        let (filter, sort) = (format!("{filter} ▾"), format!("{sort} ▾"));
         let sort_x = 1 + width(&filter) as u16 + 3;
         FilterRow { filter, sort, sort_x }
     }
@@ -249,7 +271,8 @@ impl App {
             _ => return Err(Msg::FilterUnknown { name: value, names: FILTER_VALUES.join(", ") }),
         }
         self.show_todos();
-        let name = self.filter_row().filter.trim_end_matches(" ▾").to_string();
+        let label = |v: &str| self.i18n.label(filter_label(v)).to_string();
+        let name = self.shell.todo.filters().iter().map(|v| label(v)).collect::<Vec<_>>().join(", ");
         self.info(Msg::FilterChanged { name }, now);
         Ok(())
     }

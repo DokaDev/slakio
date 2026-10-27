@@ -49,6 +49,10 @@ pub fn next(km: &Keymap, ctx: Ctx, pending: &[KeyChord]) -> Vec<Next> {
             if out.iter().any(|(seen, _)| *seen == key) {
                 continue;
             }
+            // An action bound to two keys here is listed by its first (the help lists both).
+            if k.len() == pending.len() + 1 && out.iter().any(|(_, n)| n.what == What::Action(a)) {
+                continue;
+            }
             let what = if k.len() == pending.len() + 1 {
                 What::Action(a)
             } else {
@@ -88,6 +92,16 @@ mod tests {
     use super::*;
     use crate::action::{HelpAction, ShellAction};
     use crate::app::shell::View;
+
+    #[test]
+    fn an_action_with_two_keys_after_the_same_prefix_is_listed_once() {
+        let km = Keymap::default();
+        let n = next(&km, Ctx::List, &parse_keys("space").unwrap());
+        let todos: Vec<&Next> =
+            n.iter().filter(|n| n.what == What::Action(Action::Shell(ShellAction::Show(View::Todos)))).collect();
+        assert_eq!(todos.len(), 1, "{todos:?}");
+        assert_eq!(todos[0].key, "o", "the first key; the alias stays in the help");
+    }
 
     #[test]
     fn the_leader_lists_its_keys_and_groups() {

@@ -19,10 +19,10 @@ expression: d.snap()
 │ a    Show Activity                                                           │
 │ f    Show Files                                                              │
 │ o    Show To-dos                                                             │
-│ l    Show To-dos                                                             │
 │ e    Show or hide the list panel                                             │
 │ v    Fold the view switcher to the view shown, or unfold it                  │
 │ W    Switch workspace                                                        │
+│ [    Back to the conversation before                                         │
 │ …                                                                            │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo

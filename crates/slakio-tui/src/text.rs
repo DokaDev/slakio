@@ -15,7 +15,8 @@ pub fn width(s: &str) -> usize {
     s.graphemes(true).map(grapheme_width).sum()
 }
 
-/// `s` cut to at most `w` columns, ending with `…` when cut. Never splits a grapheme.
+/// `s` cut to at most `w` columns, ending with `…` when cut (never after a blank). Never splits
+/// a grapheme.
 pub fn clip(s: &str, w: usize) -> String {
     if width(s) <= w {
         return s.to_string();
@@ -33,6 +34,7 @@ pub fn clip(s: &str, w: usize) -> String {
         out.push_str(g);
         acc += gw;
     }
+    let mut out = out.trim_end().to_string();
     out.push('…');
     out
 }

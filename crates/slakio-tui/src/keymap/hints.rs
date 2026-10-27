@@ -19,8 +19,10 @@ pub enum Place {
     ListSection,
     /// The list panel with nothing to list (a view of a later version).
     ListEmpty,
-    /// To-dos on a to-do.
+    /// To-dos on a to-do in progress.
     ListTodo,
+    /// To-dos on a completed to-do.
+    ListCompleted,
     /// Home on a saved message.
     ListSaved,
     /// To-dos on its filter row.
@@ -69,6 +71,26 @@ const ESCAPE: Action = Action::Pane(PaneAction::Escape);
 const PREV_MSG: Action = Action::Pane(PaneAction::Prev);
 const NEXT_MSG: Action = Action::Pane(PaneAction::Next);
 const NEW_TAB: Action = Action::Tab(TabAction::Open);
+const TODO_TOGGLE: Action = Action::Shell(ShellAction::TodoToggle);
+const TODO_MOVE: Action = Action::Shell(ShellAction::TodoMove);
+const TODO_FILTER: Action = Action::Shell(ShellAction::TodoFilter);
+const TODO_CLEAR: Action = Action::Shell(ShellAction::TodoClear);
+const TODO_SORT: Action = Action::Shell(ShellAction::TodoSort);
+
+/// The keys of saved items, by worth: one is shown only with those before it.
+pub fn ranked(l: Label) -> Option<usize> {
+    [
+        Label::HintTodoDone,
+        Label::HintTodoReopen,
+        Label::HintTodoSave,
+        Label::HintTodoBack,
+        Label::HintTodoFilter,
+        Label::HintTodoClear,
+        Label::HintTodoSort,
+    ]
+    .iter()
+    .position(|x| *x == l)
+}
 
 /// The entries for `place`, best first (the line drops them from the end when it is short).
 #[expect(clippy::too_many_lines, reason = "a table of hints per place")]
@@ -93,13 +115,25 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
         ],
+        // By worth: the line drops the to-do keys from the last (`d` never stays where `x` goes).
         Place::ListTodo => &[
             One(OPEN, Label::HintOpen),
-            One(Action::Shell(ShellAction::TodoToggle), Label::HintTodoDone),
-            One(Action::Shell(ShellAction::TodoMove), Label::HintTodoSave),
-            One(Action::Shell(ShellAction::TodoClear), Label::HintTodoClear),
-            One(Action::Shell(ShellAction::TodoFilter), Label::HintTodoFilter),
-            One(Action::Shell(ShellAction::TodoSort), Label::HintTodoSort),
+            One(TODO_TOGGLE, Label::HintTodoDone),
+            One(TODO_MOVE, Label::HintTodoSave),
+            One(TODO_FILTER, Label::HintTodoFilter),
+            One(TODO_CLEAR, Label::HintTodoClear),
+            One(TODO_SORT, Label::HintTodoSort),
+            VIEWS,
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
+        Place::ListCompleted => &[
+            One(OPEN, Label::HintOpen),
+            One(TODO_TOGGLE, Label::HintTodoReopen),
+            One(TODO_MOVE, Label::HintTodoSave),
+            One(TODO_FILTER, Label::HintTodoFilter),
+            One(TODO_CLEAR, Label::HintTodoClear),
+            One(TODO_SORT, Label::HintTodoSort),
             VIEWS,
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
@@ -231,6 +265,7 @@ mod tests {
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),
             (Place::ListTodo, Ctx::List),
+            (Place::ListCompleted, Ctx::List),
             (Place::ListSaved, Ctx::List),
             (Place::ListFilter, Ctx::List),
             (Place::ViewSwitcher, Ctx::ViewSwitcher),

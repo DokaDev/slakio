@@ -6,7 +6,7 @@
 //! ```text
 //! │ All ▾ · Due date ▾           │   the filter, then the order
 //! │                              │
-//! │ ▾ In progress              6 │   col 1 fold mark, col 3 the group's name, its count
+//! │ ▾ In progress              6 │   col 1 fold mark, col 3 the group's name, its count (Saved: folded only)
 //! │ MK Check the dep…    Overdue │   overdue in the warning color (never a mention's red)
 //! │    #backend · 01-05          │   short of room: the place and the date (the chip names the author)
 //! │ JP Ship the release   in 20h │   upcoming: muted
@@ -81,7 +81,8 @@ fn group(f: &mut Frame, app: &App, g: Group, area: Rect) {
     let t = &app.theme;
     let folded = app.shell.groups.contains(&g);
     let n = app.model.group_items(app.shell.workspace, g, &app.shell.todo).len();
-    let used = right(f, area, &n.to_string(), t.muted());
+    // To-dos' groups always count; Home's Saved, as Home's sections, only when folded.
+    let used = if g != Group::Saved || folded { right(f, area, &n.to_string(), t.muted()) } else { 0 };
     put(f, area, 1, 1, vec![Span::styled(if folded { "▸" } else { "▾" }, t.faint())]);
     let name = app.i18n.label(match g {
         Group::Saved => Label::GroupSaved,

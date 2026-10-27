@@ -14,9 +14,9 @@ expression: mask_hangul(&s)
 │ ▾ In progress            6 ││                                                                                        │
 │ MJ Budget invoice… Overdue ││                                                                                        │
 │    #incidents · 01-07      ││                                                                                        │
-│ KN Ticket review … Overdue ││                                                                                        │
+│ KN Ticket review…  Overdue ││                                                                                        │
 │    #backend · 01-06        ││                                                                                        │
-│ DB Again is after … in 20h ││                                                                                        │
+│ DB Again is after…  in 20h ││                                                                                        │
 │    #deploys · 01-11        ││                         No conversation open                                           │
 │ TK Someone migratio… in 4d ││                         Pick one in the list and press Enter.                          │
 │    #frontend · 01-06       ││                                                                                        │
@@ -41,4 +41,4 @@ expression: mask_hangul(&s)
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › To-dos       │ Enter open · x done · m to Saved · d clear · f filter · ? help · Space more │ demo
+ NORMAL  ▌A company › To-dos       │ Enter open · x done · m to Saved · f filter · d clear · ? help · Space more │ demo

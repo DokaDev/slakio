@@ -40,7 +40,13 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_) | Row::Group(_)) => Place::ListSection,
             Some(Row::Filter) => Place::ListFilter,
-            Some(Row::Item(_)) if app.shell.view == crate::app::shell::View::Todos => Place::ListTodo,
+            Some(Row::Item(i)) if app.shell.view == crate::app::shell::View::Todos => {
+                if app.model.saved(*i).state == slakio_core::model::SavedState::Completed {
+                    Place::ListCompleted
+                } else {
+                    Place::ListTodo
+                }
+            }
             Some(Row::Item(_)) => Place::ListSaved,
             Some(_) => Place::ListConversation,
             None => Place::ListEmpty,
@@ -294,7 +300,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
                 || (with.iter().any(|&i| worth(i) < 4) && needs(4))
                 || (with.iter().any(|&i| worth(i) <= 2 && resolved[i].1 != Label::HintPeek) && tab_left_out)
                 || (has(Label::HintNextPane) && left_out(Label::HintNav))
-                || (with.iter().any(|&i| worth(i) == 1) && needs(2));
+                || (with.iter().any(|&i| worth(i) == 1) && needs(2))
+                // The keys of saved items come in their order of worth.
+                || with.iter().any(|&j| {
+                    hints::ranked(resolved[j].1).is_some_and(|r| {
+                        (0..n).any(|i| !with.contains(&i) && hints::ranked(resolved[i].1).is_some_and(|q| q < r))
+                    })
+                });
             if broken {
                 continue;
             }

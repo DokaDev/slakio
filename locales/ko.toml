@@ -339,3 +339,8 @@
 "dialog.clear_text" = "할 일과 저장됨에서 빠집니다. 메시지 자체는 남습니다."
 "dialog.clear_no" = "두기"
 "dialog.clear_yes" = "지우기"
+"hint.todo_reopen" = "다시 열기"
+"filter.count" = "필터 {count}개"
+"sort.due_short" = "기한"
+"sort.oldest_short" = "오래된"
+"sort.newest_short" = "최신"

@@ -168,18 +168,21 @@ impl Model {
     }
 
     /// The rows of To-dos: the filter row, then In progress and Completed (as `opts` lets
-    /// them through), each a header and two rows per item unless folded (`groups`).
+    /// them through, and not when a filter leaves them empty), each a header and two rows per
+    /// item unless folded (`groups`).
     fn todo_rows(&self, ws: usize, groups: &HashSet<Group>, opts: &TodoView) -> Vec<Row> {
         let mut rows = vec![Row::Filter];
         let shown = [(Group::InProgress, StatusFilter::Completed), (Group::Completed, StatusFilter::InProgress)];
         for (g, hidden_by) in shown {
-            if opts.status == hidden_by {
+            let items = self.group_items(ws, g, opts);
+            // A filter hides the groups it leaves empty.
+            if opts.status == hidden_by || (items.is_empty() && opts.is_filtered()) {
                 continue;
             }
             rows.push(Row::Spacer);
             rows.push(Row::Group(g));
             if !groups.contains(&g) {
-                rows.extend(self.group_items(ws, g, opts).into_iter().flat_map(|i| [Row::Item(i), Row::ItemMeta(i)]));
+                rows.extend(items.into_iter().flat_map(|i| [Row::Item(i), Row::ItemMeta(i)]));
             }
         }
         rows

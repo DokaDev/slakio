@@ -360,3 +360,8 @@
 "dialog.clear_text" = "It leaves To-dos and Saved. The message itself stays."
 "dialog.clear_no" = "Keep"
 "dialog.clear_yes" = "Clear"
+"hint.todo_reopen" = "reopen"
+"filter.count" = { one = "{count} filter", other = "{count} filters" }
+"sort.due_short" = "Due"
+"sort.oldest_short" = "Oldest"
+"sort.newest_short" = "Newest"

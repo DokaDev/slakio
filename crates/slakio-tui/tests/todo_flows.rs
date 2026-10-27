@@ -304,3 +304,101 @@ fn a_change_counts_only_in_its_workspace() {
     assert_eq!(d.app.view_unread(0, View::Todos).todos, 5);
     assert_eq!(d.app.view_unread(1, View::Todos).todos, b_before, "B side is apart");
 }
+
+/// The filter row as drawn.
+fn filter_line(d: &Demo) -> String {
+    let parts = d.app.list_parts().unwrap();
+    d.screen().lines().nth(usize::from(parts.rows.y)).unwrap_or_default().to_string()
+}
+
+#[test]
+fn two_filters_shorten_to_a_count_and_the_order_always_stays_in_a_30_cell_panel() {
+    let mut d = Demo::new(80, 24);
+    assert_eq!(slakio_tui::screen::list_width(80), 30);
+    d.keys("space o");
+    d.command("filter in-progress");
+    d.command("filter no-reminder");
+    d.command("sort newest");
+    let line = filter_line(&d);
+    assert!(line.contains("2 filters ▾ · Newest ▾"), "the order by its short name: {line}");
+    let parts = d.app.list_parts().unwrap();
+    let sort_x = parts.rows.x + d.app.filter_row().sort_x;
+    assert!(sort_x + 4 < parts.rows.right(), "the order's click target is on screen");
+    d.mouse(MouseEventKind::Down(MouseButton::Left), sort_x + 1, parts.rows.y);
+    assert_eq!(d.app.cmdline.text(), "sort ");
+}
+
+/// The hint line's entries, as `key label`.
+fn hints(d: &Demo) -> Vec<String> {
+    let line = d.status_line();
+    let hints = line.split(" │ ").nth(1).unwrap_or_default();
+    hints.split(" · ").map(str::trim).map(str::to_string).collect()
+}
+
+#[test]
+fn on_a_completed_to_do_x_says_reopen() {
+    let mut d = todos();
+    let at = d
+        .app
+        .list_rows()
+        .iter()
+        .position(|r| matches!(r, Row::Item(i) if d.app.model.saved(*i).state == SavedState::Completed));
+    d.app.focus_list_row(at.unwrap());
+    let h = hints(&d);
+    assert!(h.contains(&"x reopen".to_string()) && !h.contains(&"x done".to_string()), "{h:?}");
+}
+
+#[test]
+fn short_of_room_the_to_do_keys_go_from_the_least_worth_never_x_before_d() {
+    for (w, h) in [(80, 24), (100, 30), (120, 40)] {
+        let mut d = Demo::new(w, h);
+        d.keys("space o");
+        let shown = hints(&d);
+        let order = ["Enter open", "x done", "m to Saved", "f filter", "d clear", "s sort"];
+        let got: Vec<bool> = order.iter().map(|o| shown.iter().any(|s| s == o)).collect();
+        assert!(got[0] && got[1], "{w}: the main keys first: {shown:?}");
+        assert!(got.windows(2).all(|p| p[0] || !p[1]), "{w}: by worth: {shown:?}");
+        // With a notice up too.
+        d.keys("x");
+        let shown = hints(&d);
+        let got: Vec<bool> = order.iter().map(|o| shown.iter().any(|s| s == o)).collect();
+        assert!(got.windows(2).all(|p| p[0] || !p[1]), "{w} with a notice: {shown:?}");
+    }
+}
+
+#[test]
+fn a_filter_hides_the_groups_it_leaves_empty() {
+    let mut d = todos();
+    d.command("filter overdue");
+    assert!(!d.app.list_rows().contains(&Row::Group(Group::Completed)), "{:?}", d.app.list_rows());
+    d.command("filter all");
+    assert!(d.app.list_rows().contains(&Row::Group(Group::Completed)));
+}
+
+#[test]
+fn cut_text_has_no_blank_before_its_ellipsis() {
+    for w in [80, 120, 200] {
+        let mut d = Demo::new(w, 40);
+        d.keys("space o");
+        let s = d.screen();
+        assert!(!s.contains(" …"), "{w}: {s}");
+        d.app.show_unfolded(View::Home);
+        d.keys("G");
+        assert!(!d.screen().contains(" …"), "{w}: {}", d.screen());
+    }
+}
+
+#[test]
+fn homes_saved_header_counts_only_when_folded_as_sections_do() {
+    let mut d = Demo::new(120, 40);
+    d.app.show_unfolded(View::Home);
+    let rows = d.app.list_rows();
+    let saved = rows.iter().position(|r| *r == Row::Group(Group::Saved)).unwrap();
+    d.app.focus_list_row(saved);
+    d.keys("k j");
+    let header =
+        |d: &Demo| d.screen().lines().find(|l| l.contains("▾ Saved") || l.contains("▸ Saved")).unwrap().to_string();
+    assert!(!header(&d).contains('3'), "unfolded: {}", header(&d));
+    d.keys("enter");
+    assert!(header(&d).contains('3'), "folded: {}", header(&d));
+}
