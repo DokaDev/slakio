@@ -14,7 +14,8 @@ slakio signs in to **one** Slack workspace with your own browser session ([Sign 
 and shows its channels and DMs with their unread marks; opening a conversation shows its newest
 messages (older ones and threads load as you scroll up or open them, still rough). It only
 reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
-updates (open a conversation again to see new messages) and no local cache yet. The rest of the interface runs on invented data
+updates (open a conversation again to see new messages). What it fetched is kept in a local
+cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
 ([Install](#install)); the latest release, 0.0.6, signs in from the Slack desktop app (or a pasted
 request) to one workspace and reads it (no realtime updates or cache yet); 0.0.5 signed in by
@@ -34,7 +35,9 @@ images, and settings. This README only lists what works; it will grow with each 
   channels and DMs (unread and mention marks from Slack) and, for a conversation you open, its
   newest 28 messages, read-only. `slakio login` signs in (from the Slack desktop app on macOS,
   or `slakio login --paste` to paste a browser request), `slakio logout` signs out,
-  `slakio --offline` sends nothing.
+  `slakio --offline` sends nothing. A start shows the last session's channels and the
+  conversations opened from the local cache right away (`cached` in the status line until
+  Slack has answered), with no request made first.
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
@@ -162,6 +165,10 @@ Linux and Windows):
 3. Right-click any request whose address has `/api/` and choose **Copy > Copy as cURL**.
 4. Run `slakio login --paste` and paste it (or `pbpaste | slakio login`).
 
+Signing in again from the desktop app to the workspace you are signed in to, while the app is
+still in the same session, uses what slakio kept and asks for the "Slack Safe Storage" key only
+if Slack no longer accepts it.
+
 Either way, slakio checks the session token and the `d` cookie (and `d-s`) with one request to
 Slack, shows the workspace's name and stores them in the **macOS Keychain** (the first time, and
 after an update, macOS asks whether slakio may use the entry). `workspaces.toml` next to the
@@ -171,6 +178,27 @@ signs in to **one** workspace even when the app has several; signing in to anoth
 
 The desktop-app import is adapted from the open-source client
 [gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.
+
+## Local cache
+
+slakio keeps what it fetched — the workspace's channels, people and sections, and the newest
+messages of the conversations you opened — in one SQLite file in the cache directory
+(`$XDG_CACHE_HOME/slakio`, else `~/Library/Caches/slakio` on macOS, `~/.cache/slakio` on Linux,
+`%LOCALAPPDATA%\slakio\cache` on Windows). A start draws from it before sending anything, then
+asks Slack and replaces what it showed; with the network off it shows the cache alone. No token,
+cookie or other secret is ever in it: the credentials stay in the keychain.
+
+- It keeps at most 200 messages a conversation, 500 MB in all, and drops a conversation not
+  opened for 30 days (a conversation open on screen is never dropped); `cache_messages`,
+  `cache_max_mb` and `cache_days` change the limits, and `cache = "off"` keeps nothing between
+  runs ([Configuration](#configuration)). Threads are not cached yet.
+- The directory is readable by you only (`0700`, the files `0600`). On macOS it is excluded from
+  Time Machine backups (`tmutil addexclusion`, which marks the directory itself); if that fails,
+  slakio says so once and tries again on the next start.
+- A second slakio while one runs reads the cache but does not write it, and says so. A cache that
+  cannot be read (damaged, or written by a newer slakio) is started again from nothing, with one
+  line in the status line. `slakio logout` removes it, and deleting the directory is always
+  safe.
 
 ## Install
 
@@ -229,6 +257,10 @@ avatars = "initials"     # a person's initials on a colored chip, or "off"
 density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
 nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" (`Space v` switches)
 network = "on"           # "off": nothing is ever sent to Slack (also SLAKIO_NETWORK=off)
+cache = "on"             # "off": nothing is kept on disk between runs (every start fetches)
+cache_messages = 200     # the most messages kept a conversation (10 to 10000)
+cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
+cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`

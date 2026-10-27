@@ -12,11 +12,12 @@ unless it says so.
 | `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
 | `slakio-slack` | the Slack transport and backend, read-only by construction: the method allowlist, requests in the official web client's format, tolerant decoding, errors as data, the process-wide request cap, in-flight limit and kill switch (see [the Slack transport](#the-slack-transport)) | `slakio-core` |
 | `slakio-auth` | signing in: a browser request pasted as cURL parsed for the workspace's address, the session token and the cookies; the OS keychain behind the secret store (macOS); `workspaces.toml`, the signed-in workspace without any secret (see [Signing in](#signing-in)) | `slakio-core` |
+| `slakio-store` | the local cache: the last boot snapshot and the newest messages of the conversations opened, in one SQLite file (bundled SQLite), private to the user, one writer at a time, pruned to caps, set up again when unreadable; the cache in front of a backend (see [The local cache](#the-local-cache)) | `slakio-core` |
 | `slakio-fake` | an in-process fake Slack server for the tests, seeded by `slakio-world`; it logs every request as received | `slakio-core`, `slakio-world` (dev-dependency only) |
-| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core`; `slakio-slack` and `slakio-auth` in the binary's wiring only |
+| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core`; `slakio-slack`, `slakio-auth` and `slakio-store` in the binary's wiring only |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
 
-Planned crates join with the step that needs them: `slakio-store` (the local cache) and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
+Planned crates join with the step that needs them: `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
 
 ### Dependency rules
 
@@ -27,7 +28,8 @@ tui -> core <- slack, auth, store, world
 - `slakio-core` depends on no other slakio crate and on no UI, network or database crate
   (ratatui, crossterm, tokio's network parts, HTTP or websocket clients, rusqlite).
 - Adapters (`slack`, `auth`, `store`, `world`) depend only on `slakio-core`, never on each
-  other or on `slakio-tui`.
+  other or on `slakio-tui`. The binary puts the store in front of the Slack backend; neither
+  knows of the other.
 - `slakio-auth` never depends on `slakio-slack`, nor the reverse: sign-in yields a core
   `Credentials` value and the binary hands it to the transport.
 - The concrete adapter types appear in one wiring file of `slakio-tui` (`src/main.rs`, checked:
@@ -191,6 +193,42 @@ authors along, the rest (and the DMs' people at the start) are asked of the edge
 A read-only backend offers no composer: nothing is ever shown as sent. The binary runs it for
 the signed-in workspace; the tests run it against
 `slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
+
+## The local cache
+
+`slakio-store` keeps, in `<cache>/cache.sqlite3`, the last boot snapshot (replaced whole by each
+boot; a workspace it no longer lists leaves the cache with it) and the newest messages of each
+conversation opened (each page the backend answers is the truth for the span of time it covers:
+what the cache held there and the page lacks is gone). Remote text is kept as it came and read
+back as `Remote`, so it still reaches the screen only through the sanitiser. No secret is kept.
+
+- **Schema.** `schema_version` holds the number of migrations applied (`schema.rs`, appended to
+  only); each one runs in a transaction. A cache of a newer version, or one that is not a
+  database, is set up again from nothing (it only holds what can be fetched again).
+- **One writer.** The writer holds an OS lock on `cache.lock` (`File::try_lock`); a second
+  process opens the database read-only and never writes it. The directory is `0700`, the files
+  `0600` (Unix).
+- **Caps.** At most 200 messages a conversation, 500 MB, 30 days since a conversation was last
+  opened (config keys `cache_messages`, `cache_max_mb`, `cache_days`); every conversation asked
+  for during the run is exempt, so nothing shown in a pane is pruned. Pruned after the first boot
+  and every 32 pages.
+- **In front of a backend** (`layer.rs`): a task between the UI's handle and the backend's. A
+  boot, and the newest page of a conversation of the signed-in workspace, are answered from the
+  cache first — `Event::CachedBoot` / `Event::CachedHistory`, read before the request is handed
+  on, so a start draws with no request made — then by the backend, whose answer replaces it in
+  the UI and is kept. A cached answer ends nothing: the request still gets exactly one answer of
+  the backend's. The UI marks what came from the cache (`cached` in the status line) until then,
+  keeps it when the refresh fails (the status line says why), and asks for the newest page again
+  on `r`.
+- **Its own thread.** The store runs on a thread of its own (`cache.rs`); jobs run in order,
+  writes are not waited for, a failed job goes to the error log and a database found damaged is
+  set up again.
+- **Backups.** On macOS the cache directory is excluded from Time Machine once (`tmutil
+  addexclusion`, remembered in the cache); a failure is said once. Debug builds run only a
+  stand-in named by `SLAKIO_TEST_TMUTIL` (the tests'), never `tmutil` itself.
+
+The binary opens it for the signed-in workspace (`src/store.rs`; never for the demo), and
+`slakio logout` removes it.
 
 ## Signing in
 
