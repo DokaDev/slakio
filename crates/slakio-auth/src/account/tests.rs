@@ -63,3 +63,19 @@ fn entries_round_trip() {
     assert_eq!(decode("v2\na\nb\n"), None);
     assert_eq!(decode("v1\n\nb\n"), None);
 }
+
+#[test]
+fn signing_in_to_another_workspace_leaves_no_secret_of_the_old_one() {
+    let (store, path) = (MemoryStore::new(), scratch("switch"));
+    let creds = Credentials::new(TOKEN, COOKIE);
+    keep(&store, &path, &account(), &creds).unwrap();
+    let other = Account { team: "T1OTHER".into(), ..account() };
+    keep(&store, &path, &other, &creds).unwrap();
+    assert_eq!(store.get("T0TEST"), Ok(None), "the old workspace's secret is gone");
+    assert!(store.get("T1OTHER").unwrap().is_some());
+    // Signing in again to the same workspace keeps its (new) secret.
+    keep(&store, &path, &other, &creds).unwrap();
+    assert!(store.get("T1OTHER").unwrap().is_some());
+    assert_eq!(forget(&store, &path).unwrap(), vec![other]);
+    assert_eq!(store.get("T1OTHER"), Ok(None));
+}

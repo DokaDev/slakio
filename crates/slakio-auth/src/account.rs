@@ -95,10 +95,16 @@ pub fn decode(secret: &str) -> Option<Credentials> {
 }
 
 /// Keep `account` signed in with `credentials`: the secret first, then the file (which then
-/// names this workspace only). A store that fails keeps nothing.
+/// names this workspace only). The secrets of the workspaces the file named before go, so no
+/// entry is left behind that `slakio logout` would not know of. A store that fails keeps
+/// nothing new.
 pub fn keep(store: &dyn SecretStore, path: &Path, account: &Account, credentials: &Credentials) -> Result<(), Fault> {
     if !valid_team(&account.team) {
         return Err(Fault::other("not a team id"));
+    }
+    // A file that cannot be read names nothing it could leave behind; it is replaced.
+    for old in load(path).unwrap_or_default().iter().filter(|a| a.team != account.team) {
+        store.delete(&old.team).map_err(|Unavailable(f)| f)?;
     }
     store.set(&account.team, &encode(credentials)).map_err(|Unavailable(f)| f)?;
     save(path, std::slice::from_ref(account))
