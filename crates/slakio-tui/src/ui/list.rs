@@ -58,14 +58,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     }
     let rows = app.shell.rows(&app.model);
     // Unknown is not empty: what could not be loaded, or is not available, says so.
+    let faint = |l: Label| ratatui::text::Text::styled(app.i18n.label(l).to_string(), t.faint());
     let unknown = match app.boot_failed() {
-        _ if app.model.is_loaded() => (app.shell.view == View::Todos && !app.model.saved_known())
-            .then(|| app.i18n.label(Label::ListUnavailable).to_string()),
+        _ if app.model.is_loaded() => {
+            (app.shell.view == View::Todos && !app.model.saved_known()).then(|| faint(Label::ListUnavailable))
+        }
         Some(kind) => Some(super::failed_text(app, Label::ListFailed, kind)),
-        None => Some(app.i18n.label(Label::ListLoading).to_string()),
+        None => Some(faint(Label::ListLoading)),
     };
     if let Some(text) = unknown {
-        let p = Paragraph::new(text).style(t.faint());
+        let p = Paragraph::new(text);
         f.render_widget(p, pad(inner));
         return;
     }

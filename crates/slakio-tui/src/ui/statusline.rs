@@ -37,6 +37,8 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::CommandLine => Place::CommandLine,
         Ctx::Root => Place::Welcome,
         Ctx::ViewSwitcher => Place::ViewSwitcher,
+        // To-dos that cannot be known have nothing to filter or sort.
+        Ctx::List if app.shell.view == crate::app::shell::View::Todos && !app.model.saved_known() => Place::ListEmpty,
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_) | Row::Group(_)) => Place::ListSection,
             Some(Row::Filter) => Place::ListFilter,
@@ -106,10 +108,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
 
     // The hints, best first.
     // The which-key popup lists the keys itself.
-    let resolved: Vec<(String, Label)> = place(app)
+    let mut resolved: Vec<(String, Label)> = place(app)
         .filter(|_| !app.which_key_visible(now))
         .map(|(p, ctx)| hints::resolve_offered(&app.keymap, p, ctx, app.read_only()))
         .unwrap_or_default();
+    // What could not be loaded here, for a reason that may pass: asking again comes first.
+    if !resolved.is_empty()
+        && app.failed_here().is_some_and(slakio_core::backend::FailKind::retryable)
+        && let Some(k) = super::retry_key(app)
+    {
+        resolved.insert(0, (k, Label::HintRetry));
+    }
     let all_hints: Vec<(String, String)> =
         resolved.iter().map(|(k, l)| (k.clone(), app.i18n.label(*l).to_string())).collect();
     let hint_spans = |hints: &[(String, String)]| -> Spans {
@@ -151,7 +160,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             (app.i18n.msg(&n.msg).to_string(), style)
         })
     };
-    let demo = app.backend.filter(|c| c.demo).map(|_| app.i18n.label(Label::StatusDemo).to_string());
+    let demo = app.backend.and_then(|c| {
+        let mark = if c.demo {
+            Label::StatusDemo
+        } else if c.read_only {
+            Label::StatusReadOnly
+        } else {
+            return None;
+        };
+        Some(app.i18n.label(mark).to_string())
+    });
 
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {
         let mut out = badge.clone();

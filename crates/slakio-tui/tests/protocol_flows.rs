@@ -176,6 +176,9 @@ fn saved_items_the_backend_cannot_tell_are_unavailable_not_empty() {
     let screen = s.d.screen();
     assert!(screen.contains("Not available"), "{screen}");
     assert!(!screen.contains("Nothing here"), "{screen}");
+    // Nothing to filter or sort in what cannot be known.
+    let line = s.d.status_line();
+    assert!(!line.contains("filter") && !line.contains("sort"), "{line}");
 }
 
 #[test]
@@ -356,4 +359,41 @@ fn r_in_a_pane_whose_messages_failed_asks_for_them_again() {
     s.b.answer(0);
     assert!(s.pump());
     assert!(!s.d.screen().contains("Could not load messages"), "{}", s.d.screen());
+}
+
+#[test]
+fn a_failure_reads_muted_its_retry_key_as_a_key_and_the_hint_line_offers_it() {
+    let mut s = opened("backend");
+    // Nothing failed: the palette has no retry.
+    s.keys("ctrl+p");
+    s.d.type_text("retry");
+    assert!(!s.d.screen().contains(":retry"), "{}", s.d.screen());
+    s.keys("esc");
+    s.b.fail(0, FailKind::Network);
+    s.pump();
+    let buf = s.d.buffer();
+    let t = &s.d.app.theme;
+    let find = |text: &str| {
+        (0..buf.area.height).find_map(|y| {
+            let row: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol().to_string()).collect();
+            row.find(text).map(|i| (row[..i].chars().count() as u16, y))
+        })
+    };
+    let (x, y) = find("Could not load messages").expect("the failure");
+    assert_eq!(buf[(x, y)].fg, t.muted().fg.unwrap_or_default(), "the sentence is muted");
+    let (x, y) = find("r retry").expect("the retry key");
+    assert_eq!(buf[(x, y)].style().add_modifier, t.key().add_modifier, "the key reads as a key");
+    assert_eq!(buf[(x, y)].fg, t.key().fg.unwrap_or_default());
+    assert!(s.d.status_line().contains("r retry"), "{}", s.d.status_line());
+    s.keys("ctrl+p");
+    s.d.type_text("retry");
+    assert!(s.d.screen().contains(":retry"), "{}", s.d.screen());
+}
+
+#[test]
+fn a_read_only_backend_says_so_in_the_status_line() {
+    let s = Scripted::booted(true, None);
+    assert!(s.d.status_line().ends_with("read only"), "{}", s.d.status_line());
+    let s = Scripted::booted(false, None);
+    assert!(!s.d.status_line().contains("read only"), "{}", s.d.status_line());
 }

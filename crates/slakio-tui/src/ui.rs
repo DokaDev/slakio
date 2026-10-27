@@ -220,13 +220,24 @@ fn highlight(f: &mut Frame, app: &App, row: Rect, how: Selection) {
     app.theme.paint_selection(f.buffer_mut(), row, how);
 }
 
-/// What could not be loaded (`label`), and below it the key that asks again when the reason
-/// (`kind`) may pass.
-fn failed_text(app: &App, label: Label, kind: &slakio_core::backend::FailKind) -> String {
-    let text = app.i18n.label(label).to_string();
-    let action = crate::action::Action::App(crate::action::AppAction::Retry);
-    match empty::key_of(app, action, crate::keymap::Ctx::Shell).filter(|_| kind.retryable()) {
-        Some(keys) => format!("{text}\n{}", app.i18n.msg(&Msg::RetryHint { keys })),
-        None => text,
+/// What could not be loaded (`label`, muted), and below it the key that asks again when the
+/// reason (`kind`) may pass, drawn as every other key hint.
+fn failed_text(app: &App, label: Label, kind: &slakio_core::backend::FailKind) -> ratatui::text::Text<'static> {
+    let t = &app.theme;
+    let mut lines = vec![ratatui::text::Line::styled(app.i18n.label(label).to_string(), t.muted())];
+    if let Some(keys) = retry_key(app).filter(|_| kind.retryable()) {
+        let hint = app.i18n.msg(&Msg::RetryHint { keys: keys.clone() }).to_string();
+        let (before, after) = hint.split_once(keys.as_str()).unwrap_or(("", hint.as_str()));
+        lines.push(ratatui::text::Line::from(vec![
+            ratatui::text::Span::styled(before.to_string(), t.muted()),
+            ratatui::text::Span::styled(keys.clone(), t.key()),
+            ratatui::text::Span::styled(after.to_string(), t.muted()),
+        ]));
     }
+    ratatui::text::Text::from(lines)
+}
+
+/// The keys of `:retry` where the shell's keys work.
+pub(crate) fn retry_key(app: &App) -> Option<String> {
+    empty::key_of(app, crate::action::Action::App(crate::action::AppAction::Retry), crate::keymap::Ctx::Shell)
 }

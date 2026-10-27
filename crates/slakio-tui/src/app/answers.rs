@@ -32,6 +32,12 @@ impl App {
         self.boot.1.as_ref()
     }
 
+    /// What could not be loaded where retrying would ask again — the workspaces, else the active
+    /// pane's messages — and why; `None` when nothing failed there.
+    pub fn failed_here(&self) -> Option<&FailKind> {
+        self.boot.1.as_ref().or_else(|| self.work.active_failed())
+    }
+
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
     /// workspaces, else the active pane's messages. Only when asked: nothing retries on its own.
     pub(super) fn retry(&mut self, now: Instant) {

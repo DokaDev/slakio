@@ -450,6 +450,12 @@ impl Work {
         true
     }
 
+    /// Why the active pane's messages could not be loaded, if they could not.
+    pub fn active_failed(&self) -> Option<&FailKind> {
+        let pane = self.active().and_then(|id| self.panes.get(&id))?;
+        self.timeline(pane).failed.as_ref()
+    }
+
     /// The active pane's messages could not be loaded, for a reason that may pass: ask again.
     /// `false` when there is nothing to retry there.
     pub fn retry(&mut self) -> bool {

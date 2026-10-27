@@ -55,13 +55,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     if tl.items.is_empty() {
         let text = if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
-            app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string()
+            ratatui::text::Text::styled(app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string(), t.faint())
         } else if let Some(kind) = &tl.failed {
             super::failed_text(app, Label::PaneFailed, kind)
         } else {
-            app.i18n.label(Label::PaneLoading).to_string()
+            ratatui::text::Text::styled(app.i18n.label(Label::PaneLoading).to_string(), t.faint())
         };
-        f.render_widget(Paragraph::new(text).style(t.faint()), text_area(area));
+        f.render_widget(Paragraph::new(text), text_area(area));
         return;
     }
     let (h, w) = (usize::from(area.height), usize::from(area.width.saturating_sub(2)).max(1));

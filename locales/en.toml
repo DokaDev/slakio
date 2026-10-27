@@ -95,6 +95,7 @@
 
 # The status line: the demo backend, and the unread DM total.
 "status.demo" = "demo"
+"status.read_only" = "read only"
 "status.dms" = "DM"
 "status.copied" = { one = "Copied {count} message", other = "Copied {count} messages" }
 "status.demo_echo" = "Demo: shown here only, not sent anywhere"
@@ -228,6 +229,7 @@
 "hint.commands" = "commands"
 "hint.help" = "help"
 "hint.more" = "more"
+"hint.retry" = "retry"
 "hint.fold" = "fold"
 "hint.move" = "move"
 "hint.show" = "show"
@@ -357,12 +359,12 @@
 "status.nothing_to_retry" = "Nothing to retry here"
 # A request the backend did not carry out.
 "fail.read_only" = "Read only: nothing can be changed here"
-"fail.network" = "Network error: try again"
+"fail.network" = "Network error: Slack could not be reached"
 "fail.auth" = "Signed out: sign in again"
-"fail.rate_limited" = "Slack asked to slow down: try again soon"
-"fail.cap_reached" = "Request limit reached: try again soon"
-"fail.offline" = "Offline: nothing was sent"
-"fail.busy" = "Busy: nothing was sent, try again"
+"fail.rate_limited" = "Slack asked to slow down"
+"fail.cap_reached" = "Request limit reached: nothing more is sent for now"
+"fail.offline" = "Offline: Slack is not being asked"
+"fail.busy" = "Busy: nothing was sent"
 "fail.api" = "Slack refused the request"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"

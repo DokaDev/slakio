@@ -41,4 +41,4 @@ expression: mask_hangul(&s.d.screen())
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › To-dos                         │ Enter open · f filter · s sort · [/] views · ? help · Space more
+ NORMAL  ▌A company › To-dos             │ Enter open · f filter · s sort · [/] views · ? help · Space more │ read only
