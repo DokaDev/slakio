@@ -1,26 +1,27 @@
 //! `slakio` binary: parses the command line, owns the terminal and runs the event loop.
 
 mod cli;
+mod signin;
 mod stats;
 mod term;
+mod words;
 
 use cli::{Cli, HELP, parse_args};
 use futures::StreamExt;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::EventStream;
-use slakio_auth::{Account, PasteError, account};
+use slakio_auth::{Account, account};
 use slakio_core::backend::{Backend, BackendHandle};
-use slakio_core::config::{self, ConfigError};
+use slakio_core::config;
 use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
 use slakio_core::paths::Paths;
-use slakio_core::sanitize::Remote;
 use slakio_core::secret::{Credentials, MemoryStore, STORE_ENV, SecretStore, StoreKind};
 use slakio_slack::governor::{Governor, Limits, SystemClock};
 use slakio_slack::request::Endpoints;
 use slakio_slack::{SlackError, login};
-use slakio_tui::app::signin::{Pasted, PickerRow};
+use slakio_tui::app::signin::Pasted;
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange;
@@ -90,7 +91,7 @@ fn main() -> ExitCode {
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let workspaces = paths.workspaces_file();
     if logout {
-        return sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), paths.errors_log());
+        return signin::sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), paths.errors_log());
     }
     // One governor for the whole process: the sign-in check counts toward its cap too.
     let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
@@ -133,7 +134,7 @@ fn main() -> ExitCode {
         }
     };
     if let Some(why) = sign_in {
-        wiring.desktop = offer_sign_in_screen(&mut app, desktop_ok, why).map(Arc::new);
+        wiring.desktop = signin::offer_sign_in_screen(&mut app, desktop_ok, why).map(Arc::new);
     }
     let capabilities = kind.as_ref().map(|k| match k {
         BackendKind::Demo(b) => b.capabilities(),
@@ -154,7 +155,7 @@ fn main() -> ExitCode {
     }
     if let Some(e) = cfg_err {
         ErrorLog::new(paths.errors_log()).record("config", &e.fault());
-        app.warn(config_message(&e), Instant::now());
+        app.warn(words::config_message(&e), Instant::now());
     }
     let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
         Ok(rt) => rt,
@@ -256,7 +257,7 @@ impl Wiring {
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
     /// not. Nothing is kept unless Slack accepted it.
     async fn sign_in(self, text: Pasted) -> Result<SignedIn, Label> {
-        let pasted = slakio_auth::parse(&text.0).map_err(paste_label)?;
+        let pasted = slakio_auth::parse(&text.0).map_err(words::paste_label)?;
         drop(text);
         self.finish(pasted.credentials, pasted.host).await
     }
@@ -271,7 +272,7 @@ impl Wiring {
         let creds = tokio::task::spawn_blocking(move || found.system_credentials(&team))
             .await
             .map_err(|_| Label::SigninDesktopFailed)?
-            .map_err(desktop_label)?;
+            .map_err(words::desktop_label)?;
         self.finish(creds, host).await
     }
 
@@ -306,59 +307,6 @@ impl Wiring {
     }
 }
 
-/// Offer signing in: when the real keychain is in use and nothing failed yet, try the Slack
-/// desktop app first and show its workspaces as a picker; otherwise (or when it finds nothing)
-/// fall back to the paste screen, with a short reason.
-fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) -> Option<slakio_auth::Found> {
-    use slakio_auth::DesktopError;
-    if why.is_some() || !desktop_ok {
-        app.offer_sign_in(why);
-        return None;
-    }
-    // Before the terminal is set up: the scan reads files only (no keychain, no network).
-    match slakio_auth::desktop::scan() {
-        Ok(found) => {
-            app.offer_desktop(
-                found
-                    .workspaces()
-                    .iter()
-                    .map(|w| PickerRow { team: w.team.clone(), name: shown(&w.name), host: shown(&w.host) })
-                    .collect(),
-            );
-            return Some(found);
-        }
-        Err(DesktopError::NotSupported) => app.offer_sign_in(Some(Label::SigninDesktopUnsupported)),
-        Err(e) if e.is_absent() => app.offer_sign_in(Some(Label::SigninDesktopMissing)),
-        Err(_) => app.offer_sign_in(Some(Label::SigninDesktopFailed)),
-    }
-    None
-}
-
-/// The words for a desktop import that could not sign in.
-fn desktop_label(e: slakio_auth::DesktopError) -> Label {
-    use slakio_auth::DesktopError;
-    match e {
-        DesktopError::NotSupported => Label::SigninDesktopUnsupported,
-        DesktopError::NoSecretService => Label::SigninDesktopKeychain,
-        DesktopError::CookieLocked => Label::SigninDesktopLocked,
-        _ if e.is_absent() => Label::SigninDesktopMissing,
-        _ => Label::SigninDesktopFailed,
-    }
-}
-
-/// The words for a paste that cannot sign in.
-fn paste_label(e: PasteError) -> Label {
-    match e {
-        PasteError::Empty => Label::SigninEmpty,
-        PasteError::TooLong => Label::SigninTooLong,
-        PasteError::NoAddress => Label::SigninNoAddress,
-        PasteError::NotWorkspace => Label::SigninNotWorkspace,
-        PasteError::NoToken => Label::SigninNoToken,
-        PasteError::NoCookie => Label::SigninNoCookie,
-        PasteError::Ambiguous => Label::SigninAmbiguous,
-    }
-}
-
 /// The words for a sign-in Slack did not accept, or could not be asked about.
 fn check_label(e: &SlackError) -> Label {
     match e {
@@ -374,15 +322,10 @@ fn signed_in(done: Result<SignedIn, Label>, app: &mut App, backend: &mut Option<
     match done {
         Ok(s) => {
             *backend = Some(wiring.serve(s.credentials, s.endpoints));
-            app.signed_in(slakio_slack::adapter::CAPABILITIES, shown(&s.account.name), Instant::now());
+            app.signed_in(slakio_slack::adapter::CAPABILITIES, words::shown(&s.account.name), Instant::now());
         }
         Err(why) => app.sign_in_failed(why),
     }
-}
-
-/// A workspace's name as Slack gave it, safe to print.
-fn shown(name: &str) -> String {
-    Remote::new(name).line().into_string()
 }
 
 /// `slakio login` with the paste on standard input.
@@ -398,51 +341,12 @@ fn sign_in_piped(wiring: &Wiring, i18n: &i18n::I18n) -> ExitCode {
     };
     match result {
         Ok(s) => {
-            println!("{}", i18n.msg(&Msg::SigninSignedIn { workspace: shown(&s.account.name) }));
+            println!("{}", i18n.msg(&Msg::SigninSignedIn { workspace: words::shown(&s.account.name) }));
             ExitCode::SUCCESS
         }
         Err(why) => {
             eprintln!("{}", i18n.label(why));
             ExitCode::FAILURE
-        }
-    }
-}
-
-/// `slakio logout`: every signed-in workspace's credentials leave the store, then the file.
-fn sign_out(
-    store: &dyn SecretStore,
-    path: Option<&std::path::Path>,
-    i18n: &i18n::I18n,
-    errors: Option<PathBuf>,
-) -> ExitCode {
-    let Some(path) = path else {
-        println!("{}", i18n.label(Label::LogoutNone));
-        return ExitCode::SUCCESS;
-    };
-    match account::forget(store, path) {
-        Ok(gone) if gone.is_empty() => println!("{}", i18n.label(Label::LogoutNone)),
-        Ok(gone) => {
-            for a in gone {
-                println!("{}", i18n.msg(&Msg::LogoutDone { workspace: shown(&a.name) }));
-            }
-        }
-        Err(fault) => {
-            ErrorLog::new(errors).record("logout", &fault);
-            eprintln!("{}", i18n.label(Label::LogoutFailed));
-            return ExitCode::FAILURE;
-        }
-    }
-    ExitCode::SUCCESS
-}
-
-/// The status line's words for a config file that cannot be used.
-fn config_message(e: &ConfigError) -> Msg {
-    match e {
-        ConfigError::Read { .. } => Msg::Label(Label::ConfigReadFailed),
-        ConfigError::Syntax(_) => Msg::Label(Label::ConfigSyntax),
-        ConfigError::UnknownKey(key) => Msg::ConfigUnknownKey { key: key.clone() },
-        ConfigError::Value { key, value, allowed } => {
-            Msg::ConfigBadValue { key: key.clone(), value: value.clone(), allowed: allowed.clone() }
         }
     }
 }
@@ -467,7 +371,7 @@ async fn run(
     let size = terminal.size()?;
     app.resize(size.width, size.height);
     let mut events = EventStream::new();
-    let mut signals = Signals::new()?;
+    let mut signals = term::Signals::new()?;
     let mut cursor = Cursor::default();
     let mut redraw = true;
     // A paste being checked with Slack.
@@ -547,36 +451,4 @@ async fn run(
         };
     }
     Ok(())
-}
-
-/// The signals that end the process (Unix): SIGTERM, SIGHUP (the terminal went away), SIGINT
-/// (sent from outside: in raw mode Ctrl+C is a key) and SIGQUIT. Once caught they no longer
-/// kill the process on the spot, so the terminal is restored first.
-struct Signals {
-    #[cfg(unix)]
-    all: Vec<tokio::signal::unix::Signal>,
-}
-
-impl Signals {
-    fn new() -> io::Result<Self> {
-        #[cfg(unix)]
-        {
-            use tokio::signal::unix::{SignalKind, signal};
-            let kinds = [SignalKind::terminate(), SignalKind::hangup(), SignalKind::interrupt(), SignalKind::quit()];
-            Ok(Self { all: kinds.into_iter().map(signal).collect::<io::Result<Vec<_>>>()? })
-        }
-        #[cfg(not(unix))]
-        Ok(Self {})
-    }
-
-    /// The next of them.
-    async fn recv(&mut self) {
-        #[cfg(unix)]
-        {
-            let each = self.all.iter_mut().map(|s| Box::pin(s.recv()));
-            futures::future::select_all(each).await;
-        }
-        #[cfg(not(unix))]
-        std::future::pending::<()>().await
-    }
 }

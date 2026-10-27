@@ -62,3 +62,35 @@ pub(crate) fn setup_terminal() -> io::Result<(Terminal<CrosstermBackend<Stdout>>
     STATE.enter(&mut io::stdout(), enhanced)?;
     Ok((Terminal::new(CrosstermBackend::new(io::stdout()))?, enhanced))
 }
+
+/// The signals that end the process (Unix): SIGTERM, SIGHUP (the terminal went away), SIGINT
+/// (sent from outside: in raw mode Ctrl+C is a key) and SIGQUIT. Once caught they no longer
+/// kill the process on the spot, so the terminal is restored first.
+pub(crate) struct Signals {
+    #[cfg(unix)]
+    all: Vec<tokio::signal::unix::Signal>,
+}
+
+impl Signals {
+    pub(crate) fn new() -> io::Result<Self> {
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{SignalKind, signal};
+            let kinds = [SignalKind::terminate(), SignalKind::hangup(), SignalKind::interrupt(), SignalKind::quit()];
+            Ok(Self { all: kinds.into_iter().map(signal).collect::<io::Result<Vec<_>>>()? })
+        }
+        #[cfg(not(unix))]
+        Ok(Self {})
+    }
+
+    /// The next of them.
+    pub(crate) async fn recv(&mut self) {
+        #[cfg(unix)]
+        {
+            let each = self.all.iter_mut().map(|s| Box::pin(s.recv()));
+            futures::future::select_all(each).await;
+        }
+        #[cfg(not(unix))]
+        std::future::pending::<()>().await
+    }
+}
