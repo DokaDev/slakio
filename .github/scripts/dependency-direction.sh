@@ -3,8 +3,12 @@
 # dependency tree of each crate (CI job `dependency-direction`):
 #   - slakio-core depends on no other slakio crate, and on no UI, network or database crate;
 #   - an adapter (slakio-slack, slakio-auth, slakio-store, slakio-world) depends on no slakio
-#     crate but slakio-core;
-#   - no crate depends on slakio-fake outside its dev-dependencies.
+#     crate but slakio-core (so slakio-auth never depends on slakio-slack, nor the reverse: the
+#     binary hands the credentials from one to the other);
+#   - slakio-fake (the tests' fake Slack) depends on no slakio crate but slakio-core and
+#     slakio-world, and no crate depends on it outside its dev-dependencies;
+#   - in slakio-tui only the binary's wiring (src/main.rs) names slakio-slack: the rest of the
+#     UI reaches a backend through the core's protocol and capabilities.
 # Crates that do not exist yet are skipped.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -34,6 +38,18 @@ for adapter in slakio-slack slakio-auth slakio-store slakio-world; do
   for d in $(deps "$adapter" | grep '^slakio-' | grep -vx slakio-core || true); do
     fail "$adapter depends on $d (adapters depend on slakio-core only)"
   done
+done
+
+if grep -qx slakio-fake <<< "$members"; then
+  for d in $(deps slakio-fake | grep '^slakio-' | grep -vx -e slakio-core -e slakio-world || true); do
+    fail "slakio-fake depends on $d (it serves the fake world: slakio-core and slakio-world only)"
+  done
+fi
+
+for f in $(git ls-files 'crates/slakio-tui/**.rs' | grep -vx crates/slakio-tui/src/main.rs); do
+  if grep -q 'slakio_slack' "$f"; then
+    fail "$f names slakio_slack (only crates/slakio-tui/src/main.rs may)"
+  fi
 done
 
 for m in $members; do

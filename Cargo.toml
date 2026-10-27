@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/slakio-core", "crates/slakio-world", "crates/slakio-tui", "crates/slakio-bench"]
+members = [
+    "crates/slakio-core",
+    "crates/slakio-world",
+    "crates/slakio-slack",
+    "crates/slakio-fake",
+    "crates/slakio-tui",
+    "crates/slakio-bench",
+]
 # cargo-fuzz targets need nightly; they build on their own (fuzz/Cargo.toml).
 exclude = ["fuzz"]
 
@@ -21,9 +28,21 @@ publish = false
 [workspace.dependencies]
 # Internal crates. Dependency direction (docs/architecture.md, checked in CI):
 # tui -> core <- adapters; adapters never depend on each other or on tui; bench -> all.
+# slakio-fake is a dev-dependency only.
 slakio-core = { path = "crates/slakio-core" }
+slakio-fake = { path = "crates/slakio-fake" }
+slakio-slack = { path = "crates/slakio-slack" }
 slakio-tui = { path = "crates/slakio-tui" }
 slakio-world = { path = "crates/slakio-world" }
+
+# The Slack transport's HTTP/1.1 client (docs/architecture/0001-http-stack.md): hyper's
+# connection API without its pooled client, so the transport decides every header and its order.
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", default-features = false, features = ["client", "http1"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+# Decoding Slack's JSON answers, tolerantly (unknown fields ignored, most fields optional).
+serde = { version = "1", features = ["derive"] }
 
 # Terminal input and output for Ratatui; `event-stream` for the async event loop.
 crossterm = { version = "0.29", features = ["event-stream"] }

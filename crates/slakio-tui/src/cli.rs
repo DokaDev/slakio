@@ -18,6 +18,8 @@ usage: slakio [--demo] [--config <path>]
 environment:
   SLAKIO_SECRET_STORE=memory   keep credentials in memory only, never touch the OS
                                keychain (default: keychain)
+  SLAKIO_NETWORK=off           never send anything to Slack (default: on, unless
+                               the config file says network = \"off\")
   NO_COLOR=1                   draw without colors
 ";
 

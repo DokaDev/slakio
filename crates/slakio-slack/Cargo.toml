@@ -1,0 +1,30 @@
+[package]
+name = "slakio-slack"
+description = "The Slack transport of slakio: read-only requests in the web client's format, under a request cap and a kill switch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[dependencies]
+bytes.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+slakio-core.workspace = true
+tokio = { workspace = true, features = ["net", "rt", "sync", "time", "macros"] }
+
+[dev-dependencies]
+slakio-fake.workspace = true
+slakio-world.workspace = true
+
+[lints]
+workspace = true

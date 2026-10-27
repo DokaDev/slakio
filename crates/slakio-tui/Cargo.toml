@@ -26,6 +26,9 @@ futures.workspace = true
 lexopt.workspace = true
 ratatui.workspace = true
 slakio-core.workspace = true
+# Named by the binary's wiring only (src/main.rs); the library reaches a backend through the
+# core's protocol.
+slakio-slack.workspace = true
 # The invented world behind `--demo`.
 slakio-world.workspace = true
 terminal-colorsaurus.workspace = true

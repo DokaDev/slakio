@@ -14,7 +14,9 @@ use slakio_core::config::{self, ConfigError};
 use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
 use slakio_core::paths::Paths;
-use slakio_core::secret::{STORE_ENV, StoreKind};
+use slakio_core::secret::{Credentials, STORE_ENV, StoreKind};
+use slakio_slack::governor::{Governor, Limits, SystemClock};
+use slakio_slack::request::Endpoints;
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange;
@@ -53,6 +55,18 @@ fn main() -> ExitCode {
     let paths = Paths::from_env();
     let config_path = cli_config.or_else(|| paths.config_file());
     let (cfg, cfg_err) = config::load(config_path.as_deref());
+    // Whether anything may be sent at all: a value of the switch that is not understood stops
+    // the program here, as the store's does.
+    let network = match slakio_slack::governor::network_on(
+        std::env::var(slakio_slack::governor::NETWORK_ENV).ok().as_deref(),
+        &cfg.network,
+    ) {
+        Ok(on) => on,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let env = |k: &str| std::env::var(k).ok();
     // The background matters only to a theme with a light and a dark variant, and to the
@@ -70,11 +84,14 @@ fn main() -> ExitCode {
         compact: cfg.density == "compact",
     };
     app.fold_views(cfg.nav_rows == "collapsed");
-    // The one place that names a concrete backend.
-    let backend: Option<Box<dyn Backend + Send>> =
-        demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend + Send>);
-    if let Some(b) = &backend {
-        app.connect(b.capabilities());
+    // The one place that names a concrete backend. Only the demo can be chosen yet.
+    let kind = demo.then(|| BackendKind::Demo(Box::new(DemoBackend::new(World::demo()))));
+    let capabilities = kind.as_ref().map(|k| match k {
+        BackendKind::Demo(b) => b.capabilities(),
+        BackendKind::Slack { .. } => slakio_slack::adapter::CAPABILITIES,
+    });
+    if let Some(caps) = capabilities {
+        app.connect(caps);
         // Asked once, where the view switcher can preview the answer; the answer is saved.
         if cfg.icons == "ask" && config_path.is_some() && cfg_err.is_none() {
             app.ask_icons();
@@ -109,7 +126,13 @@ fn main() -> ExitCode {
         let _restore = term::guard();
         let (mut terminal, enhanced) = term::setup_terminal()?;
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
-        let backend = backend.map(exchange::serve);
+        let backend = kind.map(|k| match k {
+            BackendKind::Demo(b) => exchange::serve(b),
+            BackendKind::Slack { credentials, endpoints } => {
+                let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
+                slakio_slack::serve(slakio_slack::Client::new(credentials, endpoints, governor))
+            }
+        });
         run(
             &mut terminal,
             app,
@@ -129,6 +152,15 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Which backend the app runs.
+enum BackendKind {
+    /// The invented workspace (`--demo`): nothing connects anywhere.
+    Demo(Box<DemoBackend>),
+    /// Slack, read-only, for a signed-in workspace. Nothing signs in yet, so nothing selects it.
+    #[expect(dead_code, reason = "selected once sign-in exists")]
+    Slack { credentials: Credentials, endpoints: Endpoints },
 }
 
 /// The status line's words for a config file that cannot be used.
