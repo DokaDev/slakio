@@ -24,7 +24,23 @@ const TOKEN_PREFIX: &str = concat!("xo", "xc-");
 const COOKIE_PREFIX: &str = concat!("xo", "xd-");
 
 /// Host names under `slack.com` that are Slack's own, never a workspace's.
-const NOT_WORKSPACES: &[&str] = &["app", "api", "edgeapi", "files", "status", "www", "slack", "my", "join"];
+const NOT_WORKSPACES: &[&str] = &[
+    "app",
+    "api",
+    "edgeapi",
+    "enterprise",
+    "files",
+    "status",
+    "www",
+    "slack",
+    "my",
+    "join",
+    "downloads",
+    "wss-primary",
+    "wss-backup",
+    "wss-mobile-primary",
+    "wss-mobile-backup",
+];
 
 /// What a pasted copy signs in with, and where: the workspace's host (`example.slack.com`).
 /// Its `Debug` print leaves the credentials out.

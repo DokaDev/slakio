@@ -124,6 +124,10 @@ fn workspace_hosts() {
     }
     for no in [
         "slack.com",
+        "enterprise.slack.com",
+        "app.enterprise.slack.com",
+        "wss-primary.slack.com",
+        "downloads.slack.com",
         "app.slack.com",
         "edgeapi.slack.com",
         "-a.slack.com",

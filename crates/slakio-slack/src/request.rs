@@ -42,7 +42,23 @@ pub(crate) enum Server {
 pub const EDGE_HOST: &str = "edgeapi.slack.com";
 
 /// Host names under `slack.com` that are Slack's own, never a workspace's.
-const NOT_WORKSPACES: &[&str] = &["app", "api", "edgeapi", "files", "status", "www", "slack", "my", "join"];
+const NOT_WORKSPACES: &[&str] = &[
+    "app",
+    "api",
+    "edgeapi",
+    "enterprise",
+    "files",
+    "status",
+    "www",
+    "slack",
+    "my",
+    "join",
+    "downloads",
+    "wss-primary",
+    "wss-backup",
+    "wss-mobile-primary",
+    "wss-mobile-backup",
+];
 
 /// `host` is a workspace's: `<name>.slack.com` or `<name>.enterprise.slack.com`, `<name>` one
 /// lowercase label that is not one of Slack's own hosts.

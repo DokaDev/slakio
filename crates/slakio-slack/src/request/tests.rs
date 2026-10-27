@@ -180,3 +180,22 @@ fn a_prepared_request_never_prints_its_token_or_cookie() {
     assert!(!printed.contains("cookie-TEST"), "{printed}");
     assert!(printed.contains("client.counts") && printed.contains("<redacted>"), "{printed}");
 }
+
+#[test]
+fn only_a_workspaces_own_host_is_a_workspace() {
+    for ok in ["example.slack.com", "my-team.slack.com", "org.enterprise.slack.com"] {
+        assert!(Endpoints::workspace(ok).is_some(), "{ok}");
+    }
+    for no in [
+        "enterprise.slack.com",
+        "app.enterprise.slack.com",
+        "edgeapi.slack.com",
+        "wss-primary.slack.com",
+        "wss-backup.slack.com",
+        "downloads.slack.com",
+        "slack.com",
+        "a.b.slack.com",
+    ] {
+        assert!(Endpoints::workspace(no).is_none(), "{no}");
+    }
+}
