@@ -222,10 +222,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .iter()
         .filter_map(|l| resolved.iter().position(|(_, x)| x == l))
         .collect();
-    // A hint's worth: help most, then the place's first key (what to press now), the leader key
+    // A hint's worth: help most, then the place's first key (what to press now; on a to-do `x`
+    // too), the leader key
     // and the new tab key (the way to tabs), the others, those of least worth.
     let worth = |i: usize| match resolved[i].1 {
         Label::HintHelp => 5,
+        // On a to-do, `x` is what to press now as much as `Enter`.
+        Label::HintTodoDone | Label::HintTodoReopen => 4,
         _ if i == 0 => 4,
         Label::HintMore | Label::HintNewTab => 3,
         l if low(l) => 1,

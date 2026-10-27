@@ -336,16 +336,17 @@ fn hints(d: &Demo) -> Vec<String> {
 }
 
 #[test]
-fn on_a_completed_to_do_x_says_reopen() {
-    let mut d = todos();
-    let at = d
-        .app
-        .list_rows()
-        .iter()
-        .position(|r| matches!(r, Row::Item(i) if d.app.model.saved(*i).state == SavedState::Completed));
-    d.app.focus_list_row(at.unwrap());
-    let h = hints(&d);
-    assert!(h.contains(&"x reopen".to_string()) && !h.contains(&"x done".to_string()), "{h:?}");
+fn on_a_completed_to_do_x_says_reopen_at_every_size() {
+    for (w, h) in [(80, 24), (120, 40)] {
+        let mut d = Demo::new(w, h);
+        d.keys("space o");
+        let rows = d.app.list_rows();
+        let at =
+            rows.iter().position(|r| matches!(r, Row::Item(i) if d.app.model.saved(*i).state == SavedState::Completed));
+        d.app.focus_list_row(at.unwrap());
+        let h = hints(&d);
+        assert!(h.contains(&"x reopen".to_string()) && !h.contains(&"x done".to_string()), "{w}: {h:?}");
+    }
 }
 
 #[test]
