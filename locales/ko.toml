@@ -61,6 +61,7 @@
 
 "pane.loading" = "메시지를 불러오는 중…"
 "pane.no_messages" = "아직 메시지가 없습니다 · {keys} 쓰기"
+"pane.no_messages_read_only" = "아직 메시지가 없습니다"
 "pane.thread" = "스레드"
 "pane.failed" = "메시지를 불러오지 못했습니다"
 "presence.active" = "활동 중"
@@ -74,6 +75,7 @@
 "composer.message" = "{name}에 메시지 보내기"
 "composer.reply" = "답글"
 "composer.hint" = "{keys} 를 눌러 쓰기"
+"composer.read_only" = "읽기 전용: 아무것도 보낼 수 없습니다"
 "composer.reply_hint" = "{keys} 를 눌러 답글 쓰기"
 
 "status.demo" = "데모"
@@ -239,6 +241,7 @@
 "guide.footer" = "Esc 닫기 · Backspace 뒤로 · ? 모든 키"
 "thread.replies" = "답글 {count}개"
 "thread.no_replies" = "아직 답글이 없습니다 · {keys} 답글 쓰기"
+"thread.no_replies_read_only" = "아직 답글이 없습니다"
 "help.title" = "키 — {context}"
 "help.keys" = "↑↓ 이동 · Enter 실행 · / 찾기 · Esc 닫기"
 "help.search" = "/ 를 눌러 찾기"

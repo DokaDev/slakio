@@ -23,10 +23,15 @@ pub enum Action {
 }
 
 impl Action {
-    /// The action asks the backend to change something: a backend that changes nothing offers
-    /// none of them.
+    /// The action asks the backend to change something (a to-do, or writing a message to
+    /// send): a backend that changes nothing offers none of them.
     pub fn changes(self) -> bool {
-        matches!(self, Action::Shell(ShellAction::TodoToggle | ShellAction::TodoMove | ShellAction::TodoClear))
+        matches!(
+            self,
+            Action::Shell(ShellAction::TodoToggle | ShellAction::TodoMove | ShellAction::TodoClear)
+                | Action::Pane(PaneAction::Insert)
+                | Action::Composer(ComposerAction::Send)
+        )
     }
 }
 

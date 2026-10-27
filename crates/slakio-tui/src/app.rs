@@ -493,9 +493,7 @@ impl App {
             PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl)),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
-                Some(p) if p.selected.is_none() || p.is_thread() => {
-                    self.work.set_insert(true);
-                }
+                Some(p) if p.selected.is_none() || p.is_thread() => self.write(now),
                 Some(_) => self.open_thread(),
                 None => {}
             },
@@ -509,11 +507,7 @@ impl App {
             }),
             PaneAction::Escape => self.escape(main_target),
             PaneAction::Copy => self.copy(now),
-            PaneAction::Insert => {
-                if self.work.focused().is_some() {
-                    self.work.set_insert(true);
-                }
-            }
+            PaneAction::Insert => self.write(now),
             PaneAction::Left => {
                 if self.focus().is_pane()
                     && let Some(id) = self.work.beside(-1)
@@ -561,6 +555,8 @@ impl App {
 
     fn composer(&mut self, a: ComposerAction, now: Instant) {
         match a {
+            // Never shown as sent where nothing can be sent.
+            ComposerAction::Send if self.read_only() => self.info(Msg::Label(Label::ComposerReadOnly), now),
             ComposerAction::Send => {
                 if self.work.send(&self.model) && self.backend.is_some_and(|c| c.demo) {
                     self.info(Msg::Label(Label::StatusDemoEcho), now);

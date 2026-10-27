@@ -27,6 +27,16 @@ impl App {
         self.backend.is_some_and(|c| c.read_only)
     }
 
+    /// Write in the focused pane's composer; a read-only backend sends nothing, so it says so
+    /// instead.
+    pub(super) fn write(&mut self, now: Instant) {
+        if self.read_only() {
+            self.info(Msg::Label(Label::ComposerReadOnly), now);
+        } else if self.work.focused().is_some() {
+            self.work.set_insert(true);
+        }
+    }
+
     /// Why the last request for the workspaces failed, if it did.
     pub fn boot_failed(&self) -> Option<&FailKind> {
         self.boot.1.as_ref()

@@ -107,13 +107,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     f.render_widget(Paragraph::new("›").style(if insert { t.accent() } else { t.faint() }), prompt);
     let text_area = Rect { x: input.x + 3, width: input.width.saturating_sub(4), ..input };
     if app.work.draft(pane).is_empty() && !insert {
-        let insert_key = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal);
-        let hint = insert_key
-            .map(|keys| {
-                let hint = if thread { Msg::ComposerReplyHint { keys } } else { Msg::ComposerHint { keys } };
-                app.i18n.msg(&hint).to_string()
-            })
-            .unwrap_or_default();
+        let hint = composer_hint(app, thread);
         f.render_widget(Paragraph::new(clip(&hint, usize::from(text_area.width))).style(t.faint()), text_area);
         return;
     }
@@ -133,3 +127,17 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 }
 
 pub(super) use crate::app::model::breadcrumb;
+
+/// What an empty composer says: how to write (or reply), or, where nothing can be sent, that.
+fn composer_hint(app: &App, thread: bool) -> String {
+    if app.read_only() {
+        return app.i18n.label(Label::ComposerReadOnly).to_string();
+    }
+    let insert_key = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal);
+    insert_key
+        .map(|keys| {
+            let hint = if thread { Msg::ComposerReplyHint { keys } } else { Msg::ComposerHint { keys } };
+            app.i18n.msg(&hint).to_string()
+        })
+        .unwrap_or_default()
+}

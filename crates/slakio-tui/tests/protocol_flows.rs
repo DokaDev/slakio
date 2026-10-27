@@ -397,3 +397,36 @@ fn a_read_only_backend_says_so_in_the_status_line() {
     let s = Scripted::booted(false, None);
     assert!(!s.d.status_line().contains("read only"), "{}", s.d.status_line());
 }
+
+#[test]
+fn a_read_only_backend_offers_no_writing_and_never_shows_a_message_as_sent() {
+    let mut s = Scripted::booted(true, None);
+    s.d.list_cursor_on("backend");
+    s.keys("enter");
+    s.b.answer(0);
+    s.pump();
+    let before = s.d.screen();
+    assert!(!s.d.status_line().contains("write"), "no write hint: {}", s.d.status_line());
+    assert!(before.contains("Read only: nothing can be sent"), "the composer says so: {before}");
+    for keys in ["i", "a", "enter"] {
+        s.keys(keys);
+        assert_eq!(s.d.app.mode(), slakio_tui::app::Mode::Normal, "{keys} opens no composer");
+        assert!(s.d.status_line().contains("Read only: nothing can be sent"), "{}", s.d.status_line());
+        s.keys("esc");
+    }
+    s.keys("i h e l l o enter");
+    let after = s.d.screen();
+    assert!(!after.contains("hello"), "nothing typed shows as sent: {after}");
+    assert!(s.b.held.is_empty() || s.b.held.iter().all(|r| !r.command.changes()));
+}
+
+#[test]
+fn the_demo_still_writes_and_echoes_locally() {
+    let mut s = Scripted::booted(false, None);
+    s.d.list_cursor_on("backend");
+    s.keys("enter");
+    s.b.answer(0);
+    s.pump();
+    s.keys("i");
+    assert_eq!(s.d.app.mode(), slakio_tui::app::Mode::Insert);
+}

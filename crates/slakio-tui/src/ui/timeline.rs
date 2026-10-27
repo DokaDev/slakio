@@ -53,7 +53,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     // One cell of padding on each side; the left one is the selection's gutter.
     let text_area = |row: Rect| Rect { x: row.x + 1, width: row.width.saturating_sub(2), ..row };
     if tl.items.is_empty() {
-        let text = if tl.complete {
+        let text = if tl.complete && app.read_only() {
+            ratatui::text::Text::styled(app.i18n.label(Label::PaneNoMessagesReadOnly).to_string(), t.faint())
+        } else if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
             ratatui::text::Text::styled(app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string(), t.faint())
         } else if let Some(kind) = &tl.failed {

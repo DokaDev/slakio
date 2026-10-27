@@ -75,6 +75,7 @@
 # The work area.
 "pane.loading" = "Loading messages…"
 "pane.no_messages" = "No messages yet · {keys} write"
+"pane.no_messages_read_only" = "No messages yet"
 "pane.thread" = "Thread"
 "pane.failed" = "Could not load messages"
 # A DM's title: its peer's presence.
@@ -91,6 +92,7 @@
 "composer.message" = "Message {name}"
 "composer.reply" = "Reply"
 "composer.hint" = "Press {keys} to write"
+"composer.read_only" = "Read only: nothing can be sent"
 "composer.reply_hint" = "Press {keys} to reply"
 
 # The status line: the demo backend, and the unread DM total.
@@ -260,6 +262,7 @@
 "guide.footer" = "Esc close · Backspace back · ? all keys"
 "thread.replies" = { one = "{count} reply", other = "{count} replies" }
 "thread.no_replies" = "No replies yet · {keys} reply"
+"thread.no_replies_read_only" = "No replies yet"
 "help.title" = "Keys — {context}"
 "help.keys" = "↑↓ move · Enter run · / search · Esc close"
 "help.search" = "Type / to search"

@@ -338,6 +338,9 @@ pub fn rule(label: &str, w: usize, style: Style) -> Line<'static> {
 
 /// "No replies yet · i reply", with the key bound.
 fn no_replies(app: &App) -> String {
+    if app.read_only() {
+        return app.i18n.label(slakio_core::i18n::Label::ThreadNoRepliesReadOnly).to_string();
+    }
     let keys = super::super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
     app.i18n.msg(&Msg::ThreadNoReplies { keys }).to_string()
 }
