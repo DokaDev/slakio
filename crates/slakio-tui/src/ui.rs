@@ -222,7 +222,7 @@ fn highlight(f: &mut Frame, app: &App, row: Rect, how: Selection) {
 
 /// What could not be loaded (`label`), and below it the key that asks again when the reason
 /// (`kind`) may pass.
-fn failed_text(app: &App, label: Label, kind: slakio_core::backend::FailKind) -> String {
+fn failed_text(app: &App, label: Label, kind: &slakio_core::backend::FailKind) -> String {
     let text = app.i18n.label(label).to_string();
     let action = crate::action::Action::App(crate::action::AppAction::Retry);
     match empty::key_of(app, action, crate::keymap::Ctx::Shell).filter(|_| kind.retryable()) {

@@ -62,5 +62,35 @@ pub trait SecretStore: Send + Sync {
     fn delete(&self, account: &str) -> Result<bool, Unavailable>;
 }
 
+/// What signs the client in to one workspace, as the web client holds it: the session token
+/// (`xoxc`) and the `d` cookie. Their text never shows in a `Debug` print, so neither reaches a
+/// log or a panic message by accident.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Credentials {
+    token: String,
+    cookie: String,
+}
+
+impl Credentials {
+    pub fn new(token: impl Into<String>, cookie: impl Into<String>) -> Self {
+        Self { token: token.into(), cookie: cookie.into() }
+    }
+
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
+    /// The `d` cookie's value.
+    pub fn cookie(&self) -> &str {
+        &self.cookie
+    }
+}
+
+impl std::fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Credentials { .. }")
+    }
+}
+
 #[cfg(test)]
 mod tests;

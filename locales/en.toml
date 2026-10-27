@@ -363,6 +363,7 @@
 "fail.cap_reached" = "Request limit reached: try again soon"
 "fail.offline" = "Offline: nothing was sent"
 "fail.busy" = "Busy: nothing was sent, try again"
+"fail.api" = "Slack refused the request"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"
 "hint.todo_save" = "to Saved"

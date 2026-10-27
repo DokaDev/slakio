@@ -104,7 +104,7 @@ fn a_failed_change_stops_waiting_and_says_why() {
     assert_eq!(s.b.held.len(), 1);
     assert!(matches!(s.b.held[0].command, Command::Save { .. }));
     assert!(s.b.held[0].workspace.is_some(), "a change names its workspace");
-    s.b.fail(0, FailKind::RateLimited);
+    s.b.fail(0, FailKind::RateLimited { retry_after: None });
     assert!(s.pump());
     assert!(s.d.status_line().contains("slow down"), "{}", s.d.status_line());
     // Nothing waits any more: a late success for the failed request is dropped.
@@ -238,7 +238,7 @@ async fn a_backend_that_is_gone_fails_the_request_at_once() {
     app.resize(80, 24);
     app.connect(handle.capabilities);
     assert!(exchange::pump(&mut app, &mut handle).await);
-    assert_eq!(app.boot_failed(), Some(FailKind::Offline), "never waits for an answer that cannot come");
+    assert_eq!(app.boot_failed(), Some(&FailKind::Offline), "never waits for an answer that cannot come");
 }
 
 /// The demo world, read-only, counting every change that reaches it.
@@ -313,7 +313,7 @@ fn a_failure_goes_to_the_error_log_as_one_safe_line() {
 fn r_asks_again_for_workspaces_that_failed_for_a_reason_that_may_pass() {
     let mut s = Scripted::connected(false);
     s.pump();
-    s.b.fail(0, FailKind::RateLimited);
+    s.b.fail(0, FailKind::RateLimited { retry_after: None });
     s.pump();
     assert!(s.d.screen().contains("r retry"), "{}", s.d.screen());
     assert!(s.b.held.is_empty(), "nothing retries on its own");

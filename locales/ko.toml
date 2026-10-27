@@ -342,6 +342,7 @@
 "fail.cap_reached" = "요청 한도에 도달했습니다: 잠시 후 다시 시도하세요"
 "fail.offline" = "오프라인: 아무것도 보내지 않았습니다"
 "fail.busy" = "처리 중: 보내지 않았습니다, 다시 시도하세요"
+"fail.api" = "Slack이 요청을 거절했습니다"
 "retry.hint" = "{keys} 다시 시도"
 "hint.todo_done" = "완료"
 "hint.todo_save" = "저장됨으로"

@@ -7,6 +7,7 @@
 //! late, or never). Only one wiring file of the UI names a concrete backend.
 
 use crate::model::{Conversation, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace, WorkspaceId};
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
@@ -125,30 +126,36 @@ pub enum Event {
 
 impl FailKind {
     /// Asking again may work (when the user asks: nothing retries on its own).
-    pub fn retryable(self) -> bool {
+    pub fn retryable(&self) -> bool {
         match self {
-            FailKind::Network | FailKind::Offline | FailKind::RateLimited | FailKind::Busy => true,
-            FailKind::ReadOnly | FailKind::Auth | FailKind::CapReached => false,
+            FailKind::Network | FailKind::Offline | FailKind::RateLimited { .. } | FailKind::Busy => true,
+            FailKind::ReadOnly | FailKind::Auth | FailKind::CapReached | FailKind::Api { .. } => false,
         }
     }
 }
 
 /// Why a request failed, as far as the UI tells it apart.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FailKind {
     /// The backend changes nothing ([`Capabilities::read_only`]).
     ReadOnly,
     Network,
     /// Signed out, or the sign-in is no longer accepted.
     Auth,
-    /// Slack asked to slow down.
-    RateLimited,
+    /// Slack asked to slow down, for `retry_after` when it said how long.
+    RateLimited {
+        retry_after: Option<Duration>,
+    },
     /// The backend's own limit of requests is reached.
     CapReached,
     /// No connection, or the backend is gone.
     Offline,
     /// The backend has more requests waiting than it takes: nothing was sent; try again.
     Busy,
+    /// Slack answered with an error of its own (`code`, such as `channel_not_found`).
+    Api {
+        code: String,
+    },
 }
 
 /// An event with the generation of the request it answers.

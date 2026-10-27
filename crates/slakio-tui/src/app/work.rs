@@ -457,7 +457,7 @@ impl Work {
             return false;
         };
         let tl = self.timelines.entry(&target);
-        if !tl.failed.is_some_and(FailKind::retryable) {
+        if !tl.failed.as_ref().is_some_and(FailKind::retryable) {
             return false;
         }
         tl.failed = None;

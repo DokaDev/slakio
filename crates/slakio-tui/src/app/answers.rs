@@ -28,14 +28,14 @@ impl App {
     }
 
     /// Why the last request for the workspaces failed, if it did.
-    pub fn boot_failed(&self) -> Option<FailKind> {
-        self.boot.1
+    pub fn boot_failed(&self) -> Option<&FailKind> {
+        self.boot.1.as_ref()
     }
 
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
     /// workspaces, else the active pane's messages. Only when asked: nothing retries on its own.
     pub(super) fn retry(&mut self, now: Instant) {
-        match self.boot.1 {
+        match &self.boot.1 {
             Some(kind) if kind.retryable() => self.boot = (self.work.requests.ask(None, Command::Boot), None),
             // Asking again cannot help: say why once more.
             Some(kind) => self.warn(Msg::Label(failure(kind)), now),
@@ -67,13 +67,13 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
         let waited = if id == self.boot.0 {
-            self.boot.1 = Some(kind);
+            self.boot.1 = Some(kind.clone());
             true
         } else {
-            self.work.on_failed(id, kind) || self.on_save_failed(id)
+            self.work.on_failed(id, kind.clone()) || self.on_save_failed(id)
         };
         if waited {
-            self.warn(Msg::Label(failure(kind)), now);
+            self.warn(Msg::Label(failure(&kind)), now);
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
             self.effects.push(Effect::Record { context: "backend", fault });
         }
@@ -82,15 +82,16 @@ impl App {
 }
 
 /// The status line's words for a failure of `kind`.
-pub(super) fn failure(kind: FailKind) -> Label {
+pub(super) fn failure(kind: &FailKind) -> Label {
     match kind {
         FailKind::ReadOnly => Label::FailReadOnly,
         FailKind::Network => Label::FailNetwork,
         FailKind::Auth => Label::FailAuth,
-        FailKind::RateLimited => Label::FailRateLimited,
+        FailKind::RateLimited { .. } => Label::FailRateLimited,
         FailKind::CapReached => Label::FailCapReached,
         FailKind::Offline => Label::FailOffline,
         FailKind::Busy => Label::FailBusy,
+        FailKind::Api { .. } => Label::FailApi,
     }
 }
 

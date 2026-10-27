@@ -32,3 +32,10 @@ fn an_unusable_store_fails_every_call_instead_of_answering_nothing_stored() {
     assert!(s.set("T1", "x").is_err());
     assert!(s.delete("T1").is_err());
 }
+
+#[test]
+fn credentials_never_print_their_text() {
+    let c = Credentials::new("token-TEST", "cookie-TEST");
+    assert_eq!((c.token(), c.cookie()), ("token-TEST", "cookie-TEST"));
+    assert_eq!(format!("{c:?}"), "Credentials { .. }");
+}
