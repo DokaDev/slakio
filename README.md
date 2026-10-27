@@ -14,7 +14,7 @@ What exists today is the project's foundation and the first part of the interfac
 invented data only (`slakio --demo`): the list panel with its workspace and views, the channels and DMs, the
 conversation pane with a thread panel and a composer, and the status line. There is no sign-in
 and no real workspace yet; nothing is ever sent anywhere. Releases have binaries for macOS,
-Linux and Windows and a Homebrew formula ([Install](#install)); the latest is 0.0.1, and it
+Linux and Windows and a Homebrew formula ([Install](#install)); the latest is 0.0.2, and it
 runs in demo mode only. Nothing here is ready for daily use.
 
 The plan, in order: a user interface on fake data first, then read-only Slack connectivity,
@@ -128,7 +128,7 @@ Six keys get you everywhere:
 
 ## Install
 
-slakio 0.0.1 is a **demo only**: run `slakio --demo`. It does not connect to Slack.
+slakio is a **demo only** for now: run `slakio --demo`. It does not connect to Slack.
 
 - **Homebrew** (macOS and Linux, arm64 and x86_64), in one line:
 
