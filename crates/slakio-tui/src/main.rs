@@ -3,6 +3,7 @@
 mod cli;
 mod signin;
 mod stats;
+mod store;
 mod term;
 mod words;
 
@@ -91,12 +92,21 @@ fn main() -> ExitCode {
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let workspaces = paths.workspaces_file();
     if logout {
-        return signin::sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), paths.errors_log());
+        return signin::sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), &paths);
     }
     // One governor for the whole process: the sign-in check counts toward its cap too.
     let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
-    let mut wiring =
-        Wiring { store, workspaces, governor, errors: paths.errors_log(), test_addr: test_addr(), desktop: None };
+    signin::test_credentials(&*store, store_kind);
+    let local = store::Local::new(&paths, &cfg, network);
+    let mut wiring = Wiring {
+        store,
+        workspaces,
+        governor,
+        errors: paths.errors_log(),
+        test_addr: test_addr(),
+        desktop: None,
+        local,
+    };
     let env = |k: &str| std::env::var(k).ok();
     // The background matters only to a theme with a light and a dark variant, and to the
     // muted text of the terminal's colors; never asked without colors.
@@ -125,7 +135,9 @@ fn main() -> ExitCode {
         (None, Some(None))
     } else {
         match wiring.signed_in() {
-            Ok(Some((credentials, endpoints))) => (Some(BackendKind::Slack { credentials, endpoints }), None),
+            Ok(Some((credentials, endpoints, team))) => {
+                (Some(BackendKind::Slack { credentials, endpoints, team }), None)
+            }
             Ok(None) => (None, Some(None)),
             Err(fault) => {
                 ErrorLog::new(paths.errors_log()).record("signin", &fault);
@@ -178,11 +190,20 @@ fn main() -> ExitCode {
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
         let backend = kind.map(|k| match k {
             BackendKind::Demo(b) => exchange::serve(b),
-            BackendKind::Slack { credentials, endpoints } => wiring.serve(credentials, endpoints),
+            BackendKind::Slack { credentials, endpoints, team } => {
+                let mut notices = Vec::new();
+                let handle = wiring.local.front(wiring.serve(credentials, endpoints), &team, &mut notices);
+                for n in notices {
+                    app.warn(n, Instant::now());
+                }
+                handle
+            }
         });
         let saved = Saved { config: config_path.filter(|_| writable), errors: paths.errors_log() };
         run(&mut terminal, app, backend, &mut stats, saved, &wiring).await
     });
+    // What the cache was asked to keep is written before the process ends.
+    wiring.local.flush();
     if let Some(s) = stats.as_mut() {
         s.write();
     }
@@ -200,7 +221,7 @@ enum BackendKind {
     /// The invented workspace (`--demo`): nothing connects anywhere.
     Demo(Box<DemoBackend>),
     /// Slack, read-only, for the signed-in workspace.
-    Slack { credentials: Credentials, endpoints: Endpoints },
+    Slack { credentials: Credentials, endpoints: Endpoints, team: String },
 }
 
 /// What signing in and the Slack backend need: the secret store, the workspaces file, the
@@ -216,6 +237,8 @@ struct Wiring {
     /// What the sign-in screen's desktop scan found (no secret but the tokens; the cookie is
     /// read only when a workspace is picked).
     desktop: Option<Arc<slakio_auth::Found>>,
+    /// The local cache, put in front of the Slack backend.
+    local: store::Local,
 }
 
 /// `SLAKIO_TEST_SLACK_ADDR`: a loopback address the tests' fake Slack listens on, used instead
@@ -242,12 +265,13 @@ impl Wiring {
         }
     }
 
-    /// The signed-in workspace's credentials and endpoints; `None` when none is signed in.
-    fn signed_in(&self) -> Result<Option<(Credentials, Endpoints)>, slakio_core::fault::Fault> {
+    /// The signed-in workspace's credentials, endpoints and team id; `None` when none is signed
+    /// in.
+    fn signed_in(&self) -> Result<Option<(Credentials, Endpoints, String)>, slakio_core::fault::Fault> {
         let Some(path) = &self.workspaces else { return Ok(None) };
         let Some(a) = account::load(path)?.into_iter().next() else { return Ok(None) };
         let Some(endpoints) = self.endpoints(&a.host) else { return Ok(None) };
-        Ok(account::credentials(&*self.store, &a)?.map(|c| (c, endpoints)))
+        Ok(account::credentials(&*self.store, &a)?.map(|c| (c, endpoints, a.team)))
     }
 
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
@@ -321,8 +345,13 @@ fn check_label(e: &SlackError) -> Label {
 fn signed_in(done: Result<SignedIn, Label>, app: &mut App, backend: &mut Option<BackendHandle>, wiring: &Wiring) {
     match done {
         Ok(s) => {
-            *backend = Some(wiring.serve(s.credentials, s.endpoints));
+            let mut notices = Vec::new();
+            *backend =
+                Some(wiring.local.front(wiring.serve(s.credentials, s.endpoints), &s.account.team, &mut notices));
             app.signed_in(slakio_slack::adapter::CAPABILITIES, words::shown(&s.account.name), Instant::now());
+            for n in notices {
+                app.warn(n, Instant::now());
+            }
         }
         Err(why) => app.sign_in_failed(why),
     }

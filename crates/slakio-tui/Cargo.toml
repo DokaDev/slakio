@@ -31,6 +31,8 @@ slakio-core.workspace = true
 # Named by the binary's wiring only (src/main.rs); the library reaches a backend through the
 # core's protocol.
 slakio-slack.workspace = true
+# The local cache (the binary's wiring only).
+slakio-store.workspace = true
 # The invented world behind `--demo`.
 slakio-world.workspace = true
 terminal-colorsaurus.workspace = true
@@ -43,7 +45,7 @@ zeroize.workspace = true
 insta.workspace = true
 # The binary signing in against the tests' fake Slack.
 slakio-fake.workspace = true
-tokio = { workspace = true, features = ["rt", "macros", "net"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net"] }
 
 [lints]
 workspace = true

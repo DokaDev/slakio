@@ -5,10 +5,10 @@ use crate::words::shown;
 use slakio_auth::account;
 use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
-use slakio_core::secret::SecretStore;
+use slakio_core::paths::Paths;
+use slakio_core::secret::{Credentials, SecretStore, StoreKind};
 use slakio_tui::app::App;
 use slakio_tui::app::signin::PickerRow;
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 /// Offer signing in: when the real keychain is in use and nothing failed yet, try the Slack
@@ -39,13 +39,15 @@ pub(crate) fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<
     None
 }
 
-/// `slakio logout`: every signed-in workspace's credentials leave the store, then the file.
+/// `slakio logout`: every signed-in workspace's credentials leave the store, then the file, then
+/// the local cache: nothing of the sign-in is left.
 pub(crate) fn sign_out(
     store: &dyn SecretStore,
     path: Option<&std::path::Path>,
     i18n: &i18n::I18n,
-    errors: Option<PathBuf>,
+    paths: &Paths,
 ) -> ExitCode {
+    let errors = || ErrorLog::new(paths.errors_log());
     let Some(path) = path else {
         println!("{}", i18n.label(Label::LogoutNone));
         return ExitCode::SUCCESS;
@@ -58,10 +60,30 @@ pub(crate) fn sign_out(
             }
         }
         Err(fault) => {
-            ErrorLog::new(errors).record("logout", &fault);
+            errors().record("logout", &fault);
             eprintln!("{}", i18n.label(Label::LogoutFailed));
             return ExitCode::FAILURE;
         }
     }
+    if let Err(fault) = crate::store::remove(paths) {
+        errors().record("logout", &fault);
+        eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
+        return ExitCode::FAILURE;
+    }
     ExitCode::SUCCESS
+}
+
+/// `SLAKIO_TEST_CREDENTIALS` (`<team>|<token>|<cookie>`), debug builds with the memory store
+/// only: the tests start the binary signed in, as a keychain entry from an earlier run would.
+/// A release build, or the real keychain, never reads it.
+pub(crate) fn test_credentials(store: &dyn SecretStore, kind: StoreKind) {
+    if !cfg!(debug_assertions) || kind != StoreKind::Memory {
+        return;
+    }
+    let Ok(value) = std::env::var("SLAKIO_TEST_CREDENTIALS") else { return };
+    if let [team, token, cookie] = value.splitn(3, '|').collect::<Vec<_>>()[..]
+        && account::valid_team(team)
+    {
+        let _ = store.set(team, &account::encode(&Credentials::new(token, cookie)));
+    }
 }

@@ -2301,6 +2301,7 @@ dependencies = [
  "slakio-core",
  "slakio-fake",
  "slakio-slack",
+ "slakio-store",
  "slakio-world",
  "terminal-colorsaurus",
  "tokio",
