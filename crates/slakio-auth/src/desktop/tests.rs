@@ -179,3 +179,38 @@ fn a_scan_takes_no_key_source_and_a_missing_directory_is_not_found() {
     assert_eq!(scan_dir(&dir.join("absent")).unwrap_err(), DesktopError::NotFound);
     std::fs::remove_dir_all(&dir).ok();
 }
+
+/// Counts the times the Safe Storage key is asked for (each one a keychain prompt).
+struct CountingStorage(std::sync::atomic::AtomicUsize);
+impl CountingStorage {
+    fn asked(&self) -> usize {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+impl SafeStorage for CountingStorage {
+    fn keys(&self, _sandboxed: bool) -> Result<Vec<Zeroizing<Vec<u8>>>, DesktopError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(vec![Zeroizing::new(KEY.to_vec())])
+    }
+}
+
+#[test]
+fn credentials_kept_from_the_same_desktop_session_are_reused_without_the_safe_storage_key() {
+    let dir = scratch("reuse");
+    write_profile(&dir, &[("T1", "Alpha", "alpha", "fake-c-alpha"), ("T2", "Beta", "beta", "fake-c-beta")]);
+    let found = scan_dir(&dir).unwrap();
+    let storage = CountingStorage(std::sync::atomic::AtomicUsize::new(0));
+    let first = found.credentials("T1", &storage).unwrap();
+    assert_eq!(storage.asked(), 1, "the first sign-in reads the cookie: one prompt");
+    // The next sign-in to the same workspace, with what the first one kept.
+    let again = found.reuse("T1", Some(first.clone())).expect("the same session");
+    assert_eq!((again.token(), again.cookie()), (first.token(), first.cookie()));
+    assert_eq!(storage.asked(), 1, "no second prompt");
+    // Kept from another session (the app signed in again since), another team, or nothing kept.
+    let older = Credentials::new("fake-c-older", first.cookie());
+    assert!(found.reuse("T1", Some(older)).is_none());
+    assert!(found.reuse("T2", Some(first.clone())).is_none());
+    assert!(found.reuse("T404", Some(first)).is_none());
+    assert!(found.reuse("T1", None).is_none());
+    std::fs::remove_dir_all(&dir).ok();
+}

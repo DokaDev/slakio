@@ -156,6 +156,14 @@ impl Found {
         &self.workspaces
     }
 
+    /// `kept` — the credentials an earlier sign-in kept for `team` — when they are still this
+    /// desktop session's: the app holds the very token they have. Then signing in again needs
+    /// no cookie from the app, so the Safe Storage key (and the keychain prompt) is not asked
+    /// for; nothing is read here. `None` otherwise.
+    pub fn reuse(&self, team: &str, kept: Option<Credentials>) -> Option<Credentials> {
+        kept.filter(|k| self.tokens.get(team).is_some_and(|t| t.as_str() == k.token()))
+    }
+
     /// The credentials for `team` using this platform's own Safe Storage (the macOS keychain,
     /// which may prompt). The cross-platform entry point for the binary; non-macOS returns
     /// [`DesktopError::NotSupported`].

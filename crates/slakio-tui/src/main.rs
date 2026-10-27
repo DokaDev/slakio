@@ -293,11 +293,33 @@ impl Wiring {
         let found = self.desktop.clone().ok_or(Label::SigninDesktopFailed)?;
         let ws = found.workspaces().iter().find(|w| w.team == team).ok_or(Label::SigninDesktopFailed)?;
         let host = ws.host.clone();
+        // Signed in from this same desktop session before: what was kept is used, without the
+        // app's cookie (so without the Safe Storage prompt). Only when Slack no longer accepts
+        // it is the cookie read.
+        if let Some(kept) = found.reuse(&team, self.kept(&team).await) {
+            match self.clone().finish(kept, host.clone()).await {
+                Err(Label::SigninRefused) => {}
+                done => return done,
+            }
+        }
         let creds = tokio::task::spawn_blocking(move || found.system_credentials(&team))
             .await
             .map_err(|_| Label::SigninDesktopFailed)?
             .map_err(words::desktop_label)?;
         self.finish(creds, host).await
+    }
+
+    /// The credentials kept for `team` by an earlier sign-in, when the workspaces file names it
+    /// (the keychain may ask, off the loop's thread).
+    async fn kept(&self, team: &str) -> Option<Credentials> {
+        let (path, store, team) = (self.workspaces.clone()?, Arc::clone(&self.store), team.to_string());
+        tokio::task::spawn_blocking(move || {
+            let a = account::load(&path).ok()?.into_iter().find(|a| a.team == team)?;
+            account::credentials(&*store, &a).ok().flatten()
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     /// Check `credentials` for the workspace at `host` with one `client.userBoot` and keep them
