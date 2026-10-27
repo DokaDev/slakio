@@ -6,5 +6,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 out=${1:-THIRD-PARTY-NOTICES.html}
+if ! cargo about --version >/dev/null 2>&1; then
+  echo "third-party-notices: cargo-about is not installed (cargo install --locked cargo-about --version 0.9.2 --features cli)" >&2
+  exit 1
+fi
 cargo about generate --manifest-path crates/slakio-tui/Cargo.toml --locked --fail about.hbs > "$out"
 echo "wrote $out"
