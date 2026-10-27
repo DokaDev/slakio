@@ -38,10 +38,10 @@ use std::time::Instant;
 fn main() -> ExitCode {
     let mut stats = stats::Stats::from_env();
     // `login`: sign in first; `logout`: sign out and end.
-    let (cli_config, demo, offline, login, logout) = match parse_args(std::env::args_os().skip(1)) {
-        Ok(Cli::Run { config, demo, offline }) => (config, demo, offline, false, false),
-        Ok(Cli::Login { config, offline }) => (config, false, offline, true, false),
-        Ok(Cli::Logout) => (None, false, false, false, true),
+    let (cli_config, demo, offline, login, logout, paste) = match parse_args(std::env::args_os().skip(1)) {
+        Ok(Cli::Run { config, demo, offline }) => (config, demo, offline, false, false, false),
+        Ok(Cli::Login { config, offline, paste }) => (config, false, offline, true, false, paste),
+        Ok(Cli::Logout) => (None, false, false, false, true, false),
         Ok(Cli::Help) => {
             print!("{HELP}");
             return ExitCode::SUCCESS;
@@ -57,14 +57,21 @@ fn main() -> ExitCode {
     };
     // Before anything else: which credential store this process may touch. A value that would
     // not be understood stops the program here, never later.
-    let store: Arc<dyn SecretStore> = match StoreKind::from_env(std::env::var(STORE_ENV).ok().as_deref()) {
-        Ok(StoreKind::Keychain) => Arc::new(slakio_auth::keychain::Keychain),
-        Ok(StoreKind::Memory) => Arc::new(MemoryStore::new()),
+    let store_kind = match StoreKind::from_env(std::env::var(STORE_ENV).ok().as_deref()) {
+        Ok(k) => k,
         Err(e) => {
             eprintln!("{e}");
             return ExitCode::from(2);
         }
     };
+    let store: Arc<dyn SecretStore> = match store_kind {
+        StoreKind::Keychain => Arc::new(slakio_auth::keychain::Keychain),
+        StoreKind::Memory => Arc::new(MemoryStore::new()),
+    };
+    // The desktop-app import touches the real Slack profile and keychain, so it is attempted only
+    // under the real keychain store (never a `memory` development or test run), and never with
+    // `--paste`.
+    let desktop_ok = store_kind == StoreKind::Keychain && !paste;
     let paths = Paths::from_env();
     let config_path = cli_config.or_else(|| paths.config_file());
     let (cfg, cfg_err) = config::load(config_path.as_deref());
@@ -125,7 +132,7 @@ fn main() -> ExitCode {
         }
     };
     if let Some(why) = sign_in {
-        app.offer_sign_in(why);
+        offer_sign_in_screen(&mut app, desktop_ok, why);
     }
     let capabilities = kind.as_ref().map(|k| match k {
         BackendKind::Demo(b) => b.capabilities(),
@@ -247,22 +254,40 @@ impl Wiring {
     async fn sign_in(self, text: Pasted) -> Result<SignedIn, Label> {
         let pasted = slakio_auth::parse(&text.0).map_err(paste_label)?;
         drop(text);
-        let endpoints = self.endpoints(&pasted.host).ok_or(Label::SigninNotWorkspace)?;
-        let client =
-            slakio_slack::Client::new(pasted.credentials.clone(), endpoints.clone(), Arc::clone(&self.governor));
+        self.finish(pasted.credentials, pasted.host).await
+    }
+
+    /// Sign in with the desktop workspace at `index` of the picker: read its credentials (the
+    /// macOS keychain may prompt, off the loop's thread), then check and keep them. The scan is
+    /// repeated here (it is deterministic and raises no prompt) so no secret is held meanwhile.
+    async fn sign_in_desktop(self, index: usize) -> Result<SignedIn, Label> {
+        let found = tokio::task::spawn_blocking(slakio_auth::desktop::scan)
+            .await
+            .map_err(|_| Label::SigninDesktopFailed)?
+            .map_err(desktop_label)?;
+        let ws = found.workspaces().get(index).ok_or(Label::SigninDesktopFailed)?;
+        let (team, host) = (ws.team.clone(), ws.host.clone());
+        let creds = tokio::task::spawn_blocking(move || found.system_credentials(&team))
+            .await
+            .map_err(|_| Label::SigninDesktopFailed)?
+            .map_err(desktop_label)?;
+        self.finish(creds, host).await
+    }
+
+    /// Check `credentials` for the workspace at `host` with one `client.userBoot` and keep them
+    /// if Slack accepts; the words for why not otherwise. Nothing is kept unless Slack accepted.
+    async fn finish(self, credentials: Credentials, host: String) -> Result<SignedIn, Label> {
+        let endpoints = self.endpoints(&host).ok_or(Label::SigninNotWorkspace)?;
+        let client = slakio_slack::Client::new(credentials.clone(), endpoints.clone(), Arc::clone(&self.governor));
         let who = login::check(&client).await.map_err(|e| {
             self.record(&slakio_core::fault::Fault::other(e.detail()));
             check_label(&e)
         })?;
-        let account = Account {
-            name: who.team_name.unwrap_or_else(|| who.team.clone()),
-            team: who.team,
-            host: pasted.host,
-            user: who.user,
-        };
+        let account =
+            Account { name: who.team_name.unwrap_or_else(|| who.team.clone()), team: who.team, host, user: who.user };
         let path = self.workspaces.clone().ok_or(Label::SigninStoreFailed)?;
         // The keychain can ask the user (a window of macOS): off the loop's thread.
-        let (store, kept, credentials) = (Arc::clone(&self.store), account.clone(), pasted.credentials);
+        let (store, kept) = (Arc::clone(&self.store), account.clone());
         let creds = credentials.clone();
         let stored = tokio::task::spawn_blocking(move || account::keep(&*store, &path, &kept, &creds)).await;
         match stored {
@@ -277,6 +302,35 @@ impl Wiring {
 
     fn record(&self, fault: &slakio_core::fault::Fault) {
         ErrorLog::new(self.errors.clone()).record("signin", fault);
+    }
+}
+
+/// Offer signing in: when the real keychain is in use and nothing failed yet, try the Slack
+/// desktop app first and show its workspaces as a picker; otherwise (or when it finds nothing)
+/// fall back to the paste screen, with a short reason.
+fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) {
+    use slakio_auth::DesktopError;
+    if why.is_some() || !desktop_ok {
+        app.offer_sign_in(why);
+        return;
+    }
+    match slakio_auth::desktop::scan() {
+        Ok(found) => app.offer_desktop(found.workspaces().iter().map(|w| shown(&w.name)).collect()),
+        Err(DesktopError::NotSupported) => app.offer_sign_in(Some(Label::SigninDesktopUnsupported)),
+        Err(e) if e.is_absent() => app.offer_sign_in(Some(Label::SigninDesktopMissing)),
+        Err(_) => app.offer_sign_in(Some(Label::SigninDesktopFailed)),
+    }
+}
+
+/// The words for a desktop import that could not sign in.
+fn desktop_label(e: slakio_auth::DesktopError) -> Label {
+    use slakio_auth::DesktopError;
+    match e {
+        DesktopError::NotSupported => Label::SigninDesktopUnsupported,
+        DesktopError::NoSecretService => Label::SigninDesktopKeychain,
+        DesktopError::CookieLocked => Label::SigninDesktopLocked,
+        _ if e.is_absent() => Label::SigninDesktopMissing,
+        _ => Label::SigninDesktopFailed,
     }
 }
 
@@ -423,6 +477,7 @@ async fn run(
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
                 Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in(pasted))),
+                Effect::DesktopPick(index) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop(index))),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

@@ -3,14 +3,25 @@
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use ratatui::crossterm::event::Event;
+use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{Label, Lang};
-use slakio_tui::app::signin::{Pasted, SignIn};
+use slakio_tui::app::signin::{Pasted, Picker, SignIn};
 use slakio_tui::app::{App, Effect};
 use slakio_tui::theme::Theme;
 use slakio_tui::ui;
 use std::time::Instant;
+
+/// Send one key press to the app.
+fn key(app: &mut App, code: KeyCode) {
+    app.handle_event(Event::Key(KeyEvent::new(code, KeyModifiers::NONE)), Instant::now());
+}
+
+fn picker() -> App {
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_desktop(vec!["Alpha".into(), "Beta".into(), "Gamma".into()]);
+    app
+}
 
 /// A synthetic secret-shaped string (spelled in parts so no file holds a token-shaped one).
 const SECRET: &str = concat!("xo", "xc-1-2-SECRETVALUE");
@@ -111,4 +122,54 @@ fn the_screen_waits_for_the_paste_and_says_how() {
             assert_eq!(next.find(|c: char| c != ' '), Some(at + 3), "hanging indent at {w}: {shown}");
         }
     }
+}
+
+#[test]
+fn the_desktop_picker_lists_the_workspaces() {
+    let now = Instant::now();
+    let app = picker();
+    let shown = screen(&app, 100, 30, now);
+    assert!(shown.contains("Sign in from the Slack desktop app"), "{shown}");
+    assert!(shown.contains("Alpha") && shown.contains("Beta") && shown.contains("Gamma"), "{shown}");
+    assert!(shown.contains("> Alpha"), "the first is under the cursor: {shown}");
+    insta::assert_snapshot!("signin_desktop_100x30", shown);
+}
+
+#[test]
+fn the_cursor_moves_and_enter_picks_the_selected_workspace() {
+    let mut app = picker();
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Down);
+    assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 2, .. }))));
+    key(&mut app, KeyCode::Char('k'));
+    assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 1, .. }))));
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(1)]);
+    assert!(matches!(app.sign_in(), Some(SignIn::DesktopChecking(_))));
+    assert!(screen(&app, 100, 30, Instant::now()).contains("Checking the sign-in"));
+}
+
+#[test]
+fn p_falls_back_to_the_paste_flow() {
+    let mut app = picker();
+    key(&mut app, KeyCode::Char('p'));
+    assert_eq!(app.sign_in(), Some(SignIn::Waiting));
+    assert!(app.take_effects().is_empty());
+    assert!(screen(&app, 100, 30, Instant::now()).contains("Copy > Copy as cURL"));
+}
+
+#[test]
+fn a_failed_pick_returns_to_the_picker_with_the_reason() {
+    let mut app = picker();
+    key(&mut app, KeyCode::Enter);
+    let _ = app.take_effects();
+    app.sign_in_failed(Label::SigninDesktopKeychain);
+    match app.sign_in() {
+        Some(SignIn::Desktop(p)) => {
+            assert_eq!(p.selected, 0);
+            assert_eq!(p.note, Some(Label::SigninDesktopKeychain));
+        }
+        other => panic!("expected the picker again, got {other:?}"),
+    }
+    assert!(screen(&app, 100, 30, Instant::now()).contains("Could not read the Slack app"));
 }

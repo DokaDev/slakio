@@ -279,8 +279,7 @@ impl App {
     /// Handle a terminal event at `now`. `true` when the screen may have changed.
     pub fn handle_event(&mut self, ev: Event, now: Instant) -> bool {
         match ev {
-            // Release and repeat events are reported only with the kitty flags this app never
-            // asks for; a press is what counts.
+            // Release and repeat events come only with kitty flags this app never asks for; a press counts.
             Event::Key(k) if k.kind == KeyEventKind::Press => {
                 let key = KeyChord::from_event(&k);
                 // Outside text input, Hangul typed with a Korean input source means the QWERTY
@@ -394,6 +393,7 @@ impl App {
                 }
                 h.cursor = 0;
             }
+            Ctx::Root => _ = self.sign_in_key(key),
             _ => {}
         }
     }

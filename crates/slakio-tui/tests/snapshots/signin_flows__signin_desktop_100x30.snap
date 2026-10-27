@@ -1,0 +1,34 @@
+---
+source: crates/slakio-tui/tests/signin_flows.rs
+expression: shown
+---
+
+
+
+
+
+            Sign in from the Slack desktop app
+
+            The Slack app on this Mac is signed in to these workspaces. Pick one:
+
+            > Alpha
+              Beta
+              Gamma
+
+            Up/Down or j/k to choose, Enter to sign in, p to paste a browser request
+            instead.
+
+            macOS will ask whether slakio may use the "Slack Safe Storage" key: choose
+            Allow. slakio reads the Slack app's files and changes nothing; the sign-in
+            goes to the macOS Keychain.
+
+            Ctrl+Q  Quit
+            ?       Keyboard help
+
+
+
+
+
+
+
+ NORMAL                                           │ Cmd+V paste · Ctrl+Q quit · ? help · : commands

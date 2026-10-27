@@ -22,10 +22,18 @@ fn options() {
 
 #[test]
 fn login_and_logout() {
-    assert_eq!(parse(&["login"]), Ok(Cli::Login { config: None, offline: false }));
-    assert_eq!(parse(&["--offline", "login"]), Ok(Cli::Login { config: None, offline: true }));
+    assert_eq!(parse(&["login"]), Ok(Cli::Login { config: None, offline: false, paste: false }));
+    assert_eq!(parse(&["--offline", "login"]), Ok(Cli::Login { config: None, offline: true, paste: false }));
+    assert_eq!(parse(&["login", "--paste"]), Ok(Cli::Login { config: None, offline: false, paste: true }));
     assert_eq!(parse(&["logout"]), Ok(Cli::Logout));
-    for args in [&["login", "--demo"][..], &["logout", "--offline"], &["login", "logout"], &["login", "x"]] {
+    for args in [
+        &["login", "--demo"][..],
+        &["logout", "--offline"],
+        &["login", "logout"],
+        &["login", "x"],
+        &["--paste"],
+        &["logout", "--paste"],
+    ] {
         assert!(parse(args).unwrap_err().contains("usage: slakio"), "{args:?}");
     }
 }
