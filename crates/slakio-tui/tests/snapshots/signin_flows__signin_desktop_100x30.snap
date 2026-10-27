@@ -18,13 +18,13 @@ expression: shown
             Up/Down or j/k to choose, Enter to sign in, p to paste a browser request
             instead.
 
-            macOS will ask whether slakio may use the "Slack Safe Storage" key: choose
-            Allow. slakio reads the Slack app's files and changes nothing; the sign-in
-            goes to the macOS Keychain.
+            macOS will ask whether "security" may use the "Slack Safe Storage" key:
+            choose Allow, not Always Allow (that would let any program read the key
+            without asking). slakio reads the Slack app's files and changes nothing; the
+            sign-in goes to the macOS Keychain.
 
             Ctrl+Q  Quit
             ?       Keyboard help
-
 
 
 

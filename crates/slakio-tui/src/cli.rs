@@ -22,13 +22,13 @@ usage: slakio [--demo] [--offline] [--config <path>]
   -V, --version      show the version
 
 signing in: on macOS, `slakio login` first offers the workspaces the Slack
-desktop app is signed in to; pick one and allow the \"Slack Safe Storage\"
-keychain prompt. If the app is not found (or on Linux/Windows), or with
-`slakio login --paste`, sign in by pasting a request instead: open your
-workspace in a browser, open the developer tools (Network tab), reload,
-right-click any request to /api/ and choose Copy > Copy as cURL, then run
-`slakio login` and paste it (or `pbpaste | slakio login`). The token and
-cookies go to the macOS Keychain.
+desktop app is signed in to; pick one and answer the \"Slack Safe Storage\"
+keychain prompt with Allow (not Always Allow). If the app is not found (or
+on Linux/Windows), or with `slakio login --paste`, sign in by pasting a
+request instead: open your workspace in a browser, open the developer
+tools (Network tab), reload, right-click any request to /api/ and choose
+Copy > Copy as cURL, then run `slakio login --paste` and paste it (or
+`pbpaste | slakio login`). The token and cookies go to the macOS Keychain.
 
 environment:
   SLAKIO_SECRET_STORE=memory   keep credentials in memory only, never touch the OS

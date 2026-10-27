@@ -414,7 +414,7 @@
 "signin.desktop_title" = "Sign in from the Slack desktop app"
 "signin.desktop_found" = "The Slack app on this Mac is signed in to these workspaces. Pick one:"
 "signin.desktop_keys" = "Up/Down or j/k to choose, Enter to sign in, p to paste a browser request instead."
-"signin.desktop_note" = "macOS will ask whether slakio may use the \"Slack Safe Storage\" key: choose Allow. slakio reads the Slack app's files and changes nothing; the sign-in goes to the macOS Keychain."
+"signin.desktop_note" = "macOS will ask whether \"security\" may use the \"Slack Safe Storage\" key: choose Allow, not Always Allow (that would let any program read the key without asking). slakio reads the Slack app's files and changes nothing; the sign-in goes to the macOS Keychain."
 "signin.desktop_missing" = "The Slack desktop app was not found on this Mac, or is not signed in. Sign in by pasting a request instead."
 "signin.desktop_unsupported" = "Signing in from the Slack desktop app works on macOS only for now. Sign in by pasting a request instead."
 "signin.desktop_keychain" = "Could not read the Slack app's key from the keychain (was the prompt declined?). Run slakio login again to retry, or paste a request instead."

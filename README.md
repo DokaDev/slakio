@@ -144,8 +144,9 @@ read-only requests to your workspace.
 ### From the Slack desktop app (macOS)
 
 If you use the Slack desktop app, run `slakio login`: it lists the workspaces the app is signed
-in to, you pick one, and macOS asks whether slakio may use the **"Slack Safe Storage"** key —
-choose **Allow**. slakio reads the app's files (its cookie database and its stored session
+in to, you pick one, and macOS asks whether `security` (the system tool slakio reads the key
+with) may use the **"Slack Safe Storage"** key — choose **Allow**, not **Always Allow** (that
+would let any program on the Mac read the key without asking). slakio reads the app's files (its cookie database and its stored session
 tokens) and changes nothing; it never contacts Slack except the one request that checks the
 sign-in. The desktop app may keep running. This reads the app's own data only when you run
 `slakio login`; a development run (`SLAKIO_SECRET_STORE=memory`) never touches it.
@@ -164,8 +165,8 @@ Either way, slakio checks the session token and the `d` cookie (and `d-s`) with 
 Slack, shows the workspace's name and stores them in the **macOS Keychain** (the first time, and
 after an update, macOS asks whether slakio may use the entry). `workspaces.toml` next to the
 config file names the workspace and holds no secret. `slakio logout` removes both. If Slack
-signs the session out, slakio says "run slakio login" and you sign in again. This release still
-uses **one** active workspace even when you have several; the rest are kept for a later version.
+signs the session out, slakio says "run slakio login" and you sign in again. This release
+signs in to **one** workspace even when the app has several; signing in to another replaces it.
 
 The desktop-app import is adapted from the open-source client
 [gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.

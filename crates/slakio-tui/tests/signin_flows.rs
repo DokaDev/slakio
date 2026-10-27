@@ -132,6 +132,9 @@ fn the_desktop_picker_lists_the_workspaces() {
     assert!(shown.contains("Sign in from the Slack desktop app"), "{shown}");
     assert!(shown.contains("Alpha") && shown.contains("Beta") && shown.contains("Gamma"), "{shown}");
     assert!(shown.contains("> Alpha"), "the first is under the cursor: {shown}");
+    // The prompt is raised by `security`; Always Allow would let any program read the key.
+    let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("\"security\"") && flat.contains("choose Allow, not Always Allow"), "{shown}");
     insta::assert_snapshot!("signin_desktop_100x30", shown);
 }
 
