@@ -86,9 +86,10 @@ pub fn parse(text: &str) -> Result<Pasted, PasteError> {
     // The Windows `cmd` copy escapes with carets (`^"`, `^%`, `^&`, `^^`).
     let text = if text.contains("^\"") { uncaret(text) } else { text.to_string() };
     let host = address(&text)?;
-    let token = one(values(&text, TOKEN_PREFIX, is_token_char), PasteError::NoToken)?;
+    let mut steps = 0;
+    let token = one(values(&text, TOKEN_PREFIX, is_token_char, &mut steps)?, PasteError::NoToken)?;
     let cookie = one(
-        values(&text, COOKIE_PREFIX, is_cookie_char).into_iter().map(|v| wire(&v)).collect(),
+        values(&text, COOKIE_PREFIX, is_cookie_char, &mut steps)?.into_iter().map(|v| wire(&v)).collect(),
         PasteError::NoCookie,
     )?;
     let mut credentials = Credentials::new(token, cookie);
@@ -166,22 +167,42 @@ fn is_cookie_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '%' | '-' | '_' | '.' | '~' | '/' | '+' | '=')
 }
 
+/// How many distinct values of one kind a copy may hold before it is not one request's.
+const CANDIDATES_MAX: usize = 8;
+
+/// The longest value read; a longer run is not a token or a cookie.
+const VALUE_MAX: usize = 4096;
+
 /// Every distinct value in `text` that starts with `prefix`, as far as `keep` holds, in order;
-/// one too short to be real is left out.
-fn values(text: &str, prefix: &str, keep: fn(char) -> bool) -> Vec<String> {
+/// one too short or too long to be real is left out. One pass: the scan goes on after each
+/// value, never back into it. More than [`CANDIDATES_MAX`] distinct values are
+/// [`PasteError::Ambiguous`]. `steps` counts the characters looked at.
+fn values(text: &str, prefix: &str, keep: fn(char) -> bool, steps: &mut usize) -> Result<Vec<String>, PasteError> {
     let mut out: Vec<String> = Vec::new();
-    for (i, _) in text.match_indices(prefix) {
-        let rest = &text[i + prefix.len()..];
-        let end = rest.find(|c: char| !keep(c)).unwrap_or(rest.len());
-        if end < 8 {
+    let mut at = 0;
+    while let Some(found) = text[at..].find(prefix) {
+        let start = at + found + prefix.len();
+        let rest = &text[start..];
+        let end = rest
+            .find(|c: char| {
+                *steps += 1;
+                !keep(c)
+            })
+            .unwrap_or(rest.len());
+        *steps += found + prefix.len();
+        at = start + end;
+        if !(8..=VALUE_MAX).contains(&end) {
             continue;
         }
         let value = format!("{prefix}{}", &rest[..end]);
         if !out.contains(&value) {
+            if out.len() == CANDIDATES_MAX {
+                return Err(PasteError::Ambiguous);
+            }
             out.push(value);
         }
     }
-    out
+    Ok(out)
 }
 
 /// A `d` cookie value as browsers send it: percent-encoded (a copy that decoded it is encoded

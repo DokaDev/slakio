@@ -175,3 +175,33 @@ proptest! {
         prop_assert!(!said.contains(&t) && !said.contains(&d), "{}", said);
     }
 }
+
+/// The characters the value scans look at for `text` (both prefixes).
+fn steps(text: &str) -> usize {
+    let mut n = 0;
+    let _ = values(text, TOKEN_PREFIX, is_token_char, &mut n);
+    let _ = values(text, COOKIE_PREFIX, is_cookie_char, &mut n);
+    n
+}
+
+#[test]
+fn a_hostile_paste_is_read_in_one_pass() {
+    // The prefixes over and over (every one a candidate whose value runs to the end), and
+    // many short distinct candidates: the work stays a few steps per character.
+    for text in [
+        TOKEN_PREFIX.repeat(PASTE_MAX / TOKEN_PREFIX.len()),
+        COOKIE_PREFIX.repeat(PASTE_MAX / COOKIE_PREFIX.len()),
+        (0..20_000).map(|i| format!("{TOKEN_PREFIX}{i:08} ")).collect::<String>(),
+    ] {
+        let n = steps(&text);
+        assert!(n <= 2 * text.len(), "{n} steps for {} characters", text.len());
+        assert!(parse(&text).is_err());
+    }
+}
+
+#[test]
+fn many_candidates_are_ambiguous() {
+    let text = (0..100).map(|i| format!("{} ", token(&format!("{i:08}")))).collect::<String>();
+    let text = format!("{} {text}", firefox(&token("1-2-3-abcdefgh"), &cookie("abcdefghij"), None));
+    assert_eq!(parse(&text), Err(PasteError::Ambiguous));
+}
