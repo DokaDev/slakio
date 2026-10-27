@@ -10,12 +10,13 @@ unless it says so.
 |---|---|---|
 | `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), the terminal-escape sanitiser, paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
 | `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
-| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core` |
+| `slakio-slack` | the Slack transport and backend, read-only by construction: the method allowlist, requests in the official web client's format, tolerant decoding, errors as data, the process-wide request cap, in-flight limit and kill switch (see [the Slack transport](#the-slack-transport)) | `slakio-core` |
+| `slakio-fake` | an in-process fake Slack server for the tests, seeded by `slakio-world`; it logs every request as received | `slakio-core`, `slakio-world` (dev-dependency only) |
+| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core`; `slakio-slack` in the binary's wiring only |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
 
-Planned crates join with the step that needs them: `slakio-slack` (the Slack adapter), `slakio-auth`
-(sign-in), `slakio-store` (the local cache), `slakio-fake` (a fake Slack server, tests only)
-and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
+Planned crates join with the step that needs them: `slakio-auth` (sign-in), `slakio-store` (the
+local cache) and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
 
 ### Dependency rules
 
@@ -27,8 +28,13 @@ tui -> core <- slack, auth, store, world
   (ratatui, crossterm, tokio's network parts, HTTP or websocket clients, rusqlite).
 - Adapters (`slack`, `auth`, `store`, `world`) depend only on `slakio-core`, never on each
   other or on `slakio-tui`.
-- The concrete adapter types appear in one wiring file of `slakio-tui`.
-- `slakio-fake` is only ever a dev-dependency.
+- `slakio-auth` never depends on `slakio-slack`, nor the reverse: sign-in yields a core
+  `Credentials` value and the binary hands it to the transport.
+- The concrete adapter types appear in one wiring file of `slakio-tui` (`src/main.rs`, checked:
+  no other file of the crate names `slakio_slack`); the UI reaches a backend only through the
+  core's protocol and `Capabilities`.
+- `slakio-fake` is only ever a dev-dependency, and depends on `slakio-core` and `slakio-world`
+  only.
 
 CI checks these with `cargo tree` (`.github/scripts/dependency-direction.sh`).
 
@@ -136,6 +142,43 @@ arrives; the composer sanitises what is typed or pasted into it.
 - **Failures as data.** Core never words a failure: a `Fault` has a kind the UI turns into a
   catalog message and a raw detail that only goes to `<state>/errors.log`. The status line never
   shows OS or parser text.
+
+## The Slack transport
+
+`slakio-slack` is the only crate that may talk to Slack. It is read-only by construction, and
+every rail sits in the transport, below the backend, so no caller can go around it:
+
+1. **Allowlist.** A request is built from a `Method`, an enum of read-only methods
+   (`client.userBoot`, `client.counts`, `client.shouldReload`, `conversations.view` / `history` /
+   `replies` / `info`, `users.info`, `users.prefs.get`, `users.channelSections.list`,
+   `emoji.list`, `stars.list`, `usergroups.list`, `dnd.info`, `dnd.teamInfo`, and the edge
+   cache's `channels/info` and `users/info`). A name that comes in as text is refused
+   (`ReadOnly`) before anything is counted or sent. No write, and no directory listing
+   (`users.list`, `conversations.list`), is on it.
+2. **Kill switch.** `SLAKIO_NETWORK=off` or `network = "off"` in the config file: nothing is
+   sent. A value of the variable that is not `on` or `off` stops the program (exit code 2).
+   `Governor::stop` turns it off while running and ends what is in flight.
+3. **Request cap**, for the whole process: 120 requests a minute, of which background work
+   (counts, lookups) may use 90, so what the user waits for always has room; 5,000 for a run,
+   after which all network stops until the program starts again. Over the cap a request fails
+   with `CapReached` and is not sent.
+4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
+   `Busy`.
+5. **Format.** Requests look like the official web client's (the browser's header set in its
+   order, no `Referer`, the token in the form body and never in a header, the client's `_x_*`
+   parameters in its order; an edge lookup is sorted JSON as text). Golden tests hold the exact
+   requests.
+6. **Answers.** Slack's JSON is decoded tolerantly (unknown fields ignored, every field but an id
+   optional, an unreadable list entry left out). `ok: false` and HTTP statuses map to the core's
+   `FailKind` (`Auth`, `RateLimited { retry_after }`, `Network`, `Offline`, `Busy`, `CapReached`,
+   `Api { code }`); the error log gets the method, the code or the status, never a body, a token
+   or a message.
+
+The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
+is refused before any request, and a newer page of the same conversation supersedes one in
+flight. This version reaches a server on the loopback address only (it has no TLS): the binary
+names the Slack backend but nothing selects it until sign-in exists, and the tests run it
+against `slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
 
 ## Keys
 

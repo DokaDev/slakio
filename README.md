@@ -184,6 +184,7 @@ icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / f
 avatars = "initials"     # a person's initials on a colored chip, or "off"
 density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
 nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" (`Space v` switches)
+network = "on"           # "off": nothing is ever sent to Slack (also SLAKIO_NETWORK=off)
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
@@ -195,6 +196,10 @@ initials until then. With `icons = "ask"`, `slakio
 --demo` asks once whether your font shows the icons (the view switcher previews the answer) and saves
 the answer in the config file; `:icons on|off` changes it later. `rail_expand`, a setting of the
 left rail (later the top bar, now the view switcher), is ignored (the status line says it can be removed).
+
+`network = "off"` (or `SLAKIO_NETWORK=off` in the environment) is a kill switch for the coming
+Slack connection: with either set, slakio sends nothing at all. This version does not connect
+to Slack in any case.
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.
