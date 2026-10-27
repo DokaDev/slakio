@@ -339,6 +339,7 @@
 "fail.rate_limited" = "Slack이 요청을 늦춰 달라고 했습니다: 잠시 후 다시 시도하세요"
 "fail.cap_reached" = "요청 한도에 도달했습니다: 잠시 후 다시 시도하세요"
 "fail.offline" = "오프라인: 아무것도 보내지 않았습니다"
+"fail.busy" = "처리 중: 보내지 않았습니다, 다시 시도하세요"
 "hint.todo_done" = "완료"
 "hint.todo_save" = "저장됨으로"
 "hint.todo_back" = "할 일로"

@@ -74,5 +74,6 @@ pub(super) fn failure(kind: FailKind) -> Label {
         FailKind::RateLimited => Label::FailRateLimited,
         FailKind::CapReached => Label::FailCapReached,
         FailKind::Offline => Label::FailOffline,
+        FailKind::Busy => Label::FailBusy,
     }
 }

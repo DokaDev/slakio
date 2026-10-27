@@ -137,6 +137,8 @@ pub enum FailKind {
     CapReached,
     /// No connection, or the backend is gone.
     Offline,
+    /// The backend has more requests waiting than it takes: nothing was sent; try again.
+    Busy,
 }
 
 /// An event with the generation of the request it answers.
@@ -205,12 +207,9 @@ impl BackendHandle {
             return Err(refused);
         }
         let id = request.id;
-        self.tx.try_send(request).map_err(|e| {
-            let detail = match e {
-                mpsc::error::TrySendError::Full(_) => "backend queue full",
-                mpsc::error::TrySendError::Closed(_) => "backend gone",
-            };
-            Envelope::failed(id, FailKind::Offline, detail)
+        self.tx.try_send(request).map_err(|e| match e {
+            mpsc::error::TrySendError::Full(_) => Envelope::failed(id, FailKind::Busy, "backend queue full"),
+            mpsc::error::TrySendError::Closed(_) => Envelope::failed(id, FailKind::Offline, "backend gone"),
         })
     }
 }

@@ -28,3 +28,15 @@ fn only_a_change_is_refused_and_every_command_is_classified() {
     assert!(Command::Save { item: SavedId::new("S1"), change: SavedChange::Clear }.changes());
     assert!(!Command::Boot.changes());
 }
+
+#[test]
+fn a_full_queue_is_busy_and_a_gone_backend_offline() {
+    let caps = Capabilities { demo: false, read_only: false };
+    let (handle, end) = BackendHandle::pair(caps, 1);
+    assert!(handle.send(request(Command::Boot)).is_ok());
+    let full = handle.send(request(Command::Boot)).expect_err("no room");
+    assert!(matches!(full.event, Event::Failed { kind: FailKind::Busy, .. }), "{full:?}");
+    drop(end);
+    let gone = handle.send(request(Command::Boot)).expect_err("gone");
+    assert!(matches!(gone.event, Event::Failed { kind: FailKind::Offline, .. }), "{gone:?}");
+}
