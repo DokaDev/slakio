@@ -79,7 +79,10 @@ builds and checks everything and publishes nothing.
 2. Once CI passed on that commit, tag it `v<version>` and push the tag
    (`git tag -a v0.0.2 -m "slakio 0.0.2" && git push origin v0.0.2`).
 
-The workflow fails unless the tag is exactly `v` and the workspace version. It builds the
+The workflow first waits for the CI run on main for the tagged commit and stops unless the
+commit is on main and every CI job passed (`.github/scripts/release-ci-gate.sh`; re-run the
+failed CI jobs, then the release's). It fails unless the tag is exactly `v` and the workspace
+version. It builds the
 archives (macOS and Linux, arm64 and x86_64; Windows x86_64), installs and tests the Homebrew
 formula from them, publishes the GitHub release with generated notes, then updates
 `Formula/slakio.rb` in [DokaDev/homebrew-tap](https://github.com/DokaDev/homebrew-tap) over

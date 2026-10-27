@@ -5,11 +5,13 @@ name: Release
 # GitHub's generated notes) and updates the formula in the tap. A `vX.Y.0-rc.N` tag is always a
 # pre-release on GitHub; whether it also updates the tap depends on whether a stable release
 # exists yet (.github/scripts/release-tap-eligible.sh). The tag must be the workspace version
-# (.github/scripts/release-version.sh).
+# (.github/scripts/release-version.sh). Before anything else, a tag waits for the CI run on main
+# for its commit and stops unless the commit is on main and every CI job passed
+# (.github/scripts/release-ci-gate.sh).
 #
 # A change to the release files (pushed to main or in a pull request) or a manual run is a dry
-# run: it builds, packs and installs everything and publishes nothing. A tag run stops in its
-# first job, before building anything, unless the repository has the `HOMEBREW_TAP_DEPLOY_KEY`
+# run: it builds, packs and installs everything and publishes nothing (and skips that wait). A
+# tag run stops before building anything unless the repository has the `HOMEBREW_TAP_DEPLOY_KEY`
 # secret: nothing can be published half way.
 on:
   push:
@@ -45,8 +47,29 @@ defaults:
     shell: bash
 
 jobs:
+  # Every other job depends on this one, so nothing is built or published for a tag whose CI
+  # failed. It passes straight away for a pull request, a push to main or a manual run.
+  gate:
+    name: CI passed on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Wait for CI on main
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          TIMEOUT: "2400"
+        run: bash .github/scripts/release-ci-gate.sh
+
   plan:
     name: version
+    needs: gate
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -79,6 +102,7 @@ jobs:
   # every target).
   notices:
     name: third-party notices
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
