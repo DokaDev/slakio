@@ -70,22 +70,21 @@ budgets (`docs/perf.md`).
 
 ## Releases
 
-There is no release yet. `.github/workflows/release.yml` builds and checks the release
-archives and the Homebrew formula on every change to the release files and on a manual run,
-without publishing anything. Publishing needs a `v<version>` tag and the
-`HOMEBREW_TAP_DEPLOY_KEY` repository secret; without the secret a tag run stops before building
-anything.
+Maintainers release by pushing a tag; `.github/workflows/release.yml` does the rest. A change
+to the release files (pushed to main or in a pull request) or a manual run is a dry run that
+builds and checks everything and publishes nothing.
 
-When releases start:
-
-1. Set `version` in `[workspace.package]` of `Cargo.toml`, run `cargo build` so that
-   `Cargo.lock` follows, and merge that change.
-2. Tag that commit `v<version>` and push the tag.
+1. Set `version` in `[workspace.package]` of `Cargo.toml` (see "Versioning" in the README),
+   run `cargo build` so that `Cargo.lock` follows, and push that change to main.
+2. Once CI passed on that commit, tag it `v<version>` and push the tag
+   (`git tag -a v0.0.2 -m "slakio 0.0.2" && git push origin v0.0.2`).
 
 The workflow fails unless the tag is exactly `v` and the workspace version. It builds the
 archives (macOS and Linux, arm64 and x86_64; Windows x86_64), installs and tests the Homebrew
-formula from them, publishes the GitHub release, then updates `Formula/slakio.rb` in
-[DokaDev/homebrew-tap](https://github.com/DokaDev/homebrew-tap).
+formula from them, publishes the GitHub release with generated notes, then updates
+`Formula/slakio.rb` in [DokaDev/homebrew-tap](https://github.com/DokaDev/homebrew-tap) over
+SSH with that repository's deploy key (the `HOMEBREW_TAP_DEPLOY_KEY` secret). Without the
+secret a tag run stops before building anything.
 
 ## License
 

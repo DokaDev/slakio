@@ -13,8 +13,9 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 What exists today is the project's foundation and the first part of the interface, on
 invented data only (`slakio --demo`): the list panel with its workspace and views, the channels and DMs, the
 conversation pane with a thread panel and a composer, and the status line. There is no sign-in
-and no real workspace yet; nothing is ever sent anywhere, and there is no release to install.
-Nothing here is ready for daily use.
+and no real workspace yet; nothing is ever sent anywhere. Releases have binaries for macOS,
+Linux and Windows and a Homebrew formula ([Install](#install)); the latest is 0.0.1, and it
+runs in demo mode only. Nothing here is ready for daily use.
 
 The plan, in order: a user interface on fake data first, then read-only Slack connectivity,
 then sending messages, drafts, the Activity view and search, reactions and emoji, files and
@@ -113,6 +114,37 @@ Six keys get you everywhere:
 | `Esc` | One step out; never closes anything |
 | `Ctrl+Q` | Quit (also `Space q`, `:qa`; `:q` and `Ctrl+W` only close the pane, then its tab) |
 - English and Korean interface text (`language = "auto" | "en" | "ko"` in the config file).
+
+## Install
+
+slakio 0.0.1 is a **demo only**: run `slakio --demo`. It does not connect to Slack.
+
+- **Homebrew** (macOS and Linux, arm64 and x86_64), in one line:
+
+  ```sh
+  brew install dokadev/tap/slakio
+  ```
+
+  or add the tap once and use the short name from then on:
+
+  ```sh
+  brew tap dokadev/tap
+  brew install slakio
+  brew upgrade slakio   # later, for a new release
+  ```
+
+  The tap installs stable releases only.
+- **GitHub Releases**: download the archive for your platform from
+  [Releases](https://github.com/DokaDev/slakio/releases) and put the `slakio` binary on your
+  `PATH`. There are archives for macOS and Linux (arm64 and x86_64) and Windows (x86_64,
+  untested); `SHA256SUMS` lists their checksums. Each archive also has the licenses and the
+  third-party notices.
+
+## Versioning
+
+Releases follow [Semantic Versioning](https://semver.org), as `0.0.PATCH` while slakio is a
+demo on invented data. The configuration format, key bindings and behavior may change in any
+release before 1.0; the release notes say so.
 
 ## Build from source
 

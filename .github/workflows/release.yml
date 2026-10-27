@@ -7,10 +7,10 @@ name: Release
 # exists yet (.github/scripts/release-tap-eligible.sh). The tag must be the workspace version
 # (.github/scripts/release-version.sh).
 #
-# There is no release yet. A change to the release files (pushed to main or in a pull request)
-# or a manual run is a dry run: it builds, packs and installs everything and publishes nothing.
-# A tag run stops in its first job, before building anything, until the repository has the
-# `HOMEBREW_TAP_DEPLOY_KEY` secret: nothing can be published half way.
+# A change to the release files (pushed to main or in a pull request) or a manual run is a dry
+# run: it builds, packs and installs everything and publishes nothing. A tag run stops in its
+# first job, before building anything, unless the repository has the `HOMEBREW_TAP_DEPLOY_KEY`
+# secret: nothing can be published half way.
 on:
   push:
     tags: ["v*"]
