@@ -87,8 +87,10 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   the events back whenever they arrive (`exchange.rs`; an answer may ask for the next page),
   and an event for an older request (an older generation) or for a target no pane shows is
   dropped. A request can fail (`Event::Failed`, its kind as data): whatever waited for it stops
-  waiting and says so, never "Loading" for ever. A read-only backend (`Capabilities::read_only`)
-  refuses a change before sending anything, and the UI offers none. Saved items a backend cannot
+  waiting and says so, never "Loading" for ever; its detail goes to the error log, and only the
+  user asks again (`r`, when the reason may pass). A read-only backend's handle
+  (`Capabilities::read_only`) refuses a change before it reaches the backend, and the UI offers
+  none. Saved items a backend cannot
   tell are `None` (To-dos is unavailable, not empty).
   Messages come in pages (`Command::History`), newest first, older ones as the selection nears
   the top.
