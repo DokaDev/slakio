@@ -283,3 +283,28 @@ async fn behind_a_read_only_handle_no_change_reaches_the_backend() {
     tokio::task::yield_now().await;
     assert_eq!(changes.load(std::sync::atomic::Ordering::SeqCst), 0, "nothing reached the backend");
 }
+
+#[test]
+fn a_failure_goes_to_the_error_log_as_one_safe_line() {
+    use slakio_tui::app::Effect;
+    let mut s = opened("backend");
+    let id = s.b.held.remove(0).id;
+    let long = "x".repeat(500);
+    s.b.push(Envelope::failed(id, FailKind::Network, format!("reset\u{1b}[31m by\npeer {long}")));
+    assert!(s.pump());
+    let logged: Vec<_> =
+        s.d.app
+            .take_effects()
+            .into_iter()
+            .filter_map(|e| match e {
+                Effect::Record { context, fault } => Some((context, fault.detail)),
+                _ => None,
+            })
+            .collect();
+    assert_eq!(logged.len(), 1, "{logged:?}");
+    let (context, detail) = &logged[0];
+    assert_eq!(*context, "backend");
+    assert!(detail.starts_with("Network: reset [31m by peer x"), "{detail}");
+    assert!(!detail.chars().any(char::is_control), "{detail:?}");
+    assert!(detail.chars().count() <= "Network: ".len() + 200, "cut: {}", detail.len());
+}

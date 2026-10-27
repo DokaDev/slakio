@@ -3,9 +3,10 @@
 //! failed request ends what waited for it — the list's "Loading", a page asked for, a change to
 //! a saved item — and the status line says why; nothing waits for an answer that never comes.
 
-use super::App;
 use super::model::Model;
+use super::{App, Effect};
 use slakio_core::backend::{Capabilities, Command, Envelope, Event, FailKind, Generation, Request};
+use slakio_core::fault::Fault;
 use slakio_core::i18n::{Label, Msg};
 use std::time::Instant;
 
@@ -46,12 +47,13 @@ impl App {
             Event::Booted(_) => false,
             Event::History(page) => self.work.on_page(id, &page, &self.model),
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
-            Event::Failed { request, kind, .. } => self.on_failed(request, kind, now),
+            Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
         }
     }
 
-    /// Request `id` failed: whatever waited for it stops waiting, and the status line says why.
-    fn on_failed(&mut self, id: Generation, kind: FailKind, now: Instant) -> bool {
+    /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
+    /// the error log gets the backend's detail.
+    fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
         let waited = if id == self.boot.0 {
             self.boot.1 = true;
             true
@@ -60,6 +62,8 @@ impl App {
         };
         if waited {
             self.warn(Msg::Label(failure(kind)), now);
+            let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
+            self.effects.push(Effect::Record { context: "backend", fault });
         }
         waited
     }
@@ -76,4 +80,14 @@ pub(super) fn failure(kind: FailKind) -> Label {
         FailKind::Offline => Label::FailOffline,
         FailKind::Busy => Label::FailBusy,
     }
+}
+
+/// The most of a backend's detail the error log keeps.
+const DETAIL_MAX: usize = 200;
+
+/// `detail` as one line of the error log: control characters (a terminal escape among them)
+/// become spaces, and it is cut to [`DETAIL_MAX`] characters. An adapter puts no message text,
+/// token or cookie in a detail; this only keeps a stray one from growing the log.
+fn log_safe(detail: &str) -> String {
+    detail.chars().map(|c| if c.is_control() { ' ' } else { c }).take(DETAIL_MAX).collect()
 }

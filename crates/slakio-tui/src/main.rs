@@ -180,6 +180,7 @@ async fn run(
                     out.write_all(osc52(&text).as_bytes())?;
                     out.flush()?;
                 }
+                Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

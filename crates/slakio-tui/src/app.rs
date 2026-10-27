@@ -32,6 +32,7 @@ pub mod cmdline;
 pub mod composer;
 pub mod dialog;
 pub(crate) mod drafts;
+mod effects;
 mod focus;
 pub mod help;
 mod layout;
@@ -57,6 +58,7 @@ use crate::screen;
 use crate::theme::{Look, Theme};
 use composer::Composer;
 use dialog::{Dialog, Question};
+pub use effects::Effect;
 use help::Help;
 use model::Model;
 pub(crate) use overlay::Layer;
@@ -88,16 +90,6 @@ pub enum Mode {
     /// Selecting a range of messages.
     Visual,
     Command,
-}
-
-/// Something only the binary can do, done by its loop.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Effect {
-    /// Put text on the system clipboard (OSC 52; the terminal does it, no clipboard library
-    /// is touched).
-    Copy(String),
-    /// Save `key = value` in the config file (an answer the app asked for).
-    Save { key: &'static str, value: String },
 }
 
 /// Display settings from the config file.
