@@ -37,6 +37,7 @@ terminal-colorsaurus.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "signal"] }
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

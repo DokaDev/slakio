@@ -86,3 +86,9 @@ fn once_signed_in_the_app_connects_and_says_where() {
     assert_eq!(app.take_commands().len(), 1, "it asks for the workspace");
     assert!(screen(&app, 100, 30, now).contains("Signed in to Example"));
 }
+
+#[test]
+fn a_paste_is_wiped_when_dropped() {
+    fn wiped_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+    wiped_on_drop::<Pasted>();
+}

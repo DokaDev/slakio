@@ -39,3 +39,12 @@ fn credentials_never_print_their_text() {
     assert_eq!((c.token(), c.cookie()), ("token-TEST", "cookie-TEST"));
     assert_eq!(format!("{c:?}"), "Credentials { .. }");
 }
+
+#[test]
+fn credentials_are_wiped_when_dropped() {
+    fn wiped_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+    wiped_on_drop::<Credentials>();
+    let mut c = Credentials::new("token-TEST", "cookie-TEST").with_ds("17");
+    zeroize::Zeroize::zeroize(&mut c);
+    assert_eq!((c.token(), c.cookie(), c.cookie_ds()), ("", "", None));
+}

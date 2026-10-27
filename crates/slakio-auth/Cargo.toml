@@ -15,6 +15,7 @@ publish.workspace = true
 [dependencies]
 slakio-core.workspace = true
 toml_edit.workspace = true
+zeroize.workspace = true
 
 # The keychain store: macOS only for now; elsewhere the store says it is not available.
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -9,11 +9,14 @@
 //! …'`, `--data-raw` / `--data-binary`), the Windows `cmd` copy (`^"…^"`) and the PowerShell copy
 //! (`New-Object System.Net.Cookie("d", "…")`). It is pure: nothing is sent, stored or printed.
 //!
+//! The copies of the paste it makes are wiped from memory when dropped.
+//!
 //! Errors say what is missing in fixed words and never carry any of the pasted text, so no
 //! error, log line or panic message can hold a token or a cookie.
 
 use slakio_core::secret::Credentials;
 use std::fmt;
+use zeroize::Zeroizing;
 
 /// The most text read: a copy is a few kilobytes; anything far longer is not one.
 pub const PASTE_MAX: usize = 256 * 1024;
@@ -100,15 +103,13 @@ pub fn parse(text: &str) -> Result<Pasted, PasteError> {
         return Err(PasteError::Empty);
     }
     // The Windows `cmd` copy escapes with carets (`^"`, `^%`, `^&`, `^^`).
-    let text = if text.contains("^\"") { uncaret(text) } else { text.to_string() };
+    let text = Zeroizing::new(if text.contains("^\"") { uncaret(text) } else { text.to_string() });
     let host = address(&text)?;
     let mut steps = 0;
-    let token = one(values(&text, TOKEN_PREFIX, is_token_char, &mut steps)?, PasteError::NoToken)?;
-    let cookie = one(
-        values(&text, COOKIE_PREFIX, is_cookie_char, &mut steps)?.into_iter().map(|v| wire(&v)).collect(),
-        PasteError::NoCookie,
-    )?;
-    let mut credentials = Credentials::new(token, cookie);
+    let tokens = Zeroizing::new(values(&text, TOKEN_PREFIX, is_token_char, &mut steps)?);
+    let cookies = Zeroizing::new(values(&text, COOKIE_PREFIX, is_cookie_char, &mut steps)?);
+    let cookies = Zeroizing::new(cookies.iter().map(|v| wire(v)).collect::<Vec<_>>());
+    let mut credentials = Credentials::new(one(&tokens, PasteError::NoToken)?, one(&cookies, PasteError::NoCookie)?);
     if let Some(ds) = cookie_ds(&text) {
         credentials = credentials.with_ds(ds);
     }
@@ -117,8 +118,7 @@ pub fn parse(text: &str) -> Result<Pasted, PasteError> {
 
 /// The one value of `found`: `missing` when there is none, [`PasteError::Ambiguous`] when there
 /// are two different ones.
-fn one(mut found: Vec<String>, missing: PasteError) -> Result<String, PasteError> {
-    found.dedup();
+fn one(found: &[String], missing: PasteError) -> Result<String, PasteError> {
     let first = found.first().ok_or(missing)?;
     if found.iter().any(|v| v != first) {
         return Err(PasteError::Ambiguous);

@@ -64,7 +64,8 @@ pub trait SecretStore: Send + Sync {
 
 /// What signs the client in to one workspace, as the web client holds it: the session token
 /// (`xoxc`), the `d` cookie and, when the browser had one, the `d-s` cookie. Their text never
-/// shows in a `Debug` print, so none reaches a log or a panic message by accident.
+/// shows in a `Debug` print, so none reaches a log or a panic message by accident, and it is
+/// wiped from memory when the value is dropped.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Credentials {
     token: String,
@@ -98,6 +99,26 @@ impl Credentials {
         &self.cookie
     }
 }
+
+/// Wiped from memory when dropped.
+impl zeroize::Zeroize for Credentials {
+    fn zeroize(&mut self) {
+        self.token.zeroize();
+        self.cookie.zeroize();
+        if let Some(ds) = self.cookie_ds.as_mut() {
+            ds.zeroize();
+        }
+        self.cookie_ds = None;
+    }
+}
+
+impl Drop for Credentials {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(self);
+    }
+}
+
+impl zeroize::ZeroizeOnDrop for Credentials {}
 
 impl std::fmt::Debug for Credentials {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

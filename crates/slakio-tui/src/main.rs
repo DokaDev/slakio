@@ -244,8 +244,8 @@ impl Wiring {
 
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
     /// not. Nothing is kept unless Slack accepted it.
-    async fn sign_in(self, text: String) -> Result<SignedIn, Label> {
-        let pasted = slakio_auth::parse(&text).map_err(paste_label)?;
+    async fn sign_in(self, text: Pasted) -> Result<SignedIn, Label> {
+        let pasted = slakio_auth::parse(&text.0).map_err(paste_label)?;
         drop(text);
         let endpoints = self.endpoints(&pasted.host).ok_or(Label::SigninNotWorkspace)?;
         let client =
@@ -321,8 +321,8 @@ fn shown(name: &str) -> String {
 
 /// `slakio login` with the paste on standard input.
 fn sign_in_piped(wiring: &Wiring, i18n: &i18n::I18n) -> ExitCode {
-    let mut text = String::new();
-    let read = io::stdin().take(slakio_auth::curl::PASTE_MAX as u64 + 1).read_to_string(&mut text);
+    let mut text = Pasted(String::new());
+    let read = io::stdin().take(slakio_auth::curl::PASTE_MAX as u64 + 1).read_to_string(&mut text.0);
     let result = match read {
         Err(_) => Err(Label::SigninEmpty),
         Ok(_) => match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -422,7 +422,7 @@ async fn run(
                     out.flush()?;
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
-                Effect::SignIn(Pasted(text)) => signing_in = Some(tokio::spawn(wiring.clone().sign_in(text))),
+                Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in(pasted))),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

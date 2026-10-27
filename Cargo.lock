@@ -1988,6 +1988,7 @@ dependencies = [
  "proptest",
  "slakio-core",
  "toml_edit",
+ "zeroize",
 ]
 
 [[package]]
@@ -2006,6 +2007,7 @@ dependencies = [
  "tokio",
  "toml",
  "toml_edit",
+ "zeroize",
 ]
 
 [[package]]
@@ -2057,6 +2059,7 @@ dependencies = [
  "tokio",
  "unicode-segmentation",
  "unicode-width",
+ "zeroize",
 ]
 
 [[package]]

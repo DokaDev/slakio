@@ -21,9 +21,18 @@ pub enum SignIn {
     Failed(Label),
 }
 
-/// Pasted text that may hold a token and cookies: its `Debug` print says nothing of it.
+/// Pasted text that may hold a token and cookies: its `Debug` print says nothing of it, and
+/// it is wiped from memory when dropped.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Pasted(pub String);
+
+impl Drop for Pasted {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
+    }
+}
+
+impl zeroize::ZeroizeOnDrop for Pasted {}
 
 impl std::fmt::Debug for Pasted {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

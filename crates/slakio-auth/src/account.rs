@@ -14,6 +14,7 @@
 use slakio_core::fault::{Fault, FaultKind};
 use slakio_core::secret::{Credentials, SecretStore, Unavailable};
 use std::path::Path;
+use zeroize::Zeroizing;
 
 /// A signed-in workspace, as `workspaces.toml` names it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,8 +77,8 @@ pub fn save(path: &Path, accounts: &[Account]) -> Result<(), Fault> {
 }
 
 /// The credentials as one secret-store entry.
-pub fn encode(c: &Credentials) -> String {
-    format!("v1\n{}\n{}\n{}", c.token(), c.cookie(), c.cookie_ds().unwrap_or(""))
+pub fn encode(c: &Credentials) -> Zeroizing<String> {
+    Zeroizing::new(format!("v1\n{}\n{}\n{}", c.token(), c.cookie(), c.cookie_ds().unwrap_or("")))
 }
 
 /// The credentials of a secret-store entry; `None` when it is not one.

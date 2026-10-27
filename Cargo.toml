@@ -53,6 +53,8 @@ rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem
 # The macOS Keychain (the login keychain's generic passwords) behind the secret store.
 apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 keyring-core = "1"
+# Secrets (pasted text, credentials) are wiped from memory when dropped.
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 # Decoding Slack's JSON answers, tolerantly (unknown fields ignored, most fields optional).
 serde = { version = "1", features = ["derive"] }
 
