@@ -373,6 +373,8 @@
 "signin.step4" = "4. 여기에 붙여 넣으세요(Cmd+V)."
 "signin.note" = "토큰과 쿠키는 macOS 키체인에만 저장됩니다. slakio는 읽기만 합니다: 메시지를 보내거나 읽음 표시를 하지 않습니다."
 "signin.checking" = "Slack에 로그인 정보를 확인하는 중…"
+"signin.waiting" = "붙여 넣기를 기다리는 중…"
+"hint.paste" = "붙여 넣기"
 "signin.signed_in" = "{workspace}에 로그인했습니다"
 "signin.empty" = "붙여 넣은 내용이 없습니다. 요청을 다시 복사해 여기에 붙여 넣으세요."
 "signin.too_long" = "요청 하나가 아닙니다. 요청 하나만 cURL로 복사하세요."

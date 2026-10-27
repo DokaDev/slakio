@@ -92,3 +92,23 @@ fn a_paste_is_wiped_when_dropped() {
     fn wiped_on_drop<T: zeroize::ZeroizeOnDrop>() {}
     wiped_on_drop::<Pasted>();
 }
+
+#[test]
+fn the_screen_waits_for_the_paste_and_says_how() {
+    let now = Instant::now();
+    let app = signing_in();
+    for (w, h) in [(80, 24), (100, 30), (60, 30)] {
+        let shown = screen(&app, w, h, now);
+        assert!(shown.contains("Waiting for the paste"), "{shown}");
+        assert!(shown.lines().last().unwrap().contains("Cmd+V paste"), "{shown}");
+        assert!(shown.contains("Copy > Copy as cURL"), "the menu path stays on one line at {w}: {shown}");
+        // A wrapped step goes on under its text, not under its number.
+        let lines: Vec<&str> = shown.lines().collect();
+        let step = lines.iter().position(|l| l.trim_start().starts_with("2. ")).unwrap();
+        let at = lines[step].find("2. ").unwrap();
+        let next = lines[step + 1];
+        if !next.trim_start().starts_with("3. ") {
+            assert_eq!(next.find(|c: char| c != ' '), Some(at + 3), "hanging indent at {w}: {shown}");
+        }
+    }
+}

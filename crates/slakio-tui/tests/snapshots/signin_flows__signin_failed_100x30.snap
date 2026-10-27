@@ -11,9 +11,9 @@ expression: "screen(&app, 100, 30, now)"
 
             1. Open your workspace in a browser and sign in as usual.
             2. Open the developer tools (Cmd+Option+I), choose the Network tab and
-            reload the page.
-            3. Right-click any request whose address has /api/ and choose Copy > Copy as
-            cURL.
+               reload the page.
+            3. Right-click any request whose address has /api/ and choose
+               Copy > Copy as cURL.
             4. Paste it here (Cmd+V).
 
             The token and the cookies go to the macOS Keychain and nowhere else. slakio
@@ -31,4 +31,4 @@ expression: "screen(&app, 100, 30, now)"
 
 
 
- NORMAL                                                         │ Ctrl+Q quit · ? help · : commands
+ NORMAL                                           │ Cmd+V paste · Ctrl+Q quit · ? help · : commands

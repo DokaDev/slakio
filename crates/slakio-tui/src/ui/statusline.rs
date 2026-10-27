@@ -112,6 +112,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .filter(|_| !app.which_key_visible(now))
         .map(|(p, ctx)| hints::resolve_offered(&app.keymap, p, ctx, app.read_only()))
         .unwrap_or_default();
+    // The sign-in screen takes a paste first (the terminal's own key, not one of the app's).
+    if app.backend.is_none() && app.sign_in().is_some() && !resolved.is_empty() {
+        resolved.insert(0, ("Cmd+V".to_string(), Label::HintPaste));
+    }
     // What could not be loaded here, for a reason that may pass: asking again comes first.
     if !resolved.is_empty()
         && app.failed_here().is_some_and(slakio_core::backend::FailKind::retryable)

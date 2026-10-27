@@ -395,6 +395,8 @@
 "signin.step4" = "4. Paste it here (Cmd+V)."
 "signin.note" = "The token and the cookies go to the macOS Keychain and nowhere else. slakio only reads: it sends no message and marks nothing as read."
 "signin.checking" = "Checking the sign-in with Slack…"
+"signin.waiting" = "Waiting for the paste…"
+"hint.paste" = "paste"
 "signin.signed_in" = "Signed in to {workspace}"
 "signin.empty" = "Nothing was pasted. Copy the request again and paste it here."
 "signin.too_long" = "That is not one request. Copy a single request as cURL."
