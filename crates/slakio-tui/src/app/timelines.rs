@@ -24,14 +24,30 @@ pub struct Timeline {
     /// The last page asked for failed, and why: no more are asked for (until asked to retry), and
     /// an empty timeline says so.
     pub failed: Option<FailKind>,
+    /// The messages are the local cache's, from an earlier run: the page awaited replaces them,
+    /// and a retry asks for the newest page again (not an older one).
+    pub cached: bool,
 }
 
 impl Timeline {
+    /// The local cache's newest messages (already sanitised) arrived before the awaited page:
+    /// shown until it comes. Only into an empty timeline; it still waits.
+    pub fn add_cached(&mut self, shown: Vec<Shown>) {
+        if self.items.is_empty() {
+            self.items = shown;
+            self.cached = true;
+        }
+    }
+
     /// A page arrived (already sanitised): put what is older than the loaded messages before
     /// them (an echo or a late page never doubles). How many were put there.
     pub fn add_page(&mut self, page: &Page, shown: Vec<Shown>) -> usize {
         self.pending = None;
         self.complete = page.complete;
+        // The backend's page replaces what the cache had.
+        if std::mem::take(&mut self.cached) {
+            self.items.clear();
+        }
         let first = self.items.first().map(|m| m.ts);
         let older: Vec<Shown> = shown.into_iter().filter(|m| first.is_none_or(|f| m.ts < f)).collect();
         let n = older.len();

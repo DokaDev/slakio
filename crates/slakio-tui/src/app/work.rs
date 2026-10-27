@@ -65,7 +65,7 @@ pub struct Work {
 /// The draft of a target that has none yet.
 static NO_DRAFT: Composer = Composer::EMPTY;
 /// The timeline of a target that has none yet.
-static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: None };
+static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: None, cached: false };
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
@@ -438,6 +438,22 @@ impl Work {
         }
         self.fill();
         true
+    }
+
+    /// The local cache's newest page for a target whose page `generation` is awaited: drawn
+    /// until that page comes. `false` when nothing awaits it, or messages are shown already.
+    pub fn on_cached_page(&mut self, generation: Generation, page: &Page, model: &Model) -> bool {
+        let Some(tl) = self.timelines.awaiting(&page.target, generation) else { return false };
+        if !tl.items.is_empty() {
+            return false;
+        }
+        tl.add_cached(page.messages.iter().map(|m| shown(model, &page.target, m)).collect());
+        true
+    }
+
+    /// The active pane shows the local cache's messages, not (yet) the backend's.
+    pub fn active_cached(&self) -> bool {
+        self.active().and_then(|id| self.panes.get(&id)).is_some_and(|p| self.timeline(p).cached)
     }
 
     /// Request `id` for a page failed: its timeline stops waiting and asks no more (until it is

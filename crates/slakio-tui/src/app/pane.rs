@@ -181,6 +181,9 @@ impl Pane {
         if tl.pending.is_some() || tl.complete || tl.failed.is_some() {
             return None;
         }
+        if tl.cached {
+            return Some(None);
+        }
         let Some(first) = tl.items.first() else { return Some(None) };
         let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
         near_top.then_some(Some(first.ts))

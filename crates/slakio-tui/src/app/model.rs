@@ -55,16 +55,28 @@ pub struct Model {
     users: HashMap<UserId, usize>,
     /// Set once the backend answered.
     loaded: bool,
+    /// The answer came from the local cache (an earlier run's): shown until the backend's own.
+    cached: bool,
 }
 
 impl Model {
     pub fn new(snapshot: Snapshot) -> Self {
         let users = snapshot.users.iter().enumerate().map(|(i, u)| (u.id.clone(), i)).collect();
-        Self { snapshot, users, loaded: true }
+        Self { snapshot, users, loaded: true, cached: false }
+    }
+
+    /// The local cache's snapshot from an earlier run, until the backend answers.
+    pub fn cached(snapshot: Snapshot) -> Self {
+        Self { cached: true, ..Self::new(snapshot) }
     }
 
     pub fn is_loaded(&self) -> bool {
         self.loaded
+    }
+
+    /// What is listed came from the local cache, not (yet) from the backend.
+    pub fn is_cached(&self) -> bool {
+        self.cached
     }
 
     pub fn workspaces(&self) -> &[Workspace] {

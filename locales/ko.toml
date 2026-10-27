@@ -80,6 +80,7 @@
 
 "status.demo" = "데모"
 "status.read_only" = "읽기 전용"
+"status.cached" = "캐시"
 "status.dms" = "DM"
 "status.copied" = "메시지 {count}개를 복사했습니다"
 "status.demo_echo" = "데모: 여기에만 보이고 어디로도 보내지 않습니다"

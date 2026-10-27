@@ -113,6 +113,14 @@ pub struct Snapshot {
 pub enum Event {
     Booted(Box<Snapshot>),
     History(Box<Page>),
+    /// The answer to a [`Command::Boot`] as the local cache kept it from an earlier run, given
+    /// before the request's own answer so a start draws at once: shown until that answer (its
+    /// `Booted`) replaces it. Never the request's answer: that one still comes, or its `Failed`.
+    CachedBoot(Box<Snapshot>),
+    /// The newest page of a conversation as the local cache kept it, given before the request's
+    /// own answer (its `History`, or `Failed`), which replaces it. Like [`Event::CachedBoot`], it
+    /// ends nothing.
+    CachedHistory(Box<Page>),
     /// Every saved item after a [`Command::Save`], and the backend's clock then (reminders due
     /// before it are overdue).
     Saved {

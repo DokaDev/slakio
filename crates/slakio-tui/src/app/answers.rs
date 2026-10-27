@@ -37,6 +37,12 @@ impl App {
         }
     }
 
+    /// What is shown came from the local cache and the backend has not answered with its own:
+    /// the list, or the active pane's messages.
+    pub fn showing_cached(&self) -> bool {
+        self.model.is_cached() || self.work.active_cached()
+    }
+
     /// Why the last request for the workspaces failed, if it did.
     pub fn boot_failed(&self) -> Option<&FailKind> {
         self.boot.1.as_ref()
@@ -73,6 +79,18 @@ impl App {
                 true
             }
             Event::Booted(_) => false,
+            // The cache's snapshot draws only while the backend's own has not come.
+            Event::CachedBoot(snapshot) if id == self.boot.0 && (!self.model.is_loaded() || self.model.is_cached()) => {
+                self.model = Model::cached(*snapshot);
+                self.shell.clamp(&self.model, self.list_height());
+                self.work.clamp(&self.model);
+                true
+            }
+            Event::CachedBoot(_) => false,
+            Event::CachedHistory(page) => {
+                self.model.add_users(&page.users);
+                self.work.on_cached_page(id, &page, &self.model)
+            }
             Event::History(page) => {
                 // Its authors' names first: a page's messages are drawn with them as it arrives.
                 self.model.add_users(&page.users);

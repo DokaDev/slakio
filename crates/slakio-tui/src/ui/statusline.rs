@@ -173,7 +173,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         } else {
             return None;
         };
-        Some(app.i18n.label(mark).to_string())
+        let mark = app.i18n.label(mark).to_string();
+        // Until the backend's own answer comes, what is shown is an earlier run's.
+        Some(if !c.demo && app.showing_cached() {
+            format!("{mark} · {}", app.i18n.label(Label::StatusCached))
+        } else {
+            mark
+        })
     });
 
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {

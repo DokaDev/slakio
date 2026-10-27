@@ -98,6 +98,7 @@
 # The status line: the demo backend, and the unread DM total.
 "status.demo" = "demo"
 "status.read_only" = "read only"
+"status.cached" = "cached"
 "status.dms" = "DM"
 "status.copied" = { one = "Copied {count} message", other = "Copied {count} messages" }
 "status.demo_echo" = "Demo: shown here only, not sent anywhere"
