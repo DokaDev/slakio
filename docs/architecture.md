@@ -198,7 +198,10 @@ PowerShell copies), without running anything; its errors are fixed words that ne
 paste. The binary then asks Slack with one `client.userBoot`, through the transport and its
 rails, and only an accepted sign-in is kept: the credentials as one entry of the OS keychain
 (service `slakio`, the team id as the account), the workspace's id, name and host in
-`workspaces.toml`. `slakio logout` removes both. With `SLAKIO_SECRET_STORE=memory` (every test)
+`workspaces.toml`. Signing in to another workspace removes the previous one's keychain entry,
+so `slakio logout`, which removes every workspace the file names and then the file, leaves
+nothing behind. The paste and the credentials are wiped from memory when dropped (`zeroize`);
+the parser reads the paste in one pass and gives up on more than a few candidate values. With `SLAKIO_SECRET_STORE=memory` (every test)
 the keychain is never touched. A debug build may sign in to a fake Slack on the loopback address
 (`SLAKIO_TEST_SLACK_ADDR`); a release build never reads that variable.
 
