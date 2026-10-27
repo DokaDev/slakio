@@ -11,12 +11,12 @@ unless it says so.
 | `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), the terminal-escape sanitiser, paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
 | `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
 | `slakio-slack` | the Slack transport and backend, read-only by construction: the method allowlist, requests in the official web client's format, tolerant decoding, errors as data, the process-wide request cap, in-flight limit and kill switch (see [the Slack transport](#the-slack-transport)) | `slakio-core` |
+| `slakio-auth` | signing in: a browser request pasted as cURL parsed for the workspace's address, the session token and the cookies; the OS keychain behind the secret store (macOS); `workspaces.toml`, the signed-in workspace without any secret (see [Signing in](#signing-in)) | `slakio-core` |
 | `slakio-fake` | an in-process fake Slack server for the tests, seeded by `slakio-world`; it logs every request as received | `slakio-core`, `slakio-world` (dev-dependency only) |
-| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core`; `slakio-slack` in the binary's wiring only |
+| `slakio-tui` | the terminal UI (Ratatui) and the `slakio` binary | `slakio-core`; `slakio-slack` and `slakio-auth` in the binary's wiring only |
 | `slakio-bench` | performance budgets (not product code) | runs the binary |
 
-Planned crates join with the step that needs them: `slakio-auth` (sign-in), `slakio-store` (the
-local cache) and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
+Planned crates join with the step that needs them: `slakio-store` (the local cache) and `slakio-scrub` (a tool that scrubs captured API traffic into test fixtures).
 
 ### Dependency rules
 
@@ -167,11 +167,15 @@ every rail sits in the transport, below the backend, so no caller can go around 
    `RateLimited` without being sent, and the other methods go on.
 4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
    `Busy`.
-5. **Format.** Requests look like the official web client's (the browser's header set in its
+5. **Hosts.** TLS (rustls with the OS's certificate verifier, HTTP/2 when offered) to the
+   signed-in workspace's own host (`<name>.slack.com`) and the edge cache's
+   (`edgeapi.slack.com`), nothing else: the host is checked where the socket opens, so no file,
+   image or other host is ever reached. The tests reach a loopback address over plain HTTP.
+6. **Format.** Requests look like the official web client's (the browser's header set in its
    order, no `Referer`, the token in the form body and never in a header, the client's `_x_*`
    parameters in its order; an edge lookup is sorted JSON as text). Golden tests hold the exact
    requests.
-6. **Answers.** Slack's JSON is decoded tolerantly (unknown fields ignored, every field but an id
+7. **Answers.** Slack's JSON is decoded tolerantly (unknown fields ignored, every field but an id
    optional, an unreadable list entry left out). `ok: false` and HTTP statuses map to the core's
    `FailKind` (`Auth`, `RateLimited { retry_after }`, `Network`, `Offline`, `Busy`, `CapReached`,
    `Api { code }`); the error log gets the method, the code or the status, never a body, a token
@@ -179,9 +183,24 @@ every rail sits in the transport, below the backend, so no caller can go around 
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
 is refused before any request, and a newer page of the same conversation supersedes one in
-flight. This version reaches a server on the loopback address only (it has no TLS): the binary
-names the Slack backend but nothing selects it until sign-in exists, and the tests run it
-against `slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
+flight. Opening a conversation waits 200 ms first and at most one open is under way: a newer
+one cancels it (before it is sent, or by dropping its answer), and the cancelled one is answered
+`Busy`. The binary runs it for the signed-in workspace; the tests run it against
+`slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
+
+## Signing in
+
+`slakio login` (or the screen `slakio` shows when no workspace is signed in) takes a request
+copied from the Slack web app with the browser's "Copy as cURL", pasted into the app (bracketed
+paste) or piped in. `slakio-auth` reads the workspace's host, the session token and the `d` and
+`d-s` cookies out of it wherever the browser put them (Chrome, Firefox, Safari, `cmd` and
+PowerShell copies), without running anything; its errors are fixed words that never quote the
+paste. The binary then asks Slack with one `client.userBoot`, through the transport and its
+rails, and only an accepted sign-in is kept: the credentials as one entry of the OS keychain
+(service `slakio`, the team id as the account), the workspace's id, name and host in
+`workspaces.toml`. `slakio logout` removes both. With `SLAKIO_SECRET_STORE=memory` (every test)
+the keychain is never touched. A debug build may sign in to a fake Slack on the loopback address
+(`SLAKIO_TEST_SLACK_ADDR`); a release build never reads that variable.
 
 ## Keys
 

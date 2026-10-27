@@ -8,14 +8,17 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 
 ## Status
 
-**Pre-alpha, early development. slakio does not connect to Slack yet.**
+**Pre-alpha, early development. Read-only, one workspace, no live updates yet.**
 
-What exists today is the project's foundation and the first part of the interface, on
-invented data only (`slakio --demo`): the list panel with its workspace and views, the channels and DMs, the
-conversation pane with a thread panel and a composer, and the status line. There is no sign-in
-and no real workspace yet; nothing is ever sent anywhere. Releases have binaries for macOS,
-Linux and Windows and a Homebrew formula ([Install](#install)); the latest is 0.0.4, and it
-runs in demo mode only. Nothing here is ready for daily use.
+slakio signs in to **one** Slack workspace with your own browser session ([Sign in](#sign-in))
+and shows its channels and DMs with their unread marks; opening a conversation shows its newest
+messages (older ones and threads load as you scroll up or open them, still rough). It only
+reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
+updates (open a conversation again to see new messages) and no local cache yet. The rest of the interface runs on invented data
+(`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
+([Install](#install)); the latest release, 0.0.4, runs in demo mode only, and signing in comes
+with the next one. Sign-in works on macOS only (the credentials go to the macOS Keychain).
+Nothing here is ready for daily use.
 
 The plan, in order: a user interface on fake data first, then read-only Slack connectivity,
 then sending messages, drafts, the Activity view and search, reactions and emoji, files and
@@ -24,8 +27,11 @@ images, and settings. This README only lists what works; it will grow with each 
 ## What works
 
 - `slakio --version` and `slakio --help`.
-- `slakio` opens a full-screen, empty work area with a status line (mode badge) and restores
-  the terminal on exit, on `SIGTERM`/`SIGHUP`, and on a crash.
+- `slakio` opens full screen and restores the terminal on exit, on `SIGTERM`/`SIGHUP`, and on
+  a crash. Not signed in, it says how to sign in; signed in, it shows the workspace's
+  channels and DMs (unread and mention marks from Slack) and, for a conversation you open, its
+  newest 28 messages, read-only. `slakio login` signs in, `slakio logout` signs out,
+  `slakio --offline` sends nothing.
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
@@ -126,9 +132,25 @@ Six keys get you everywhere:
 | `Ctrl+Q` | Quit (also `Space q`, `:qa`; `:q` and `Ctrl+W` only close the pane, then its tab) |
 - English and Korean interface text (`language = "auto" | "en" | "ko"` in the config file).
 
-## Install
+## Sign in
 
-slakio is a **demo only** for now: run `slakio --demo`. It does not connect to Slack.
+slakio signs in the way your browser is signed in: you copy one request the Slack web app sends
+and paste it. Nothing else is asked for, and nothing leaves your computer but slakio's own
+read-only requests to your workspace.
+
+1. Open your workspace in a browser (`https://<workspace>.slack.com`) and sign in as usual.
+2. Open the developer tools (`Cmd+Option+I`), choose the **Network** tab and reload the page.
+3. Right-click any request whose address has `/api/` and choose **Copy > Copy as cURL**.
+4. Run `slakio login` and paste it (or `pbpaste | slakio login`).
+
+slakio reads the session token, the `d` cookie (and `d-s`) and the workspace's address from the
+copy, checks them with one request to Slack, shows the workspace's name and stores the token
+and cookies in the **macOS Keychain** (the first time, and after an update, macOS asks whether
+slakio may use the entry). `workspaces.toml` next to the config file names the workspace and
+holds no secret. `slakio logout` removes both. If Slack signs the session out, slakio says
+"run slakio login" and you paste a new copy.
+
+## Install
 
 - **Homebrew** (macOS and Linux, arm64 and x86_64), in one line:
 
@@ -153,8 +175,8 @@ slakio is a **demo only** for now: run `slakio --demo`. It does not connect to S
 
 ## Versioning
 
-Releases follow [Semantic Versioning](https://semver.org), as `0.0.PATCH` while slakio is a
-demo on invented data. The configuration format, key bindings and behavior may change in any
+Releases follow [Semantic Versioning](https://semver.org), as `0.0.PATCH` while slakio is
+early and read-only. The configuration format, key bindings and behavior may change in any
 release before 1.0; the release notes say so.
 
 ## Build from source
@@ -197,9 +219,9 @@ initials until then. With `icons = "ask"`, `slakio
 the answer in the config file; `:icons on|off` changes it later. `rail_expand`, a setting of the
 left rail (later the top bar, now the view switcher), is ignored (the status line says it can be removed).
 
-`network = "off"` (or `SLAKIO_NETWORK=off` in the environment) is a kill switch for the coming
-Slack connection: with either set, slakio sends nothing at all. This version does not connect
-to Slack in any case.
+`network = "off"` (or `SLAKIO_NETWORK=off` in the environment, or `slakio --offline`) is a kill
+switch for the Slack connection: with any of them set, slakio sends nothing at all. Every
+request also goes through a request cap and an allowlist of read-only methods.
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.

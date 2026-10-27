@@ -15,9 +15,11 @@ hyper 1 (`client` and `http1` features only), driven through its connection API
 (`hyper::client::conn::http1`) with `hyper-util`'s Tokio adapter and `http-body-util`, one
 connection per request. Decoding uses `serde` and `serde_json` (already in the workspace).
 
-TLS is not part of 0.0.4: the transport reaches the loopback address only, so this version
-cannot reach Slack at all. TLS (rustls) and HTTP/2, which a browser uses with Slack, join with
-sign-in, chosen against the same budget.
+TLS joined with sign-in: rustls (ring provider) through `tokio-rustls`, with
+`rustls-platform-verifier` (the OS's own certificate store and checks, no bundled root list),
+offering HTTP/2 before HTTP/1.1 in ALPN as a browser does and speaking whichever the server
+picks (`hyper::client::conn::http2` / `http1`). Only the workspace's own Slack host and the
+edge cache's host are reached; a loopback address (the tests' fake Slack) is plain HTTP.
 
 ## Alternatives
 
@@ -35,4 +37,4 @@ sign-in, chosen against the same budget.
   transport) and the length. A test against the fake server checks the order on the wire.
 - Dependencies are small and maintained by the Tokio project; `cargo deny` and `cargo audit`
   cover them in CI.
-- Adding TLS later changes `http.rs` only.
+- TLS changed `http.rs` (and where requests go, `Endpoints`) only.
