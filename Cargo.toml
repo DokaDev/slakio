@@ -4,6 +4,7 @@ members = [
     "crates/slakio-core",
     "crates/slakio-world",
     "crates/slakio-slack",
+    "crates/slakio-auth",
     "crates/slakio-fake",
     "crates/slakio-tui",
     "crates/slakio-bench",
@@ -29,6 +30,7 @@ publish = false
 # Internal crates. Dependency direction (docs/architecture.md, checked in CI):
 # tui -> core <- adapters; adapters never depend on each other or on tui; bench -> all.
 # slakio-fake is a dev-dependency only.
+slakio-auth = { path = "crates/slakio-auth" }
 slakio-core = { path = "crates/slakio-core" }
 slakio-fake = { path = "crates/slakio-fake" }
 slakio-slack = { path = "crates/slakio-slack" }
@@ -39,8 +41,18 @@ slakio-world = { path = "crates/slakio-world" }
 # connection API without its pooled client, so the transport decides every header and its order.
 bytes = "1"
 http-body-util = "0.1"
-hyper = { version = "1", default-features = false, features = ["client", "http1"] }
+hyper = { version = "1", default-features = false, features = ["client", "http1", "http2"] }
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+# TLS to Slack's hosts: rustls with the ring provider, the OS's own certificate verifier (macOS
+# Security framework, Windows CryptoAPI, Linux rustls-native-certs): no bundled root list.
+rustls = { version = "0.23.45", default-features = false, features = ["std", "tls12", "ring"] }
+rustls-platform-verifier = "0.7.1"
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
+# The tests' certificates for a TLS server on this machine, made when they run.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
+# The macOS Keychain (the login keychain's generic passwords) behind the secret store.
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
+keyring-core = "1"
 # Decoding Slack's JSON answers, tolerantly (unknown fields ignored, most fields optional).
 serde = { version = "1", features = ["derive"] }
 

@@ -1,0 +1,28 @@
+[package]
+name = "slakio-auth"
+description = "Signing slakio in to Slack: a browser request pasted as cURL, the credentials in the OS keychain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[dependencies]
+slakio-core.workspace = true
+toml_edit.workspace = true
+
+# The keychain store: macOS only for now; elsewhere the store says it is not available.
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store.workspace = true
+keyring-core.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
