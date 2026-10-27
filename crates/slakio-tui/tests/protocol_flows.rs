@@ -240,3 +240,46 @@ async fn a_backend_that_is_gone_fails_the_request_at_once() {
     assert!(exchange::pump(&mut app, &mut handle).await);
     assert!(app.boot_failed(), "never waits for an answer that cannot come");
 }
+
+/// The demo world, read-only, counting every change that reaches it.
+struct Counting {
+    demo: DemoBackend,
+    changes: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl slakio_core::backend::Backend for Counting {
+    fn capabilities(&self) -> Capabilities {
+        Capabilities { demo: true, read_only: true }
+    }
+
+    fn send(&mut self, request: slakio_core::backend::Request) {
+        if request.command.changes() {
+            self.changes.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        self.demo.send(request);
+    }
+
+    fn poll(&mut self) -> Option<Envelope> {
+        self.demo.poll()
+    }
+}
+
+#[tokio::test]
+async fn behind_a_read_only_handle_no_change_reaches_the_backend() {
+    use slakio_core::backend::{Request, SavedChange};
+    let changes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let backend = Counting { demo: DemoBackend::new(World::demo()), changes: changes.clone() };
+    let mut handle = exchange::serve(Box::new(backend));
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.resize(80, 24);
+    app.connect(handle.capabilities);
+    assert!(exchange::pump(&mut app, &mut handle).await);
+    // Sent past the UI (which offers no change): the handle itself refuses it.
+    let item = World::demo().saved()[0].clone();
+    let save = Command::Save { item: item.id, change: SavedChange::Complete };
+    let refused = handle.send(Request { id: slakio_core::backend::Generation(99), workspace: None, command: save });
+    let Err(answer) = refused else { panic!("a change is refused before it is sent") };
+    assert!(matches!(answer.event, Event::Failed { kind: FailKind::ReadOnly, .. }));
+    tokio::task::yield_now().await;
+    assert_eq!(changes.load(std::sync::atomic::Ordering::SeqCst), 0, "nothing reached the backend");
+}

@@ -195,9 +195,15 @@ impl BackendHandle {
         (Self { capabilities, tx: req_tx, rx: ev_rx }, BackendEnd { rx: req_rx, tx: ev_tx })
     }
 
-    /// Hand `request` to the backend without waiting. A backend that is gone or has no room
-    /// answers here and now: the request failed ([`FailKind::Offline`]), it is never lost.
+    /// Hand `request` to the backend without waiting. A change to a read-only backend never
+    /// reaches it, and a backend that is gone or has no room answers here and now: the request
+    /// failed ([`Envelope::failed`]), it is never lost.
     pub fn send(&self, request: Request) -> Result<(), Envelope> {
+        if self.capabilities.read_only
+            && let Some(refused) = refuse_change(&request)
+        {
+            return Err(refused);
+        }
         let id = request.id;
         self.tx.try_send(request).map_err(|e| {
             let detail = match e {
