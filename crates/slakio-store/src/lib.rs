@@ -8,20 +8,24 @@
 //! * [`snapshot`], [`messages`] — what is kept, and read back;
 //! * [`prune`] — the caps (200 messages a conversation, 500 MB, 30 days by default), never
 //!   touching a conversation shown;
-//! * [`backup`] — the cache kept out of Time Machine backups (macOS).
+//! * [`backup`] — the cache kept out of Time Machine backups (macOS);
+//! * [`cache`] — the store on a thread of its own; [`layer`] — the cache in front of a backend.
 //!
 //! No secret is ever kept here: the credentials stay in the OS keychain. The crate depends on
 //! `slakio-core` only.
 
 pub mod backup;
+pub mod cache;
 mod codec;
 pub mod db;
+pub mod layer;
 pub mod messages;
 pub mod prune;
 pub mod schema;
 pub mod snapshot;
 
 pub use backup::{Exclude, Tmutil};
+pub use cache::Cache;
 pub use db::{OpenError, Opened, Store};
 pub use prune::Caps;
 
