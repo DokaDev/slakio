@@ -11,7 +11,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
-use slakio_core::i18n::Label;
+use slakio_core::i18n::{Label, Msg};
 
 /// The widest the text runs, for lines that read well.
 const WIDTH: u16 = 76;
@@ -51,12 +51,31 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
         bottom.push(Line::default());
         bottom.extend(lines(Label::SigninDesktopNote, 4, t.muted()));
     }
-    // As many rows as fit, the cursor's always among them.
+    // As many rows as fit, the cursor's always among them; when not all fit, a muted line above
+    // and below says how many more there are that way.
     let fixed = top.len() + bottom.len() + 4;
-    let room = usize::from(area.height).saturating_sub(fixed).max(1);
+    let mut room = usize::from(area.height).saturating_sub(fixed).max(1);
+    let scrolled = p.rows.len() > room;
+    if scrolled {
+        room = room.saturating_sub(2).max(1);
+    }
     let n = p.rows.len().min(room);
     let first = (p.selected + 1).saturating_sub(n).min(p.rows.len() - n);
+    let (above, below) = (first, p.rows.len() - first - n);
     let rows = |f: &mut Frame, at: Rect| {
+        let mark = |f: &mut Frame, y: u16, arrow: &str, more: usize| {
+            if more > 0 && y < at.bottom() {
+                let text = format!("{arrow} {}", app.i18n.msg(&Msg::SigninDesktopMore { count: more as u64 }));
+                f.buffer_mut().set_string(at.x + 1, y, clip(&text, usize::from(at.width).saturating_sub(2)), t.muted());
+            }
+        };
+        let at = if scrolled {
+            mark(f, at.y, "↑", above);
+            mark(f, at.y + 1 + n as u16, "↓", below);
+            Rect { y: at.y + 1, height: at.height.saturating_sub(2), ..at }
+        } else {
+            at
+        };
         for (i, row) in p.rows.iter().enumerate().skip(first).take(n) {
             let y = at.y + (i - first) as u16;
             if y >= at.bottom() {
@@ -75,7 +94,7 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
             }
         }
     };
-    render_parts(f, app, area, w, top, n as u16, rows, bottom);
+    render_parts(f, app, area, w, top, (n + if scrolled { 2 } else { 0 }) as u16, rows, bottom);
 }
 
 /// Center `lines` in `area` with the quit/help keys below, the common frame of the sign-in

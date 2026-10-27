@@ -400,6 +400,7 @@
 "signin.store_read" = "키체인에서 로그인 정보를 읽지 못했습니다. 새 요청을 붙여 넣어 다시 로그인하세요."
 "signin.desktop_title" = "Slack 데스크톱 앱으로 로그인"
 "signin.desktop_found" = "이 Mac의 Slack 앱이 로그인된 워크스페이스입니다. 하나를 고르세요:"
+"signin.desktop_more" = "{count}개 더"
 "signin.desktop_keys" = "Enter로 로그인, j/k 또는 위/아래로 고르기, p로 브라우저 요청 붙여 넣기(이미 복사해 둔 요청은 Cmd+V로 붙여 넣으면 됩니다)."
 "signin.desktop_note" = "이 창은 slakio가 키를 읽을 때 쓰는 시스템 도구 \"security\" 이름으로 뜹니다. 항상 허용을 누르면 어떤 프로그램이든 묻지 않고 그 키를 읽을 수 있게 됩니다. slakio는 Slack 앱의 파일을 읽기만 하고 아무것도 바꾸지 않으며, 로그인 정보는 macOS 키체인에 저장됩니다."
 "signin.desktop_allow" = "\"Slack Safe Storage\" 창에서는 허용만 누르세요. 항상 허용은 안 됩니다."

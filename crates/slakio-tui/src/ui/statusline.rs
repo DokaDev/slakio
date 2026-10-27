@@ -14,6 +14,7 @@
 use super::view_label;
 use super::work::breadcrumb;
 use crate::app::model::Row;
+use crate::app::signin::SignIn;
 use crate::app::status::Level;
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
@@ -113,9 +114,18 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         .filter(|_| !app.which_key_visible(now))
         .map(|(p, ctx)| hints::resolve_offered(&app.keymap, p, ctx, app.read_only()))
         .unwrap_or_default();
-    // The sign-in screen takes a paste first (the terminal's own key, not one of the app's).
-    if app.backend.is_none() && app.sign_in().is_some() && !resolved.is_empty() {
-        resolved.insert(0, ("Cmd+V".to_string(), Label::HintPaste));
+    // The paste screen takes a paste first (the terminal's own key, not one of the app's); the
+    // desktop picker takes one too, after its own keys (`p` among them); while a sign-in is
+    // being checked a paste is not taken, so it is not offered.
+    let paste = ("Cmd+V".to_string(), Label::HintPaste);
+    match app.sign_in().filter(|_| app.backend.is_none() && !resolved.is_empty()) {
+        Some(SignIn::Waiting | SignIn::Failed(_)) => resolved.insert(0, paste),
+        Some(SignIn::Desktop(_)) => {
+            let after =
+                resolved.iter().position(|(_, l)| *l == Label::HintPasteRequest).map_or(resolved.len(), |i| i + 1);
+            resolved.insert(after, paste);
+        }
+        _ => {}
     }
     // What could not be loaded here, for a reason that may pass: asking again comes first.
     if !resolved.is_empty()

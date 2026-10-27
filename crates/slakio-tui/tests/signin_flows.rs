@@ -291,3 +291,79 @@ fn find_from(buf: &ratatui::buffer::Buffer, text: &str, from: u16) -> Option<(u1
 fn find(buf: &ratatui::buffer::Buffer, text: &str) -> Option<(u16, u16)> {
     find_from(buf, text, 0)
 }
+
+#[test]
+fn at_80_columns_the_picker_keeps_its_own_keys_and_drops_the_paste_hint_first() {
+    let app = picker();
+    let shown = screen(&app, 80, 24, Instant::now());
+    let status = shown.lines().last().unwrap();
+    assert!(status.contains("Enter sign in · j/k choose · p paste a request"), "{status}");
+    let p = status.find("p paste a request").unwrap();
+    assert!(status.find("Cmd+V").is_none_or(|c| c > p), "Cmd+V paste comes after p: {status}");
+}
+
+#[test]
+fn no_paste_is_offered_while_a_sign_in_is_being_checked() {
+    let mut app = picker();
+    key(&mut app, KeyCode::Enter);
+    assert!(matches!(app.sign_in(), Some(SignIn::DesktopChecking(_))));
+    let status = screen(&app, 120, 30, Instant::now()).lines().last().unwrap().to_string();
+    assert!(!status.contains("Cmd+V"), "a paste is not taken now: {status}");
+    // The paste screen offers it first; while its paste is checked, not at all.
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_sign_in(None);
+    let status = screen(&app, 120, 30, Instant::now()).lines().last().unwrap().to_string();
+    assert!(
+        status
+            .trim_start()
+            .trim_start_matches("NORMAL")
+            .trim_start()
+            .trim_start_matches('│')
+            .trim_start()
+            .starts_with("Cmd+V paste"),
+        "{status}"
+    );
+    app.handle_event(Event::Paste("curl 'https://x.slack.com/api/a'".into()), Instant::now());
+    assert_eq!(app.sign_in(), Some(SignIn::Checking));
+    let status = screen(&app, 120, 30, Instant::now()).lines().last().unwrap().to_string();
+    assert!(!status.contains("Cmd+V"), "{status}");
+}
+
+#[test]
+fn a_scrolled_picker_says_how_many_more_there_are_above_and_below() {
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_desktop(
+        (0..30)
+            .map(|i| PickerRow { team: format!("T{i}"), name: format!("Team {i:02}"), host: format!("t{i}.slack.com") })
+            .collect(),
+    );
+    let at = |app: &App| screen(app, 80, 24, Instant::now());
+    let top = at(&app);
+    assert!(top.contains("Team 00") && top.contains("more") && top.contains('↓'), "{top}");
+    assert!(!top.contains('↑'), "nothing above the first: {top}");
+    let shown = top.lines().filter(|l| l.contains("Team ")).count();
+    assert!(top.contains(&format!("↓ {} more", 30 - shown)), "{top}");
+    for _ in 0..15 {
+        key(&mut app, KeyCode::Char('j'));
+    }
+    let middle = at(&app);
+    assert!(middle.contains('↑') && middle.contains('↓'), "{middle}");
+    for _ in 0..20 {
+        key(&mut app, KeyCode::Char('j'));
+    }
+    let end = at(&app);
+    assert!(end.contains("Team 29") && end.contains('↑') && !end.contains('↓'), "{end}");
+    let shown = end.lines().filter(|l| l.contains("Team ")).count();
+    assert!(end.contains(&format!("↑ {} more", 30 - shown)), "{end}");
+    // The marks are muted, not text of a row.
+    let buf = {
+        let mut t = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        t.draw(|f| ui::draw(f, &app, Instant::now())).unwrap();
+        t.backend().buffer().clone()
+    };
+    let (x, y) = find_from(&buf, "↑", 0).unwrap();
+    assert_eq!(buf[(x, y)].fg, app.theme.muted().fg.unwrap_or_default(), "muted");
+    // A list that fits has no marks.
+    let fits = at(&picker());
+    assert!(!fits.contains("more") && !fits.contains('↑') && !fits.contains('↓'), "{fits}");
+}
