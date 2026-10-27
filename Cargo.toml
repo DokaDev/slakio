@@ -6,6 +6,7 @@ members = [
     "crates/slakio-slack",
     "crates/slakio-auth",
     "crates/slakio-fake",
+    "crates/slakio-store",
     "crates/slakio-tui",
     "crates/slakio-bench",
 ]
@@ -34,6 +35,7 @@ slakio-auth = { path = "crates/slakio-auth" }
 slakio-core = { path = "crates/slakio-core" }
 slakio-fake = { path = "crates/slakio-fake" }
 slakio-slack = { path = "crates/slakio-slack" }
+slakio-store = { path = "crates/slakio-store" }
 slakio-tui = { path = "crates/slakio-tui" }
 slakio-world = { path = "crates/slakio-world" }
 
@@ -56,6 +58,7 @@ keyring-core = "1"
 # Desktop-app sign-in (slakio-auth, macOS only): reading the app's encrypted Cookies database
 # (SQLite, on a temp copy), the per-workspace tokens from its Local Storage (a Chromium
 # LevelDB), and decrypting the `d` cookie (AES-128-CBC with a PBKDF2-SHA1 key).
+# The local cache (slakio-store) is a SQLite file too, on every OS.
 rusqlite = { version = "0.37", features = ["bundled"] }
 rusty-leveldb = { version = "3", default-features = false, features = ["fs"] }
 aes = "0.8"

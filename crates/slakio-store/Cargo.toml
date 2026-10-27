@@ -1,0 +1,27 @@
+[package]
+name = "slakio-store"
+description = "The local cache of slakio: what an earlier run fetched from Slack, in SQLite, so a start draws at once"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+# The core only among slakio's crates (docs/architecture.md); no network.
+[dependencies]
+rusqlite.workspace = true
+slakio-core.workspace = true
+# The cache in front of a backend: channels and a task of its own.
+tokio = { workspace = true, features = ["rt", "sync", "macros"] }
+
+[dev-dependencies]
+slakio-world.workspace = true
+tokio = { workspace = true, features = ["rt", "sync", "macros", "time"] }
+
+[lints]
+workspace = true

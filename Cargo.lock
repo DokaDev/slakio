@@ -2278,6 +2278,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "slakio-store"
+version = "0.0.6"
+dependencies = [
+ "rusqlite",
+ "slakio-core",
+ "slakio-world",
+ "tokio",
+]
+
+[[package]]
 name = "slakio-tui"
 version = "0.0.6"
 dependencies = [
