@@ -13,7 +13,7 @@ keychain-account ordering, Local Storage token layout, workspace list).
 
 MIT License
 
-Copyright (c) 2023 Grant Ammons
+Copyright (c) 2026 Grant Ammons
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ turn adapted and slakio ports (`crates/slakio-auth/src/desktop/decrypt.rs`).
 
 MIT License
 
-Copyright (c) Robert Neatherway
+Copyright (c) 2023 Robin Neatherway
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
