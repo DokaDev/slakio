@@ -5,7 +5,8 @@
 use super::empty::Content;
 use crate::app::App;
 use crate::app::signin::{Picker, SignIn};
-use crate::text::wrap;
+use crate::text::{clip, width, wrap};
+use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
@@ -23,43 +24,79 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, state: SignIn) {
     }
 }
 
-/// The desktop-workspace picker: the workspaces the Slack app is signed in to, one per line, with
-/// the cursor, how to choose, and the keychain-prompt note.
+/// The desktop-workspace picker: the workspaces the Slack app is signed in to, one row each (the
+/// name, and the host muted on the right) with the app's selection bar; the keychain-prompt
+/// advice on a line of its own (also while checking and after a failure); then where it stands
+/// and the keys, and the explanation.
 fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool) {
     let t = &app.theme;
     let w = area.width.saturating_sub(4).min(WIDTH);
     let text = |l: Label| app.i18n.label(l).to_string();
-    let mut lines: Vec<Line<'static>> =
-        vec![Line::styled(text(Label::SigninDesktopTitle), t.current()), Line::default()];
-    lines.extend(
-        wrap(&text(Label::SigninDesktopFound), usize::from(w), 2).0.into_iter().map(|l| Line::styled(l, t.text())),
-    );
-    lines.push(Line::default());
-    for (i, name) in p.names.iter().enumerate() {
-        let picked = i == p.selected;
-        let marker = if picked { "> " } else { "  " };
-        let style = if picked { t.accent() } else { t.text() };
-        lines.push(Line::styled(format!("{marker}{name}"), style));
-    }
-    lines.push(Line::default());
-    let (said, style) = if checking {
-        (Label::SigninChecking, t.accent())
-    } else if let Some(note) = p.note {
-        (note, t.warning())
-    } else {
-        (Label::SigninDesktopKeys, t.faint())
+    let lines = |l: Label, max: usize, style| -> Vec<Line<'static>> {
+        wrap(&text(l), usize::from(w), max).0.into_iter().map(|s| Line::styled(s, style)).collect()
     };
-    lines.extend(wrap(&text(said), usize::from(w), 3).0.into_iter().map(|l| Line::styled(l, style)));
-    lines.push(Line::default());
-    lines.extend(
-        wrap(&text(Label::SigninDesktopNote), usize::from(w), 4).0.into_iter().map(|l| Line::styled(l, t.muted())),
-    );
-    render_centered(f, app, area, w, lines);
+    let mut top = vec![Line::styled(text(Label::SigninDesktopTitle), t.current()), Line::default()];
+    top.extend(lines(Label::SigninDesktopFound, 2, t.text()));
+    top.push(Line::default());
+    let mut bottom = vec![Line::default()];
+    bottom.extend(lines(Label::SigninDesktopAllow, 2, t.warning()));
+    bottom.push(Line::default());
+    if checking {
+        bottom.extend(lines(Label::SigninDesktopReading, 2, t.accent()));
+    } else {
+        if let Some(note) = p.note {
+            bottom.extend(lines(note, 3, t.warning()));
+        }
+        bottom.extend(lines(Label::SigninDesktopKeys, 3, t.faint()));
+        bottom.push(Line::default());
+        bottom.extend(lines(Label::SigninDesktopNote, 4, t.muted()));
+    }
+    // As many rows as fit, the cursor's always among them.
+    let fixed = top.len() + bottom.len() + 4;
+    let room = usize::from(area.height).saturating_sub(fixed).max(1);
+    let n = p.rows.len().min(room);
+    let first = (p.selected + 1).saturating_sub(n).min(p.rows.len() - n);
+    let rows = |f: &mut Frame, at: Rect| {
+        for (i, row) in p.rows.iter().enumerate().skip(first).take(n) {
+            let y = at.y + (i - first) as u16;
+            if y >= at.bottom() {
+                break;
+            }
+            let picked = i == p.selected;
+            let host_w = width(&row.host).min(usize::from(at.width) / 2);
+            let room = usize::from(at.width).saturating_sub(host_w + 4);
+            let buf = f.buffer_mut();
+            buf.set_string(at.x + 1, y, clip(&row.name, room), if picked { t.bold() } else { t.text() });
+            let hx = at.right().saturating_sub(host_w as u16 + 1);
+            buf.set_string(hx, y, clip(&row.host, host_w), t.muted());
+            if picked {
+                let how = if checking { Selection::Unfocused } else { Selection::Focused };
+                t.paint_selection(f.buffer_mut(), Rect { y, height: 1, ..at }, how);
+            }
+        }
+    };
+    render_parts(f, app, area, w, top, n as u16, rows, bottom);
 }
 
 /// Center `lines` in `area` with the quit/help keys below, the common frame of the sign-in
 /// screens.
 fn render_centered(f: &mut Frame, app: &App, area: Rect, w: u16, lines: Vec<Line<'static>>) {
+    render_parts(f, app, area, w, lines, 0, |_, _| {}, Vec::new());
+}
+
+/// Center `top`, a block of `mid_h` rows drawn by `mid`, and `bottom` in `area`, `w` wide, with
+/// the quit/help keys below.
+#[expect(clippy::too_many_arguments, reason = "the parts of one centred block")]
+fn render_parts(
+    f: &mut Frame,
+    app: &App,
+    area: Rect,
+    w: u16,
+    top: Vec<Line<'static>>,
+    mid_h: u16,
+    mid: impl FnOnce(&mut Frame, Rect),
+    bottom: Vec<Line<'static>>,
+) {
     use crate::action::{Action, AppAction, HelpAction};
     use crate::keymap::Ctx;
     let keys = Content::keys(
@@ -68,11 +105,15 @@ fn render_centered(f: &mut Frame, app: &App, area: Rect, w: u16, lines: Vec<Line
         &[(Action::App(AppAction::Quit), Label::EmptyQuit), (Action::Help(HelpAction::Open), Label::EmptyHelp)],
     );
     let keys = Content { headline: None, sentence: None, keys, tip: None };
-    let h = lines.len() as u16;
+    let (top_h, bottom_h) = (top.len() as u16, bottom.len() as u16);
+    let h = top_h + mid_h + bottom_h;
     let x = area.x + area.width.saturating_sub(w) / 2;
     let y = area.y + area.height.saturating_sub(h + 4) / 2;
     let at = Rect::new(x, y, w, h.min(area.height)).intersection(area);
-    f.render_widget(Paragraph::new(lines), at);
+    f.render_widget(Paragraph::new(top), Rect { height: top_h, ..at }.intersection(at));
+    mid(f, Rect { y: at.y + top_h, height: mid_h, ..at }.intersection(at));
+    let low = Rect { y: at.y + top_h + mid_h, height: bottom_h, ..at }.intersection(at);
+    f.render_widget(Paragraph::new(bottom), low);
     let below = Rect::new(x, at.bottom().saturating_add(1), w, 3).intersection(area);
     keys.draw_top(f, app, Rect { x: below.x.saturating_sub(1), width: below.width + 2, ..below });
 }

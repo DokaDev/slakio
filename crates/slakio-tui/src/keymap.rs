@@ -38,7 +38,8 @@ pub use check::{Conflict, ConflictKind, check};
 pub use keys::{KeyChord, KeyError, parse_keys};
 
 use crate::action::{
-    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction, TabAction,
+    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
+    SignInAction, TabAction,
 };
 use crate::app::shell::View;
 use slakio_core::i18n::Label;
@@ -51,6 +52,8 @@ pub enum Ctx {
     /// Applies everywhere a context of its own does not take the key (text inputs and modal
     /// contexts excepted).
     Root,
+    /// The sign-in screen's picker of the Slack desktop app's workspaces.
+    SignIn,
     /// The non-text regions of the main screen.
     Shell,
     /// The view switcher: the list panel's first rows, a row per view.
@@ -80,6 +83,7 @@ impl Ctx {
     pub const ALL: &'static [Ctx] = &[
         Ctx::Global,
         Ctx::Root,
+        Ctx::SignIn,
         Ctx::Shell,
         Ctx::ViewSwitcher,
         Ctx::List,
@@ -98,6 +102,7 @@ impl Ctx {
         match self {
             Ctx::Global => "global",
             Ctx::Root => "root",
+            Ctx::SignIn => "signin",
             Ctx::Shell => "shell",
             Ctx::ViewSwitcher => "nav",
             Ctx::List => "list",
@@ -116,6 +121,7 @@ impl Ctx {
         match self {
             Ctx::Global => Label::CtxGlobal,
             Ctx::Root => Label::CtxRoot,
+            Ctx::SignIn => Label::CtxSignin,
             Ctx::Shell => Label::CtxShell,
             Ctx::ViewSwitcher => Label::CtxNav,
             Ctx::List => Label::CtxList,
@@ -142,7 +148,7 @@ impl Ctx {
             | Ctx::HelpFilter
             | Ctx::Dialog
             | Ctx::Switcher => None,
-            Ctx::Shell => Some(Ctx::Root),
+            Ctx::Shell | Ctx::SignIn => Some(Ctx::Root),
             Ctx::ViewSwitcher | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
             Ctx::PaneVisual => Some(Ctx::PaneNormal),
         }
@@ -225,6 +231,13 @@ pub const DEFAULTS: &[Binding] = &[
     cmdline(Ctx::Root, ":", CommandLineAction::Open),
     help(Ctx::Root, "?", HelpAction::Open),
     app(Ctx::Root, "ctrl+c", AppAction::Interrupt),
+    // The sign-in screen's picker of the Slack desktop app's workspaces.
+    bind(Ctx::SignIn, "enter", Action::SignIn(SignInAction::Pick)),
+    bind(Ctx::SignIn, "j", Action::SignIn(SignInAction::Down)),
+    bind(Ctx::SignIn, "down", Action::SignIn(SignInAction::Down)),
+    bind(Ctx::SignIn, "k", Action::SignIn(SignInAction::Up)),
+    bind(Ctx::SignIn, "up", Action::SignIn(SignInAction::Up)),
+    bind(Ctx::SignIn, "p", Action::SignIn(SignInAction::Paste)),
     // Between the panels. `Tab` goes round the view switcher, list, main pane and thread panel.
     // `Ctrl+R` and `Space r` go straight to the view switcher (on the view shown) and `Ctrl+R`
     // back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send

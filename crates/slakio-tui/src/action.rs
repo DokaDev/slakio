@@ -20,6 +20,7 @@ pub enum Action {
     Composer(ComposerAction),
     Help(HelpAction),
     Dialog(DialogAction),
+    SignIn(SignInAction),
 }
 
 impl Action {
@@ -233,6 +234,17 @@ pub enum DialogAction {
     Toggle,
 }
 
+/// Actions of the sign-in screen's picker of the Slack desktop app's workspaces.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SignInAction {
+    Down,
+    Up,
+    /// Sign in with the workspace under the cursor.
+    Pick,
+    /// Paste a browser request instead.
+    Paste,
+}
+
 /// One registered action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ActionSpec {
@@ -397,6 +409,10 @@ pub const REGISTRY: &[ActionSpec] = &[
     dialog(DialogAction::No, "dialog.no", Label::ActionDialogNo),
     dialog(DialogAction::Choose, "dialog.choose", Label::ActionDialogChoose),
     dialog(DialogAction::Toggle, "dialog.toggle", Label::ActionDialogToggle),
+    spec_of(Action::SignIn(SignInAction::Down), "signin.down", Label::ActionSigninDown, &[]),
+    spec_of(Action::SignIn(SignInAction::Up), "signin.up", Label::ActionSigninUp, &[]),
+    spec_of(Action::SignIn(SignInAction::Pick), "signin.pick", Label::ActionSigninPick, &[]),
+    spec_of(Action::SignIn(SignInAction::Paste), "signin.paste", Label::ActionSigninPaste, &[]),
 ];
 
 /// The registry entry of `action` (every action has one; a test checks it).

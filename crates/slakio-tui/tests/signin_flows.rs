@@ -6,7 +6,7 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{Label, Lang};
-use slakio_tui::app::signin::{Pasted, Picker, SignIn};
+use slakio_tui::app::signin::{Pasted, Picker, PickerRow, SignIn};
 use slakio_tui::app::{App, Effect};
 use slakio_tui::theme::Theme;
 use slakio_tui::ui;
@@ -19,7 +19,13 @@ fn key(app: &mut App, code: KeyCode) {
 
 fn picker() -> App {
     let mut app = App::new(Lang::En, Theme::terminal());
-    app.offer_desktop(vec![("T1".into(), "Alpha".into()), ("T2".into(), "Beta".into()), ("T3".into(), "Gamma".into())]);
+    let row =
+        |team: &str, name: &str, host: &str| PickerRow { team: team.into(), name: name.into(), host: host.into() };
+    app.offer_desktop(vec![
+        row("T1", "Acme Corp", "acme.slack.com"),
+        row("T2", "Acme Corp", "acme-eu.slack.com"),
+        row("T3", "Gamma", "gamma.slack.com"),
+    ]);
     app
 }
 
@@ -125,17 +131,68 @@ fn the_screen_waits_for_the_paste_and_says_how() {
 }
 
 #[test]
-fn the_desktop_picker_lists_the_workspaces() {
+fn the_desktop_picker_lists_the_workspaces_with_their_hosts() {
     let now = Instant::now();
     let app = picker();
     let shown = screen(&app, 100, 30, now);
     assert!(shown.contains("Sign in from the Slack desktop app"), "{shown}");
-    assert!(shown.contains("Alpha") && shown.contains("Beta") && shown.contains("Gamma"), "{shown}");
-    assert!(shown.contains("> Alpha"), "the first is under the cursor: {shown}");
-    // The prompt is raised by `security`; Always Allow would let any program read the key.
+    // Two workspaces of the same name are told apart by their hosts.
+    let rows: Vec<&str> = shown.lines().filter(|l| l.contains("Acme Corp")).collect();
+    assert_eq!(rows.len(), 2, "{shown}");
+    assert!(
+        rows[0].trim_end().ends_with("acme.slack.com") && rows[1].trim_end().ends_with("acme-eu.slack.com"),
+        "{shown}"
+    );
+    assert!(!shown.contains("> "), "no ASCII cursor: the selection bar marks the row: {shown}");
     let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(flat.contains("\"security\"") && flat.contains("choose Allow, not Always Allow"), "{shown}");
+    assert!(flat.contains("The prompt names \"security\""), "the requester the prompt shows: {shown}");
     insta::assert_snapshot!("signin_desktop_100x30", shown);
+}
+
+#[test]
+fn the_selected_workspace_has_the_selection_bar_and_a_bold_name() {
+    let app = picker();
+    let buf = buffer(&app, 100, 30);
+    let (x, y) = find(&buf, "Acme Corp").expect("the first row");
+    let theme = Theme::terminal();
+    let mut bar = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 1, 1));
+    theme.paint_selection(&mut bar, ratatui::layout::Rect::new(0, 0, 1, 1), slakio_tui::theme::Selection::Focused);
+    assert_eq!(buf[(x, y)].bg, bar[(0, 0)].bg, "the selection bar");
+    assert!(buf[(x, y)].modifier.contains(ratatui::style::Modifier::BOLD), "a bold name");
+    let (_, other) = find_from(&buf, "Acme Corp", y + 1).expect("the second row");
+    assert!(!buf[(x, other)].modifier.contains(ratatui::style::Modifier::BOLD), "only the selected one");
+}
+
+#[test]
+fn the_allow_advice_is_one_emphasised_line_in_every_state() {
+    let advice = "press Allow, not Always Allow.";
+    let mut app = picker();
+    let check = |app: &App, state: &str| {
+        let buf = buffer(app, 100, 30);
+        let (x, y) = find(&buf, advice).unwrap_or_else(|| panic!("{state}: {}", screen(app, 100, 30, Instant::now())));
+        assert_eq!(buf[(x, y)].fg, Theme::terminal().warning().fg.unwrap(), "{state}: warning-coloured");
+        let line = row(&buf, y);
+        assert!(
+            line.trim_start().starts_with("When macOS asks about \"Slack Safe Storage\""),
+            "{state}: one line: {line}"
+        );
+    };
+    check(&app, "choosing");
+    key(&mut app, KeyCode::Enter);
+    check(&app, "checking");
+    assert!(screen(&app, 100, 30, Instant::now()).contains("Reading the Slack app's key"));
+    app.sign_in_failed(Label::SigninDesktopKeychain);
+    check(&app, "after a failure");
+}
+
+#[test]
+fn a_paste_on_the_picker_is_taken_as_a_sign_in() {
+    let now = Instant::now();
+    let mut app = picker();
+    let text = format!("curl 'https://example.slack.com/api/x' --data-raw 'token={SECRET}'");
+    app.handle_event(Event::Paste(text.clone()), now);
+    assert_eq!(app.sign_in(), Some(SignIn::Checking));
+    assert_eq!(app.take_effects(), vec![Effect::SignIn(Pasted(text))]);
 }
 
 #[test]
@@ -144,12 +201,13 @@ fn the_cursor_moves_and_enter_picks_the_selected_workspace() {
     key(&mut app, KeyCode::Char('j'));
     key(&mut app, KeyCode::Down);
     assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 2, .. }))));
+    key(&mut app, KeyCode::Down);
+    assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 2, .. }))), "stops at the last");
     key(&mut app, KeyCode::Char('k'));
     assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 1, .. }))));
     key(&mut app, KeyCode::Enter);
     assert_eq!(app.take_effects(), vec![Effect::DesktopPick("T2".into())], "picked by team id");
     assert!(matches!(app.sign_in(), Some(SignIn::DesktopChecking(_))));
-    assert!(screen(&app, 100, 30, Instant::now()).contains("Checking the sign-in"));
 }
 
 #[test]
@@ -162,7 +220,7 @@ fn p_falls_back_to_the_paste_flow() {
 }
 
 #[test]
-fn a_failed_pick_returns_to_the_picker_with_the_reason() {
+fn a_failed_pick_returns_to_the_picker_with_the_reason_and_the_keys() {
     let mut app = picker();
     key(&mut app, KeyCode::Enter);
     let _ = app.take_effects();
@@ -174,5 +232,62 @@ fn a_failed_pick_returns_to_the_picker_with_the_reason() {
         }
         other => panic!("expected the picker again, got {other:?}"),
     }
-    assert!(screen(&app, 100, 30, Instant::now()).contains("Could not read the Slack app"));
+    let flat = screen(&app, 100, 30, Instant::now()).split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("Press Enter to try again, or p to paste a request"), "{flat}");
+    assert!(!flat.contains("Run slakio login"), "already there: {flat}");
+    assert!(flat.contains("Enter to sign in, j/k or Up/Down to choose"), "the keys stay: {flat}");
+    // Enter tries again.
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick("T1".into())]);
+}
+
+#[test]
+fn the_picker_says_its_keys_on_the_status_line_and_in_the_help() {
+    let mut app = picker();
+    let shown = screen(&app, 120, 30, Instant::now());
+    let status = shown.lines().last().unwrap();
+    for hint in ["Enter sign in", "p paste a request", "Cmd+V paste"] {
+        assert!(status.contains(hint), "{hint}: {status}");
+    }
+    key(&mut app, KeyCode::Char('?'));
+    let help = screen(&app, 120, 40, Instant::now());
+    assert!(help.contains("Sign-in: Slack desktop app workspaces"), "{help}");
+    assert!(help.contains("Sign in with this workspace") && help.contains("Paste a browser request instead"), "{help}");
+}
+
+#[test]
+fn a_long_list_scrolls_to_keep_the_cursor_in_view() {
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_desktop(
+        (0..30)
+            .map(|i| PickerRow { team: format!("T{i}"), name: format!("Team {i:02}"), host: format!("t{i}.slack.com") })
+            .collect(),
+    );
+    for _ in 0..29 {
+        key(&mut app, KeyCode::Char('j'));
+    }
+    let shown = screen(&app, 80, 24, Instant::now());
+    assert!(shown.contains("Team 29") && !shown.contains("Team 00"), "{shown}");
+}
+
+fn buffer(app: &App, w: u16, h: u16) -> ratatui::buffer::Buffer {
+    let mut t = Terminal::new(TestBackend::new(w, h)).unwrap();
+    t.draw(|f| ui::draw(f, app, Instant::now())).unwrap();
+    t.backend().buffer().clone()
+}
+
+fn row(buf: &ratatui::buffer::Buffer, y: u16) -> String {
+    (0..buf.area.width).map(|x| buf[(x, y)].symbol().to_string()).collect()
+}
+
+/// Where `text` starts on the screen, from row `from` down.
+fn find_from(buf: &ratatui::buffer::Buffer, text: &str, from: u16) -> Option<(u16, u16)> {
+    (from..buf.area.height).find_map(|y| {
+        let line = row(buf, y);
+        line.find(text).map(|i| (line[..i].chars().count() as u16, y))
+    })
+}
+
+fn find(buf: &ratatui::buffer::Buffer, text: &str) -> Option<(u16, u16)> {
+    find_from(buf, text, 0)
 }

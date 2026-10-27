@@ -238,7 +238,7 @@ impl App {
     /// the palette shows are those of this context).
     pub fn region_context(&self) -> Ctx {
         if self.backend.is_none() {
-            return Ctx::Root;
+            return if self.picking() { Ctx::SignIn } else { Ctx::Root };
         }
         match self.focus() {
             Focus::ViewSwitcher => Ctx::ViewSwitcher,
@@ -393,7 +393,6 @@ impl App {
                 }
                 h.cursor = 0;
             }
-            Ctx::Root => _ = self.sign_in_key(key),
             _ => {}
         }
     }
@@ -409,6 +408,7 @@ impl App {
             Action::Composer(a) => self.composer(a, now),
             Action::Help(a) => self.help(a, now),
             Action::Dialog(a) => self.answer(a),
+            Action::SignIn(a) => self.sign_in_action(a),
         }
     }
 

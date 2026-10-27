@@ -21,6 +21,17 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `?` | Keyboard help | `help.open` |
 | `Ctrl+C` | Cancel what is pending (Ctrl+Q quits) | `app.interrupt` |
 
+## Sign-in: Slack desktop app workspaces (`signin`)
+
+| Keys | Action | Id |
+|---|---|---|
+| `Enter` | Sign in with this workspace | `signin.pick` |
+| `j` | Next workspace | `signin.down` |
+| `Down` | Next workspace | `signin.down` |
+| `k` | Previous workspace | `signin.up` |
+| `Up` | Previous workspace | `signin.up` |
+| `p` | Paste a browser request instead | `signin.paste` |
+
 ## Main screen (`shell`)
 
 | Keys | Action | Id |

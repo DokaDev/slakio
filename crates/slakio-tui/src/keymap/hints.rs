@@ -4,7 +4,7 @@
 
 use super::{Ctx, Keymap, LEADER, check, keys, parse_keys};
 use crate::action::{
-    Action, AppAction, CommandLineAction, ComposerAction, HelpAction, PaneAction, ShellAction, TabAction,
+    Action, AppAction, CommandLineAction, ComposerAction, HelpAction, PaneAction, ShellAction, SignInAction, TabAction,
 };
 use slakio_core::i18n::Label;
 
@@ -13,6 +13,8 @@ use slakio_core::i18n::Label;
 pub enum Place {
     /// No backend: the welcome screen.
     Welcome,
+    /// The sign-in screen's picker of the Slack desktop app's workspaces.
+    SignIn,
     /// The list panel on a conversation.
     ListConversation,
     /// The list panel on a section header.
@@ -97,6 +99,13 @@ pub fn ranked(l: Label) -> Option<usize> {
 pub fn entries(place: Place) -> &'static [Hint] {
     match place {
         Place::Welcome => &[One(QUIT, Label::HintQuit), One(HELP, Label::HintHelp), One(COMMANDS, Label::HintCommands)],
+        Place::SignIn => &[
+            One(Action::SignIn(SignInAction::Pick), Label::HintSignin),
+            Pair(Action::SignIn(SignInAction::Down), Action::SignIn(SignInAction::Up), Label::HintChoose),
+            One(Action::SignIn(SignInAction::Paste), Label::HintPasteRequest),
+            One(QUIT, Label::HintQuit),
+            One(HELP, Label::HintHelp),
+        ],
         Place::ListConversation => &[
             One(OPEN, Label::HintOpen),
             One(Action::Shell(ShellAction::ListPeek), Label::HintPeek),
@@ -267,6 +276,7 @@ mod tests {
         let km = Keymap::default();
         let cases = [
             (Place::Welcome, Ctx::Root),
+            (Place::SignIn, Ctx::SignIn),
             (Place::ListConversation, Ctx::List),
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),

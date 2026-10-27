@@ -6,22 +6,23 @@ expression: shown
 
 
 
-
             Sign in from the Slack desktop app
 
             The Slack app on this Mac is signed in to these workspaces. Pick one:
 
-            > Alpha
-              Beta
-              Gamma
+             Acme Corp                                                   acme.slack.com
+             Acme Corp                                                acme-eu.slack.com
+             Gamma                                                      gamma.slack.com
 
-            Up/Down or j/k to choose, Enter to sign in, p to paste a browser request
-            instead.
+            When macOS asks about "Slack Safe Storage", press Allow, not Always Allow.
 
-            macOS will ask whether "security" may use the "Slack Safe Storage" key:
-            choose Allow, not Always Allow (that would let any program read the key
-            without asking). slakio reads the Slack app's files and changes nothing; the
-            sign-in goes to the macOS Keychain.
+            Enter to sign in, j/k or Up/Down to choose, p to paste a browser request
+            (Cmd+V pastes one you copied already).
+
+            The prompt names "security", the system tool slakio reads the key with.
+            Always Allow would let any program read that key without asking. slakio
+            reads the Slack app's files and changes nothing; the sign-in goes to the
+            macOS Keychain.
 
             Ctrl+Q  Quit
             ?       Keyboard help
@@ -30,5 +31,4 @@ expression: shown
 
 
 
-
- NORMAL                                           │ Cmd+V paste · Ctrl+Q quit · ? help · : commands
+ NORMAL       │ Cmd+V paste · Enter sign in · j/k choose · p paste a request · Ctrl+Q quit · ? help

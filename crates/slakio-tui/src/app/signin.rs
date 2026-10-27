@@ -1,11 +1,12 @@
 //! Signing in from the app. `slakio login` (and the first run without a workspace) first offers
 //! the workspaces the Slack desktop app is signed in to, as a picker; the chosen one goes to the
-//! binary ([`Effect::DesktopPick`], by team id), which reads its credentials (the macOS keychain may prompt),
-//! asks Slack whether they sign in and keeps them. Pressing `p` (or no desktop app) falls back to
+//! binary by team id ([`Effect::DesktopPick`]), which reads its credentials (the macOS keychain
+//! may prompt), asks Slack whether they sign in and keeps them. Pressing `p` (or no desktop app) falls back to
 //! the paste flow: the screen says how to copy a request, what is pasted there goes to the binary
 //! ([`Effect::SignIn`]). The pasted text is never kept by the app, drawn or printed.
 
 use super::{App, Effect};
+use crate::action::SignInAction;
 use crate::keymap::Ctx;
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{Label, Msg};
@@ -27,12 +28,20 @@ pub enum SignIn {
     Failed(Label),
 }
 
-/// The desktop-workspace picker: the workspaces' team ids and names (Slack's text, already
-/// sanitised), the one under the cursor, and the reason the last pick did not sign in, if any.
+/// One workspace of the desktop picker: its team id, its name and its host (Slack's text,
+/// already sanitised). The host tells apart two workspaces of the same name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PickerRow {
+    pub team: String,
+    pub name: String,
+    pub host: String,
+}
+
+/// The desktop-workspace picker: its rows, the one under the cursor, and the reason the last pick
+/// did not sign in, if any.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Picker {
-    pub teams: Vec<String>,
-    pub names: Vec<String>,
+    pub rows: Vec<PickerRow>,
     pub selected: usize,
     pub note: Option<Label>,
 }
@@ -63,11 +72,9 @@ impl App {
         self.sign_in = Some(why.map_or(SignIn::Waiting, SignIn::Failed));
     }
 
-    /// Offer the desktop app's signed-in workspaces as a picker: `(team id, name)` pairs, the
-    /// names Slack's text, already sanitised. The pick is reported by team id.
-    pub fn offer_desktop(&mut self, workspaces: Vec<(String, String)>) {
-        let (teams, names) = workspaces.into_iter().unzip();
-        self.sign_in = Some(SignIn::Desktop(Picker { teams, names, selected: 0, note: None }));
+    /// Offer the desktop app's signed-in workspaces as a picker. The pick is reported by team id.
+    pub fn offer_desktop(&mut self, rows: Vec<PickerRow>) {
+        self.sign_in = Some(SignIn::Desktop(Picker { rows, selected: 0, note: None }));
     }
 
     /// Where signing in stands; `None` when the app does not offer it.
@@ -97,50 +104,42 @@ impl App {
         self.info(Msg::SigninSignedIn { workspace }, now);
     }
 
-    /// A key no binding claims on the sign-in screen: the desktop picker moves (`j`/`k`, arrows),
-    /// picks (`Enter`) or switches to the paste flow (`p`); `true` when it was one of those. The
-    /// paste screen takes a bracketed paste instead, handled in [`App::paste`].
-    pub(super) fn sign_in_key(&mut self, key: crate::keymap::KeyChord) -> bool {
-        use ratatui::crossterm::event::KeyCode;
-        let Some(SignIn::Desktop(p)) = &mut self.sign_in else { return false };
-        if !key.mods.is_empty() {
-            return false;
-        }
-        match key.code {
-            KeyCode::Down | KeyCode::Char('j') => {
-                if p.selected + 1 < p.names.len() {
-                    p.selected += 1;
-                }
-                true
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                p.selected = p.selected.saturating_sub(1);
-                true
-            }
-            KeyCode::Enter => {
-                let Some(team) = p.teams.get(p.selected).cloned() else { return false };
-                let p = p.clone();
+    /// The desktop picker has the keyboard (its keys are [`Ctx::SignIn`]'s).
+    pub(super) fn picking(&self) -> bool {
+        matches!(self.sign_in, Some(SignIn::Desktop(_)))
+    }
+
+    /// An action of the desktop picker: move, pick (the binary reads and checks that workspace),
+    /// or switch to the paste flow.
+    pub(super) fn sign_in_action(&mut self, a: SignInAction) {
+        let Some(SignIn::Desktop(p)) = &mut self.sign_in else { return };
+        match a {
+            SignInAction::Down => p.selected = (p.selected + 1).min(p.rows.len().saturating_sub(1)),
+            SignInAction::Up => p.selected = p.selected.saturating_sub(1),
+            SignInAction::Pick => {
+                let Some(team) = p.rows.get(p.selected).map(|r| r.team.clone()) else { return };
+                let p = Picker { note: None, ..p.clone() };
                 self.sign_in = Some(SignIn::DesktopChecking(p));
                 self.effects.push(Effect::DesktopPick(team));
-                true
             }
-            KeyCode::Char('p') => {
-                self.offer_sign_in(None);
-                true
-            }
-            _ => false,
+            SignInAction::Paste => self.offer_sign_in(None),
         }
     }
 
-    /// Text pasted (bracketed paste) where the keyboard is: a sign-in on the paste screen,
-    /// else typed into the composer, the help filter or the command line.
+    /// Text pasted (bracketed paste) where the keyboard is: a sign-in on the paste screen or the
+    /// desktop picker (a request copied first is taken there too), else typed into the composer,
+    /// the help filter or the command line.
     pub(super) fn paste(&mut self, text: String) {
         match self.key_context() {
+            Ctx::SignIn => {
+                self.sign_in = Some(SignIn::Checking);
+                self.effects.push(Effect::SignIn(Pasted(text)));
+            }
             Ctx::Root if matches!(self.sign_in, Some(SignIn::Waiting | SignIn::Failed(_))) => {
                 self.sign_in = Some(SignIn::Checking);
                 self.effects.push(Effect::SignIn(Pasted(text)));
             }
-            // Checking, or the desktop picker: one sign-in at a time, no paste into the picker.
+            // Checking: one sign-in at a time.
             Ctx::Root if self.sign_in.is_some() => {}
             Ctx::ComposerInsert => {
                 if let Some(c) = self.work.draft_mut() {

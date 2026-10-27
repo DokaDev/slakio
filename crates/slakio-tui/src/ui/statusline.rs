@@ -36,6 +36,7 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
     let place = match ctx {
         Ctx::CommandLine => Place::CommandLine,
         Ctx::Root => Place::Welcome,
+        Ctx::SignIn => Place::SignIn,
         Ctx::ViewSwitcher => Place::ViewSwitcher,
         // To-dos that cannot be known have nothing to filter or sort.
         Ctx::List if app.shell.view == crate::app::shell::View::Todos && !app.model.saved_known() => Place::ListEmpty,

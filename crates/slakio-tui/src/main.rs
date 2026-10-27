@@ -20,7 +20,7 @@ use slakio_core::secret::{Credentials, MemoryStore, STORE_ENV, SecretStore, Stor
 use slakio_slack::governor::{Governor, Limits, SystemClock};
 use slakio_slack::request::Endpoints;
 use slakio_slack::{SlackError, login};
-use slakio_tui::app::signin::Pasted;
+use slakio_tui::app::signin::{Pasted, PickerRow};
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange;
@@ -318,7 +318,13 @@ fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) -> 
     // Before the terminal is set up: the scan reads files only (no keychain, no network).
     match slakio_auth::desktop::scan() {
         Ok(found) => {
-            app.offer_desktop(found.workspaces().iter().map(|w| (w.team.clone(), shown(&w.name))).collect());
+            app.offer_desktop(
+                found
+                    .workspaces()
+                    .iter()
+                    .map(|w| PickerRow { team: w.team.clone(), name: shown(&w.name), host: shown(&w.host) })
+                    .collect(),
+            );
             return Some(found);
         }
         Err(DesktopError::NotSupported) => app.offer_sign_in(Some(Label::SigninDesktopUnsupported)),

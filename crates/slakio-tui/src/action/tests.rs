@@ -106,6 +106,10 @@ fn every_action_is_registered() {
         use DialogAction::*;
         [Yes, No, Choose, Toggle].map(Action::Dialog)
     };
+    let sign_in = {
+        use SignInAction::*;
+        [Down, Up, Pick, Paste].map(Action::SignIn)
+    };
     let app = {
         use AppAction::*;
         [Quit, Interrupt, Palette, ChooseWorkspace, Retry, ToggleAvatars, ToggleIcons, ToggleDensity].map(Action::App)
@@ -127,7 +131,8 @@ fn every_action_is_registered() {
         .chain(tab)
         .chain(composer)
         .chain(help)
-        .chain(dialog);
+        .chain(dialog)
+        .chain(sign_in);
     let mut n = 0;
     for a in all {
         assert_eq!(spec(a).action, a);
