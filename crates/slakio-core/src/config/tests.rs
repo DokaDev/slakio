@@ -113,3 +113,37 @@ fn a_saved_value_keeps_its_same_line_comment() {
     assert_eq!(text, "# mine\ntheme = \"dark\"  # owner pick\nicons = \"on\"\n");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_cache_settings_are_read_within_their_ranges() {
+    let d = Config::default();
+    assert_eq!((d.cache.as_str(), d.cache_messages, d.cache_max_mb, d.cache_days), ("on", 200, 500, 30));
+    let cfg = parse("cache = \"OFF\"\ncache_messages = 50\ncache_max_mb = 100\ncache_days = 7\n").unwrap();
+    assert_eq!((cfg.cache.as_str(), cfg.cache_messages, cfg.cache_max_mb, cfg.cache_days), ("off", 50, 100, 7));
+    // The ends of each range are in it.
+    assert_eq!(parse("cache_messages = 10").unwrap().cache_messages, 10);
+    assert_eq!(parse("cache_days = 3650").unwrap().cache_days, 3650);
+    for bad in [
+        "cache = true",
+        "cache = \"maybe\"",
+        "cache_messages = 9",
+        "cache_messages = 10001",
+        "cache_messages = -1",
+        "cache_messages = \"200\"",
+        "cache_messages = 2.5",
+        "cache_max_mb = 0",
+        "cache_max_mb = 100001",
+        "cache_days = 0",
+        "cache_days = 99999999999",
+    ] {
+        assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
+    }
+    assert_eq!(
+        parse("cache_days = 0"),
+        Err(ConfigError::Value {
+            key: "cache_days".into(),
+            value: "0".into(),
+            allowed: "a whole number from 1 to 3650".into()
+        })
+    );
+}

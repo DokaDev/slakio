@@ -11,6 +11,10 @@
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
 //! nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" to the view shown
 //! network = "on"           # "off": nothing is sent to Slack at all (also SLAKIO_NETWORK=off)
+//! cache = "on"             # "off": nothing is kept on disk between runs (every start fetches)
+//! cache_messages = 200     # the most messages kept a conversation (10 to 10000)
+//! cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
+//! cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -51,6 +55,14 @@ pub struct Config {
     pub nav_rows: String,
     /// `off`: no request leaves the process ([`NETWORK`]); the environment can turn it off too.
     pub network: String,
+    /// `off`: nothing is read from or kept in the local cache ([`CACHE`]).
+    pub cache: String,
+    /// The most messages the cache keeps of a conversation ([`CACHE_MESSAGES`]).
+    pub cache_messages: u32,
+    /// The most megabytes the cache may use ([`CACHE_MAX_MB`]).
+    pub cache_max_mb: u32,
+    /// A conversation not opened for this many days leaves the cache ([`CACHE_DAYS`]).
+    pub cache_days: u32,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -68,6 +80,10 @@ impl Default for Config {
             density: "comfortable".to_string(),
             nav_rows: "expanded".to_string(),
             network: "on".to_string(),
+            cache: "on".to_string(),
+            cache_messages: 200,
+            cache_max_mb: 500,
+            cache_days: 30,
             path: None,
             retired: Vec::new(),
         }
@@ -111,6 +127,18 @@ pub const NAV_ROWS: &[&str] = &["expanded", "collapsed"];
 
 /// The values `network` takes.
 pub const NETWORK: &[&str] = &["on", "off"];
+
+/// The values `cache` takes.
+pub const CACHE: &[&str] = &["on", "off"];
+
+/// The range of `cache_messages`.
+pub const CACHE_MESSAGES: std::ops::RangeInclusive<u32> = 10..=10_000;
+
+/// The range of `cache_max_mb`.
+pub const CACHE_MAX_MB: std::ops::RangeInclusive<u32> = 10..=100_000;
+
+/// The range of `cache_days`.
+pub const CACHE_DAYS: std::ops::RangeInclusive<u32> = 1..=3650;
 
 /// Keys an older version had: ignored, never an error ([`Config::retired`]).
 pub const RETIRED: &[&str] = &["rail_expand"];
@@ -173,6 +201,12 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "density" => cfg.density = one_of(item, DENSITIES).ok_or_else(|| bad(DENSITIES.join(", ")))?,
             "nav_rows" => cfg.nav_rows = one_of(item, NAV_ROWS).ok_or_else(|| bad(NAV_ROWS.join(", ")))?,
             "network" => cfg.network = one_of(item, NETWORK).ok_or_else(|| bad(NETWORK.join(", ")))?,
+            "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,
+            "cache_messages" => {
+                cfg.cache_messages = within(item, &CACHE_MESSAGES).ok_or_else(|| bad(span(&CACHE_MESSAGES)))?
+            }
+            "cache_max_mb" => cfg.cache_max_mb = within(item, &CACHE_MAX_MB).ok_or_else(|| bad(span(&CACHE_MAX_MB)))?,
+            "cache_days" => cfg.cache_days = within(item, &CACHE_DAYS).ok_or_else(|| bad(span(&CACHE_DAYS)))?,
             "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
             "icons" => {
                 cfg.icons = match item.as_bool() {
@@ -190,6 +224,16 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
 /// The string value of `item` when it is one of `allowed` (case ignored), lowercased.
 fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
     item.as_str().map(str::to_ascii_lowercase).filter(|v| allowed.contains(&v.as_str()))
+}
+
+/// The whole number `item` when it is in `range`.
+fn within(item: &toml_edit::Item, range: &std::ops::RangeInclusive<u32>) -> Option<u32> {
+    item.as_integer().and_then(|n| u32::try_from(n).ok()).filter(|n| range.contains(n))
+}
+
+/// The words for a range of whole numbers (`10 to 10000`).
+fn span(range: &std::ops::RangeInclusive<u32>) -> String {
+    format!("a whole number from {} to {}", range.start(), range.end())
 }
 
 /// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
