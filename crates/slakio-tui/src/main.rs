@@ -94,7 +94,8 @@ fn main() -> ExitCode {
     }
     // One governor for the whole process: the sign-in check counts toward its cap too.
     let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
-    let wiring = Wiring { store, workspaces, governor, errors: paths.errors_log(), test_addr: test_addr() };
+    let mut wiring =
+        Wiring { store, workspaces, governor, errors: paths.errors_log(), test_addr: test_addr(), desktop: None };
     let env = |k: &str| std::env::var(k).ok();
     // The background matters only to a theme with a light and a dark variant, and to the
     // muted text of the terminal's colors; never asked without colors.
@@ -132,7 +133,7 @@ fn main() -> ExitCode {
         }
     };
     if let Some(why) = sign_in {
-        offer_sign_in_screen(&mut app, desktop_ok, why);
+        wiring.desktop = offer_sign_in_screen(&mut app, desktop_ok, why).map(Arc::new);
     }
     let capabilities = kind.as_ref().map(|k| match k {
         BackendKind::Demo(b) => b.capabilities(),
@@ -211,6 +212,9 @@ struct Wiring {
     governor: Arc<Governor>,
     errors: Option<PathBuf>,
     test_addr: Option<std::net::SocketAddr>,
+    /// What the sign-in screen's desktop scan found (no secret but the tokens; the cookie is
+    /// read only when a workspace is picked).
+    desktop: Option<Arc<slakio_auth::Found>>,
 }
 
 /// `SLAKIO_TEST_SLACK_ADDR`: a loopback address the tests' fake Slack listens on, used instead
@@ -257,16 +261,13 @@ impl Wiring {
         self.finish(pasted.credentials, pasted.host).await
     }
 
-    /// Sign in with the desktop workspace at `index` of the picker: read its credentials (the
-    /// macOS keychain may prompt, off the loop's thread), then check and keep them. The scan is
-    /// repeated here (it is deterministic and raises no prompt) so no secret is held meanwhile.
-    async fn sign_in_desktop(self, index: usize) -> Result<SignedIn, Label> {
-        let found = tokio::task::spawn_blocking(slakio_auth::desktop::scan)
-            .await
-            .map_err(|_| Label::SigninDesktopFailed)?
-            .map_err(desktop_label)?;
-        let ws = found.workspaces().get(index).ok_or(Label::SigninDesktopFailed)?;
-        let (team, host) = (ws.team.clone(), ws.host.clone());
+    /// Sign in with the picked desktop workspace `team` (matched by team id in what the sign-in
+    /// screen's scan found, never by position): read its credentials (the macOS keychain may
+    /// prompt, off the loop's thread), then check and keep them.
+    async fn sign_in_desktop(self, team: String) -> Result<SignedIn, Label> {
+        let found = self.desktop.clone().ok_or(Label::SigninDesktopFailed)?;
+        let ws = found.workspaces().iter().find(|w| w.team == team).ok_or(Label::SigninDesktopFailed)?;
+        let host = ws.host.clone();
         let creds = tokio::task::spawn_blocking(move || found.system_credentials(&team))
             .await
             .map_err(|_| Label::SigninDesktopFailed)?
@@ -308,18 +309,23 @@ impl Wiring {
 /// Offer signing in: when the real keychain is in use and nothing failed yet, try the Slack
 /// desktop app first and show its workspaces as a picker; otherwise (or when it finds nothing)
 /// fall back to the paste screen, with a short reason.
-fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) {
+fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) -> Option<slakio_auth::Found> {
     use slakio_auth::DesktopError;
     if why.is_some() || !desktop_ok {
         app.offer_sign_in(why);
-        return;
+        return None;
     }
+    // Before the terminal is set up: the scan reads files only (no keychain, no network).
     match slakio_auth::desktop::scan() {
-        Ok(found) => app.offer_desktop(found.workspaces().iter().map(|w| shown(&w.name)).collect()),
+        Ok(found) => {
+            app.offer_desktop(found.workspaces().iter().map(|w| (w.team.clone(), shown(&w.name))).collect());
+            return Some(found);
+        }
         Err(DesktopError::NotSupported) => app.offer_sign_in(Some(Label::SigninDesktopUnsupported)),
         Err(e) if e.is_absent() => app.offer_sign_in(Some(Label::SigninDesktopMissing)),
         Err(_) => app.offer_sign_in(Some(Label::SigninDesktopFailed)),
     }
+    None
 }
 
 /// The words for a desktop import that could not sign in.
@@ -477,7 +483,7 @@ async fn run(
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
                 Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in(pasted))),
-                Effect::DesktopPick(index) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop(index))),
+                Effect::DesktopPick(team) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop(team))),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

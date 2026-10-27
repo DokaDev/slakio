@@ -1,6 +1,6 @@
 //! Signing in from the app. `slakio login` (and the first run without a workspace) first offers
 //! the workspaces the Slack desktop app is signed in to, as a picker; the chosen one goes to the
-//! binary ([`Effect::DesktopPick`]), which reads its credentials (the macOS keychain may prompt),
+//! binary ([`Effect::DesktopPick`], by team id), which reads its credentials (the macOS keychain may prompt),
 //! asks Slack whether they sign in and keeps them. Pressing `p` (or no desktop app) falls back to
 //! the paste flow: the screen says how to copy a request, what is pasted there goes to the binary
 //! ([`Effect::SignIn`]). The pasted text is never kept by the app, drawn or printed.
@@ -27,10 +27,11 @@ pub enum SignIn {
     Failed(Label),
 }
 
-/// The desktop-workspace picker: the workspace names (Slack's text, already sanitised), the one
-/// under the cursor, and the reason the last pick did not sign in, if any.
+/// The desktop-workspace picker: the workspaces' team ids and names (Slack's text, already
+/// sanitised), the one under the cursor, and the reason the last pick did not sign in, if any.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Picker {
+    pub teams: Vec<String>,
     pub names: Vec<String>,
     pub selected: usize,
     pub note: Option<Label>,
@@ -62,10 +63,11 @@ impl App {
         self.sign_in = Some(why.map_or(SignIn::Waiting, SignIn::Failed));
     }
 
-    /// Offer the desktop app's signed-in workspaces as a picker. `names` are Slack's workspace
-    /// names, already sanitised, in the order the binary holds them.
-    pub fn offer_desktop(&mut self, names: Vec<String>) {
-        self.sign_in = Some(SignIn::Desktop(Picker { names, selected: 0, note: None }));
+    /// Offer the desktop app's signed-in workspaces as a picker: `(team id, name)` pairs, the
+    /// names Slack's text, already sanitised. The pick is reported by team id.
+    pub fn offer_desktop(&mut self, workspaces: Vec<(String, String)>) {
+        let (teams, names) = workspaces.into_iter().unzip();
+        self.sign_in = Some(SignIn::Desktop(Picker { teams, names, selected: 0, note: None }));
     }
 
     /// Where signing in stands; `None` when the app does not offer it.
@@ -116,10 +118,10 @@ impl App {
                 true
             }
             KeyCode::Enter => {
-                let picked = p.selected;
+                let Some(team) = p.teams.get(p.selected).cloned() else { return false };
                 let p = p.clone();
                 self.sign_in = Some(SignIn::DesktopChecking(p));
-                self.effects.push(Effect::DesktopPick(picked));
+                self.effects.push(Effect::DesktopPick(team));
                 true
             }
             KeyCode::Char('p') => {

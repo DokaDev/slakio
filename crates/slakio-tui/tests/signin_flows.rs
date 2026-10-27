@@ -19,7 +19,7 @@ fn key(app: &mut App, code: KeyCode) {
 
 fn picker() -> App {
     let mut app = App::new(Lang::En, Theme::terminal());
-    app.offer_desktop(vec!["Alpha".into(), "Beta".into(), "Gamma".into()]);
+    app.offer_desktop(vec![("T1".into(), "Alpha".into()), ("T2".into(), "Beta".into()), ("T3".into(), "Gamma".into())]);
     app
 }
 
@@ -147,7 +147,7 @@ fn the_cursor_moves_and_enter_picks_the_selected_workspace() {
     key(&mut app, KeyCode::Char('k'));
     assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 1, .. }))));
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(1)]);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick("T2".into())], "picked by team id");
     assert!(matches!(app.sign_in(), Some(SignIn::DesktopChecking(_))));
     assert!(screen(&app, 100, 30, Instant::now()).contains("Checking the sign-in"));
 }

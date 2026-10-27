@@ -65,8 +65,17 @@ rneatherway/slack. Both MIT notices are retained in `NOTICE` and in the module h
   log line or a `Debug` print (the import's errors are fixed words). Fixture tests cover cookie
   decrypt, token discovery, multiple workspaces, the App Store container path, a missing app, a
   corrupt database, an unreadable (locked) database, a declined keychain and no-secret-in-error.
-- The owner's real data is read only when the owner runs `slakio login` on their own machine;
-  tests use synthetic fixtures built in temp directories.
+- The scan (`scan()`: the workspace list and the session tokens, files only) runs whenever the
+  sign-in screen is offered: `slakio login`, and a plain `slakio` launch with no workspace signed
+  in. It touches no keychain and no network. The keychain (its prompt) and the cookie database are
+  reached only after the user picks a workspace, and the pick is matched by team id against that
+  same scan. Only the real keychain store runs it (never `SLAKIO_SECRET_STORE=memory`, never
+  `--paste`); tests use synthetic fixtures built in temp directories.
+- Temp copies go into a private `0700` directory with an unpredictable name, removed when
+  dropped; reads are size-capped and the LevelDB reader runs under `catch_unwind`, so a damaged or
+  hostile file is an error, never a crash.
+- The prompt is raised by the system tool `security`; the user should answer **Allow**, not
+  **Always Allow**, which would let any program read the Safe Storage key without asking.
 - The new dependencies are macOS-only and covered by `cargo deny` / `cargo audit` and the
   generated third-party notices in CI.
 - Caching the import result (so the keychain prompt is not raised on every start) is deferred to
