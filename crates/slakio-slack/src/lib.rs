@@ -7,10 +7,24 @@
 //!   ([`error::SlackError`], worded by the core's `FailKind`);
 //! * [`governor`] — the process-wide rails: the kill switch, the request cap, at most eight
 //!   requests in flight;
-//! * [`http`] — the wire (this version reaches a server on this machine only: no TLS, so no
-//!   Slack);
+//! * `http` (crate-private) — the wire (this version reaches a server on this machine only:
+//!   no TLS, so no Slack);
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
 //!   behind the UI's handle.
+//!
+//! **The only way out is [`Client`]** (and [`serve`], which uses it): a request is built from
+//! an allowed [`Method`] and sent only after the governor lets it through. Building a request
+//! by hand and sending it is not possible from outside the crate:
+//!
+//! ```compile_fail
+//! // The wire is crate-private.
+//! use slakio_slack::http::send;
+//! ```
+//!
+//! ```compile_fail
+//! // So is a prepared request and its builder.
+//! use slakio_slack::request::{Prepared, prepare};
+//! ```
 //!
 //! The crate depends on `slakio-core` only. The terminal UI never names it but in the binary's
 //! wiring; the authentication crate never depends on it (the binary hands it the credentials).
@@ -19,7 +33,7 @@ pub mod adapter;
 pub mod client;
 pub mod error;
 pub mod governor;
-pub mod http;
+pub(crate) mod http;
 pub mod method;
 pub mod request;
 pub mod response;

@@ -79,7 +79,7 @@ impl Os {
 }
 
 /// Random ids of the request envelope (trace ids, the process's client and session ids).
-pub trait Ids: Send {
+pub(crate) trait Ids: Send {
     /// `bytes` random bytes as lowercase hex.
     fn hex(&mut self, bytes: usize) -> String;
 }
@@ -87,7 +87,7 @@ pub trait Ids: Send {
 /// Ids from the standard library's per-process random hash keys: unpredictable enough for
 /// trace ids, which secure nothing.
 #[derive(Debug, Default)]
-pub struct RandomIds {
+pub(crate) struct RandomIds {
     n: u64,
 }
 
@@ -110,7 +110,7 @@ impl Ids for RandomIds {
 /// session id (`_x_csid`), the team once signed in (`slack_route`) and Slack's build
 /// (`_x_version_ts`).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Session {
+pub(crate) struct Session {
     client_id: String,
     session_id: String,
     team: Option<String>,
@@ -118,7 +118,7 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(ids: &mut dyn Ids) -> Self {
+    pub(crate) fn new(ids: &mut dyn Ids) -> Self {
         // 8 hex characters, and 11 URL-safe characters (the length of 8 bytes in base64).
         let client_id = ids.hex(4);
         let session_id = ids.hex(6).chars().take(11).collect();
@@ -126,15 +126,9 @@ impl Session {
     }
 
     /// Signed in to `team`: the requests after it carry the post-boot parameters.
-    pub fn set_team(&mut self, team: &str) {
+    pub(crate) fn set_team(&mut self, team: &str) {
         if !team.is_empty() {
             self.team = Some(team.to_string());
-        }
-    }
-
-    pub fn set_version_ts(&mut self, ts: &str) {
-        if !ts.is_empty() {
-            self.version_ts = ts.to_string();
         }
     }
 }
@@ -163,13 +157,33 @@ impl Call {
     }
 }
 
-/// A request ready to send: everything the wire carries, in order.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Prepared {
-    pub url: String,
+/// A request ready to send: everything the wire carries, in order. Crate-private: a request
+/// leaves only through [`crate::Client`], past the allowlist and the governor. Its `Debug`
+/// print leaves out the body (the token) and the cookie.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct Prepared {
+    pub(crate) url: String,
     /// In the order sent.
-    pub headers: Vec<(&'static str, String)>,
-    pub body: String,
+    pub(crate) headers: Vec<(&'static str, String)>,
+    pub(crate) body: String,
+}
+
+impl std::fmt::Debug for Prepared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let headers: Vec<(&str, &str)> = self
+            .headers
+            .iter()
+            .map(|(n, v)| match n.to_ascii_lowercase().as_str() {
+                "cookie" | "authorization" => (*n, "<redacted>"),
+                _ => (*n, v.as_str()),
+            })
+            .collect();
+        f.debug_struct("Prepared")
+            .field("url", &self.url)
+            .field("headers", &headers)
+            .field("body", &format_args!("<{} bytes redacted>", self.body.len()))
+            .finish()
+    }
 }
 
 /// The browser's headers of an API request (`Fetch` from `app.slack.com`), in order. No
@@ -195,7 +209,7 @@ fn browser_headers(os: Os) -> Vec<(&'static str, String)> {
 }
 
 /// Build `call` for `credentials`, at `now_ms` (milliseconds since the Unix epoch).
-pub fn prepare(
+pub(crate) fn prepare(
     call: &Call,
     credentials: &Credentials,
     session: &Session,

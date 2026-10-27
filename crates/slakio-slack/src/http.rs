@@ -18,8 +18,9 @@ pub const TIMEOUT: Duration = Duration::from_secs(30);
 /// The largest answer read.
 const BODY_MAX: usize = 32 * 1024 * 1024;
 
-/// Send `request` to the server of `endpoints`.
-pub async fn send(endpoints: &Endpoints, request: &Prepared) -> Result<Raw, SlackError> {
+/// Send `request` to the server of `endpoints`. Crate-private: only [`crate::Client`] sends,
+/// after the allowlist and the governor.
+pub(crate) async fn send(endpoints: &Endpoints, request: &Prepared) -> Result<Raw, SlackError> {
     match tokio::time::timeout(TIMEOUT, exchange(endpoints, request)).await {
         Ok(answer) => answer,
         Err(_) => Err(net("timed out")),

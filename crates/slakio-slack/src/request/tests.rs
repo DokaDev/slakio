@@ -169,3 +169,14 @@ fn random_ids_have_the_asked_length() {
     assert_ne!(a, b);
     assert!(a.bytes().all(|c| c.is_ascii_hexdigit()));
 }
+
+#[test]
+fn a_prepared_request_never_prints_its_token_or_cookie() {
+    let (creds, session, endpoints) = setup(Some("T0TEST"));
+    let p = prepare(&Call::form(Method::ClientCounts, &[]), &creds, &session, &endpoints, 0, &mut FixedIds, Os::Mac)
+        .unwrap();
+    let printed = format!("{p:?}");
+    assert!(!printed.contains(TOKEN), "{printed}");
+    assert!(!printed.contains("cookie-TEST"), "{printed}");
+    assert!(printed.contains("client.counts") && printed.contains("<redacted>"), "{printed}");
+}
