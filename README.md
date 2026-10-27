@@ -17,7 +17,8 @@ reads: it sends no message, reacts to nothing and marks nothing as read. There a
 updates (open a conversation again to see new messages) and no local cache yet. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
 ([Install](#install)); the latest release, 0.0.5, signs in to one workspace and reads it (no realtime updates yet);
-earlier releases ran in demo mode only. Sign-in works on macOS only (the credentials go to the macOS Keychain).
+earlier releases ran in demo mode only. Sign-in works on macOS only (the credentials go to the
+macOS Keychain); it reads the session from the Slack desktop app, or you paste a browser request.
 Nothing here is ready for daily use.
 
 The plan, in order: a user interface on fake data first, then read-only Slack connectivity,
@@ -30,7 +31,8 @@ images, and settings. This README only lists what works; it will grow with each 
 - `slakio` opens full screen and restores the terminal on exit, on `SIGTERM`/`SIGHUP`, and on
   a crash. Not signed in, it says how to sign in; signed in, it shows the workspace's
   channels and DMs (unread and mention marks from Slack) and, for a conversation you open, its
-  newest 28 messages, read-only. `slakio login` signs in, `slakio logout` signs out,
+  newest 28 messages, read-only. `slakio login` signs in (from the Slack desktop app on macOS,
+  or `slakio login --paste` to paste a browser request), `slakio logout` signs out,
   `slakio --offline` sends nothing.
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
@@ -134,21 +136,39 @@ Six keys get you everywhere:
 
 ## Sign in
 
-slakio signs in the way your browser is signed in: you copy one request the Slack web app sends
-and paste it. Nothing else is asked for, and nothing leaves your computer but slakio's own
+slakio signs in the way your browser is signed in, with your own session. On macOS it can read
+that session straight from the Slack desktop app, so there is usually nothing to copy; otherwise
+you paste one request the Slack web app sends. Nothing leaves your computer but slakio's own
 read-only requests to your workspace.
+
+### From the Slack desktop app (macOS)
+
+If you use the Slack desktop app, run `slakio login`: it lists the workspaces the app is signed
+in to, you pick one, and macOS asks whether slakio may use the **"Slack Safe Storage"** key —
+choose **Allow**. slakio reads the app's files (its cookie database and its stored session
+tokens) and changes nothing; it never contacts Slack except the one request that checks the
+sign-in. The desktop app may keep running. This reads the app's own data only when you run
+`slakio login`; a development run (`SLAKIO_SECRET_STORE=memory`) never touches it.
+
+### By pasting a request
+
+Run `slakio login --paste` (or just `slakio login` when the desktop app is not found, or on
+Linux and Windows):
 
 1. Open your workspace in a browser (`https://<workspace>.slack.com`) and sign in as usual.
 2. Open the developer tools (`Cmd+Option+I`), choose the **Network** tab and reload the page.
 3. Right-click any request whose address has `/api/` and choose **Copy > Copy as cURL**.
-4. Run `slakio login` and paste it (or `pbpaste | slakio login`).
+4. Run `slakio login --paste` and paste it (or `pbpaste | slakio login`).
 
-slakio reads the session token, the `d` cookie (and `d-s`) and the workspace's address from the
-copy, checks them with one request to Slack, shows the workspace's name and stores the token
-and cookies in the **macOS Keychain** (the first time, and after an update, macOS asks whether
-slakio may use the entry). `workspaces.toml` next to the config file names the workspace and
-holds no secret. `slakio logout` removes both. If Slack signs the session out, slakio says
-"run slakio login" and you paste a new copy.
+Either way, slakio checks the session token and the `d` cookie (and `d-s`) with one request to
+Slack, shows the workspace's name and stores them in the **macOS Keychain** (the first time, and
+after an update, macOS asks whether slakio may use the entry). `workspaces.toml` next to the
+config file names the workspace and holds no secret. `slakio logout` removes both. If Slack
+signs the session out, slakio says "run slakio login" and you sign in again. This release still
+uses **one** active workspace even when you have several; the rest are kept for a later version.
+
+The desktop-app import is adapted from the open-source client
+[gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.
 
 ## Install
 
