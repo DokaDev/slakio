@@ -5,7 +5,6 @@
 
 use super::{App, Effect};
 use crate::action::DialogAction;
-use std::time::Instant;
 
 /// What is asked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,7 +34,7 @@ impl Dialog {
 
 impl App {
     /// An answer to the question asked (`Tab` moves the focus between the answers).
-    pub(super) fn answer(&mut self, a: DialogAction, now: Instant) {
+    pub(super) fn answer(&mut self, a: DialogAction) {
         let Some(mut d) = self.dialog else { return };
         let yes = match a {
             DialogAction::Yes => true,
@@ -54,7 +53,7 @@ impl App {
         self.dialog = None;
         match d.question {
             Question::Quit | Question::QuitConfirm => self.quit = yes,
-            Question::Clear => self.answer_clear(yes, now),
+            Question::Clear => self.answer_clear(yes),
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });

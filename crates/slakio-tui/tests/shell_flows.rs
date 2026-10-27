@@ -43,7 +43,7 @@ fn the_list_says_loading_until_the_backend_answers() {
 fn an_answer_to_an_older_boot_request_is_dropped() {
     let mut d = Demo::new(80, 24);
     let stale = Envelope { generation: Generation(0), event: BackendEvent::Booted(Box::default()) };
-    assert!(!d.app.on_backend(stale), "nothing changes");
+    assert!(!d.app.on_backend(stale, d.now), "nothing changes");
     assert_eq!(d.app.model.workspaces().len(), 2, "the newer answer stays");
     // A second connect asks again; the first answer, arriving late, is dropped too.
     let first = d.app.take_commands();
@@ -53,8 +53,8 @@ fn an_answer_to_an_older_boot_request_is_dropped() {
     d.app.connect(caps);
     let asked = d.app.take_commands();
     assert_eq!(asked.len(), 2);
-    let old = Envelope { generation: asked[0].0, event: BackendEvent::Booted(Box::default()) };
-    assert!(!d.app.on_backend(old));
+    let old = Envelope { generation: asked[0].id, event: BackendEvent::Booted(Box::default()) };
+    assert!(!d.app.on_backend(old, d.now));
     assert_eq!(d.app.model.workspaces().len(), 2);
 }
 

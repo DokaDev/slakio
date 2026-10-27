@@ -1,0 +1,242 @@
+//! The backend protocol end to end over a scripted backend: answers that come late, out of
+//! order, twice or never; failed requests (nothing keeps waiting for them); a read-only backend
+//! (a change is refused before anything is sent, and none is offered); saved items the backend
+//! cannot tell (unavailable, not empty); and the binary's handle, where a late answer wakes the
+//! loop.
+
+#[path = "support/demo.rs"]
+mod demo;
+#[path = "support/scripted.rs"]
+mod scripted;
+
+use demo::mask_hangul;
+use scripted::Scripted;
+use slakio_core::backend::{BackendHandle, Capabilities, Command, Envelope, Event, FailKind, Snapshot};
+use slakio_core::i18n::Lang;
+use slakio_tui::app::App;
+use slakio_tui::app::shell::View;
+use slakio_tui::demo::DemoBackend;
+use slakio_tui::exchange;
+use slakio_tui::theme::Theme;
+use slakio_world::World;
+use std::time::{Duration, Instant};
+
+/// Booted, the conversation `name` opened; its first page asked for and held.
+fn opened(name: &str) -> Scripted {
+    let mut s = Scripted::booted(false, None);
+    s.d.list_cursor_on(name);
+    s.keys("enter");
+    assert_eq!(s.b.held.len(), 1, "the newest page is asked for");
+    assert!(matches!(s.b.held[0].command, Command::History { .. }));
+    s
+}
+
+#[test]
+fn the_list_waits_for_a_late_boot_and_says_so_when_it_fails() {
+    let mut s = Scripted::connected(false);
+    s.pump();
+    assert_eq!(s.b.held.len(), 1);
+    assert_eq!(s.b.held[0].workspace, None, "the boot is about every workspace");
+    assert!(s.d.screen().contains("Loading"), "{}", s.d.screen());
+    s.b.fail(0, FailKind::Network);
+    assert!(s.pump());
+    let screen = s.d.screen();
+    assert!(!screen.contains("Loading"), "never Loading for ever: {screen}");
+    assert!(screen.contains("Could not load workspaces"), "{screen}");
+    assert!(s.d.status_line().contains("Network error"), "{}", s.d.status_line());
+}
+
+#[test]
+fn a_page_request_names_its_workspace_and_a_late_answer_still_lands() {
+    let mut s = opened("backend");
+    assert_eq!(s.b.held[0].workspace.as_ref().map(|w| w.as_str()), Some("TDEMOA"));
+    assert!(s.d.screen().contains("Loading messages"));
+    // Nothing else happens for a while; then the answer comes.
+    assert!(!s.pump(), "no answer, no change");
+    s.b.answer(0);
+    assert!(s.pump());
+    assert!(!s.d.screen().contains("Loading messages"), "{}", s.d.screen());
+}
+
+#[test]
+fn a_duplicate_or_out_of_order_answer_changes_nothing() {
+    let mut s = opened("backend");
+    let first = s.b.answer(0);
+    assert!(s.pump());
+    let before = s.d.screen();
+    s.b.push(first.clone());
+    assert!(!s.pump(), "the same answer twice");
+    // An answer to a request nobody waits for any more (an older id).
+    let older = Envelope { generation: slakio_core::backend::Generation(first.generation.0 - 1), ..first };
+    s.b.push(older);
+    assert!(!s.pump(), "an older answer");
+    assert_eq!(s.d.screen(), before);
+}
+
+#[test]
+fn a_failed_page_ends_loading_with_an_error_row_and_asks_no_more() {
+    let mut s = opened("backend");
+    s.b.fail(0, FailKind::Offline);
+    assert!(s.pump());
+    let screen = s.d.screen();
+    assert!(screen.contains("Could not load messages"), "{screen}");
+    assert!(!screen.contains("Loading messages"), "{screen}");
+    assert!(s.d.status_line().contains("Offline"), "{}", s.d.status_line());
+    assert!(s.b.held.is_empty(), "no request in a loop after a failure");
+    // A failure nobody waits for is dropped.
+    s.b.push(Envelope::failed(slakio_core::backend::Generation(999), FailKind::Network, ""));
+    assert!(!s.pump());
+}
+
+/// To-dos shown, the cursor on its first to-do in progress.
+fn todos(s: &mut Scripted) {
+    s.keys("space o");
+    assert_eq!(s.d.app.view(), View::Todos);
+    s.keys("j j j");
+}
+
+#[test]
+fn a_failed_change_stops_waiting_and_says_why() {
+    let mut s = Scripted::booted(false, None);
+    todos(&mut s);
+    let before = s.d.screen();
+    s.keys("x");
+    assert_eq!(s.b.held.len(), 1);
+    assert!(matches!(s.b.held[0].command, Command::Save { .. }));
+    assert!(s.b.held[0].workspace.is_some(), "a change names its workspace");
+    s.b.fail(0, FailKind::RateLimited);
+    assert!(s.pump());
+    assert!(s.d.status_line().contains("slow down"), "{}", s.d.status_line());
+    // Nothing waits any more: a late success for the failed request is dropped.
+    let late = s.b.log.len();
+    s.keys("x");
+    let again = s.b.answer(0);
+    assert_eq!(s.b.log.len(), late + 1);
+    assert!(s.pump());
+    s.b.push(Envelope { generation: slakio_core::backend::Generation(again.generation.0 - 1), ..again });
+    assert!(!s.pump(), "the failed request's id is not waited for");
+    assert_ne!(s.d.screen(), before, "the second change landed");
+}
+
+#[test]
+fn a_read_only_backend_refuses_a_change_without_sending_it() {
+    let mut s = Scripted::booted(true, None);
+    todos(&mut s);
+    let before: Vec<_> = s.d.app.list_rows();
+    let log = s.b.log.len();
+    for k in ["x", "m", "d"] {
+        s.keys(k);
+        assert!(s.d.status_line().contains("Read only"), "{k}: {}", s.d.status_line());
+    }
+    assert!(s.b.held.is_empty() && s.b.log.len() == log, "nothing sent: {:?}", s.b.log);
+    assert_eq!(s.d.app.list_rows(), before, "nothing changed");
+    assert!(s.d.app.overlay().is_none(), "d asks nothing");
+}
+
+#[test]
+fn a_read_only_backend_answers_a_change_sent_anyway_with_read_only() {
+    let mut b = scripted::ScriptedBackend::new(true);
+    use slakio_core::backend::{Backend, Request, SavedChange};
+    let item = World::demo().saved()[0].clone();
+    let save = Command::Save { item: item.id, change: SavedChange::Complete };
+    b.send(Request { id: slakio_core::backend::Generation(7), workspace: Some(item.workspace), command: save });
+    let answer = b.poll().expect("answered at once");
+    assert!(matches!(answer.event, Event::Failed { kind: FailKind::ReadOnly, .. }));
+    assert_eq!(answer.generation.0, 7);
+    assert!(b.log.is_empty() && b.held.is_empty(), "the request went nowhere");
+}
+
+#[test]
+fn a_read_only_backend_offers_no_change() {
+    let mut s = Scripted::booted(true, None);
+    todos(&mut s);
+    let status = s.d.status_line();
+    assert!(!status.contains("done") && !status.contains("clear") && !status.contains("to Saved"), "{status}");
+    insta::assert_snapshot!("todos_read_only_120x40", mask_hangul(&s.d.screen()));
+    s.keys(":");
+    for c in "todo".chars() {
+        s.d.app.handle_event(
+            ratatui::crossterm::event::Event::Key(ratatui::crossterm::event::KeyEvent::new(
+                ratatui::crossterm::event::KeyCode::Char(c),
+                ratatui::crossterm::event::KeyModifiers::NONE,
+            )),
+            s.d.now,
+        );
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains("Clear the saved item") && !screen.contains("todo.toggle"), "{screen}");
+}
+
+#[test]
+fn saved_items_the_backend_cannot_tell_are_unavailable_not_empty() {
+    let mut snapshot: Snapshot = World::demo().snapshot().clone();
+    snapshot.saved = None;
+    let mut s = Scripted::booted(false, Some(snapshot));
+    s.keys("space o");
+    let screen = s.d.screen();
+    assert!(screen.contains("Not available"), "{screen}");
+    assert!(!screen.contains("Nothing here"), "{screen}");
+}
+
+#[test]
+fn an_answer_brings_the_backends_clock() {
+    let mut s = Scripted::booted(false, None);
+    todos(&mut s);
+    let overdue = |s: &Scripted| s.d.screen().matches("Overdue").count();
+    let before = overdue(&s);
+    s.keys("x");
+    let mut e = s.b.reply(0);
+    let Event::Saved { taken, .. } = &mut e.event else { panic!("a saved answer") };
+    // The clock moved on a year: every reminder in progress is overdue now.
+    *taken = slakio_core::model::Ts(taken.0 + 365 * 86_400 * 1_000_000);
+    let moved = *taken;
+    s.b.push(e);
+    assert!(s.pump());
+    assert_eq!(s.d.app.model.taken(), moved);
+    assert!(overdue(&s) > before, "overdue by the new clock: {}", s.d.screen());
+}
+
+#[tokio::test]
+async fn a_late_answer_wakes_the_loop() {
+    let caps = Capabilities { demo: false, read_only: false };
+    let (mut handle, mut end) = BackendHandle::pair(caps, 4);
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.resize(80, 24);
+    app.connect(handle.capabilities);
+    assert!(!exchange::pump(&mut app, &mut handle).await, "nothing answered yet");
+    let boot = end.rx.recv().await.expect("the boot request went out");
+    let snapshot = World::demo().snapshot().clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let _ = end.tx.send(Envelope { generation: boot.id, event: Event::Booted(Box::new(snapshot)) }).await;
+        // Kept open until the answer is taken.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    });
+    let envelope = tokio::time::timeout(Duration::from_secs(5), exchange::next(Some(&mut handle)))
+        .await
+        .expect("the late answer wakes the loop");
+    assert!(app.on_backend(envelope, Instant::now()));
+    assert!(app.model.is_loaded());
+}
+
+#[tokio::test]
+async fn the_demo_behind_its_handle_answers_in_the_same_turn() {
+    let mut handle = exchange::serve(Box::new(DemoBackend::new(World::demo())));
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.resize(80, 24);
+    app.connect(handle.capabilities);
+    assert!(exchange::pump(&mut app, &mut handle).await);
+    assert!(app.model.is_loaded(), "the first frame is drawn booted");
+}
+
+#[tokio::test]
+async fn a_backend_that_is_gone_fails_the_request_at_once() {
+    let caps = Capabilities { demo: false, read_only: false };
+    let (mut handle, end) = BackendHandle::pair(caps, 4);
+    drop(end);
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.resize(80, 24);
+    app.connect(handle.capabilities);
+    assert!(exchange::pump(&mut app, &mut handle).await);
+    assert!(app.boot_failed(), "never waits for an answer that cannot come");
+}

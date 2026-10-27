@@ -41,7 +41,7 @@ impl Demo {
 
     /// One turn of the binary's loop for the backend.
     pub fn pump(&mut self) {
-        slakio_tui::exchange::exchange(&mut self.app, &mut self.backend);
+        slakio_tui::exchange::exchange(&mut self.app, &mut self.backend, self.now);
     }
 
     /// Press keys written in config notation (`space w h`, `G`, `ctrl+l`).

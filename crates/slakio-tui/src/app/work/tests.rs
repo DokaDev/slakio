@@ -32,10 +32,10 @@ fn thread_pane(w: &Work) -> Option<&Pane> {
 }
 
 /// Answer the requests `asked` from the demo world.
-fn answer(w: &mut Work, m: &Model, backend: &mut crate::demo::DemoBackend, asked: Vec<(Generation, Command)>) {
+fn answer(w: &mut Work, m: &Model, backend: &mut crate::demo::DemoBackend, asked: Vec<Request>) {
     use slakio_core::backend::Backend;
-    for (g, c) in asked {
-        backend.send(g, c);
+    for r in asked {
+        backend.send(r);
     }
     while let Some(e) = backend.poll() {
         if let Event::History(page) = e.event {
@@ -77,7 +77,7 @@ fn a_stale_or_foreign_page_is_dropped() {
     let m = model();
     let mut w = Work::default();
     w.open(conversation(&m, "backend"));
-    let (g, _) = w.take_requests().remove(0);
+    let g = w.take_requests().remove(0).id;
     let other = Page { target: conversation(&m, "incidents"), messages: Vec::new(), complete: true };
     assert!(!w.on_page(g, &other, &m), "another target");
     let same = Page { target: conversation(&m, "backend"), messages: Vec::new(), complete: true };
@@ -206,14 +206,14 @@ fn a_page_for_a_closed_pane_is_dropped_and_reopening_loads_afresh() {
     let mut w = Work::default();
     let backend = conversation(&m, "backend");
     w.open(backend.clone());
-    let (g, _) = w.take_requests().remove(0);
+    let g = w.take_requests().remove(0).id;
     w.close();
     let page = Page { target: backend.clone(), messages: Vec::new(), complete: true };
     assert!(!w.on_page(g, &page, &m), "nobody waits for it");
     w.open(backend);
     let asked = w.take_requests();
     assert_eq!(asked.len(), 1, "loaded again");
-    assert!(asked[0].0 > g, "one allocator: every request a new id");
+    assert!(asked[0].id > g, "one allocator: every request a new id");
 }
 
 #[test]

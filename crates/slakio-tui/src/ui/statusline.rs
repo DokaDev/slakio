@@ -108,7 +108,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     // The which-key popup lists the keys itself.
     let resolved: Vec<(String, Label)> = place(app)
         .filter(|_| !app.which_key_visible(now))
-        .map(|(p, ctx)| hints::resolve(&app.keymap, p, ctx))
+        .map(|(p, ctx)| hints::resolve_offered(&app.keymap, p, ctx, app.read_only()))
         .unwrap_or_default();
     let all_hints: Vec<(String, String)> =
         resolved.iter().map(|(k, l)| (k.clone(), app.i18n.label(*l).to_string())).collect();

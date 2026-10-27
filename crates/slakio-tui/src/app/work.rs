@@ -38,7 +38,7 @@ use super::pane::{History, PAGE, Pane, Shown, echo};
 use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
 use crate::screen::THREAD_SHARE;
-use slakio_core::backend::{Command, Generation, Page};
+use slakio_core::backend::{Command, Generation, Page, Request};
 use slakio_core::layout::tabs::{Tab, Tabs};
 use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
@@ -65,7 +65,7 @@ pub struct Work {
 /// The draft of a target that has none yet.
 static NO_DRAFT: Composer = Composer::EMPTY;
 /// The timeline of a target that has none yet.
-static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None };
+static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: false };
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
@@ -219,7 +219,7 @@ impl Work {
     }
 
     /// The page requests queued since the last call.
-    pub fn take_requests(&mut self) -> Vec<(Generation, Command)> {
+    pub fn take_requests(&mut self) -> Vec<Request> {
         self.requests.take()
     }
 
@@ -245,7 +245,7 @@ impl Work {
             let tl = self.timelines.entry(&pane.target);
             if let Some(before) = pane.wants(tl) {
                 let command = Command::History { target: pane.target.clone(), before, limit: PAGE };
-                tl.pending = Some(self.requests.ask(command));
+                tl.pending = Some(self.requests.ask(Some(pane.target.workspace().clone()), command));
             }
         }
     }
@@ -437,6 +437,16 @@ impl Work {
             }
         }
         self.fill();
+        true
+    }
+
+    /// Request `id` for a page failed: its timeline stops waiting and asks no more (until it is
+    /// opened again), and `gg` stops waiting for the oldest. `false` when nothing waited for it.
+    pub fn on_failed(&mut self, id: Generation) -> bool {
+        let Some(target) = self.timelines.fail(id) else { return false };
+        for pane in self.panes.values_mut().filter(|p| p.target == target) {
+            pane.to_oldest = false;
+        }
         true
     }
 

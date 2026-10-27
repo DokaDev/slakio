@@ -1,11 +1,13 @@
 //! The protocol between the UI and a backend (the demo world now, Slack later): the UI sends
-//! [`Command`]s and receives [`Event`]s, each tagged with the [`Generation`] of the request it
-//! answers so an answer that arrives after a newer request is dropped instead of drawn.
+//! [`Request`]s and receives [`Event`]s, each tagged with the id ([`Generation`]) of the request
+//! it answers so an answer that arrives after a newer request is dropped instead of drawn.
 //!
-//! The UI state never calls a backend: it queues commands, and the binary's loop delivers them
-//! and hands the events back. Only one wiring file of the UI names a concrete backend.
+//! The UI state never calls a backend: it queues requests, and the binary's loop delivers them
+//! through a [`BackendHandle`] and hands the events back whenever they arrive (an answer may come
+//! late, or never). Only one wiring file of the UI names a concrete backend.
 
-use crate::model::{Conversation, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace};
+use crate::model::{Conversation, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace, WorkspaceId};
+use tokio::sync::mpsc;
 
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
 /// drops events of an older one.
@@ -23,6 +25,17 @@ impl Generation {
 pub struct Capabilities {
     /// The data is invented (the demo): the status line says so, and nothing reaches Slack.
     pub demo: bool,
+    /// Nothing can be changed: a [`Command::Save`] is answered with [`FailKind::ReadOnly`], and
+    /// the UI offers no change.
+    pub read_only: bool,
+}
+
+/// A command, with the id its answers carry and the workspace it is about (`None`: every one).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Request {
+    pub id: Generation,
+    pub workspace: Option<WorkspaceId>,
+    pub command: Command,
 }
 
 /// A request to the backend.
@@ -73,8 +86,9 @@ pub struct Snapshot {
     pub sections: Vec<Section>,
     /// Per section, in sidebar order.
     pub conversations: Vec<Conversation>,
-    /// The to-dos and saved messages of every workspace.
-    pub saved: Vec<SavedItem>,
+    /// The to-dos and saved messages of every workspace; `None` when the backend cannot tell
+    /// (unknown is not empty).
+    pub saved: Option<Vec<SavedItem>>,
     /// When the backend took this snapshot: reminders due before it are overdue.
     pub taken: Ts,
 }
@@ -84,8 +98,34 @@ pub struct Snapshot {
 pub enum Event {
     Booted(Box<Snapshot>),
     History(Box<Page>),
-    /// Every saved item, after a [`Command::Save`].
-    Saved(Vec<SavedItem>),
+    /// Every saved item after a [`Command::Save`], and the backend's clock then (reminders due
+    /// before it are overdue).
+    Saved {
+        items: Vec<SavedItem>,
+        taken: Ts,
+    },
+    /// Request `request` failed: nothing changed. `detail` is raw text for the error log only.
+    Failed {
+        request: Generation,
+        kind: FailKind,
+        detail: String,
+    },
+}
+
+/// Why a request failed, as far as the UI tells it apart.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailKind {
+    /// The backend changes nothing ([`Capabilities::read_only`]).
+    ReadOnly,
+    Network,
+    /// Signed out, or the sign-in is no longer accepted.
+    Auth,
+    /// Slack asked to slow down.
+    RateLimited,
+    /// The backend's own limit of requests is reached.
+    CapReached,
+    /// No connection, or the backend is gone.
+    Offline,
 }
 
 /// An event with the generation of the request it answers.
@@ -95,13 +135,65 @@ pub struct Envelope {
     pub event: Event,
 }
 
-/// A source of workspace data.
+impl Envelope {
+    /// Request `request` failed.
+    pub fn failed(request: Generation, kind: FailKind, detail: impl Into<String>) -> Self {
+        Self { generation: request, event: Event::Failed { request, kind, detail: detail.into() } }
+    }
+}
+
+/// What a read-only backend answers instead of carrying out `request`: a change is refused before
+/// anything is sent anywhere. `None` for a request that changes nothing.
+pub fn refuse_change(request: &Request) -> Option<Envelope> {
+    matches!(request.command, Command::Save { .. }).then(|| Envelope::failed(request.id, FailKind::ReadOnly, ""))
+}
+
+/// A source of workspace data that answers in turn (the demo, tests): the binary runs it behind
+/// a [`BackendHandle`].
 pub trait Backend {
     fn capabilities(&self) -> Capabilities;
 
-    /// Start `command`; its events carry `generation`.
-    fn send(&mut self, generation: Generation, command: Command);
+    /// Start `request`; its events carry its id.
+    fn send(&mut self, request: Request);
 
     /// The next event that is ready, if any (never blocks).
     fn poll(&mut self) -> Option<Envelope>;
+}
+
+/// The UI's end of a backend running on its own: requests go out and events come back over
+/// bounded channels, so an event can arrive at any time and wake the loop.
+#[derive(Debug)]
+pub struct BackendHandle {
+    pub capabilities: Capabilities,
+    pub tx: mpsc::Sender<Request>,
+    pub rx: mpsc::Receiver<Envelope>,
+}
+
+/// The backend's end of a [`BackendHandle`].
+#[derive(Debug)]
+pub struct BackendEnd {
+    pub rx: mpsc::Receiver<Request>,
+    pub tx: mpsc::Sender<Envelope>,
+}
+
+impl BackendHandle {
+    /// A handle and the backend's end of it, each channel holding up to `bound` items.
+    pub fn pair(capabilities: Capabilities, bound: usize) -> (Self, BackendEnd) {
+        let (req_tx, req_rx) = mpsc::channel(bound);
+        let (ev_tx, ev_rx) = mpsc::channel(bound);
+        (Self { capabilities, tx: req_tx, rx: ev_rx }, BackendEnd { rx: req_rx, tx: ev_tx })
+    }
+
+    /// Hand `request` to the backend without waiting. A backend that is gone or has no room
+    /// answers here and now: the request failed ([`FailKind::Offline`]), it is never lost.
+    pub fn send(&self, request: Request) -> Result<(), Envelope> {
+        let id = request.id;
+        self.tx.try_send(request).map_err(|e| {
+            let detail = match e {
+                mpsc::error::TrySendError::Full(_) => "backend queue full",
+                mpsc::error::TrySendError::Closed(_) => "backend gone",
+            };
+            Envelope::failed(id, FailKind::Offline, detail)
+        })
+    }
 }

@@ -178,7 +178,7 @@ impl Pane {
     /// needs no case of its own: it keeps the oldest loaded message selected, which is near the
     /// top.
     pub fn wants(&self, tl: &Timeline) -> Option<Option<Ts>> {
-        if tl.pending.is_some() || tl.complete {
+        if tl.pending.is_some() || tl.complete || tl.failed {
             return None;
         }
         let Some(first) = tl.items.first() else { return Some(None) };

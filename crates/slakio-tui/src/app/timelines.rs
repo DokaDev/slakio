@@ -21,6 +21,8 @@ pub struct Timeline {
     pub complete: bool,
     /// A page was asked for and has not arrived; its request id.
     pub pending: Option<Generation>,
+    /// The last page asked for failed: no more are asked for, and an empty timeline says so.
+    pub failed: bool,
 }
 
 impl Timeline {
@@ -68,6 +70,15 @@ impl TimelineStore {
     /// The timeline waiting for the answer `id` about `target`.
     pub fn awaiting(&mut self, target: &Target, id: Generation) -> Option<&mut Timeline> {
         self.timelines.get_mut(target).filter(|t| t.pending == Some(id))
+    }
+
+    /// The page asked for as request `id` failed: its timeline stops waiting. The target, when
+    /// one waited for it.
+    pub fn fail(&mut self, id: Generation) -> Option<Target> {
+        let (target, tl) = self.timelines.iter_mut().find(|(_, t)| t.pending == Some(id))?;
+        tl.pending = None;
+        tl.failed = true;
+        Some(target.clone())
     }
 
     /// Keep only the timelines `keep` says yes to.

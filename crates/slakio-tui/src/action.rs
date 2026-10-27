@@ -22,6 +22,14 @@ pub enum Action {
     Dialog(DialogAction),
 }
 
+impl Action {
+    /// The action asks the backend to change something: a backend that changes nothing offers
+    /// none of them.
+    pub fn changes(self) -> bool {
+        matches!(self, Action::Shell(ShellAction::TodoToggle | ShellAction::TodoMove | ShellAction::TodoClear))
+    }
+}
+
 /// Actions of the app as a whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AppAction {

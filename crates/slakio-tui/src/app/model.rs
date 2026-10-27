@@ -109,12 +109,23 @@ impl Model {
     }
 
     pub fn saved(&self, i: usize) -> &SavedItem {
-        &self.snapshot.saved[i]
+        &self.items()[i]
     }
 
-    /// Every saved item, after a change the backend made.
-    pub fn set_saved(&mut self, items: Vec<SavedItem>) {
-        self.snapshot.saved = items;
+    /// Every saved item; none while the backend cannot tell ([`Model::saved_known`]).
+    fn items(&self) -> &[SavedItem] {
+        self.snapshot.saved.as_deref().unwrap_or_default()
+    }
+
+    /// The backend told which items are saved (else To-dos is unavailable, not empty).
+    pub fn saved_known(&self) -> bool {
+        self.snapshot.saved.is_some()
+    }
+
+    /// Every saved item after a change the backend made, and its clock then.
+    pub fn set_saved(&mut self, items: Vec<SavedItem>, taken: slakio_core::model::Ts) {
+        self.snapshot.saved = Some(items);
+        self.snapshot.taken = taken;
     }
 
     /// Whether item `s`'s reminder is overdue (only a to-do in progress is), upcoming or none,
@@ -131,7 +142,7 @@ impl Model {
     /// The to-dos of workspace `ws` in progress, and whether one is overdue (the view's count).
     pub fn todo_count(&self, ws: usize) -> (u32, bool) {
         let Some(w) = self.snapshot.workspaces.get(ws) else { return (0, false) };
-        let open = self.snapshot.saved.iter().filter(|s| s.workspace == w.id && s.state == SavedState::InProgress);
+        let open = self.items().iter().filter(|s| s.workspace == w.id && s.state == SavedState::InProgress);
         open.fold((0, false), |(n, late), s| (n + 1, late || self.due(s) == Due::Overdue))
     }
 
@@ -149,18 +160,16 @@ impl Model {
             (DueFilter::NoReminder, d) => d == Due::None,
             _ => false,
         };
-        let mut out: Vec<usize> = (0..self.snapshot.saved.len())
+        let mut out: Vec<usize> = (0..self.items().len())
             .filter(|&i| {
-                let s = &self.snapshot.saved[i];
+                let s = &self.items()[i];
                 s.workspace == w.id && s.state == state && (!todo || due_ok(s))
             })
             .collect();
-        let key = |i: &usize| self.snapshot.saved[*i].created;
+        let key = |i: &usize| self.items()[*i].created;
         match opts.sort {
             _ if !todo => out.sort_by_key(|i| std::cmp::Reverse(key(i))),
-            Sort::Due => {
-                out.sort_by_key(|i| (self.snapshot.saved[*i].due.is_none(), self.snapshot.saved[*i].due, key(i)))
-            }
+            Sort::Due => out.sort_by_key(|i| (self.items()[*i].due.is_none(), self.items()[*i].due, key(i))),
             Sort::Oldest => out.sort_by_key(key),
             Sort::Newest => out.sort_by_key(|i| std::cmp::Reverse(key(i))),
         }

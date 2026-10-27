@@ -9,7 +9,7 @@ use futures::StreamExt;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::EventStream;
-use slakio_core::backend::Backend;
+use slakio_core::backend::{Backend, BackendHandle};
 use slakio_core::config::{self, ConfigError};
 use slakio_core::fault::ErrorLog;
 use slakio_core::i18n::{self, Label, Msg};
@@ -17,7 +17,7 @@ use slakio_core::paths::Paths;
 use slakio_core::secret::{STORE_ENV, StoreKind};
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
-use slakio_tui::exchange::exchange;
+use slakio_tui::exchange;
 use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
 use slakio_tui::theme::{Background, Look};
 use slakio_tui::ui;
@@ -71,7 +71,8 @@ fn main() -> ExitCode {
     };
     app.fold_views(cfg.nav_rows == "collapsed");
     // The one place that names a concrete backend.
-    let backend: Option<Box<dyn Backend>> = demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend>);
+    let backend: Option<Box<dyn Backend + Send>> =
+        demo.then(|| Box::new(DemoBackend::new(World::demo())) as Box<dyn Backend + Send>);
     if let Some(b) = &backend {
         app.connect(b.capabilities());
         // Asked once, where the view switcher can preview the answer; the answer is saved.
@@ -108,6 +109,7 @@ fn main() -> ExitCode {
         let _restore = term::guard();
         let (mut terminal, enhanced) = term::setup_terminal()?;
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
+        let backend = backend.map(exchange::serve);
         run(
             &mut terminal,
             app,
@@ -141,8 +143,8 @@ fn config_message(e: &ConfigError) -> Msg {
     }
 }
 
-/// The event loop: draw when something changed, then sleep until the next input event, signal
-/// or deadline of the app. With nothing to do it never wakes up.
+/// The event loop: draw when something changed, then sleep until the next input event, signal,
+/// backend event or deadline of the app. With nothing to do it never wakes up.
 /// Where the loop saves what the app asks it to: the config file, and the error log for a save
 /// that fails.
 struct Saved {
@@ -153,7 +155,7 @@ struct Saved {
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     mut app: App,
-    mut backend: Option<Box<dyn Backend>>,
+    mut backend: Option<BackendHandle>,
     stats: &mut Option<stats::Stats>,
     saved: Saved,
 ) -> io::Result<()> {
@@ -169,7 +171,7 @@ async fn run(
     while !app.quit {
         // The backend's turn: deliver what the app asked for, take what is ready.
         if let Some(b) = backend.as_mut() {
-            redraw |= exchange(&mut app, b.as_mut());
+            redraw |= exchange::pump(&mut app, b).await;
         }
         for effect in app.take_effects() {
             match effect {
@@ -219,6 +221,8 @@ async fn run(
                 None => break,
             },
             _ = timer => app.on_tick(Instant::now()),
+            // An answer that came later than its turn: it wakes the loop like a key.
+            envelope = exchange::next(backend.as_mut()) => app.on_backend(envelope, Instant::now()),
             // Asked to end from outside: the loop ends and the terminal is restored on the way
             // out, as on a normal quit.
             _ = signals.recv() => {

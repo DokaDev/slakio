@@ -27,6 +27,7 @@
 //! `Ctrl+R` or `Space r` ([`nav`]), is a stop of the `Tab` round, and runs on into the list. Tabs ([`tabs`]) keep their own panes; the mouse is
 //! [`mouse`]'s.
 
+mod answers;
 pub mod cmdline;
 pub mod composer;
 pub mod dialog;
@@ -63,7 +64,7 @@ pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use shell::Shell;
-use slakio_core::backend::{Capabilities, Command, Envelope, Event as BackendEvent, Generation};
+use slakio_core::backend::{Capabilities, Generation};
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
 use std::time::{Duration, Instant};
@@ -148,8 +149,8 @@ pub struct App {
     pub(crate) dialog: Option<Dialog>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
-    /// The generation of the last boot request; older answers are dropped.
-    boot: Generation,
+    /// The generation of the last boot request (older answers are dropped), and whether it failed.
+    boot: (Generation, bool),
     effects: Vec<Effect>,
     /// The last click (for a double click): when, and where.
     last_click: Option<(Instant, Position)>,
@@ -183,7 +184,7 @@ impl App {
             help: None,
             dialog: None,
             backend: None,
-            boot: Generation::default(),
+            boot: (Generation::default(), false),
             effects: Vec::new(),
             last_click: None,
             tab_drag: None,
@@ -193,12 +194,6 @@ impl App {
         }
     }
 
-    /// Use a backend that can do `caps`: asks it for the workspaces.
-    pub fn connect(&mut self, caps: Capabilities) {
-        self.backend = Some(caps);
-        self.boot = self.work.requests.ask(Command::Boot);
-    }
-
     /// Ask once whether the terminal shows Nerd Font icons; the view switcher previews the answer that
     /// has the focus, and the answer is saved ([`Effect::Save`]).
     pub fn ask_icons(&mut self) {
@@ -206,30 +201,9 @@ impl App {
         self.settings.icons = false;
     }
 
-    /// The requests for the backend queued since the last call.
-    pub fn take_commands(&mut self) -> Vec<(Generation, Command)> {
-        self.work.take_requests()
-    }
-
     /// The effects queued since the last call.
     pub fn take_effects(&mut self) -> Vec<Effect> {
         std::mem::take(&mut self.effects)
-    }
-
-    /// An event of the backend. `true` when the screen changed; an answer to an older request
-    /// is dropped.
-    pub fn on_backend(&mut self, envelope: Envelope) -> bool {
-        match envelope.event {
-            BackendEvent::Booted(snapshot) if envelope.generation == self.boot => {
-                self.model = Model::new(*snapshot);
-                self.shell.clamp(&self.model, self.list_height());
-                self.work.clamp(&self.model);
-                true
-            }
-            BackendEvent::Booted(_) => false,
-            BackendEvent::History(page) => self.work.on_page(envelope.generation, &page, &self.model),
-            BackendEvent::Saved(items) => self.on_saved(envelope.generation, items),
-        }
     }
 
     pub fn resize(&mut self, width: u16, height: u16) {
@@ -453,7 +427,7 @@ impl App {
             Action::Tab(a) => self.tab(a, now),
             Action::Composer(a) => self.composer(a, now),
             Action::Help(a) => self.help(a, now),
-            Action::Dialog(a) => self.answer(a, now),
+            Action::Dialog(a) => self.answer(a),
         }
     }
 

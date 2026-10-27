@@ -267,33 +267,34 @@ fn done_paging(w: &World, c: &ConversationId, thread: Ts, all: &mut Vec<Message>
 fn saved_items_are_messages_of_the_world_with_reminders_by_its_own_clock() {
     let w = world();
     let s = w.snapshot();
-    assert_eq!(s.saved.len(), 14);
-    assert!(s.saved.windows(2).all(|p| p[0].created <= p[1].created), "in the order they were saved");
-    for item in &s.saved {
+    let saved = w.saved();
+    assert_eq!(saved.len(), 14);
+    assert!(saved.windows(2).all(|p| p[0].created <= p[1].created), "in the order they were saved");
+    for item in saved {
         let i = w.index_of(&item.conversation, item.ts).expect("a message of its conversation");
         let m = w.message(&item.conversation, i).unwrap();
         assert_eq!((&m.user, &m.text, m.thread.is_some()), (&item.author, &item.text, item.thread));
         assert!(item.created < s.taken, "saved before the clock");
     }
-    let overdue = s.saved.iter().filter(|i| i.state == SavedState::InProgress && i.due.is_some_and(|d| d < s.taken));
+    let overdue = saved.iter().filter(|i| i.state == SavedState::InProgress && i.due.is_some_and(|d| d < s.taken));
     assert_eq!(overdue.count(), 3, "two in A company, one in B side");
-    assert!(s.saved.iter().any(|i| i.thread), "one opens a thread");
-    assert_eq!(world().snapshot().saved, s.saved, "the same every run");
+    assert!(saved.iter().any(|i| i.thread), "one opens a thread");
+    assert_eq!(world().saved(), saved, "the same every run");
 }
 
 #[test]
 fn a_saved_change_applies_as_slack_would_and_only_where_it_applies() {
     let mut w = world();
-    let first = |w: &World, st: SavedState| w.snapshot().saved.iter().find(|i| i.state == st).unwrap().id.clone();
+    let first = |w: &World, st: SavedState| w.saved().iter().find(|i| i.state == st).unwrap().id.clone();
     let id = first(&w, SavedState::InProgress);
     assert!(w.change_saved(&id, SavedChange::Complete));
     assert!(!w.change_saved(&id, SavedChange::Complete), "completed already");
     assert!(w.change_saved(&id, SavedChange::MoveToSaved));
-    let moved = w.snapshot().saved.iter().find(|i| i.id == id).unwrap();
+    let moved = w.saved().iter().find(|i| i.id == id).unwrap();
     assert_eq!((moved.state, moved.due), (SavedState::Saved, None), "Saved has no reminders");
     assert!(w.change_saved(&id, SavedChange::MoveToTodos));
-    let n = w.snapshot().saved.len();
+    let n = w.saved().len();
     assert!(w.change_saved(&id, SavedChange::Clear));
-    assert_eq!(w.snapshot().saved.len(), n - 1);
+    assert_eq!(w.saved().len(), n - 1);
     assert!(!w.change_saved(&id, SavedChange::Reopen), "gone");
 }

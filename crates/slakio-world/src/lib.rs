@@ -26,8 +26,8 @@ pub use hostile::{Hostile, all as hostile_strings};
 use rng::Rng;
 use slakio_core::backend::{SavedChange, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, SavedId, Section, SectionId,
-    SectionKind, ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
+    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, SavedId, SavedItem, Section,
+    SectionId, SectionKind, ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
@@ -198,7 +198,7 @@ impl World {
         for (n, spec) in SPECS.iter().enumerate() {
             w.add_workspace(n, spec);
         }
-        w.snapshot.saved = saved::items(&w);
+        w.snapshot.saved = Some(saved::items(&w));
         w.snapshot.taken = saved::now(&w);
         w
     }
@@ -206,7 +206,12 @@ impl World {
     /// Apply `change` to saved item `id`, as Slack would; `false` when there is no such item or
     /// the change does not apply to it. The snapshot holds the result.
     pub fn change_saved(&mut self, id: &SavedId, change: SavedChange) -> bool {
-        saved::change(&mut self.snapshot.saved, id, change)
+        self.snapshot.saved.as_mut().is_some_and(|items| saved::change(items, id, change))
+    }
+
+    /// Every saved item of the world, in the order they were saved.
+    pub fn saved(&self) -> &[SavedItem] {
+        self.snapshot.saved.as_deref().unwrap_or_default()
     }
 
     /// The demo world.

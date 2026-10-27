@@ -130,9 +130,12 @@ fn a_change_waits_for_the_backend_and_an_older_answer_is_dropped() {
     assert_eq!(items(&d), before, "sent is not succeeded");
     let asked = d.app.take_commands();
     assert_eq!(asked.len(), 1);
-    let stale =
-        Envelope { generation: slakio_core::backend::Generation(asked[0].0.0 - 1), event: BackendEvent::Saved(vec![]) };
-    assert!(!d.app.on_backend(stale), "an answer to an older request changes nothing");
+    let taken = d.app.model.taken();
+    let stale = Envelope {
+        generation: slakio_core::backend::Generation(asked[0].id.0 - 1),
+        event: BackendEvent::Saved { items: vec![], taken },
+    };
+    assert!(!d.app.on_backend(stale, d.now), "an answer to an older request changes nothing");
     assert_eq!(items(&d), before);
 }
 

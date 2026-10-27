@@ -14,6 +14,8 @@ publish.workspace = true
 
 # No UI crates (ratatui/crossterm), no network, no database here (docs/architecture.md).
 [dependencies]
+# Channels only (the backend handle): no runtime, no network.
+tokio = { workspace = true, features = ["sync"] }
 toml_edit.workspace = true
 
 # build.rs: checks the locale catalogs and generates the typed message API.

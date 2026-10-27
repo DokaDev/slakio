@@ -24,7 +24,7 @@ use crate::action::ShellAction;
 use crate::text::{clip, width};
 use slakio_core::backend::{Command, Generation, SavedChange};
 use slakio_core::i18n::{Label, Msg};
-use slakio_core::model::{SavedId, SavedItem, SavedState};
+use slakio_core::model::{SavedId, SavedItem, SavedState, Ts, WorkspaceId};
 use std::time::Instant;
 
 /// Which to-dos To-dos shows by their state.
@@ -83,11 +83,11 @@ pub struct TodoView {
     pub status: StatusFilter,
     pub due: DueFilter,
     pub sort: Sort,
-    /// The last change asked for (older answers are dropped), what it was and when (its
-    /// notice counts from then).
-    asked: Option<(Generation, SavedChange, Instant)>,
-    /// The item `d` asked about, while the question is open.
-    clearing: Option<SavedId>,
+    /// The last change asked for (older answers are dropped) and what it was; its notice counts
+    /// from the answer.
+    asked: Option<(Generation, SavedChange)>,
+    /// The item `d` asked about (and its workspace), while the question is open.
+    clearing: Option<(SavedId, WorkspaceId)>,
 }
 
 /// The values `:filter` takes: `all` shows every to-do again.
@@ -180,13 +180,15 @@ impl App {
         self.shell.item_at_cursor(&self.model).map(|i| self.model.saved(i))
     }
 
-    /// The keys of To-dos and Saved (see the module's text).
+    /// The keys of To-dos and Saved (see the module's text). A backend that changes nothing
+    /// refuses every change, saying so.
     pub(super) fn todo(&mut self, a: ShellAction, now: Instant) {
-        let state = self.item().map(|s| (s.id.clone(), s.state));
+        let state = self.item().map(|s| ((s.id.clone(), s.workspace.clone()), s.state));
         let change = match (a, state) {
             (ShellAction::TodoFilter, _) => return self.palette_with("filter "),
             (ShellAction::TodoSort, _) => return self.palette_with("sort "),
             (_, None) => return self.info(Msg::Label(Label::StatusNotSaved), now),
+            _ if self.read_only() => return self.info(Msg::Label(Label::FailReadOnly), now),
             (ShellAction::TodoToggle, Some((_, SavedState::Saved))) => {
                 return self.info(Msg::Label(Label::StatusNotTodo), now);
             }
@@ -201,26 +203,27 @@ impl App {
                 return;
             }
         };
-        self.ask_saved(change.0, change.1, now);
+        self.ask_saved(change.0, change.1);
     }
 
-    fn ask_saved(&mut self, item: SavedId, change: SavedChange, now: Instant) {
-        let g = self.work.requests.ask(Command::Save { item, change });
-        self.shell.todo.asked = Some((g, change, now));
+    fn ask_saved(&mut self, (item, workspace): (SavedId, WorkspaceId), change: SavedChange) {
+        let g = self.work.requests.ask(Some(workspace), Command::Save { item, change });
+        self.shell.todo.asked = Some((g, change));
     }
 
     /// The answer to the clear question: `yes` clears the item asked about.
-    pub(super) fn answer_clear(&mut self, yes: bool, now: Instant) {
-        if let Some(id) = self.shell.todo.clearing.take().filter(|_| yes) {
-            self.ask_saved(id, SavedChange::Clear, now);
+    pub(super) fn answer_clear(&mut self, yes: bool) {
+        if let Some(item) = self.shell.todo.clearing.take().filter(|_| yes) {
+            self.ask_saved(item, SavedChange::Clear);
         }
     }
 
-    /// The backend's saved items after the change asked last; an older answer is dropped.
-    pub(super) fn on_saved(&mut self, generation: Generation, items: Vec<SavedItem>) -> bool {
-        let Some((_, change, now)) = self.shell.todo.asked.filter(|(g, ..)| *g == generation) else { return false };
+    /// The backend's saved items after the change asked last, by its clock `taken`, arrived at
+    /// `now`; an older answer is dropped.
+    pub(super) fn on_saved(&mut self, generation: Generation, items: Vec<SavedItem>, taken: Ts, now: Instant) -> bool {
+        let Some((_, change)) = self.shell.todo.asked.filter(|(g, _)| *g == generation) else { return false };
         self.shell.todo.asked = None;
-        self.model.set_saved(items);
+        self.model.set_saved(items, taken);
         self.shell.clamp(&self.model, self.list_height());
         let done = match change {
             SavedChange::Complete => Label::StatusTodoCompleted,
@@ -231,6 +234,11 @@ impl App {
         };
         self.info(Msg::Label(done), now);
         true
+    }
+
+    /// The change asked last as request `id` failed: nothing changed, and nothing waits for it.
+    pub(super) fn on_save_failed(&mut self, id: Generation) -> bool {
+        self.shell.todo.asked.take_if(|(g, _)| *g == id).is_some()
     }
 
     /// `Enter` (`focus`) or `l` on an item: its message in the work area, selected — in its

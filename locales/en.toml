@@ -69,11 +69,14 @@
 "list.later_version" = "{view} comes in a later version"
 "list.empty" = "Nothing here"
 "list.external" = "ext"
+"list.failed" = "Could not load workspaces"
+"list.unavailable" = "Not available"
 
 # The work area.
 "pane.loading" = "Loading messages…"
 "pane.no_messages" = "No messages yet · {keys} write"
 "pane.thread" = "Thread"
+"pane.failed" = "Could not load messages"
 # A DM's title: its peer's presence.
 "presence.active" = "active"
 "presence.away" = "away"
@@ -350,6 +353,13 @@
 "status.todo_saved" = "Moved to Saved"
 "status.todo_back" = "Moved to To-dos"
 "status.todo_cleared" = "Cleared"
+# A request the backend did not carry out.
+"fail.read_only" = "Read only: nothing can be changed here"
+"fail.network" = "Network error: try again"
+"fail.auth" = "Signed out: sign in again"
+"fail.rate_limited" = "Slack asked to slow down: try again soon"
+"fail.cap_reached" = "Request limit reached: try again soon"
+"fail.offline" = "Offline: nothing was sent"
 "hint.todo_done" = "done"
 "hint.todo_save" = "to Saved"
 "hint.todo_back" = "to To-dos"

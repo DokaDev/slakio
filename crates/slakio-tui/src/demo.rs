@@ -1,8 +1,8 @@
-//! The demo backend (`slakio --demo`): answers every command from the invented world of
+//! The demo backend (`slakio --demo`): answers every request from the invented world of
 //! `slakio-world`, at once and without any network. It is the only backend for now; the
 //! binary's wiring is the one place that names it.
 
-use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Generation, Page};
+use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Page, Request};
 use slakio_core::model::Target;
 use slakio_world::World;
 use std::collections::VecDeque;
@@ -20,11 +20,11 @@ impl DemoBackend {
 
 impl Backend for DemoBackend {
     fn capabilities(&self) -> Capabilities {
-        Capabilities { demo: true }
+        Capabilities { demo: true, read_only: false }
     }
 
-    fn send(&mut self, generation: Generation, command: Command) {
-        let event = match command {
+    fn send(&mut self, request: Request) {
+        let event = match request.command {
             Command::Boot => Event::Booted(Box::new(self.world.snapshot().clone())),
             Command::History { target, before, limit } => {
                 let limit = limit as usize;
@@ -39,10 +39,10 @@ impl Backend for DemoBackend {
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
-                Event::Saved(self.world.snapshot().saved.clone())
+                Event::Saved { items: self.world.saved().to_vec(), taken: self.world.snapshot().taken }
             }
         };
-        self.ready.push_back(Envelope { generation, event });
+        self.ready.push_back(Envelope { generation: request.id, event });
     }
 
     fn poll(&mut self) -> Option<Envelope> {

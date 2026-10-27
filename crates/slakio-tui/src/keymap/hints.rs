@@ -238,9 +238,15 @@ pub fn key_label(km: &Keymap, action: Action, ctx: Ctx) -> Option<String> {
 
 /// The entries of `place` with their keys, typed from `ctx`: (keys, label).
 pub fn resolve(km: &Keymap, place: Place, ctx: Ctx) -> Vec<(String, Label)> {
+    resolve_offered(km, place, ctx, false)
+}
+
+/// [`resolve`], without the changes when the backend is `read_only` ([`Action::changes`]).
+pub fn resolve_offered(km: &Keymap, place: Place, ctx: Ctx, read_only: bool) -> Vec<(String, Label)> {
     let leader = parse_keys(LEADER).expect("the leader parses");
     entries(place)
         .iter()
+        .filter(|h| !(read_only && matches!(h, One(a, _) if a.changes())))
         .filter_map(|h| match *h {
             One(a, l) => key_label(km, a, ctx).map(|k| (k, l)),
             Pair(a, b, l) => Some((format!("{}/{}", key_label(km, a, ctx)?, key_label(km, b, ctx)?), l)),

@@ -179,6 +179,7 @@ impl App {
         for (i, s) in REGISTRY.iter().enumerate() {
             // What works here: a command, or a key from where the keyboard is.
             let works = offered(s.action, backend)
+                && (!s.action.changes() || !self.read_only())
                 && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty());
             if works && let Some((tier, score)) = action::rank_spec(word, s, &self.i18n) {
                 let quit = s.action == Action::App(AppAction::Quit);

@@ -57,8 +57,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let rows = app.shell.rows(&app.model);
-    if !app.model.is_loaded() {
-        let p = Paragraph::new(app.i18n.label(Label::ListLoading).to_string()).style(t.faint());
+    // Unknown is not empty: what could not be loaded, or is not available, says so.
+    let unknown = if !app.model.is_loaded() {
+        Some(if app.boot_failed() { Label::ListFailed } else { Label::ListLoading })
+    } else if app.shell.view == View::Todos && !app.model.saved_known() {
+        Some(Label::ListUnavailable)
+    } else {
+        None
+    };
+    if let Some(l) = unknown {
+        let p = Paragraph::new(app.i18n.label(l).to_string()).style(t.faint());
         f.render_widget(p, pad(inner));
         return;
     }
