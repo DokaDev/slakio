@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Commits <formula> as Formula/slakio.rb of the Homebrew tap $TAP_REPO and pushes it, over SSH
 # with the tap's deploy key ($TAP_DEPLOY_KEY, a write key of that repository only). GitHub's
-# host keys come from its API, so the connection never trusts an unknown key. With DRY_RUN=1
+# host keys come from its API (asked with $GH_TOKEN when set: an anonymous request from a shared
+# runner can be rate limited), so the connection never trusts an unknown key. With DRY_RUN=1
 # everything but the push happens, and `git push --dry-run` checks that the key may write.
 # Usage: release-tap.sh <tag> <formula>
 set -euo pipefail
@@ -21,7 +22,9 @@ ssh_dir=$(mktemp -d)
 trap 'rm -rf "$ssh_dir"' EXIT
 printf '%s\n' "$TAP_DEPLOY_KEY" > "$ssh_dir/key"
 chmod 600 "$ssh_dir/key"
-curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$ssh_dir/known_hosts"
+auth=()
+[[ -n ${GH_TOKEN:-} ]] && auth=(-H "Authorization: Bearer $GH_TOKEN")
+curl -fsSL --retry 3 ${auth[@]+"${auth[@]}"} https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$ssh_dir/known_hosts"
 export GIT_SSH_COMMAND="ssh -i $ssh_dir/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$ssh_dir/known_hosts -o StrictHostKeyChecking=yes"
 
 git clone --depth 1 "git@github.com:$TAP_REPO.git" "$ssh_dir/tap"

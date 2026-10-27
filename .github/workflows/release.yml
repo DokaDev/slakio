@@ -216,6 +216,7 @@ jobs:
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           DRY_RUN: ${{ needs.plan.outputs.publish == 'true' && '0' || '1' }}
         run: |
