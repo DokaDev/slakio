@@ -430,3 +430,39 @@ fn the_demo_still_writes_and_echoes_locally() {
     s.keys("i");
     assert_eq!(s.d.app.mode(), slakio_tui::app::Mode::Insert);
 }
+
+#[test]
+fn authors_a_page_names_show_by_name_and_the_others_by_id_until_known() {
+    // A start that knows nobody but the user (as Slack's does).
+    let world = World::demo();
+    let full = world.snapshot().clone();
+    let mut known = full.clone();
+    let mes: Vec<_> = full.workspaces.iter().map(|w| w.me.clone()).collect();
+    known.users.retain(|u| mes.contains(&u.id));
+    let mut s = Scripted::booted(false, Some(known));
+    s.d.list_cursor_on("backend");
+    s.keys("enter");
+    let mut e = s.b.reply(0);
+    let slakio_core::backend::Event::History(page) = &mut e.event else { panic!("a page") };
+    let author = page.messages.iter().rev().find(|m| !mes.contains(&m.user)).unwrap().user.clone();
+    let person = full.users.iter().find(|u| u.id == author).unwrap().clone();
+    let mut unnamed = e.clone();
+    // Without the author's name the id shows; with it, the name.
+    s.b.push(unnamed.clone());
+    s.pump();
+    assert!(s.d.screen().contains(author.as_str()), "{}", s.d.screen());
+    s.d.list_cursor_on("incidents");
+    s.keys("enter");
+    s.b.held.clear();
+    s.d.list_cursor_on("backend");
+    s.keys("enter");
+    let slakio_core::backend::Event::History(p) = &mut unnamed.event else { unreachable!() };
+    p.users = vec![person.clone()];
+    unnamed.generation = s.b.held[0].id;
+    s.b.held.clear();
+    s.b.push(unnamed);
+    s.pump();
+    let screen = s.d.screen();
+    assert!(screen.contains(person.display_name.line().as_str()), "{screen}");
+    assert!(!screen.contains(author.as_str()), "{screen}");
+}

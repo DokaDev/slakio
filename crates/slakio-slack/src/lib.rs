@@ -9,7 +9,8 @@
 //!   requests in flight;
 //! * `http` (crate-private) — the wire: TLS to the workspace's own Slack hosts only, or plain
 //!   HTTP to a server on this machine (the tests' fake Slack);
-//! * [`login`] — whether credentials sign in (one `client.userBoot`);
+//! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
+//!   the names of the people messages and DMs name, looked up in batches and kept;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
 //!   behind the UI's handle.
 //!
@@ -37,6 +38,7 @@ pub mod governor;
 pub(crate) mod http;
 pub mod login;
 pub mod method;
+pub(crate) mod people;
 pub mod request;
 pub mod response;
 pub mod wire;

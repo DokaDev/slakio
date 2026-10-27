@@ -75,10 +75,54 @@ pub struct Count {
     pub mention_count: Option<u32>,
 }
 
-/// `conversations.view`: the conversation's newest messages under `history`.
+/// `conversations.view`: the conversation's newest messages under `history`, and (some of)
+/// their authors.
 #[derive(Debug, Default, Deserialize)]
 pub struct View {
     pub history: Option<History>,
+    #[serde(default, deserialize_with = "lenient")]
+    pub users: Option<Vec<Person>>,
+}
+
+/// A person, as a view and the edge cache's `users/info` describe one.
+#[derive(Debug, Deserialize)]
+pub struct Person {
+    pub id: String,
+    pub team_id: Option<String>,
+    pub name: Option<String>,
+    pub real_name: Option<String>,
+    pub is_bot: Option<bool>,
+    pub profile: Option<Profile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Profile {
+    pub display_name: Option<String>,
+    pub real_name: Option<String>,
+}
+
+impl Person {
+    /// The name people see: the display name, else the real name, else the handle; `None`
+    /// when Slack gave none (an empty one is none).
+    pub fn shown_name(&self) -> Option<&str> {
+        let p = self.profile.as_ref();
+        [
+            p.and_then(|p| p.display_name.as_deref()),
+            p.and_then(|p| p.real_name.as_deref()),
+            self.real_name.as_deref(),
+            self.name.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .find(|n| !n.trim().is_empty())
+    }
+}
+
+/// The edge cache's `users/info`.
+#[derive(Debug, Default, Deserialize)]
+pub struct EdgeUsers {
+    #[serde(default, deserialize_with = "lenient")]
+    pub results: Option<Vec<Person>>,
 }
 
 /// `conversations.history` and `conversations.replies` (and `history` of a view).

@@ -90,6 +90,20 @@ impl Model {
         self.snapshot.conversations.iter().find(|c| &c.workspace == workspace && &c.id == conversation)
     }
 
+    /// People the backend learned of after the start (a page's authors): each is added, or
+    /// replaces what was known of them.
+    pub fn add_users(&mut self, users: &[User]) {
+        for u in users {
+            match self.users.get(&u.id) {
+                Some(&i) => self.snapshot.users[i] = u.clone(),
+                None => {
+                    self.users.insert(u.id.clone(), self.snapshot.users.len());
+                    self.snapshot.users.push(u.clone());
+                }
+            }
+        }
+    }
+
     pub fn user(&self, id: &UserId) -> Option<&User> {
         self.users.get(id).map(|&i| &self.snapshot.users[i])
     }

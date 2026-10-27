@@ -7,7 +7,7 @@ fn target(ws: &str) -> Target {
 }
 
 fn page(ws: &str, complete: bool) -> Page {
-    Page { target: target(ws), messages: Vec::new(), complete }
+    Page { target: target(ws), messages: Vec::new(), complete, users: Vec::new() }
 }
 
 #[test]

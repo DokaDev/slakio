@@ -73,7 +73,11 @@ impl App {
                 true
             }
             Event::Booted(_) => false,
-            Event::History(page) => self.work.on_page(id, &page, &self.model),
+            Event::History(page) => {
+                // Its authors' names first: a page's messages are drawn with them as it arrives.
+                self.model.add_users(&page.users);
+                self.work.on_page(id, &page, &self.model)
+            }
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
         }

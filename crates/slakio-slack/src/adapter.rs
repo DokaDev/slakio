@@ -14,6 +14,7 @@ use crate::client::Client;
 use crate::error::SlackError;
 use crate::governor::Priority;
 use crate::method::Method;
+use crate::people::People;
 use crate::request::Call;
 use crate::wire;
 use slakio_core::backend::{
@@ -53,8 +54,11 @@ pub fn serve(client: Client) -> BackendHandle {
 /// The user's own id once the workspace has booted (whose reactions are "mine").
 type Me = Arc<Mutex<Option<UserId>>>;
 
+pub use crate::people::LOOKUP_BATCH;
+
 async fn run(client: Arc<Client>, mut end: BackendEnd) {
     let me: Me = Arc::default();
+    let people: Arc<People> = Arc::default();
     let mut tasks = JoinSet::new();
     let mut in_flight: HashMap<Target, AbortHandle> = HashMap::new();
     // The open under way, to cancel when a newer one comes.
@@ -67,11 +71,11 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
             }
             continue;
         }
-        let (client, tx, me) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&me));
+        let (client, tx, me, people) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&me), Arc::clone(&people));
         let Request { id, command, .. } = request;
         match command {
             Command::Boot => {
-                tasks.spawn(async move { answer(&tx, id, boot(&client, &me).await).await });
+                tasks.spawn(async move { answer(&tx, id, boot(&client, &me, &people).await).await });
             }
             Command::History { target, before, limit } => {
                 if let Some(older) = in_flight.remove(&target) {
@@ -92,7 +96,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
                         if opening {
                             tokio::time::sleep(OPEN_DEBOUNCE).await;
                         }
-                        history(&client, &me, target, before, limit).await
+                        history(&client, &me, &people, target, before, limit).await
                     };
                     let page = match cancelled {
                         Some(cancelled) => tokio::select! {
@@ -130,16 +134,20 @@ async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Even
 
 /// The workspace from `client.userBoot` (it cannot do without), its unread marks from
 /// `client.counts` (it can).
-async fn boot(client: &Client, me: &Me) -> Result<Event, SlackError> {
+async fn boot(client: &Client, me: &Me, people: &People) -> Result<Event, SlackError> {
     let boot: wire::UserBoot = client.call(&crate::login::user_boot(), Priority::User).await?;
     let (Some(team), Some(self_)) = (boot.team, boot.me) else {
         return Err(SlackError::Network { detail: "the start answer has no team or user".to_string() });
     };
     client.set_team(&team.id);
+    people.set_team(&team.id);
     *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
     let counts: Option<wire::Counts> =
         client.call(&Call::form(Method::ClientCounts, &[]), Priority::Background).await.ok();
-    Ok(Event::Booted(Box::new(snapshot(&team, &self_, boot.channels, boot.ims, counts))))
+    // The DMs' people, by name (in batches); those not found show their id.
+    let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
+    let known = people.names(client, &peers, Priority::Background).await;
+    Ok(Event::Booted(Box::new(snapshot(&team, &self_, boot.channels, boot.ims, counts, known))))
 }
 
 fn snapshot(
@@ -148,6 +156,7 @@ fn snapshot(
     channels: Option<Vec<wire::Channel>>,
     ims: Option<Vec<wire::Im>>,
     counts: Option<wire::Counts>,
+    known: Vec<User>,
 ) -> Snapshot {
     let ws = WorkspaceId::new(&team.id);
     let mut unread: HashMap<String, (u32, u32)> = HashMap::new();
@@ -194,7 +203,10 @@ fn snapshot(
         .collect();
     conversations.extend(ims.unwrap_or_default().into_iter().filter_map(|im| {
         let user = im.user?;
-        Some(conversation(im.id, user.clone(), ConversationKind::Dm { user: UserId::new(user) }, false, &sections[1]))
+        let peer = known.iter().find(|u| u.id.as_str() == user);
+        let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
+        let external = peer.is_some_and(|u| matches!(u.org, Org::External(_)));
+        Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external, &sections[1]))
     }));
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
     Snapshot {
@@ -204,7 +216,7 @@ fn snapshot(
             color: WorkspaceColor(0),
             me: UserId::new(&me.id),
         }],
-        users: vec![User {
+        users: std::iter::once(User {
             id: UserId::new(&me.id),
             workspace: ws,
             name: Remote::new(me_name.clone()),
@@ -212,7 +224,9 @@ fn snapshot(
             org: Org::Own,
             bot: false,
             presence: Presence::Unknown,
-        }],
+        })
+        .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
+        .collect(),
         sections,
         conversations,
         // Saved items are not read in this version: unknown, not none.
@@ -223,7 +237,14 @@ fn snapshot(
 
 /// A page of `target`: the newest through `conversations.view`, older ones through
 /// `conversations.history`, a thread through `conversations.replies`.
-async fn history(client: &Client, me: &Me, target: Target, before: Option<Ts>, limit: u32) -> Result<Page, SlackError> {
+async fn history(
+    client: &Client,
+    me: &Me,
+    people: &People,
+    target: Target,
+    before: Option<Ts>,
+    limit: u32,
+) -> Result<Page, SlackError> {
     let limit = limit.clamp(1, PAGE_MAX).to_string();
     let channel = target.conversation().as_str().to_string();
     let latest = before.map(|ts| ts.to_string());
@@ -247,6 +268,7 @@ async fn history(client: &Client, me: &Me, target: Target, before: Option<Ts>, l
                 ],
             );
             let view: wire::View = client.call(&call, Priority::User).await?;
+            people.learn(view.users.as_deref().unwrap_or_default());
             view.history.unwrap_or_default()
         }
         (Target::Conversation { .. }, Some(l)) => {
@@ -265,7 +287,15 @@ async fn history(client: &Client, me: &Me, target: Target, before: Option<Ts>, l
     messages.sort_by_key(|m| m.ts);
     // Unknown is not complete: only Slack's own "no more" says the start is in this page.
     let complete = history.has_more == Some(false);
-    Ok(Page { target, messages, complete })
+    // The authors by name: what the view brought, else looked up (in batches); not the user.
+    let authors: Vec<String> = messages
+        .iter()
+        .map(|m| m.user.as_str())
+        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != *u))
+        .map(str::to_string)
+        .collect();
+    let users = people.names(client, &authors, Priority::User).await;
+    Ok(Page { target, messages, complete, users })
 }
 
 fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {

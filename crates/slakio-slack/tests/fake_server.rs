@@ -170,7 +170,7 @@ fn the_backend_boots_from_the_start_bundle_and_reads_a_conversation() {
         assert!(handle.capabilities.read_only && !handle.capabilities.demo);
         ask(&handle, 1, Command::Boot);
         let Event::Booted(snapshot) = next(&mut handle).await.event else { panic!("booted") };
-        assert_eq!(fake.methods(), ["client.userBoot", "client.counts"]);
+        assert_eq!(fake.methods(), ["client.userBoot", "client.counts", "users/info"], "the DMs' people by name");
         assert_eq!(snapshot.workspaces[0].id, ws.id);
         assert_eq!(snapshot.saved, None, "saved items are unknown, not none");
         let expected = world
@@ -200,7 +200,7 @@ fn the_backend_boots_from_the_start_bundle_and_reads_a_conversation() {
             expected.iter().map(|m| m.ts).collect::<Vec<_>>()
         );
         assert!(!page.complete);
-        let view = fake.log().pop().unwrap();
+        let view = fake.log().into_iter().rfind(|l| l.method() == "conversations.view").unwrap();
         assert_eq!(view.method(), "conversations.view");
         assert!(view.fields().contains(&("count", "28")), "a page is at most 28");
     });

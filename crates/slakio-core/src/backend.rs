@@ -86,6 +86,9 @@ pub struct Page {
     pub messages: Vec<Message>,
     /// Nothing older exists: the start of the conversation or thread is in this page.
     pub complete: bool,
+    /// People the messages name whom the backend learned of with this page (their names, for
+    /// authors not in the snapshot); none when it has nothing new.
+    pub users: Vec<User>,
 }
 
 /// Everything the UI lists right after start: the answer to [`Command::Boot`].

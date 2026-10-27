@@ -21,7 +21,7 @@ pub(crate) fn msg(ts: u64) -> Shown {
 
 /// Messages `from..to` arrive in `tl`, and `p` (its pane) follows them.
 fn arrive(p: &mut Pane, tl: &mut Timeline, from: u64, to: u64, complete: bool) {
-    let page = Page { target: target(), messages: Vec::new(), complete };
+    let page = Page { target: target(), messages: Vec::new(), complete, users: Vec::new() };
     tl.add_page(&page, (from..to).map(msg).collect());
     p.arrived(tl);
 }

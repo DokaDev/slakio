@@ -14,6 +14,7 @@ pub(crate) fn answer(world: &World, request: &Logged) -> Value {
         "conversations.view" => view(world, request),
         "conversations.history" => history(world, request),
         "conversations.replies" => replies(world, request),
+        "users/info" => edge_users(world, request),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
     if let Some(o) = out.as_object_mut() {
@@ -153,7 +154,13 @@ fn view(world: &World, request: &Logged) -> Value {
         return json!({"ok": false, "error": "channel_not_found"});
     };
     let (messages, complete) = world.history(&c, None, limit(request, "count"));
-    json!({"ok": true, "history": page(messages, complete), "users": [], "channels": [], "emojis": {}})
+    // The authors, as Slack sends them with a view: here only every other one, so the client's
+    // lookup of the rest is exercised too.
+    let mut authors: Vec<&str> = messages.iter().map(|m| m.user.as_str()).collect();
+    authors.sort_unstable();
+    authors.dedup();
+    let users: Vec<Value> = authors.iter().step_by(2).filter_map(|id| person(world, id)).collect();
+    json!({"ok": true, "history": page(messages, complete), "users": users, "channels": [], "emojis": {}})
 }
 
 fn history(world: &World, request: &Logged) -> Value {
@@ -178,4 +185,40 @@ fn replies(world: &World, request: &Logged) -> Value {
     // Replies come oldest first, the thread's own message first.
     let list: Vec<Value> = messages.iter().enumerate().map(|(n, m)| message(m, n)).collect();
     json!({"ok": true, "messages": list, "has_more": !complete})
+}
+
+/// A person of the world as Slack describes one; `None` for an id it does not know. Some leave
+/// their display name out (Slack's empty display name).
+fn person(world: &World, id: &str) -> Option<Value> {
+    let u = world.snapshot().users.iter().find(|u| u.id.as_str() == id)?;
+    let mut profile = json!({"real_name": u.display_name.unsanitized()});
+    if id.len().is_multiple_of(2) {
+        profile["display_name"] = json!(u.display_name.unsanitized());
+    }
+    Some(json!({
+        "id": id,
+        "team_id": u.workspace.as_str(),
+        "name": u.name.unsanitized(),
+        "real_name": u.display_name.unsanitized(),
+        "is_bot": u.bot,
+        "deleted": false,
+        "profile": profile,
+    }))
+}
+
+/// The edge cache's people lookup: `updated_ids` (id → version) in the JSON body; every id it
+/// knows comes back, the others are listed as failed.
+fn edge_users(world: &World, request: &Logged) -> Value {
+    let body: Value = serde_json::from_str(&request.body).unwrap_or_default();
+    let Some(ids) = body.get("updated_ids").and_then(Value::as_object) else {
+        return json!({"ok": false, "error": "invalid_arguments"});
+    };
+    let (mut results, mut failed) = (Vec::new(), Vec::new());
+    for id in ids.keys() {
+        match person(world, id) {
+            Some(p) => results.push(p),
+            None => failed.push(json!(id)),
+        }
+    }
+    json!({"ok": true, "results": results, "failed_ids": failed})
 }

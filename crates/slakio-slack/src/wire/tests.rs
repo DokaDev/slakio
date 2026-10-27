@@ -22,3 +22,16 @@ fn an_unreadable_entry_is_left_out_not_fatal() {
     assert!(boot.ims.is_none(), "unknown, not empty");
     assert_eq!(boot.team.unwrap().name, None);
 }
+
+#[test]
+fn a_person_shows_the_first_name_slack_gave() {
+    let p: Person = serde_json::from_value(serde_json::json!({
+        "id": "U1", "name": "minsu", "real_name": "Minsu Kim", "profile": {"display_name": "", "real_name": "Minsu K"}
+    }))
+    .unwrap();
+    assert_eq!(p.shown_name(), Some("Minsu K"), "an empty display name is none");
+    let bare: Person = serde_json::from_value(serde_json::json!({"id": "U2"})).unwrap();
+    assert_eq!(bare.shown_name(), None);
+    let view: View = serde_json::from_value(serde_json::json!({"users": [{"id": "U1"}, {"no_id": 1}]})).unwrap();
+    assert_eq!(view.users.unwrap().len(), 1, "an unreadable person is left out");
+}
