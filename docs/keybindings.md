@@ -49,6 +49,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space e` | Show or hide the list panel | `list.toggle_panel` |
 | `Space v` | Fold the view switcher to the view shown, or unfold it | `nav.toggle_rows` |
 | `Space W` | Switch workspace | `workspace.choose` |
+| `r` | Retry what could not be loaded | `app.retry` |
 | `Ctrl+O` | Back to the conversation before | `history.back` |
 | `Alt+Left` | Back to the conversation before | `history.back` |
 | `Space [` | Back to the conversation before | `history.back` |
@@ -262,6 +263,7 @@ Type `:` and the command, then `Enter`.
 |---|---|---|
 | `:qa` | `:qall` `:quitall` | Quit |
 | `:workspace` |  | Switch workspace |
+| `:retry` |  | Retry what could not be loaded |
 | `:help` |  | Keyboard help |
 | `:avatars` |  | Show or hide avatars (initials) |
 | `:icons` |  | Show Nerd Font icons, or text instead |

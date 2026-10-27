@@ -12,17 +12,17 @@ expression: d.snap()
 │ ▾ Favorites           │ : type a command or an action name                                   │                       │
 │   # backend           ├──────────────────────────────────────────────────────────────────────┤                       │
 │   # incidents         │  :workspace            Switch workspace                      Space W │                       │
-│                       │  :help                 Keyboard help                          ? / F1 │                       │
-│ ▾ Ops                 │  :theme <theme>        Change the color theme                        │                       │
-│   # deploys           │  :avatars              Show or hide avatars (initials)               │                       │
-│   # alerts            │  :icons                Show Nerd Font icons, or text instead         │                       │
-│   # partner-shared ext│  :density              Comfortable or compact messages               │                       │
-│   # hostile-strings   │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
-│   # big-history       │  :list                 Show or hide the list panel           Space e │                       │
-│   # long-threads      │  :navrows              Fold the view switcher to the view…   Space v │                       │
-│                       │  :home                 Show Home                             Space h │                       │
-│ ▾ Channels            │  :dms                  Show DMs                              Space d │                       │
-│   # announcements     │  :activity             Show Activity                         Space a │                       │
+│                       │  :retry                Retry what could not be loaded              r │                       │
+│ ▾ Ops                 │  :help                 Keyboard help                          ? / F1 │                       │
+│   # deploys           │  :theme <theme>        Change the color theme                        │                       │
+│   # alerts            │  :avatars              Show or hide avatars (initials)               │                       │
+│   # partner-shared ext│  :icons                Show Nerd Font icons, or text instead         │                       │
+│   # hostile-strings   │  :density              Comfortable or compact messages               │                       │
+│   # big-history       │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
+│   # long-threads      │  :list                 Show or hide the list panel           Space e │                       │
+│                       │  :navrows              Fold the view switcher to the view…   Space v │                       │
+│ ▾ Channels            │  :home                 Show Home                             Space h │                       │
+│   # announcements     │  :dms                  Show DMs                              Space d │                       │
 │   # design-review     ╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
 │   # feed-alert-134         ││                         ?        Keyboard help                                         │
 │   # feed-alert-8           ││                         Ctrl+Q   Quit                                                  │

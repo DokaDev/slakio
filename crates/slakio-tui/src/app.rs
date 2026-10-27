@@ -141,8 +141,8 @@ pub struct App {
     pub(crate) dialog: Option<Dialog>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
-    /// The generation of the last boot request (older answers are dropped), and whether it failed.
-    boot: (Generation, bool),
+    /// The generation of the last boot request (older answers are dropped), and why it failed.
+    boot: (Generation, Option<slakio_core::backend::FailKind>),
     effects: Vec<Effect>,
     /// The last click (for a double click): when, and where.
     last_click: Option<(Instant, Position)>,
@@ -176,7 +176,7 @@ impl App {
             help: None,
             dialog: None,
             backend: None,
-            boot: (Generation::default(), false),
+            boot: (Generation::default(), None),
             effects: Vec::new(),
             last_click: None,
             tab_drag: None,
@@ -450,11 +450,11 @@ impl App {
             }
             AppAction::ToggleAvatars | AppAction::ToggleDensity | AppAction::ToggleIcons => self.toggle(a, now),
             AppAction::ChooseWorkspace => self.open_switcher(),
+            AppAction::Retry => self.retry(now),
         }
     }
 
-    /// Ask before quitting: about the text not sent when a composer holds some, else only
-    /// whether to quit (for a click, which is easy to make by mistake).
+    /// Ask before quitting: about the text not sent, else only whether to quit (a click is easy).
     fn confirm_quit(&mut self) {
         self.help = None;
         let q = if self.work.unsent() { Question::Quit } else { Question::QuitConfirm };

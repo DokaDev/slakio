@@ -238,7 +238,7 @@ async fn a_backend_that_is_gone_fails_the_request_at_once() {
     app.resize(80, 24);
     app.connect(handle.capabilities);
     assert!(exchange::pump(&mut app, &mut handle).await);
-    assert!(app.boot_failed(), "never waits for an answer that cannot come");
+    assert_eq!(app.boot_failed(), Some(FailKind::Offline), "never waits for an answer that cannot come");
 }
 
 /// The demo world, read-only, counting every change that reaches it.
@@ -307,4 +307,53 @@ fn a_failure_goes_to_the_error_log_as_one_safe_line() {
     assert!(detail.starts_with("Network: reset [31m by peer x"), "{detail}");
     assert!(!detail.chars().any(char::is_control), "{detail:?}");
     assert!(detail.chars().count() <= "Network: ".len() + 200, "cut: {}", detail.len());
+}
+
+#[test]
+fn r_asks_again_for_workspaces_that_failed_for_a_reason_that_may_pass() {
+    let mut s = Scripted::connected(false);
+    s.pump();
+    s.b.fail(0, FailKind::RateLimited);
+    s.pump();
+    assert!(s.d.screen().contains("r retry"), "{}", s.d.screen());
+    assert!(s.b.held.is_empty(), "nothing retries on its own");
+    s.keys("r");
+    assert_eq!(s.b.held.len(), 1, "asked again");
+    assert!(matches!(s.b.held[0].command, Command::Boot));
+    assert!(s.d.screen().contains("Loading"), "{}", s.d.screen());
+    s.b.answer(0);
+    s.pump();
+    assert!(s.d.app.model.is_loaded());
+}
+
+#[test]
+fn r_does_not_ask_again_when_asking_again_cannot_help() {
+    let mut s = Scripted::connected(false);
+    s.pump();
+    s.b.fail(0, FailKind::Auth);
+    s.pump();
+    assert!(!s.d.screen().contains("r retry"), "{}", s.d.screen());
+    s.keys("r");
+    assert!(s.b.held.is_empty(), "signed out: asking again cannot help");
+    assert!(s.d.status_line().contains("Signed out"), "says why: {}", s.d.status_line());
+    // Booted, with nothing failed: `r` says there is nothing to retry.
+    let mut s = Scripted::booted(false, None);
+    s.keys("r");
+    assert!(s.b.held.is_empty());
+    assert!(s.d.status_line().contains("Nothing to retry"), "{}", s.d.status_line());
+}
+
+#[test]
+fn r_in_a_pane_whose_messages_failed_asks_for_them_again() {
+    let mut s = opened("backend");
+    s.b.fail(0, FailKind::Offline);
+    s.pump();
+    assert!(s.d.screen().contains("r retry"), "{}", s.d.screen());
+    assert!(s.b.held.is_empty(), "nothing retries on its own");
+    s.keys("r");
+    assert_eq!(s.b.held.len(), 1, "asked again");
+    assert!(matches!(s.b.held[0].command, Command::History { .. }));
+    s.b.answer(0);
+    assert!(s.pump());
+    assert!(!s.d.screen().contains("Could not load messages"), "{}", s.d.screen());
 }

@@ -255,6 +255,7 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space e", ShellAction::ToggleList),
     shell(Ctx::Shell, "space v", ShellAction::ToggleNavRows),
     app(Ctx::Shell, "space W", AppAction::ChooseWorkspace),
+    app(Ctx::Shell, "r", AppAction::Retry),
     // Back and forward through what the work area showed. `Ctrl+I` is `Tab` without the kitty
     // keyboard protocol, so it is bound only with it; `Alt` needs Option-as-Alt on macOS;
     // `Space [` and `Space ]` work everywhere.

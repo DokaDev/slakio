@@ -56,8 +56,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         let text = if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
             app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string()
-        } else if tl.failed {
-            app.i18n.label(Label::PaneFailed).to_string()
+        } else if let Some(kind) = tl.failed {
+            super::failed_text(app, Label::PaneFailed, kind)
         } else {
             app.i18n.label(Label::PaneLoading).to_string()
         };

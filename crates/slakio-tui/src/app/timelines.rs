@@ -9,7 +9,7 @@
 //! the target again loads it afresh.
 
 use super::pane::Shown;
-use slakio_core::backend::{Generation, Page};
+use slakio_core::backend::{FailKind, Generation, Page};
 use slakio_core::model::{Target, Ts};
 use std::collections::HashMap;
 
@@ -21,8 +21,9 @@ pub struct Timeline {
     pub complete: bool,
     /// A page was asked for and has not arrived; its request id.
     pub pending: Option<Generation>,
-    /// The last page asked for failed: no more are asked for, and an empty timeline says so.
-    pub failed: bool,
+    /// The last page asked for failed, and why: no more are asked for (until asked to retry), and
+    /// an empty timeline says so.
+    pub failed: Option<FailKind>,
 }
 
 impl Timeline {
@@ -74,10 +75,10 @@ impl TimelineStore {
 
     /// The page asked for as request `id` failed: its timeline stops waiting. The target, when
     /// one waited for it.
-    pub fn fail(&mut self, id: Generation) -> Option<Target> {
+    pub fn fail(&mut self, id: Generation, kind: FailKind) -> Option<Target> {
         let (target, tl) = self.timelines.iter_mut().find(|(_, t)| t.pending == Some(id))?;
         tl.pending = None;
-        tl.failed = true;
+        tl.failed = Some(kind);
         Some(target.clone())
     }
 

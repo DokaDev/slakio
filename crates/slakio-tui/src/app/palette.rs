@@ -82,7 +82,11 @@ fn offered(a: Action, backend: bool) -> bool {
     match a {
         Action::App(AppAction::Quit) => true,
         Action::App(
-            AppAction::ChooseWorkspace | AppAction::ToggleAvatars | AppAction::ToggleIcons | AppAction::ToggleDensity,
+            AppAction::ChooseWorkspace
+            | AppAction::Retry
+            | AppAction::ToggleAvatars
+            | AppAction::ToggleIcons
+            | AppAction::ToggleDensity,
         )
         | Action::Shell(_)
         | Action::Pane(_)

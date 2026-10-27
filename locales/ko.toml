@@ -298,6 +298,7 @@
 "switcher.keys" = "Enter 전환 · Esc 닫기"
 "config.retired" = "{key} 설정은 더 이상 쓰지 않습니다(레일이 보기 전환으로 바뀜). 설정 파일에서 지워도 됩니다"
 "action.density" = "메시지 넉넉하게 또는 촘촘하게"
+"action.retry" = "불러오지 못한 것 다시 시도"
 "density.changed" = "밀도: {name}"
 "nav_rows.changed" = "보기 전환: {name}"
 "density.unknown" = "알 수 없는 밀도 {name} ({names} 중 하나)"
@@ -332,6 +333,7 @@
 "status.todo_saved" = "저장됨으로 옮겼습니다"
 "status.todo_back" = "할 일로 옮겼습니다"
 "status.todo_cleared" = "지웠습니다"
+"status.nothing_to_retry" = "여기서 다시 시도할 것이 없습니다"
 # A request the backend did not carry out.
 "fail.read_only" = "읽기 전용: 여기서는 바꿀 수 없습니다"
 "fail.network" = "네트워크 오류: 다시 시도하세요"
@@ -340,6 +342,7 @@
 "fail.cap_reached" = "요청 한도에 도달했습니다: 잠시 후 다시 시도하세요"
 "fail.offline" = "오프라인: 아무것도 보내지 않았습니다"
 "fail.busy" = "처리 중: 보내지 않았습니다, 다시 시도하세요"
+"retry.hint" = "{keys} 다시 시도"
 "hint.todo_done" = "완료"
 "hint.todo_save" = "저장됨으로"
 "hint.todo_back" = "할 일로"

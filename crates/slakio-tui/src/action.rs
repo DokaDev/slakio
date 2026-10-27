@@ -41,6 +41,8 @@ pub enum AppAction {
     Palette,
     /// Pick another workspace (the switcher under the list panel's workspace chip).
     ChooseWorkspace,
+    /// Ask again for what could not be loaded, when the reason may pass (`:retry`).
+    Retry,
     /// Picture people by their initials chip, or not (`:avatars`); saved in the config file.
     ToggleAvatars,
     /// Nerd Font icons, or text instead (`:icons`); saved in the config file.
@@ -275,6 +277,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::Interrupt, "app.interrupt", Label::ActionInterrupt, &[]),
     app(AppAction::Palette, "palette.open", Label::ActionPalette, &[]),
     app(AppAction::ChooseWorkspace, "workspace.choose", Label::ActionWorkspaceChoose, &["workspace"]),
+    app(AppAction::Retry, "app.retry", Label::ActionRetry, &["retry"]),
     help(HelpAction::Open, "help.open", Label::ActionHelpOpen, &["help"]),
     app(AppAction::ToggleAvatars, "avatars.toggle", Label::ActionAvatars, &["avatars"]),
     app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),

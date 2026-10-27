@@ -38,7 +38,7 @@ use super::pane::{History, PAGE, Pane, Shown, echo};
 use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
 use crate::screen::THREAD_SHARE;
-use slakio_core::backend::{Command, Generation, Page, Request};
+use slakio_core::backend::{Command, FailKind, Generation, Page, Request};
 use slakio_core::layout::tabs::{Tab, Tabs};
 use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
@@ -65,7 +65,7 @@ pub struct Work {
 /// The draft of a target that has none yet.
 static NO_DRAFT: Composer = Composer::EMPTY;
 /// The timeline of a target that has none yet.
-static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: false };
+static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: None };
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
@@ -442,11 +442,26 @@ impl Work {
 
     /// Request `id` for a page failed: its timeline stops waiting and asks no more (until it is
     /// opened again), and `gg` stops waiting for the oldest. `false` when nothing waited for it.
-    pub fn on_failed(&mut self, id: Generation) -> bool {
-        let Some(target) = self.timelines.fail(id) else { return false };
+    pub fn on_failed(&mut self, id: Generation, kind: FailKind) -> bool {
+        let Some(target) = self.timelines.fail(id, kind) else { return false };
         for pane in self.panes.values_mut().filter(|p| p.target == target) {
             pane.to_oldest = false;
         }
+        true
+    }
+
+    /// The active pane's messages could not be loaded, for a reason that may pass: ask again.
+    /// `false` when there is nothing to retry there.
+    pub fn retry(&mut self) -> bool {
+        let Some(target) = self.active().and_then(|id| self.panes.get(&id)).map(|p| p.target.clone()) else {
+            return false;
+        };
+        let tl = self.timelines.entry(&target);
+        if !tl.failed.is_some_and(FailKind::retryable) {
+            return false;
+        }
+        tl.failed = None;
+        self.fill();
         true
     }
 

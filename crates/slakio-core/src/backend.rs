@@ -123,6 +123,16 @@ pub enum Event {
     },
 }
 
+impl FailKind {
+    /// Asking again may work (when the user asks: nothing retries on its own).
+    pub fn retryable(self) -> bool {
+        match self {
+            FailKind::Network | FailKind::Offline | FailKind::RateLimited | FailKind::Busy => true,
+            FailKind::ReadOnly | FailKind::Auth | FailKind::CapReached => false,
+        }
+    }
+}
+
 /// Why a request failed, as far as the UI tells it apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FailKind {

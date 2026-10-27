@@ -14,7 +14,7 @@ impl App {
     /// Use a backend that can do `caps`: asks it for the workspaces.
     pub fn connect(&mut self, caps: Capabilities) {
         self.backend = Some(caps);
-        self.boot = (self.work.requests.ask(None, Command::Boot), false);
+        self.boot = (self.work.requests.ask(None, Command::Boot), None);
     }
 
     /// The requests for the backend queued since the last call.
@@ -27,9 +27,21 @@ impl App {
         self.backend.is_some_and(|c| c.read_only)
     }
 
-    /// The last request for the workspaces failed.
-    pub fn boot_failed(&self) -> bool {
+    /// Why the last request for the workspaces failed, if it did.
+    pub fn boot_failed(&self) -> Option<FailKind> {
         self.boot.1
+    }
+
+    /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
+    /// workspaces, else the active pane's messages. Only when asked: nothing retries on its own.
+    pub(super) fn retry(&mut self, now: Instant) {
+        match self.boot.1 {
+            Some(kind) if kind.retryable() => self.boot = (self.work.requests.ask(None, Command::Boot), None),
+            // Asking again cannot help: say why once more.
+            Some(kind) => self.warn(Msg::Label(failure(kind)), now),
+            None if self.work.retry() => {}
+            None => self.info(Msg::Label(Label::StatusNothingToRetry), now),
+        }
     }
 
     /// An event of the backend, which arrived at `now`. `true` when the screen changed; an
@@ -39,7 +51,7 @@ impl App {
         match envelope.event {
             Event::Booted(snapshot) if id == self.boot.0 => {
                 self.model = Model::new(*snapshot);
-                self.boot.1 = false;
+                self.boot.1 = None;
                 self.shell.clamp(&self.model, self.list_height());
                 self.work.clamp(&self.model);
                 true
@@ -55,10 +67,10 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
         let waited = if id == self.boot.0 {
-            self.boot.1 = true;
+            self.boot.1 = Some(kind);
             true
         } else {
-            self.work.on_failed(id) || self.on_save_failed(id)
+            self.work.on_failed(id, kind) || self.on_save_failed(id)
         };
         if waited {
             self.warn(Msg::Label(failure(kind)), now);
