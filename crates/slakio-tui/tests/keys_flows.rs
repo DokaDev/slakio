@@ -223,8 +223,11 @@ fn arrows_pages_home_and_end_work_wherever_j_and_k_do() {
     assert!(n - 1 - selected(&d).unwrap() < page);
     d.keys("up down");
     assert!(selected(&d).is_some());
+    // `Home` selects the oldest message loaded; the one older page it asks for lands above it.
+    let oldest = d.pane(PaneKind::Conversation).unwrap().messages()[0].ts;
     d.keys("home");
-    assert_eq!(selected(&d), Some(0));
+    let main = d.pane(PaneKind::Conversation).unwrap();
+    assert_eq!(selected(&d).map(|i| main.messages()[i].ts), Some(oldest));
 }
 
 // --- Quitting ---------------------------------------------------------------------------------

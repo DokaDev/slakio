@@ -102,7 +102,8 @@ fn above(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid>
 /// The rows of message `i` of `pane` for a width of `w` cells; `selected`: it is selected (a
 /// grouped message then shows its time).
 pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected: bool) -> Vec<Laid> {
-    let mut out = above(app, pane, tl, i, w);
+    let mut out = if i == 0 { start(app, pane, tl, w) } else { Vec::new() };
+    out.extend(above(app, pane, tl, i, w));
     if app.settings.compact {
         out.extend(compact(app, pane, tl, i, w));
     } else {
@@ -111,11 +112,39 @@ pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected:
     out.extend(footer(app, pane, tl, i, w));
     // A thread read only in part says so after the last reply read.
     if tl.cut && i + 1 == tl.items.len() {
-        let notice = app.i18n.label(Label::PaneThreadCut).to_string();
         out.push((Line::raw(""), Kind::Gap));
-        out.push((Line::from(Span::styled(clip(&notice, w), app.theme.faint())), Kind::Gap));
+        out.extend(notice(&app.i18n.label(Label::PaneThreadCut).to_string(), w, app.theme.faint()));
     }
     out
+}
+
+/// What is above the oldest message loaded: older ones on their way, older ones that failed
+/// (and the key that asks again), or the start of the conversation once a history read back
+/// reached it. A blank row parts it from the message.
+fn start(app: &App, pane: &Pane, tl: &Timeline, w: usize) -> Vec<Laid> {
+    let faint = app.theme.faint();
+    let text = if tl.loading_older() {
+        app.i18n.label(Label::PaneOlderLoading).to_string()
+    } else if let Some(kind) = tl.older_failed() {
+        let words = app.i18n.label(Label::PaneOlderFailed).to_string();
+        match crate::ui::retry_key(app).filter(|_| tl.retryable() || kind.retryable()) {
+            Some(keys) => format!("{words} · {}", app.i18n.msg(&Msg::RetryHint { keys })),
+            None => words,
+        }
+    } else if tl.complete && tl.paged && !pane.is_thread() {
+        app.i18n.label(Label::PaneStart).to_string()
+    } else {
+        return Vec::new();
+    };
+    let mut out = notice(&text, w, faint);
+    out.push((Line::raw(""), Kind::Gap));
+    out
+}
+
+/// A notice `text` in `style`, wrapped at blanks to `w` cells (a few rows at most).
+fn notice(text: &str, w: usize, style: Style) -> Vec<Laid> {
+    let (lines, _) = crate::text::wrap(text, w.max(1), 3);
+    lines.into_iter().map(|l| (Line::from(Span::styled(l, style)), Kind::Gap)).collect()
 }
 
 /// The picture slot a pane `w` cells wide gives a message (none with avatars off).

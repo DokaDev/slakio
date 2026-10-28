@@ -128,7 +128,7 @@ fn a_change_waits_for_the_backend_and_an_older_answer_is_dropped() {
         d.app.handle_event(ratatui::crossterm::event::Event::Key(k.to_event()), d.now);
     }
     assert_eq!(items(&d), before, "sent is not succeeded");
-    let asked = d.app.take_commands();
+    let asked = d.app.take_commands(d.now);
     assert_eq!(asked.len(), 1);
     let taken = d.app.model.taken();
     let stale = Envelope {

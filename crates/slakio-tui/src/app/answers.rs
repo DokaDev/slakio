@@ -51,7 +51,8 @@ impl App {
     }
 
     /// The requests for the backend queued since the last call.
-    pub fn take_commands(&mut self) -> Vec<Request> {
+    pub fn take_commands(&mut self, now: Instant) -> Vec<Request> {
+        self.work.send_older(now);
         self.work.take_requests()
     }
 
@@ -205,7 +206,7 @@ impl App {
             whose = b.workspace.clone();
             true
         } else {
-            self.work.on_failed(id, kind.clone()) || self.on_save_failed(id)
+            self.work.on_failed(id, kind.clone(), now) || self.on_save_failed(id)
         };
         if waited {
             // With several workspaces, the words say whose start failed.

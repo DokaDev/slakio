@@ -2,8 +2,9 @@
 //! where the view is anchored, the rows drawn last, the thread panel it opened and what it showed
 //! before and after (its back/forward [`History`]). The messages are not the pane's: they are the
 //! target's [`Timeline`], shared by every pane that shows it, and what is being written is the
-//! target's draft ([`super::drafts`]). A pane asks for older messages as its selection nears
-//! the top; drawing lays out only the rows on screen.
+//! target's draft ([`super::drafts`]). A pane asks for one more page of older messages when a
+//! gesture takes its selection near the top (moving up, `gg`), never by itself: a page that
+//! arrives asks for nothing more. Drawing lays out only the rows on screen.
 //!
 //! The selection, the VISUAL range and the anchor name messages by their timestamp, so they stay
 //! on their messages whatever arrives before or after them.
@@ -131,8 +132,9 @@ pub struct Pane {
     pub visual: Option<Ts>,
     /// The message on the last row (`None`: the newest). Kept by drawing.
     pub bottom: Cell<Option<Ts>>,
-    /// `gg` was pressed before the oldest message was loaded: keep loading, then select it.
-    pub to_oldest: bool,
+    /// The last gesture moved up (or to the oldest): near the top, it wants one more older
+    /// page. Asking for pages takes it back.
+    pub older: bool,
     /// Its composer is being written in (Insert mode); only the pane with the keyboard is.
     pub insert: bool,
     /// The auto thread panel this pane opened beside it, while open.
@@ -150,7 +152,7 @@ impl Pane {
             selected: None,
             visual: None,
             bottom: Cell::new(None),
-            to_oldest: false,
+            older: false,
             insert: false,
             thread: None,
             history: History::default(),
@@ -179,11 +181,9 @@ impl Pane {
     }
 
     /// The page of `tl` (this pane's timeline) to ask for next, if one is wanted: the newest
-    /// first, then older ones when the selection nears the top. `gg` waiting for the oldest
-    /// needs no case of its own: it keeps the oldest loaded message selected, which is near the
-    /// top.
+    /// first, then an older one when the last gesture moved up near the top.
     pub fn wants(&self, tl: &Timeline) -> Option<Option<Ts>> {
-        if tl.pending.is_some() || tl.complete || tl.failed.is_some() {
+        if tl.pending.is_some() || tl.queued || tl.complete || tl.failed.is_some() {
             return None;
         }
         if tl.cached {
@@ -191,16 +191,7 @@ impl Pane {
         }
         let Some(first) = tl.items.first() else { return Some(None) };
         let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
-        near_top.then_some(Some(first.ts))
-    }
-
-    /// A page arrived in `tl` (this pane's timeline): `gg` keeps the oldest selected until it
-    /// is loaded. (The selection names its message, so it stays on it.)
-    pub fn arrived(&mut self, tl: &Timeline) {
-        if self.to_oldest {
-            self.selected = tl.items.first().map(|m| m.ts);
-            self.to_oldest = !tl.complete;
-        }
+        (self.older && near_top).then_some(Some(first.ts))
     }
 
     /// The selected message's index in `tl` (this pane's timeline).
@@ -216,7 +207,7 @@ impl Pane {
     /// Select the next (`1`) or previous (`-1`) message of `tl` (this pane's timeline); the
     /// first move selects the newest.
     pub fn step(&mut self, by: isize, tl: &Timeline) {
-        self.to_oldest = false;
+        self.older = by < 0;
         let Some(last) = tl.items.len().checked_sub(1) else { return };
         let i = match self.selected_index(tl) {
             None => last,
@@ -227,7 +218,6 @@ impl Pane {
 
     /// Select the newest message of `tl` (this pane's timeline).
     pub fn select_newest(&mut self, tl: &Timeline) {
-        self.to_oldest = false;
         self.selected = tl.items.last().map(|m| m.ts);
     }
 
@@ -242,13 +232,13 @@ impl Pane {
         self.hits.borrow().iter().find(|h| h.y == y).copied()
     }
 
-    /// Select the oldest message of `tl` (its timeline), loading the rest of the history first.
+    /// Select the oldest message loaded in `tl` (its timeline); one more older page is wanted.
     pub fn select_oldest(&mut self, tl: &Timeline) {
         if tl.items.is_empty() {
             return;
         }
         self.select_index(0, tl);
-        self.to_oldest = !tl.complete;
+        self.older = true;
     }
 
     /// The selected messages of `tl` (this pane's timeline): the VISUAL range, or the selected

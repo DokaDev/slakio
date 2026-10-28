@@ -131,8 +131,16 @@ fn signed() -> Vec<slakio_tui::app::model::SignedIn> {
 /// bots among the senders are marked `app`.
 #[test]
 fn a_thread_read_only_in_part_says_so_and_a_bot_is_marked() {
+    for (w, h) in [(120, 40), (80, 24)] {
+        thread_cut_at(w, h);
+    }
+}
+
+/// The cut thread at `w`x`h`: the whole notice is on screen, however narrow the thread pane.
+fn thread_cut_at(w: u16, h: u16) {
     use slakio_core::model::Target;
     let mut s = Scripted::booted(true, None);
+    s.d.app.resize(w, h);
     s.d.list_cursor_on("long-threads");
     s.keys("enter");
     let i = s.b.held.len() - 1;
@@ -163,7 +171,13 @@ fn a_thread_read_only_in_part_says_so_and_a_bot_is_marked() {
     s.pump();
     let screen = s.d.screen();
     let lines: Vec<&str> = screen.lines().collect();
-    let notice = lines.iter().position(|l| l.contains("Thread cut short here")).unwrap_or_else(|| panic!("{screen}"));
+    let notice = lines.iter().position(|l| l.contains("Newer replies")).unwrap_or_else(|| panic!("{screen}"));
+    let words: String = lines[notice..]
+        .iter()
+        .take(2)
+        .map(|l| l.split('│').filter(|c| c.contains("Newer") || c.contains("loaded")).collect::<String>())
+        .collect();
+    assert!(words.contains("Newer replies") && words.contains("not loaded"), "the whole notice at {w}x{h}: {screen}");
     let bot = lines.iter().position(|l| l.contains("Minsu Kim app")).unwrap_or_else(|| panic!("{screen}"));
     assert!(bot < notice, "the notice after the last reply (the bot's): {screen}");
 }

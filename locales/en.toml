@@ -80,7 +80,11 @@
 "pane.no_messages_read_only" = "No messages yet"
 "pane.thread" = "Thread"
 "pane.failed" = "Could not load messages"
-"pane.thread_cut" = "Thread cut short here: newer replies were not read"
+"pane.thread_cut" = "Newer replies not loaded"
+# Above the oldest message loaded: older ones on their way, ones that failed, or the start.
+"pane.older_loading" = "Loading older messages…"
+"pane.older_failed" = "Older messages not loaded"
+"pane.start" = "Start of the conversation"
 # A DM's title: its peer's presence.
 "presence.active" = "active"
 "presence.away" = "away"

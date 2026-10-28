@@ -593,12 +593,12 @@ impl App {
     /// goes away, or the which-key popup shows.
     pub fn deadline(&self) -> Option<Instant> {
         let guide = self.guide.at.filter(|_| !self.guide.shown && !self.keys.pending().is_empty());
-        [self.status.deadline(), guide].into_iter().flatten().min()
+        [self.status.deadline(), guide, self.work.deadline()].into_iter().flatten().min()
     }
 
     /// The deadline passed. `true` when the screen changed.
     pub fn on_tick(&mut self, now: Instant) -> bool {
-        let mut changed = self.status.expire(now);
+        let mut changed = self.status.expire(now) | self.work.deadline().is_some_and(|at| at <= now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

@@ -5,6 +5,10 @@
 //! is recorded by its request id, so a late answer is told from the awaited one. Messages are
 //! kept in timestamp order.
 //!
+//! Older pages are asked for one at a time and only when a gesture wants one (moving up near the
+//! top, `gg`, `r`): one is queued, then sent when the pace allows ([`super::work`]). A page that
+//! failed stays failed until retried (`r`, or by itself once Slack's `Retry-After` passed).
+//!
 //! A timeline lives while a pane shows its target: the work area drops the others, and opening
 //! the target again loads it afresh.
 
@@ -12,6 +16,11 @@ use super::pane::Shown;
 use slakio_core::backend::{FailKind, Generation, Page};
 use slakio_core::model::{Target, Ts};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+/// How long a page Slack asked to slow down for waits before it is asked for again by itself,
+/// when Slack did not say.
+pub const RETRY_PAUSE: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, Default)]
 pub struct Timeline {
@@ -29,6 +38,12 @@ pub struct Timeline {
     pub cached: bool,
     /// A thread read only in part: its newest replies are not among those shown.
     pub cut: bool,
+    /// An older page is wanted and waits for its turn (requests are paced).
+    pub queued: bool,
+    /// When the failed page is asked for again by itself (Slack asked to slow down).
+    pub retry_at: Option<Instant>,
+    /// An older page arrived: the history was read back from its newest page.
+    pub paged: bool,
 }
 
 impl Timeline {
@@ -52,11 +67,31 @@ impl Timeline {
             self.cut = false;
         }
         self.cut |= page.cut;
+        self.paged |= !self.items.is_empty();
         let first = self.items.first().map(|m| m.ts);
         let older: Vec<Shown> = shown.into_iter().filter(|m| first.is_none_or(|f| m.ts < f)).collect();
         let n = older.len();
         self.items.splice(0..0, older);
         n
+    }
+
+    /// An older page is on its way, or waits for its turn.
+    pub fn loading_older(&self) -> bool {
+        !self.items.is_empty() && !self.cached && (self.pending.is_some() || self.queued)
+    }
+
+    /// Why the older page asked for last failed, while it stays failed (`None` for a timeline
+    /// that never loaded, or the cache's).
+    pub fn older_failed(&self) -> Option<&FailKind> {
+        self.failed.as_ref().filter(|_| !self.items.is_empty() && !self.cached && !self.loading_older())
+    }
+
+    /// The failed page may be asked for again: for a reason that may pass, or an older page the
+    /// request limit stopped (the limit's window moves on).
+    pub fn retryable(&self) -> bool {
+        self.failed
+            .as_ref()
+            .is_some_and(|k| k.retryable() || (self.older_failed().is_some() && *k == FailKind::CapReached))
     }
 
     /// The index of the message at `ts`, when loaded.
@@ -93,13 +128,27 @@ impl TimelineStore {
         self.timelines.get_mut(target).filter(|t| t.pending == Some(id))
     }
 
-    /// The page asked for as request `id` failed: its timeline stops waiting. The target, when
-    /// one waited for it.
-    pub fn fail(&mut self, id: Generation, kind: FailKind) -> Option<Target> {
+    /// The page asked for as request `id` failed at `now`: its timeline stops waiting; when
+    /// Slack asked to slow down, it asks again by itself once Slack's pause passed. The target,
+    /// when one waited for it.
+    pub fn fail(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<Target> {
         let (target, tl) = self.timelines.iter_mut().find(|(_, t)| t.pending == Some(id))?;
         tl.pending = None;
+        tl.retry_at = match &kind {
+            FailKind::RateLimited { retry_after } => Some(now + retry_after.unwrap_or(RETRY_PAUSE)),
+            _ => None,
+        };
         tl.failed = Some(kind);
         Some(target.clone())
+    }
+
+    /// Every timeline, to look through.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Target, &mut Timeline)> {
+        self.timelines.iter_mut()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Target, &Timeline)> {
+        self.timelines.iter()
     }
 
     /// Keep only the timelines `keep` says yes to.

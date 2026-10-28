@@ -1,7 +1,8 @@
 //! Between the app and its backend: hand the app's requests to the backend and the backend's
-//! answers to the app. An answer can ask for more (a page that arrives while `gg` waits for the
-//! oldest message asks for the next one), so one round is not enough: the requests an answer
-//! queued are sent in the same turn, not when the next key happens to wake the loop up.
+//! answers to the app. An answer can ask for more (a workspace's start asks for the conversation
+//! open), so one round is not enough: the requests an answer queued are sent in the same turn,
+//! not when the next key happens to wake the loop up. Older pages that wait for their turn go
+//! out once it came ([`App::take_commands`] at `now`).
 //!
 //! [`exchange`] drives a backend that answers in turn until neither side has more (the tests).
 //! The binary runs the backend on its own task behind a [`BackendHandle`] ([`serve`]): [`pump`]
@@ -19,7 +20,7 @@ pub const BOUND: usize = 64;
 pub fn exchange(app: &mut App, backend: &mut dyn Backend, now: Instant) -> bool {
     let mut changed = false;
     loop {
-        let requests = app.take_commands();
+        let requests = app.take_commands(now);
         let sent = !requests.is_empty();
         for request in requests {
             backend.send(request);
@@ -58,7 +59,7 @@ pub fn serve(mut backend: Box<dyn Backend + Send>) -> BackendHandle {
 pub async fn pump(app: &mut App, handle: &mut BackendHandle) -> bool {
     let mut changed = false;
     loop {
-        let requests = app.take_commands();
+        let requests = app.take_commands(Instant::now());
         let sent = !requests.is_empty();
         for request in requests {
             if let Err(failed) = handle.send(request) {

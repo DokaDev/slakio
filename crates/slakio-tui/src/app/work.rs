@@ -44,6 +44,7 @@ use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[derive(Clone, Debug, Default)]
 pub struct Work {
@@ -60,13 +61,24 @@ pub struct Work {
     pub drafts: DraftStore,
     /// The app's requests to the backend (the boot request too).
     pub requests: Requests,
+    /// When the last older page was asked for (they are paced).
+    older_at: Option<Instant>,
 }
 
 /// The draft of a target that has none yet.
 static NO_DRAFT: Composer = Composer::EMPTY;
 /// The timeline of a target that has none yet.
-static EMPTY: Timeline =
-    Timeline { items: Vec::new(), complete: false, pending: None, failed: None, cached: false, cut: false };
+static EMPTY: Timeline = Timeline {
+    items: Vec::new(),
+    complete: false,
+    pending: None,
+    failed: None,
+    cached: false,
+    cut: false,
+    queued: false,
+    retry_at: None,
+    paged: false,
+};
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
@@ -242,14 +254,21 @@ impl Work {
     }
 
     /// Ask for the pages the panes want; one request for a target however many panes show it.
+    /// An older page waits for its turn ([`Work::send_older`]); the gesture that wanted it is
+    /// spent either way.
     fn fill(&mut self) {
         for id in self.ids() {
-            let Some(pane) = self.panes.get(&id) else { continue };
+            let Some(pane) = self.panes.get_mut(&id) else { continue };
             let tl = self.timelines.entry(&pane.target);
-            if let Some(before) = pane.wants(tl) {
-                let command = Command::History { target: pane.target.clone(), before, limit: PAGE };
-                tl.pending = Some(self.requests.ask(Some(pane.target.workspace().clone()), command));
+            match pane.wants(tl) {
+                Some(None) => {
+                    let command = Command::History { target: pane.target.clone(), before: None, limit: PAGE };
+                    tl.pending = Some(self.requests.ask(Some(pane.target.workspace().clone()), command));
+                }
+                Some(Some(_)) => tl.queued = true,
+                None => {}
             }
+            pane.older = false;
         }
     }
 
@@ -434,11 +453,6 @@ impl Work {
         let Some(tl) = self.timelines.awaiting(&page.target, generation) else { return false };
         let shown = page.messages.iter().map(|m| shown(model, &page.target, m)).collect();
         tl.add_page(page, shown);
-        for pane in self.panes.values_mut() {
-            if pane.target == page.target {
-                pane.arrived(tl);
-            }
-        }
         self.fill();
         true
     }
@@ -459,14 +473,11 @@ impl Work {
         self.active().and_then(|id| self.panes.get(&id)).is_some_and(|p| self.timeline(p).cached)
     }
 
-    /// Request `id` for a page failed: its timeline stops waiting and asks no more (until it is
-    /// opened again), and `gg` stops waiting for the oldest. `false` when nothing waited for it.
-    pub fn on_failed(&mut self, id: Generation, kind: FailKind) -> bool {
-        let Some(target) = self.timelines.fail(id, kind) else { return false };
-        for pane in self.panes.values_mut().filter(|p| p.target == target) {
-            pane.to_oldest = false;
-        }
-        true
+    /// Request `id` for a page failed at `now`: its timeline stops waiting and asks no more
+    /// until retried (by `r`, or by itself when Slack asked to slow down). `false` when nothing
+    /// waited for it.
+    pub fn on_failed(&mut self, id: Generation, kind: FailKind, now: Instant) -> bool {
+        self.timelines.fail(id, kind, now).is_some()
     }
 
     /// Why the active pane's messages could not be loaded, if they could not.
@@ -475,17 +486,18 @@ impl Work {
         self.timeline(pane).failed.as_ref()
     }
 
-    /// The active pane's messages could not be loaded, for a reason that may pass: ask again.
-    /// `false` when there is nothing to retry there.
+    /// The active pane's messages (its newest page, or an older one) could not be loaded, for a
+    /// reason that may pass: ask again. `false` when there is nothing to retry there.
     pub fn retry(&mut self) -> bool {
         let Some(target) = self.active().and_then(|id| self.panes.get(&id)).map(|p| p.target.clone()) else {
             return false;
         };
         let tl = self.timelines.entry(&target);
-        if !tl.failed.as_ref().is_some_and(FailKind::retryable) {
+        if !tl.retryable() {
             return false;
         }
-        tl.failed = None;
+        tl.queued = tl.older_failed().is_some();
+        (tl.failed, tl.retry_at) = (None, None);
         self.fill();
         true
     }
@@ -565,6 +577,7 @@ impl Work {
     }
 }
 
+mod older;
 mod tabs;
 use tabs::ClosedTab;
 

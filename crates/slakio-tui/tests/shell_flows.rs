@@ -46,12 +46,12 @@ fn an_answer_to_an_older_boot_request_is_dropped() {
     assert!(!d.app.on_backend(stale, d.now), "nothing changes");
     assert_eq!(d.app.model.workspaces().len(), 2, "the newer answer stays");
     // A second connect asks again; the first answer, arriving late, is dropped too.
-    let first = d.app.take_commands();
+    let first = d.app.take_commands(d.now);
     assert!(first.is_empty());
     let caps = d.backend.capabilities();
     d.app.connect(caps);
     d.app.connect(caps);
-    let asked = d.app.take_commands();
+    let asked = d.app.take_commands(d.now);
     assert_eq!(asked.len(), 2);
     let old = Envelope { generation: asked[0].id, event: BackendEvent::Booted(Box::default()) };
     assert!(!d.app.on_backend(old, d.now));

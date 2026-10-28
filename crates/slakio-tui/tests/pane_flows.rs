@@ -342,16 +342,27 @@ fn the_10k_channel_and_the_1200_reply_thread_lay_out_at_most_twice_the_visible_r
         d.keys("k");
         check(&mut d, "k");
     }
+    // `gg` again and again, a page each time (paced), down to the oldest.
+    let mut presses = 0;
+    while !conversation(&d).complete() {
+        d.now += std::time::Duration::from_secs(2);
+        d.keys("g g");
+        presses += 1;
+        assert!(presses <= 60, "a page a gesture");
+    }
     d.keys("g g");
     let main = conversation(&d);
-    assert!(main.complete() && main.messages().len() == 10_000 && main.selected() == Some(0), "gg loads to the oldest");
+    assert!(main.messages().len() == 10_000 && main.selected() == Some(0), "gg reaches the oldest");
     check(&mut d, "gg");
     d.keys("G");
     check(&mut d, "G");
     d.open("long-threads");
     d.keys("g g enter");
     check(&mut d, "thread");
-    d.keys("g g");
+    while !d.pane(PaneKind::Thread).unwrap().complete() {
+        d.now += std::time::Duration::from_secs(2);
+        d.keys("g g");
+    }
     assert_eq!(d.pane(PaneKind::Thread).unwrap().messages().len(), 1_201, "the thread's message and its replies");
     check(&mut d, "thread gg");
 }
@@ -362,7 +373,7 @@ fn two_panes_on_one_conversation_share_its_messages_and_load_it_once() {
     d.open("backend");
     let target = d.app.open_target().unwrap().clone();
     d.app.open_beside(target.clone());
-    assert!(d.app.take_commands().is_empty(), "the second pane loads nothing");
+    assert!(d.app.take_commands(d.now).is_empty(), "the second pane loads nothing");
     let panes = d.app.open_panes();
     assert_eq!(panes.len(), 2);
     assert!(!panes[0].messages().is_empty() && panes[0].messages() == panes[1].messages());

@@ -20,67 +20,57 @@ pub(crate) fn msg(ts: u64) -> Shown {
     }
 }
 
-/// Messages `from..to` arrive in `tl`, and `p` (its pane) follows them.
-fn arrive(p: &mut Pane, tl: &mut Timeline, from: u64, to: u64, complete: bool) {
+/// Messages `from..to` arrive in `tl`.
+fn arrive(tl: &mut Timeline, from: u64, to: u64, complete: bool) {
     let page = Page { target: target(), messages: Vec::new(), complete, users: Vec::new(), cut: false };
     tl.add_page(&page, (from..to).map(msg).collect());
-    p.arrived(tl);
 }
 
 #[test]
-fn the_newest_page_first_then_older_pages_as_the_selection_nears_the_top() {
+fn the_newest_page_first_then_one_older_page_per_gesture_near_the_top() {
     let mut p = Pane::new(target());
     let mut tl = Timeline::default();
     assert_eq!(p.wants(&tl), Some(None), "the newest page");
     tl.pending = Some(Generation(1));
     assert_eq!(p.wants(&tl), None, "one request at a time");
-    arrive(&mut p, &mut tl, 100, 300, false);
+    arrive(&mut tl, 100, 300, false);
     assert_eq!(p.wants(&tl), None, "nothing selected near the top");
     p.step(-1, &tl);
     assert_eq!(p.selected_index(&tl), Some(199), "the first move selects the newest");
     p.select_index(PREFETCH - 1, &tl);
-    assert_eq!(p.wants(&tl), Some(Some(Ts(100))));
-    arrive(&mut p, &mut tl, 0, 100, true);
-    assert_eq!(tl.items.len(), 300);
-    assert_eq!(p.selected_index(&tl), Some(PREFETCH - 1 + 100), "the selection stays on its message");
-    assert_eq!(p.wants(&tl), None, "complete");
+    p.older = false;
+    assert_eq!(p.wants(&tl), None, "a selection near the top asks nothing by itself");
+    p.step(-1, &tl);
+    assert_eq!(p.wants(&tl), Some(Some(Ts(100))), "moving up near the top does");
+    p.older = false;
+    arrive(&mut tl, 0, 100, false);
+    assert_eq!(p.selected_index(&tl), Some(PREFETCH - 2 + 100), "the selection stays on its message");
+    assert_eq!(p.wants(&tl), None, "a page that arrives asks for no other");
+    p.step(1, &tl);
+    assert_eq!(p.wants(&tl), None, "moving down asks for none");
 }
 
 #[test]
-fn gg_keeps_loading_until_the_oldest_message_is_selected() {
+fn gg_selects_the_oldest_loaded_and_wants_one_more_page() {
     let mut p = Pane::new(target());
     let mut tl = Timeline::default();
-    arrive(&mut p, &mut tl, 400, 600, false);
+    arrive(&mut tl, 400, 600, false);
     p.select_oldest(&tl);
-    assert_eq!((p.selected_index(&tl), p.to_oldest), (Some(0), true));
+    assert_eq!(p.selected_index(&tl), Some(0));
     assert_eq!(p.wants(&tl), Some(Some(Ts(400))));
-    arrive(&mut p, &mut tl, 200, 400, false);
-    assert_eq!(p.selected_index(&tl), Some(0), "still the oldest loaded");
-    arrive(&mut p, &mut tl, 0, 200, true);
-    assert_eq!((p.selected_index(&tl), p.to_oldest, tl.items[0].ts), (Some(0), false, Ts(0)));
-    p.step(1, &tl);
-    assert_eq!(p.selected_index(&tl), Some(1));
-}
-
-#[test]
-fn gg_selects_the_oldest_loaded_until_a_move_cancels_it() {
-    // Every way the selection changes keeps `to_oldest` true only on the oldest loaded message,
-    // which is why `wants` needs no case of its own for it.
-    let mut p = Pane::new(target());
-    let mut tl = Timeline::default();
-    arrive(&mut p, &mut tl, 500, 600, false);
+    tl.queued = true;
+    assert_eq!(p.wants(&tl), None, "one is queued already");
+    tl.queued = false;
+    tl.failed = Some(slakio_core::backend::FailKind::Network);
+    assert_eq!(p.wants(&tl), None, "a failed page waits for a retry");
+    tl.failed = None;
+    p.older = false;
+    arrive(&mut tl, 200, 400, false);
+    assert_eq!(p.selected_index(&tl), Some(200), "the page lands above, the selection stays");
+    assert_eq!(p.wants(&tl), None);
+    arrive(&mut tl, 0, 200, true);
     p.select_oldest(&tl);
-    for _ in 0..3 {
-        assert_eq!((p.to_oldest, p.selected_index(&tl)), (true, Some(0)));
-        let first = tl.items[0].ts.0;
-        arrive(&mut p, &mut tl, first - 100, first, false);
-    }
-    p.step(1, &tl);
-    assert!(!p.to_oldest && p.selected_index(&tl) == Some(1));
-    p.select_oldest(&tl);
-    p.select_newest(&tl);
-    assert!(!p.to_oldest && p.selected_index(&tl) == Some(tl.items.len() - 1));
-    assert_eq!(p.wants(&tl), None, "the newest selected, far from the top");
+    assert_eq!(p.wants(&tl), None, "complete: nothing older");
 }
 
 #[test]
@@ -89,7 +79,7 @@ fn steps_stop_at_the_ends_and_the_range_is_ordered() {
     let mut tl = Timeline::default();
     p.step(1, &tl);
     assert_eq!(p.selected, None, "nothing loaded, nothing selected");
-    arrive(&mut p, &mut tl, 0, 5, true);
+    arrive(&mut tl, 0, 5, true);
     p.step(1, &tl);
     p.step(1, &tl);
     assert_eq!(p.selected_index(&tl), Some(4));
@@ -107,7 +97,7 @@ fn steps_stop_at_the_ends_and_the_range_is_ordered() {
 fn an_echo_goes_after_the_newest_and_brings_the_view_back_to_it() {
     let mut p = Pane::new(target());
     let mut tl = Timeline::default();
-    arrive(&mut p, &mut tl, 0, 3, true);
+    arrive(&mut tl, 0, 3, true);
     p.select_index(0, &tl);
     p.bottom.set(Some(Ts(1)));
     echo(&mut tl.items, UserId::new("ME"), Safe::default(), slakio_core::sanitize::sanitize_block("hi"));
@@ -121,11 +111,11 @@ fn an_echo_goes_after_the_newest_and_brings_the_view_back_to_it() {
 fn the_selection_and_the_anchor_stay_on_their_messages_whatever_arrives() {
     let mut p = Pane::new(target());
     let mut tl = Timeline::default();
-    arrive(&mut p, &mut tl, 100, 200, false);
+    arrive(&mut tl, 100, 200, false);
     p.select_index(10, &tl);
     p.visual = Some(Ts(120));
     p.bottom.set(Some(Ts(150)));
-    arrive(&mut p, &mut tl, 0, 100, true);
+    arrive(&mut tl, 0, 100, true);
     echo(&mut tl.items, UserId::new("ME"), Safe::default(), Safe::default());
     assert_eq!(p.selected_index(&tl).map(|i| tl.items[i].ts), Some(Ts(110)), "older messages came before it");
     assert_eq!(p.range(&tl), Some((110, 120)));
@@ -139,7 +129,7 @@ fn the_selection_and_the_anchor_stay_on_their_messages_whatever_arrives() {
 fn a_deleted_selection_moves_to_the_nearest_newer_message_else_the_older_one() {
     let mut p = Pane::new(target());
     let mut tl = Timeline::default();
-    arrive(&mut p, &mut tl, 0, 5, true);
+    arrive(&mut tl, 0, 5, true);
     p.select_index(2, &tl);
     tl.items.retain(|m| m.ts != Ts(2));
     assert_eq!(p.selected_index(&tl).map(|i| tl.items[i].ts), Some(Ts(3)), "the next newer");

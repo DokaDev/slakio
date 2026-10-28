@@ -184,14 +184,21 @@ fn two_panes_on_one_target_share_its_messages_and_load_them_once() {
     assert!(w.take_requests().is_empty(), "the second pane loads nothing");
     let n = w.timeline(main_pane(&w).unwrap()).items.len();
     assert_eq!(w.timeline(thread_pane(&w).unwrap()).items.len(), n);
-    // Both panes select messages near the top; one older page comes, both keep their messages.
-    w.with_pane(|p, tl| p.select_index(3, tl));
+    // Both panes move up near the top; one older page comes, both keep their messages.
+    w.with_pane(|p, tl| {
+        p.select_index(3, tl);
+        p.older = true;
+    });
     let (ts3, ts5) = {
         let tl = w.timeline(main_pane(&w).unwrap());
         (tl.items[3].ts, tl.items[5].ts)
     };
     w.activate(main_id(&w).unwrap());
-    w.with_pane(|p, _| p.selected = Some(ts5));
+    w.with_pane(|p, _| {
+        p.selected = Some(ts5);
+        p.older = true;
+    });
+    w.send_older(std::time::Instant::now());
     let asked = w.take_requests();
     assert_eq!(asked.len(), 1, "one request for the target");
     answer(&mut w, &m, &mut b, asked);

@@ -106,7 +106,7 @@ fn once_signed_in_the_app_connects_and_says_where() {
     app.signed_in(Capabilities { demo: false, read_only: false }, &signed, None, &["Example".into()], now);
     assert_eq!(app.sign_in(), None);
     assert!(app.read_only(), "each workspace is read-only");
-    let asked = app.take_commands();
+    let asked = app.take_commands(std::time::Instant::now());
     let boots: Vec<_> = asked.iter().map(|r| r.workspace.clone()).collect();
     assert_eq!(boots, vec![Some(signed[0].id.clone()), Some(signed[1].id.clone())], "each workspace is asked for");
     assert!(screen(&app, 100, 30, now).contains("Signed in to Example"));
