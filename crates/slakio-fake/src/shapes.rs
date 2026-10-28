@@ -7,10 +7,10 @@ use slakio_core::model::{ConversationId, ConversationKind, Message, Ts};
 use slakio_world::World;
 
 /// The answer to `request`.
-pub(crate) fn answer(world: &World, request: &Logged) -> Value {
+pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
     let mut out = match request.method() {
-        "client.userBoot" => user_boot(world),
-        "client.counts" => counts(world),
+        "client.userBoot" => user_boot(world, team),
+        "client.counts" => counts(world, team),
         "conversations.view" => view(world, request),
         "conversations.history" => history(world, request),
         "conversations.replies" => replies(world, request),
@@ -52,12 +52,13 @@ fn decode(v: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-fn first_workspace(world: &World) -> Option<&slakio_core::model::Workspace> {
-    world.snapshot().workspaces.first()
+/// The workspace this fake serves: the world's `team`-th.
+fn served(world: &World, team: usize) -> Option<&slakio_core::model::Workspace> {
+    world.snapshot().workspaces.get(team)
 }
 
-fn user_boot(world: &World) -> Value {
-    let Some(ws) = first_workspace(world) else { return json!({"ok": false, "error": "invalid_auth"}) };
+fn user_boot(world: &World, team: usize) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
     let s = world.snapshot();
     let me = s.users.iter().find(|u| u.id == ws.me);
     let mut channels = Vec::new();
@@ -93,8 +94,8 @@ fn user_boot(world: &World) -> Value {
     })
 }
 
-fn counts(world: &World) -> Value {
-    let Some(ws) = first_workspace(world) else { return json!({"ok": false, "error": "invalid_auth"}) };
+fn counts(world: &World, team: usize) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
     let (mut channels, mut ims, mut mpims) = (Vec::new(), Vec::new(), Vec::new());
     for c in world.snapshot().conversations.iter().filter(|c| c.workspace == ws.id) {
         let entry = json!({"id": c.id.as_str(), "has_unreads": c.unread > 0, "mention_count": c.mentions, "last_read": "0000000000.000000"});

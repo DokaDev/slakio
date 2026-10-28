@@ -3,7 +3,8 @@
 //! shapes of Slack's answers, and logs every request exactly as it came off the wire (headers
 //! in their order). Faults can be queued per method. Never a product dependency.
 //!
-//! The fake serves the world's first workspace. Its answers add fields no decoder knows and
+//! The fake serves one workspace of the world, the first unless told another
+//! ([`FakeSlack::start_team`]): two fakes serve a user signed in to two workspaces. Its answers add fields no decoder knows and
 //! leave optional ones out now and then, so tolerant decoding is tested all the time.
 
 mod shapes;
@@ -77,8 +78,13 @@ impl Drop for FakeSlack {
 }
 
 impl FakeSlack {
-    /// Start serving `world` (inside a Tokio runtime).
+    /// Start serving `world`'s first workspace (inside a Tokio runtime).
     pub async fn start(world: World) -> std::io::Result<Self> {
+        Self::start_team(world, 0).await
+    }
+
+    /// Start serving `world`'s `team`-th workspace (inside a Tokio runtime).
+    pub async fn start_team(world: World, team: usize) -> std::io::Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let addr = listener.local_addr()?;
         let shared = Arc::new(Mutex::new(Shared::default()));
@@ -87,7 +93,7 @@ impl FakeSlack {
             let shared = Arc::clone(&shared);
             tokio::spawn(async move {
                 while let Ok((stream, _)) = listener.accept().await {
-                    tokio::spawn(serve(stream, Arc::clone(&world), Arc::clone(&shared)));
+                    tokio::spawn(serve(stream, Arc::clone(&world), team, Arc::clone(&shared)));
                 }
             })
         };
@@ -121,7 +127,7 @@ impl FakeSlack {
 }
 
 /// Read one request from `stream` and answer it.
-async fn serve(mut stream: TcpStream, world: Arc<World>, shared: Arc<Mutex<Shared>>) {
+async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Arc<Mutex<Shared>>) {
     let Some(logged) = read_request(&mut stream).await else { return };
     let fault = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -141,7 +147,7 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, shared: Arc<Mutex<Share
         }
         Some(Fault::Api(code)) => (200, String::new(), serde_json::json!({"ok": false, "error": code}).to_string()),
         Some(Fault::Malformed) => (200, String::new(), "{\"ok\": tr".to_string()),
-        None => (200, String::new(), shapes::answer(&world, &logged).to_string()),
+        None => (200, String::new(), shapes::answer(&world, team, &logged).to_string()),
     };
     let head = format!(
         "HTTP/1.1 {status} FAKE\r\ncontent-type: application/json; charset=utf-8\r\ncontent-length: {}\r\n{extra}connection: close\r\n\r\n",
