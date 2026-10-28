@@ -1,8 +1,8 @@
 //! Reading back through the 10,000-message channel with the real binary in a pseudo terminal,
 //! against the tests' fake Slack: `gg` pressed again and again sends a few paced requests, never
 //! a burst, and the request count stays far under the governor's caps; a page Slack refuses with
-//! 429 shows a row, is asked for again by itself after `Retry-After`, and paging goes on. Unix
-//! only.
+//! 429 shows a row, is asked for again by itself after `Retry-After`, and paging goes on; on a
+//! slow network a page on its way shows a loading row. Unix only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line and passes; with
 //! `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead.
@@ -113,6 +113,13 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     let n = m.calls("conversations.history");
     run.type_bytes(b"gg");
     wait_until("one more page", || m.calls("conversations.history") > n);
+    // On a slow network the page on its way shows a row above the oldest message.
+    m.fake.set_delay(Duration::from_secs(3));
+    std::thread::sleep(Duration::from_millis(1600));
+    run.type_bytes(b"gg");
+    run.wait_for("the loading row", |t| t.contains("Loading older messages…"));
+    run.wait_for("the page landed", |t| !t.contains("Loading older messages…"));
+    m.fake.set_delay(Duration::ZERO);
     let total = m.fake.log().len();
     assert!(total < 60, "far under the per-minute cap: {total} requests");
     run.quit();

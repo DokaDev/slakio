@@ -66,6 +66,8 @@ struct Shared {
     log: Vec<Logged>,
     hangs_closed: usize,
     faults: HashMap<String, VecDeque<Fault>>,
+    /// How long every answer waits before it is sent (a slow network).
+    delay: std::time::Duration,
 }
 
 /// A running fake Slack; it stops when dropped.
@@ -123,6 +125,11 @@ impl FakeSlack {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).hangs_closed
     }
 
+    /// Every answer from now on waits `delay` first (a slow network); zero for none.
+    pub fn set_delay(&self, delay: std::time::Duration) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).delay = delay;
+    }
+
     /// Answer the next request for `method` with `fault` (faults queue up per method).
     pub fn fail_next(&self, method: &str, fault: Fault) {
         let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -133,11 +140,14 @@ impl FakeSlack {
 /// Read one request from `stream` and answer it.
 async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Arc<Mutex<Shared>>) {
     let Some(logged) = read_request(&mut stream).await else { return };
-    let fault = {
+    let (fault, delay) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());
-        s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front)
+        (s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front), s.delay)
     };
+    if !delay.is_zero() {
+        tokio::time::sleep(delay).await;
+    }
     let (status, extra, body) = match fault {
         Some(Fault::Hang) => {
             let mut byte = [0u8; 1];
