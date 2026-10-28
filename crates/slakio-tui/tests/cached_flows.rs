@@ -170,3 +170,25 @@ fn at_80_columns_a_notice_and_the_cached_mark_leave_the_open_conversations_name_
     assert!(line.contains("Offline") && line.contains("cached"), "{line}");
     assert!(line.contains("#backend-old"), "the place is not cut while the line has room: {line}");
 }
+
+// Every Korean cache notice fits 40 cells (two cells a syllable made the first ones too long to
+// read whole in the status line's message slot).
+#[test]
+fn every_korean_cache_notice_fits_forty_cells() {
+    use slakio_core::i18n::{I18n, Label, Lang};
+    let notices = [
+        Label::CacheRebuilt,
+        Label::CacheReadOnly,
+        Label::CacheInUse,
+        Label::CacheFailed,
+        Label::CacheBackupFailed,
+    ];
+    for lang in [Lang::Ko] {
+        let i18n = I18n::new(lang);
+        for l in notices {
+            let text = i18n.label(l);
+            let cells = unicode_width::UnicodeWidthStr::width(&*text);
+            assert!(cells <= 40, "{lang:?} {l:?}: {cells} cells: {text}");
+        }
+    }
+}
