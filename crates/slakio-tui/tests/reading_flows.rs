@@ -213,3 +213,46 @@ fn thread_cut_at(w: u16, h: u16) {
     let bot = lines.iter().position(|l| l.contains("Minsu Kim app")).unwrap_or_else(|| panic!("{screen}"));
     assert!(bot < notice, "the notice after the last reply (the bot's): {screen}");
 }
+
+/// In the compact column a long name keeps eight cells at least: `ext` goes before the name is
+/// cut shorter, the bot's `app` stays; the tags are faint and italic, a style no name is drawn
+/// in (also without color).
+#[test]
+fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
+    use slakio_core::model::{Org, User, UserId};
+    use slakio_core::sanitize::Remote;
+    for theme in [slakio_tui::theme::Theme::terminal(), slakio_tui::theme::Theme::no_color()] {
+        let mut s = Scripted::booted(true, None);
+        s.d.app.theme = theme;
+        s.d.app.settings.compact = true;
+        s.d.list_cursor_on("deploys");
+        s.keys("enter");
+        let i = s.b.held.len() - 1;
+        let mut e = s.b.reply(i);
+        let Event::History(page) = &mut e.event else { panic!("{e:?}") };
+        let last = page.messages.last_mut().unwrap();
+        last.user = UserId::new("BREL~1");
+        page.users.push(User {
+            id: last.user.clone(),
+            workspace: page.target.workspace().clone(),
+            name: Remote::new("Partner Release Notifier Bot".to_string()),
+            display_name: Remote::new("Partner Release Notifier Bot".to_string()),
+            org: Org::External(Remote::new("TPARTNER".to_string())),
+            bot: true,
+            presence: Presence::Unknown,
+        });
+        s.b.push(e);
+        s.pump();
+        let screen = s.d.screen();
+        let line = screen.lines().find(|l| l.contains("Partner")).unwrap_or_else(|| panic!("{screen}"));
+        let rest = line.split("Partner").nth(1).unwrap().split('…').next().unwrap();
+        assert!("Partner".len() + rest.chars().count() + 1 >= 8, "the name keeps 8 cells: {line}");
+        assert!(!line.contains("app ext"), "ext went first: {line}");
+        assert!(line.contains("… app"), "the bot's mark stays: {line}");
+        let (y, row) = screen.lines().enumerate().find(|(_, l)| l.contains("… app")).unwrap();
+        let x = row[..row.find("… app").unwrap()].chars().count() + 2;
+        let style = s.d.buffer()[(x as u16, y as u16)].style();
+        assert!(style.add_modifier.contains(ratatui::style::Modifier::ITALIC), "{row}");
+        assert!(!style.add_modifier.contains(ratatui::style::Modifier::BOLD), "{row}");
+    }
+}

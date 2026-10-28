@@ -43,6 +43,8 @@ use slakio_core::model::Org;
 
 /// The sender's column, at most (compact).
 const AUTHOR_WIDTH: usize = 14;
+/// A name in the compact column keeps at least this many cells before its tags do.
+const NAME_MIN: usize = 8;
 /// The time column (`10:02` and a space before it, compact).
 const TIME_WIDTH: usize = 6;
 /// Rows of text a message shows at most; the rest is marked, not drawn.
@@ -210,12 +212,12 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     };
     let author_style = if m.own { t.own_author() } else { t.author() };
     let time_text = time::hm(m.ts);
-    let tag = tags(app, pane, m);
+    let tag = tags(app, pane, m, true);
     let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2 + width(&tag)).max(1));
     let mut header = picture(0);
     header.push(Span::styled(name, author_style));
     if !tag.is_empty() {
-        header.push(Span::styled(tag, t.faint()));
+        header.push(Span::styled(tag, tag_style(app)));
     }
     header.extend([Span::raw("  "), Span::styled(time_text, t.faint())]);
     out.push((Line::from(header), Kind::Content));
@@ -258,10 +260,10 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             spans.extend([chip, Span::raw(" ")]);
             room -= chip_column;
         }
-        let tag = tags(app, pane, m);
+        let tag = tags(app, pane, m, true);
         spans.extend([
             Span::styled(clip(m.author.as_str(), room.saturating_sub(width(&tag))), author_style),
-            Span::styled(tag, t.faint()),
+            Span::styled(tag, tag_style(app)),
             Span::styled(" · ", t.faint()),
             Span::styled(time::hm(m.ts), t.faint()),
         ]);
@@ -276,15 +278,18 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
                 spans.extend([chip, Span::raw(" ")]);
                 name_w -= chip_w;
             }
-            // The tags after the name, the name cut to leave them room (a bot's mark always shows).
-            let tag = tags(app, pane, m);
+            // The tags after the name, the name cut to leave them room: where both would leave
+            // it under [`NAME_MIN`] cells, `ext` goes first (a bot's mark shows while it fits).
+            let full = tags(app, pane, m, true);
+            let want = width(m.author.as_str()).min(NAME_MIN);
+            let tag = if (name_w - 1).saturating_sub(width(&full)) >= want { full } else { tags(app, pane, m, false) };
             let tag = if width(&tag) + 2 <= name_w { tag } else { String::new() };
             let name = clip(m.author.as_str(), (name_w - 1).saturating_sub(width(&tag)).max(1));
             let pad = " ".repeat(name_w.saturating_sub(width(&name) + width(&tag)));
             if tag.is_empty() {
                 spans.push(Span::styled(format!("{name}{pad}"), author_style));
             } else {
-                spans.extend([Span::styled(name, author_style), Span::styled(tag, t.faint()), Span::raw(pad)]);
+                spans.extend([Span::styled(name, author_style), Span::styled(tag, tag_style(app)), Span::raw(pad)]);
             }
         } else {
             spans.push(Span::raw(" ".repeat(indent_w)));
@@ -301,18 +306,25 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
 }
 
 /// What follows the sender's name: ` app` for a bot or an app (GUI Slack's APP badge: its name
-/// is whatever it chose to post as), ` ext` for a sender of another organization (a Slack Connect
+/// is whatever it chose to post as; a bot's per-name author id is one even when its person is
+/// no longer kept), ` ext` (with `ext`) for a sender of another organization (a Slack Connect
 /// peer); empty for a person of the workspace's own.
-fn tags(app: &App, pane: &Pane, m: &Shown) -> String {
+fn tags(app: &App, pane: &Pane, m: &Shown, ext: bool) -> String {
     let user = app.model.user(pane.target.workspace(), &m.user);
     let mut out = String::new();
-    if user.is_some_and(|u| u.bot) {
+    if user.is_some_and(|u| u.bot) || m.user.as_str().contains('~') {
         out.push_str(&format!(" {}", app.i18n.label(Label::MessageApp)));
     }
-    if user.is_some_and(|u| matches!(u.org, Org::External(_))) {
+    if ext && user.is_some_and(|u| matches!(u.org, Org::External(_))) {
         out.push_str(&format!(" {}", app.i18n.label(Label::ListExternal)));
     }
     out
+}
+
+/// The tags' style: faint and italic, which no sender's name is drawn in (a name is bold), so a
+/// name ending in ` app` cannot pass for the mark, with or without color.
+fn tag_style(app: &App) -> Style {
+    app.theme.faint().add_modifier(ratatui::style::Modifier::ITALIC)
 }
 
 /// The text's column in the current density, for the rows under it.

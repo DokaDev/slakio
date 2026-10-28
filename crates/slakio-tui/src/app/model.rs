@@ -90,7 +90,12 @@ pub struct Model {
     /// The workspaces whose unread counts Slack could not tell, with none kept from before:
     /// their views show `?`, not a look of all read.
     pub counts_unknown: HashSet<WorkspaceId>,
+    /// Each bot's author ids of the names it posted as, oldest first ([`BOT_NAMES`] at most).
+    bot_names: HashMap<(WorkspaceId, String), std::collections::VecDeque<UserId>>,
 }
+
+/// The names of one bot kept as people at most.
+pub const BOT_NAMES: usize = 16;
 
 impl Model {
     /// Every workspace's data at once (a backend that boots them together, the demo).
@@ -104,6 +109,7 @@ impl Model {
             cached: HashSet::new(),
             saved_unknown,
             counts_unknown: HashSet::new(),
+            bot_names: HashMap::new(),
         };
         m.index_users();
         m
@@ -275,11 +281,30 @@ impl Model {
     /// is added, or replaces what was known of them in `ws`; one of another workspace is left out.
     pub fn add_users(&mut self, ws: &WorkspaceId, users: &[User]) {
         for u in users.iter().filter(|u| &u.workspace == ws) {
-            match self.users.get(&(u.workspace.clone(), u.id.clone())) {
+            let key = (u.workspace.clone(), u.id.clone());
+            match self.users.get(&key) {
                 Some(&i) => self.snapshot.users[i] = u.clone(),
                 None => {
-                    self.users.insert((u.workspace.clone(), u.id.clone()), self.snapshot.users.len());
-                    self.snapshot.users.push(u.clone());
+                    // A bot's author of one more name: past [`BOT_NAMES`] of that bot, it takes
+                    // the place of its oldest name (its messages still carry their names and the
+                    // `app` mark).
+                    let bot = u.id.as_str().split_once('~').map(|(b, _)| (u.workspace.clone(), b.to_string()));
+                    let names = bot.map(|b| self.bot_names.entry(b).or_default());
+                    let reuse = names.and_then(|n| {
+                        n.push_back(u.id.clone());
+                        (n.len() > BOT_NAMES).then(|| n.pop_front()).flatten()
+                    });
+                    let i = match reuse.and_then(|old| self.users.remove(&(u.workspace.clone(), old))) {
+                        Some(i) => {
+                            self.snapshot.users[i] = u.clone();
+                            i
+                        }
+                        None => {
+                            self.snapshot.users.push(u.clone());
+                            self.snapshot.users.len() - 1
+                        }
+                    };
+                    self.users.insert(key, i);
                 }
             }
         }

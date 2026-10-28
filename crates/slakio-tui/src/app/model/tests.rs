@@ -291,3 +291,29 @@ fn an_answer_of_one_workspace_never_changes_another_workspaces_people_or_saved_i
     m.add_users(&a, &[changed]);
     assert_eq!(m.user(&b, &id).cloned(), before);
 }
+
+/// A bot that posts under ever new names keeps [`BOT_NAMES`] of them as people, the newest;
+/// people stay as they are.
+#[test]
+fn a_bot_s_names_kept_as_people_are_capped() {
+    let mut m = model();
+    let w = ws(&m, 0);
+    let before = m.snapshot.users.len();
+    let bot = |i: usize| slakio_core::model::User {
+        id: UserId::new(format!("BHOOK~{i:016x}")),
+        workspace: w.clone(),
+        name: slakio_core::sanitize::Remote::new(format!("name {i}")),
+        display_name: slakio_core::sanitize::Remote::new(format!("name {i}")),
+        org: slakio_core::model::Org::Own,
+        bot: true,
+        presence: slakio_core::model::Presence::Unknown,
+    };
+    for i in 0..1000 {
+        m.add_users(&w, &[bot(i)]);
+    }
+    assert_eq!(m.snapshot.users.len(), before + BOT_NAMES);
+    assert!(m.user(&w, &bot(999).id).is_some() && m.user(&w, &bot(1000 - BOT_NAMES).id).is_some());
+    assert!(m.user(&w, &bot(0).id).is_none(), "the oldest name went");
+    let named = m.user(&w, &bot(990).id).unwrap();
+    assert_eq!(named.display_name.line().as_str(), "name 990", "each id still names its own");
+}
