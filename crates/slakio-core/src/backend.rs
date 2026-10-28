@@ -108,6 +108,9 @@ pub struct Snapshot {
     pub saved: Option<Vec<SavedItem>>,
     /// When the backend took this snapshot: reminders due before it are overdue.
     pub taken: Ts,
+    /// The unread counts could not be read: every conversation's `unread` and `mentions` here
+    /// are unknown, not zero (the UI keeps those it had, and says so).
+    pub counts_failed: bool,
 }
 
 impl Snapshot {
@@ -121,6 +124,7 @@ impl Snapshot {
             conversations: self.conversations.iter().filter(|c| &c.workspace == ws).cloned().collect(),
             saved: self.saved.as_ref().map(|items| items.iter().filter(|s| &s.workspace == ws).cloned().collect()),
             taken: self.taken,
+            counts_failed: self.counts_failed,
         }
     }
 }

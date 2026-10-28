@@ -155,6 +155,12 @@ pub struct Conversation {
 }
 
 impl Conversation {
+    /// Its counts as badges show them: (unread, mentions), none at all when it is muted (a
+    /// muted conversation never badges, nor adds to a section's or a view's count).
+    pub fn badges(&self) -> (u32, u32) {
+        if self.muted { (0, 0) } else { (self.unread, self.mentions) }
+    }
+
     pub fn is_dm(&self) -> bool {
         matches!(self.kind, ConversationKind::Dm { .. } | ConversationKind::GroupDm { .. })
     }
