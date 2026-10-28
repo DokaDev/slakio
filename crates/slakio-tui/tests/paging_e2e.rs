@@ -100,11 +100,13 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     let paced = 1 + (t0.elapsed().as_millis() / 1500) as usize + 1;
     let asked = m.calls("conversations.history");
     assert!((1..=paced).contains(&asked), "{asked} older pages for 40 gestures in {:?}", t0.elapsed());
-    // Slack refuses the next one with 429 and two seconds to wait.
-    m.fake.fail_next("conversations.history", Fault::Status { status: 429, retry_after: Some("2".into()) });
-    std::thread::sleep(Duration::from_millis(1600));
+    // Slack refuses the next one with 429 and two seconds to wait (once the page a gesture of
+    // the burst queued has gone out, and its turn passed).
+    std::thread::sleep(Duration::from_millis(3200));
     let before = m.calls("conversations.history");
+    m.fake.fail_next("conversations.history", Fault::Status { status: 429, retry_after: Some("2".into()) });
     run.type_bytes(b"gg");
+    wait_until("the refused page", || m.calls("conversations.history") > before);
     run.wait_for("the failed row", |t| t.contains("Older messages not loaded"));
     wait_until("asked again by itself", || m.calls("conversations.history") > before + 1);
     run.wait_for("the row gone", |t| !t.contains("Older messages not loaded"));
