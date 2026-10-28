@@ -17,9 +17,11 @@ reads: it sends no message, reacts to nothing and marks nothing as read. There a
 updates (open a conversation again to see new messages). What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.6, signs in from the Slack desktop app (or a pasted
-request) to one workspace and reads it (no realtime updates or cache yet); 0.0.5 signed in by
-paste only, and earlier releases ran in demo mode only. Sign-in works on macOS only (the credentials go to the
+([Install](#install)); the latest release, 0.0.7, signs in from the Slack desktop app (or a pasted
+request) to one workspace and reads it (no realtime updates); it keeps a local cache, so slakio
+starts from the last run's data and then refreshes it (the cache is excluded from Time Machine,
+and logout deletes it); 0.0.6 had no cache, 0.0.5 signed in by paste only, and earlier releases
+ran in demo mode only. Sign-in works on macOS only (the credentials go to the
 macOS Keychain); it reads the session from the Slack desktop app, or you paste a browser request.
 Nothing here is ready for daily use.
 
