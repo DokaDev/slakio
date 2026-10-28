@@ -7,10 +7,11 @@
 //! * a **request cap** per minute, with a share that background work cannot use, so what the
 //!   user asked for goes first; a budget per hour; and a ceiling for the life of the process
 //!   that, once reached, stops all network until the program is started again;
-//! * **fair between workspaces** — each workspace's client has a [`Lane`] of its own: it holds
-//!   at most [`Limits::lane_in_flight`] of the slots and [`Limits::lane_waiting`] of the waiting
-//!   places, so one busy workspace never leaves another without a slot; the caps and budgets
-//!   are shared;
+//! * **fair between workspaces** — each workspace's client has a [`Lane`] of its own: one of
+//!   the slots is kept for it alone (for as many lanes as there are slots), and it holds at most
+//!   [`Limits::lane_in_flight`] of the slots and [`Limits::lane_waiting`] of the waiting places,
+//!   so busy workspaces, however many, never leave another without a slot; the caps and
+//!   budgets are shared;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
 //!   one); the others go on.
@@ -166,7 +167,8 @@ impl std::fmt::Debug for Governor {
 /// dropped.
 #[derive(Debug)]
 pub struct Admitted {
-    _slot: OwnedSemaphorePermit,
+    _slot: Option<OwnedSemaphorePermit>,
+    _kept: Option<Kept>,
     _lane: Option<OwnedSemaphorePermit>,
 }
 
@@ -176,6 +178,40 @@ pub struct Lane {
     slots: Arc<Semaphore>,
     waiting: AtomicUsize,
     limit: usize,
+    /// The process's slot kept for this lane, while no request of it uses it (none when the
+    /// lane was made with every slot taken).
+    kept: Arc<Mutex<Option<OwnedSemaphorePermit>>>,
+}
+
+/// A lane's kept slot in use: it goes back to the lane when dropped.
+#[derive(Debug)]
+struct Kept {
+    slot: Option<OwnedSemaphorePermit>,
+    home: Arc<Mutex<Option<OwnedSemaphorePermit>>>,
+}
+
+impl Drop for Kept {
+    fn drop(&mut self) {
+        *self.home.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = self.slot.take();
+    }
+}
+
+/// A waiting place taken: it is given back when dropped, also when the waiting request is
+/// given up (its future dropped).
+struct Waiting<'a>(&'a AtomicUsize);
+
+impl<'a> Waiting<'a> {
+    /// A place of `count`'s `limit`, or none when they are all taken.
+    fn take(count: &'a AtomicUsize, limit: usize) -> Option<Self> {
+        let place = Self(count);
+        (count.fetch_add(1, Ordering::SeqCst) < limit).then_some(place)
+    }
+}
+
+impl Drop for Waiting<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 impl Governor {
@@ -229,27 +265,40 @@ impl Governor {
             slots: Arc::new(Semaphore::new(self.limits.lane_in_flight.clamp(1, self.limits.in_flight.max(1)))),
             waiting: AtomicUsize::new(0),
             limit: self.limits.lane_waiting,
+            kept: Arc::new(Mutex::new(Arc::clone(&self.slots).try_acquire_owned().ok())),
         }
     }
 
     /// [`Governor::admit`] for a request of `lane`: it first waits for one of its lane's slots
-    /// (refused as busy when its lane's waiting places are taken), then for one of the process's.
+    /// (refused as busy when its lane's waiting places are taken), then takes the lane's kept
+    /// slot when it is free, else waits for one of the process's.
     pub async fn admit_in(&self, lane: &Lane, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
         let off = || SlackError::Offline { why: "the network is switched off" };
         if !self.is_on() {
             return Err(off());
         }
-        if lane.waiting.fetch_add(1, Ordering::SeqCst) >= lane.limit {
-            lane.waiting.fetch_sub(1, Ordering::SeqCst);
-            return Err(SlackError::Busy);
-        }
+        let Some(place) = Waiting::take(&lane.waiting, lane.limit) else { return Err(SlackError::Busy) };
         let own = tokio::select! {
             slot = Arc::clone(&lane.slots).acquire_owned() => slot.ok(),
             () = self.stopped() => None,
         };
-        lane.waiting.fetch_sub(1, Ordering::SeqCst);
+        drop(place);
         let Some(own) = own else { return Err(off()) };
-        let mut admitted = self.admit(method, priority).await?;
+        let slot = lane.kept.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+        let mut admitted = match slot {
+            Some(slot) => {
+                let kept = Kept { slot: Some(slot), home: Arc::clone(&lane.kept) };
+                if let Some(left) = self.paused(method) {
+                    return Err(SlackError::RateLimited { retry_after: Some(left) });
+                }
+                if !self.is_on() {
+                    return Err(off());
+                }
+                self.count(priority)?;
+                Admitted { _slot: None, _kept: Some(kept), _lane: None }
+            }
+            None => self.admit(method, priority).await?,
+        };
         admitted._lane = Some(own);
         Ok(admitted)
     }
@@ -264,24 +313,18 @@ impl Governor {
         if let Some(left) = self.paused(method) {
             return Err(SlackError::RateLimited { retry_after: Some(left) });
         }
-        if self.waiting.fetch_add(1, Ordering::SeqCst) >= self.limits.waiting {
-            self.waiting.fetch_sub(1, Ordering::SeqCst);
-            return Err(SlackError::Busy);
-        }
+        let Some(place) = Waiting::take(&self.waiting, self.limits.waiting) else { return Err(SlackError::Busy) };
         let slot = tokio::select! {
             slot = Arc::clone(&self.slots).acquire_owned() => slot,
-            () = self.stopped() => {
-                self.waiting.fetch_sub(1, Ordering::SeqCst);
-                return Err(off());
-            }
+            () = self.stopped() => return Err(off()),
         };
-        self.waiting.fetch_sub(1, Ordering::SeqCst);
+        drop(place);
         let Ok(slot) = slot else { return Err(off()) };
         if !self.is_on() {
             return Err(off());
         }
         self.count(priority)?;
-        Ok(Admitted { _slot: slot, _lane: None })
+        Ok(Admitted { _slot: Some(slot), _kept: None, _lane: None })
     }
 
     /// Count a request against the caps, or refuse it.

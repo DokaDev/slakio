@@ -184,3 +184,59 @@ fn a_busy_workspace_never_takes_every_slot_from_another() {
         drop(first);
     });
 }
+
+#[test]
+fn a_waiting_request_given_up_frees_its_waiting_place() {
+    rt().block_on(async {
+        // In a lane: the one waiting place is given back when the waiting request is dropped.
+        let (g, _) = governor(Limits { in_flight: 1, lane_in_flight: 1, lane_waiting: 1, ..Limits::default() }, true);
+        let lane = g.lane();
+        let first = g.admit_in(&lane, M, Priority::User).await.unwrap();
+        for _ in 0..3 {
+            let waiting = g.admit_in(&lane, M, Priority::User);
+            tokio::pin!(waiting);
+            assert!(tokio::time::timeout(Duration::from_millis(20), &mut waiting).await.is_err(), "it waits");
+        }
+        let next = g.admit_in(&lane, M, Priority::User);
+        tokio::pin!(next);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut next).await.is_err(), "it waits, not busy");
+        drop(first);
+        drop(tokio::time::timeout(Duration::from_secs(1), next).await.expect("its turn").unwrap());
+        // The process's waiting places, the same.
+        let (g, _) = governor(Limits { in_flight: 1, waiting: 1, ..Limits::default() }, true);
+        let first = g.admit(M, Priority::User).await.unwrap();
+        for _ in 0..3 {
+            let waiting = g.admit(M, Priority::User);
+            tokio::pin!(waiting);
+            assert!(tokio::time::timeout(Duration::from_millis(20), &mut waiting).await.is_err(), "it waits");
+        }
+        let next = g.admit(M, Priority::User);
+        tokio::pin!(next);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut next).await.is_err(), "it waits, not busy");
+        drop(first);
+        drop(tokio::time::timeout(Duration::from_secs(1), next).await.expect("its turn").unwrap());
+    });
+}
+
+#[test]
+fn busy_workspaces_never_take_every_slot_from_a_third() {
+    rt().block_on(async {
+        let (g, _) = governor(Limits::default(), true);
+        let (a, b, c) = (g.lane(), g.lane(), g.lane());
+        let wait = Duration::from_millis(20);
+        let mut held = Vec::new();
+        for _ in 0..6 {
+            held.push(tokio::time::timeout(wait, g.admit_in(&a, M, Priority::User)).await.expect("A's share").unwrap());
+        }
+        held.push(tokio::time::timeout(wait, g.admit_in(&b, M, Priority::User)).await.expect("B's first").unwrap());
+        let b2 = g.admit_in(&b, M, Priority::User);
+        tokio::pin!(b2);
+        let b2_now = tokio::time::timeout(wait, &mut b2).await;
+        // A and B busy: C still gets a slot at once.
+        let c1 = tokio::time::timeout(wait, g.admit_in(&c, M, Priority::User)).await;
+        let c1 = c1.expect("C is not held back by A and B").unwrap();
+        assert!(b2_now.is_err(), "B's second waits for a slot, C's is kept");
+        drop((c1, held));
+        drop(tokio::time::timeout(Duration::from_secs(1), b2).await.expect("B's turn").unwrap());
+    });
+}
