@@ -7,8 +7,8 @@
 //!   cache is waited for [`BOOT_WAIT`] at most (a page [`READ_WAIT`]): a cache that is busy or
 //!   slow never holds a request back, which then goes on without a cached answer, and the error
 //!   log says so. The backend's `Booted` is kept and handed to the UI.
-//! - The newest page of a conversation of this workspace likewise (`CachedHistory`); every page
-//!   the backend answers for one is kept.
+//! - The newest page of a conversation or a thread of this workspace likewise
+//!   (`CachedHistory`); every page the backend answers for one is kept.
 //! - Everything else goes through untouched, both ways: the UI's request still gets exactly one
 //!   answer of the backend's (a cached one is extra and ends nothing).
 //!
@@ -19,7 +19,7 @@
 use crate::cache::Cache;
 use slakio_core::backend::{BackendEnd, BackendHandle, Command, Envelope, Event, Generation, Request};
 use slakio_core::fault::Fault;
-use slakio_core::model::{Target, Ts, WorkspaceId};
+use slakio_core::model::{Ts, WorkspaceId};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -143,9 +143,7 @@ async fn ask(request: &Request, front: &Front, asked: &mut HashMap<Generation, A
             let s = within(front.waits.boot, read, "the boot snapshot", &front.on_slow).await?;
             Some(Envelope { generation: id, event: Event::CachedBoot(Box::new(s)) })
         }
-        Command::History { target: target @ Target::Conversation { workspace: ws, .. }, before, limit }
-            if *ws == front.workspace =>
-        {
+        Command::History { target, before, limit } if *target.workspace() == front.workspace => {
             front.cache.protect(target.clone());
             asked.insert(id, Asked::Page { before: *before });
             if before.is_some() {

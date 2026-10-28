@@ -5,7 +5,11 @@
 //! the conversation, when it is complete) to the time it was asked before (or now, for the
 //! newest). What the cache held in that span and the page no longer has (deleted since) goes;
 //! an edited message is replaced. A conversation's time of last use (`seen`) is what ages it out
-//! ([`crate::prune`]). Only conversations are kept: threads are not cached.
+//! ([`crate::prune`]).
+//!
+//! A thread is kept the same way, as a place of its own named `<conversation>:<thread>` (its
+//! own message's time, as Slack spells it; a Slack id has no `:`, so no conversation is named
+//! so): its pages, its time of last use and the caps are its own.
 
 use crate::codec::{count, int, pack, uint, unpack};
 use crate::db::Store;
@@ -58,20 +62,20 @@ fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
     })
 }
 
-/// The conversation of `target`, when it is one (a thread is not cached).
-fn conversation(target: &Target) -> Option<(&str, &str)> {
+/// Where the messages of `target` are kept: its workspace, and its conversation or the place
+/// of its thread.
+pub(crate) fn place(target: &Target) -> (&str, String) {
     match target {
-        Target::Conversation { workspace, conversation } => Some((workspace.as_str(), conversation.as_str())),
-        Target::Thread { .. } => None,
+        Target::Conversation { workspace, conversation } => (workspace.as_str(), conversation.as_str().to_string()),
+        Target::Thread { workspace, conversation, thread } => (workspace.as_str(), format!("{conversation}:{thread}")),
     }
 }
 
 impl Store {
     /// Keep `page`, the answer to a request for the messages of its target older than `before`
-    /// (the newest: `None`), seen at `now` (seconds since the Unix epoch). The writer only; a
-    /// thread's page is not kept.
+    /// (the newest: `None`), seen at `now` (seconds since the Unix epoch). The writer only.
     pub fn put_page(&mut self, page: &Page, before: Option<Ts>, now: u64) -> rusqlite::Result<()> {
-        let Some((ws, conv)) = conversation(&page.target) else { return Ok(()) };
+        let (ws, conv) = place(&page.target);
         if self.read_only() {
             return Ok(());
         }
@@ -117,7 +121,7 @@ impl Store {
     /// whom the cache knows; `None` when it keeps none. Never `complete`: the backend's own page
     /// says whether older ones exist.
     pub fn newest_page(&self, target: &Target, limit: u32) -> rusqlite::Result<Option<Page>> {
-        let Some((ws, conv)) = conversation(target) else { return Ok(None) };
+        let (ws, conv) = place(target);
         // One read transaction: the messages and their people as one commit left them.
         let tx = self.conn.unchecked_transaction()?;
         let mut messages: Vec<Message> = tx

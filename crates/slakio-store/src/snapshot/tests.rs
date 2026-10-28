@@ -117,3 +117,33 @@ fn a_value_this_version_cannot_read_is_an_error_not_a_guess() {
     store.conn.execute("UPDATE conversations SET peers = 'x' WHERE ord = 0", []).unwrap();
     assert!(store.snapshot(&ids(s)).is_err());
 }
+
+#[test]
+fn counts_slack_could_not_tell_keep_those_kept_before() {
+    let mut store = writer("snap-counts");
+    let mut s = World::new(5).snapshot().clone();
+    s.conversations[0].unread = 4;
+    s.conversations[0].mentions = 2;
+    store.put_snapshot(&s).unwrap();
+    // The next boot could not read the counts: its zeros are unknown.
+    let mut next = s.clone();
+    next.counts_failed = true;
+    for c in &mut next.conversations {
+        (c.unread, c.mentions) = (0, 0);
+    }
+    next.conversations[1].name = Remote::new("renamed");
+    store.put_snapshot(&next).unwrap();
+    let back = store.snapshot(&ids(&s)).unwrap().unwrap();
+    assert_eq!((back.conversations[0].unread, back.conversations[0].mentions), (4, 2));
+    assert_eq!(back.conversations[1].name.unsanitized(), "renamed", "the rest is the new boot's");
+    assert!(!back.counts_failed, "the counts kept are known ones");
+    // A boot that read them replaces them, zeros too.
+    store
+        .put_snapshot(&{
+            let mut ok = next.clone();
+            ok.counts_failed = false;
+            ok
+        })
+        .unwrap();
+    assert_eq!(store.snapshot(&ids(&s)).unwrap().unwrap().conversations[0].unread, 0);
+}

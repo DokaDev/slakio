@@ -440,3 +440,28 @@ async fn a_conversation_one_workspace_shows_is_kept_from_another_workspaces_prun
     r.backend_next().await;
     assert!(matches!(r.ui_next().await.event, Event::CachedHistory(_)), "A's open conversation outlived B's prune");
 }
+
+#[tokio::test]
+async fn a_thread_s_newest_page_is_kept_and_given_first_on_a_later_open() {
+    let (dir, w) = (scratch("thread"), world());
+    first_run(&dir, &w).await;
+    let ws = snapshot(&w).workspaces[0].id.clone();
+    let conv = target(&w, "general");
+    let parent = page(&w, &conv, None).messages[0].clone();
+    let thread = Target::Thread { workspace: ws.clone(), conversation: conv.conversation().clone(), thread: parent.ts };
+    let replies = Page { target: thread.clone(), messages: vec![parent.clone()], complete: true, users: Vec::new() };
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, history(&thread, None));
+    let req = r.backend_next().await;
+    assert!(r.ui.rx.try_recv().is_err(), "nothing kept of it yet");
+    r.answer(req.id, Event::History(Box::new(replies.clone()))).await;
+    r.ui_next().await;
+    r.settled().await;
+    r.no_faults();
+    drop(r);
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(2, history(&thread, None));
+    r.backend_next().await;
+    let Event::CachedHistory(p) = r.ui_next().await.event else { panic!("cached") };
+    assert_eq!((p.target, p.messages), (thread, replies.messages), "the thread, not its conversation");
+}

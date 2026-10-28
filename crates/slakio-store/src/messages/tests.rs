@@ -81,7 +81,7 @@ fn a_complete_page_clears_everything_older_and_an_empty_one_everything() {
 }
 
 #[test]
-fn threads_are_not_kept_and_conversations_do_not_mix() {
+fn a_thread_s_page_is_not_its_conversation_s_and_conversations_do_not_mix() {
     let world = World::new(9);
     let mut store = writer("msg-threads");
     let t = target(&world, "general");
@@ -92,7 +92,11 @@ fn threads_are_not_kept_and_conversations_do_not_mix() {
         thread: p.messages[0].ts,
     };
     store.put_page(&Page { target: thread.clone(), ..p.clone() }, None, 1).unwrap();
-    assert_eq!(store.newest_page(&thread, 10).unwrap(), None);
+    assert_eq!(
+        store.newest_page(&thread, 10).unwrap().map(|b| b.messages),
+        Some(p.messages.clone()),
+        "kept as the thread's"
+    );
     assert_eq!(store.newest_page(&t, 10).unwrap(), None, "a thread's page is not its conversation's");
     store.put_page(&p, None, 1).unwrap();
     assert_eq!(store.newest_page(&other(t.workspace().as_str(), "COTHER"), 10).unwrap(), None);
@@ -135,4 +139,36 @@ fn a_page_never_writes_the_people_of_another_workspace() {
     };
     assert_eq!(count(t.workspace().as_str()), 1, "the target's workspace's person is kept");
     assert_eq!(count("T0OTHER"), 0, "another workspace's part is not written");
+}
+
+/// The thread under message `thread` of `t`'s conversation.
+fn thread_of(t: &Target, thread: Ts) -> Target {
+    Target::Thread { workspace: t.workspace().clone(), conversation: t.conversation().clone(), thread }
+}
+
+#[test]
+fn a_thread_is_kept_apart_from_its_conversation() {
+    let world = World::new(9);
+    let mut store = writer("msg-thread");
+    let t = target(&world, "general");
+    let conv = page(&world, &t, None, 28);
+    store.put_page(&conv, None, 1).unwrap();
+    let th = thread_of(&t, conv.messages[0].ts);
+    let replies = Page {
+        target: th.clone(),
+        messages: conv.messages[..5].iter().map(|m| Message { text: Remote::new("reply"), ..m.clone() }).collect(),
+        complete: true,
+        users: Vec::new(),
+    };
+    store.put_page(&replies, None, 2).unwrap();
+    let back = store.newest_page(&th, 28).unwrap().unwrap();
+    assert_eq!(back.messages, replies.messages);
+    assert_eq!(back.target, th);
+    assert_eq!(store.newest_page(&t, 28).unwrap().unwrap().messages, conv.messages, "the conversation's are its own");
+    // A thread's page is the truth for its span too: a reply deleted since goes.
+    let fewer = Page { messages: replies.messages[1..].to_vec(), ..replies.clone() };
+    store.put_page(&fewer, None, 3).unwrap();
+    assert_eq!(store.newest_page(&th, 28).unwrap().unwrap().messages.len(), 4);
+    // Another thread of the conversation has nothing kept.
+    assert_eq!(store.newest_page(&thread_of(&t, Ts(1)), 28).unwrap(), None);
 }

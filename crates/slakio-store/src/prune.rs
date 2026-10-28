@@ -1,7 +1,8 @@
 //! Keeping the cache small: at most so many messages a conversation, conversations not opened
 //! for so many days dropped, and the whole file under a size — dropping the conversations used
 //! longest ago first. A conversation in `protect` (shown in a pane, or asked for during this run)
-//! is never touched by any of the three.
+//! is never touched by any of the three. A thread kept is a place of its own
+//! ([`crate::messages`]): capped, aged and dropped as a conversation is.
 
 use crate::codec::int;
 use crate::db::Store;
@@ -35,12 +36,10 @@ pub struct Pruned {
     pub messages: usize,
 }
 
-/// `(workspace, conversation)` of a conversation target.
+/// `(workspace, place)` of a target: its conversation, or its thread's place.
 fn key(t: &Target) -> Option<(String, String)> {
-    match t {
-        Target::Conversation { workspace, conversation } => Some((workspace.0.clone(), conversation.0.clone())),
-        Target::Thread { .. } => None,
-    }
+    let (ws, place) = crate::messages::place(t);
+    Some((ws.to_string(), place))
 }
 
 /// The bytes the database of `conn` uses, as its transaction sees them.

@@ -144,3 +144,23 @@ fn a_prune_is_one_step_and_its_freed_pages_go_back_a_few_at_a_time() {
     assert!(pragma(&store, "page_count") < file_pages);
     assert!(!store.vacuum(8).unwrap(), "nothing left: no step more");
 }
+
+#[test]
+fn a_thread_is_capped_aged_and_protected_as_a_conversation_is() {
+    let mut store = writer("prune-thread");
+    let conv = other("T1", "C1");
+    let thread = |ts| Target::Thread {
+        workspace: conv.workspace().clone(),
+        conversation: conv.conversation().clone(),
+        thread: Ts(ts),
+    };
+    let (long, old, shown) = (thread(1), thread(2), thread(3));
+    put(&mut store, &long, 50, 10, 100 * DAY);
+    put(&mut store, &old, 5, 10, DAY);
+    put(&mut store, &shown, 5, 10, DAY);
+    let caps = Caps { per_conversation: 20, max_bytes: u64::MAX, max_days: 30 };
+    store.prune(caps, &HashSet::from([shown.clone()]), 100 * DAY).unwrap();
+    assert_eq!(kept(&store, &long), 20, "the newest 20 replies");
+    assert_eq!(kept(&store, &old), 0, "not opened for 99 days");
+    assert_eq!(kept(&store, &shown), 5, "a thread shown is never pruned");
+}

@@ -205,6 +205,14 @@ fn saved(r: &Row<'_>) -> rusqlite::Result<SavedItem> {
 /// are not touched. `ord` is its place in `s`.
 fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> rusqlite::Result<()> {
     let id = ws.as_str();
+    // Counts Slack could not tell are unknown, not zero: those kept from before stay.
+    let kept: std::collections::HashMap<String, (u32, u32)> = if s.counts_failed {
+        tx.prepare("SELECT id, unread, mentions FROM conversations WHERE workspace = ?1")?
+            .query_map([id], |r| Ok((r.get::<_, String>(0)?, (r.get(1)?, r.get(2)?))))?
+            .collect::<Result<_, _>>()?
+    } else {
+        std::collections::HashMap::new()
+    };
     for table in ["sections", "conversations", "saved"] {
         tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?1"), [id])?;
     }
@@ -227,7 +235,10 @@ fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> ru
         )?;
     }
     for (i, c) in s.conversations.iter().enumerate() {
-        put_conversation(tx, i, c)?;
+        match kept.get(c.id.as_str()) {
+            Some(&(unread, mentions)) => put_conversation(tx, i, &Conversation { unread, mentions, ..c.clone() })?,
+            None => put_conversation(tx, i, c)?,
+        }
     }
     for (i, item) in s.saved.iter().flatten().enumerate() {
         put_saved(tx, i, item)?;
@@ -288,7 +299,7 @@ fn read(conn: &Connection, ws: &WorkspaceId) -> rusqlite::Result<Option<Snapshot
         "unknown" => None,
         _ => return Err(damaged("saved marker")),
     };
-    Ok(Some(Snapshot { workspaces, users, sections, conversations, saved, taken }))
+    Ok(Some(Snapshot { workspaces, users, sections, conversations, saved, taken, counts_failed: false }))
 }
 
 impl Store {
