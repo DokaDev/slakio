@@ -104,32 +104,32 @@ fn sign_out_one(
 ) -> ExitCode {
     let errors = || ErrorLog::new(paths.errors_log());
     let Some(path) = path else { return ExitCode::FAILURE };
-    // A slakio that runs writes the cache: nothing is signed out until it is quit, so its part
-    // of the cache is never left behind without a workspace that names it.
-    if crate::store::in_use(paths) {
-        eprintln!("{}", i18n.label(Label::LogoutStillRunning));
-        return ExitCode::FAILURE;
-    }
+    // The cache is held as its writer first, and until its part is removed: a slakio that runs
+    // writes the cache, so nothing is signed out until it is quit, and one that starts meanwhile
+    // cannot take the part — it is never left behind without a workspace that names it.
+    let held = match crate::store::hold(paths) {
+        Err(None) => {
+            eprintln!("{}", i18n.label(Label::LogoutStillRunning));
+            return ExitCode::FAILURE;
+        }
+        Err(Some(fault)) => Err(fault),
+        Ok(held) => Ok(held),
+    };
     if let Err(fault) = account::forget_one(store, path, &a.team) {
         errors().record("logout", &fault);
         eprintln!("{}", i18n.label(Label::LogoutFailed));
         return ExitCode::FAILURE;
     }
     let workspace = shown(&a.name);
-    match crate::store::forget(paths, &a.team) {
+    match held.and_then(|held| held.map_or(Ok(()), |mut cache| cache.forget(&a.team))) {
         Ok(()) => {
             println!("{}", i18n.msg(&Msg::LogoutDoneOne { workspace }));
             ExitCode::SUCCESS
         }
-        Err(running) => {
+        Err(fault) => {
             println!("{}", i18n.msg(&Msg::LogoutDoneCacheKept { workspace }));
-            match running {
-                None => eprintln!("{}", i18n.label(Label::LogoutStillRunning)),
-                Some(fault) => {
-                    errors().record("logout", &fault);
-                    eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
-                }
-            }
+            errors().record("logout", &fault);
+            eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
             ExitCode::FAILURE
         }
     }

@@ -320,3 +320,35 @@ fn signing_out_of_one_workspace_while_a_slakio_runs_changes_nothing_and_says_to_
     assert!(out.status.success(), "{}", text(&out));
     assert!(!m.file().contains(HOSTS[1]));
 }
+
+#[test]
+fn signing_out_of_one_workspace_holds_the_cache_from_before_its_credentials_go() {
+    let m = Machine::new("logout-held", &[0, 1]);
+    let Some(run) = m.start(1, (100, 30), &[]) else { return };
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    wait_until("B booted", || m.methods(1).iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(500));
+    run.quit();
+    // Another sign-in changes the workspaces file meanwhile: the logout waits for it.
+    let held = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(m.workspaces_file().with_extension("lock"))
+        .unwrap();
+    held.lock().unwrap();
+    let (_, addrs) = m.env();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_slakio"));
+    cmd.args(["logout", "b-team"]).env("SLAKIO_TEST_SLACK_ADDR", addrs);
+    dirs(&mut cmd, &m.dir);
+    let child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
+    // Before B's credentials go, the cache is held: no slakio that starts now can write B's part.
+    let cache = m.dir.join("cache").join("slakio");
+    wait_until("the logout holds the cache", || slakio_store::db::in_use(&cache));
+    assert!(m.file().contains(HOSTS[1]), "still signed in to B while it waits");
+    drop(held);
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("its part of the local cache is deleted"), "{}", text(&out));
+    assert!(!m.file().contains(HOSTS[1]) && m.file().contains(HOSTS[0]), "{}", m.file());
+}

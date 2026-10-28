@@ -200,12 +200,13 @@ pub(crate) fn remove(paths: &Paths) -> Result<(), Fault> {
     }
 }
 
-/// `slakio logout <workspace>` while other workspaces stay signed in: workspace `team`'s part of
-/// the cache is removed, the others' kept. `Err(None)`: a slakio runs and writes the cache, so
-/// nothing was removed (it is to be quit first).
-pub(crate) fn forget(paths: &Paths, team: &str) -> Result<(), Option<Fault>> {
-    let Some(dir) = paths.cache.as_ref().filter(|d| d.join(slakio_store::db::DIR).exists()) else { return Ok(()) };
-    let mut opened = match Store::open(dir) {
+/// `slakio logout <workspace>` while other workspaces stay signed in: the cache, held as its
+/// writer from before the workspace is signed out until its part is removed, so no slakio starts
+/// writing that part meanwhile. `Ok(None)`: there is no cache. `Err(None)`: a slakio runs and
+/// writes the cache (it is to be quit first).
+pub(crate) fn hold(paths: &Paths) -> Result<Option<Store>, Option<Fault>> {
+    let Some(dir) = paths.cache.as_ref().filter(|d| d.join(slakio_store::db::DIR).exists()) else { return Ok(None) };
+    let opened = match Store::open(dir) {
         Ok(o) => o,
         Err(OpenError::InUse) => return Err(None),
         Err(OpenError::Failed(f)) => return Err(Some(f)),
@@ -213,7 +214,7 @@ pub(crate) fn forget(paths: &Paths, team: &str) -> Result<(), Option<Fault>> {
     if opened.store.read_only() {
         return Err(None);
     }
-    opened.store.forget(team).map_err(Some)
+    Ok(Some(opened.store))
 }
 
 /// A slakio runs and uses the cache (it holds the writer's lock).
