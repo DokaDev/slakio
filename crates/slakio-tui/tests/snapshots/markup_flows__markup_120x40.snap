@@ -1,0 +1,45 @@
+---
+source: crates/slakio-tui/tests/markup_flows.rs
+assertion_line: 104
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────────────────────────────────────────────╮
+│▎Home                   @21 ││                                                                                        │
+│ DMs                    ●11 ││                                                                                        │
+│ Activity               @33 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ To-dos                   6 ││                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
+│ ▾ Favorites                ││                                                                                        │
+│   # backend                ││                                                                                        │
+│   # incidents           3  ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Ops                      ││                                                                                        │
+│▎  # deploys                ││                                                                                        │
+│   # alerts                 ││                                                                                        │
+│   # partner-shared ext     ││                                                                                        │
+│   # hostile-strings        ││                                                                                        │
+│   # big-history            ││                                                                                        │
+│   # long-threads           ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Channels                 ││                                                                                        │
+│   # announcements          ││                                                                                        │
+│   # design-review          ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
+│   # feed-alert-134         ││  KN   Kate Nam  09:00                                                                  │
+│   # feed-alert-8           ││       Deploy of api is cancelled done: run make ship & ask @Minsu Kim or @Me in        │
+│   # feed-budget-162        ││       #alerts                                                                          │
+│   # feed-budget-33         ││                                                                                        │
+│   # feed-build-50          ││  KN   Kate Nam  09:10                                                                  │
+│   # feed-cache-119         ││       see the runbook or https://status.example.com @here 🎉                           │
+│   # feed-customer-161      ││                                                                                        │
+│   # feed-customer-167      ││  KN   Kate Nam  09:20                                                                  │
+│   # feed-dashboard-22      ││       fn main() { println!("a very long line of code that never wraps in a narrow pan… │
+│   # feed-dashboard-41      ││           *not bold*                                                                   │
+│   # feed-design-34         ││                                                                                        │
+│   # feed-design-83         ││  KN   Kate Nam  09:30                                                                  │
+│   # feed-draft-142         ││       ▎ quoted line that is long enough to wrap under its bar when the pane is narrow  │
+│   # feed-draft-58          ││       after the quote                                                                  │
+│   # feed-draft-84          │├─ Message #deploys ─────────────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Read only: nothing can be sent                                                       │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys                 │ k messages · Esc list · Ctrl+R views · ? help · Space more │ read only

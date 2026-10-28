@@ -1,4 +1,5 @@
-//! A message laid out as rows, in either density (`density`, `:density`).
+//! A message laid out as rows, in either density (`density`, `:density`); its text as
+//! [`super::body`] draws Slack's markup.
 //!
 //! Comfortable (the default, as in GUI Slack): the sender's picture in a 4 × 2 slot on the left
 //! ([`crate::avatar::BLOCK`]), the name in bold and the time beside it on the first row, the text
@@ -25,6 +26,7 @@
 //! separator keeps its own row. A pane narrower than [`STACKED_BELOW`] shrinks the picture to the
 //! 2-cell chip, and below [`NO_PICTURE_BELOW`] leaves it out.
 
+use super::body;
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::{Pane, Shown};
@@ -32,11 +34,12 @@ use crate::app::timelines::Timeline;
 use crate::avatar::{self, Art, Slot};
 use crate::emoji;
 use crate::keymap::Ctx;
-use crate::text::{clip, width, wrap};
+use crate::text::{clip, width};
 use crate::time;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::model::Org;
 
 /// The sender's column, at most (compact).
 const AUTHOR_WIDTH: usize = 14;
@@ -121,10 +124,9 @@ fn slot_for(app: &App, w: usize) -> Option<Slot> {
 
 /// The text of `m` wrapped at `text_w`, emoji drawn, the edited marker on its last line when it
 /// fits (else on a row of its own); whether text was left out.
-fn text_lines(app: &App, m: &Shown, text_w: usize) -> (Vec<Vec<Span<'static>>>, bool) {
+fn text_lines(app: &App, pane: &Pane, m: &Shown, text_w: usize) -> (Vec<Vec<Span<'static>>>, bool) {
     let t = &app.theme;
-    let (lines, more) = wrap(&emoji::replace(m.text.as_str()), text_w, MAX_TEXT_ROWS);
-    let mut out: Vec<Vec<Span<'static>>> = lines.into_iter().map(|l| vec![Span::styled(l, t.text())]).collect();
+    let (mut out, more) = body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS);
     if m.edited {
         let edited = app.i18n.label(Label::MessageEdited).to_string();
         let last_w: usize = out.last().map_or(0, |l| l.iter().map(Span::width).sum());
@@ -148,7 +150,7 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     let indent = slot.map_or(0, |s| s.cols + 2);
     let text_w = w.saturating_sub(indent).max(4);
     let group = grouped(pane, tl, i);
-    let (lines, _) = text_lines(app, m, text_w);
+    let (lines, _) = text_lines(app, pane, m, text_w);
     let mut out: Vec<Laid> = Vec::new();
     if group {
         for (k, mut spans) in lines.into_iter().enumerate() {
@@ -173,9 +175,14 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     };
     let author_style = if m.own { t.own_author() } else { t.author() };
     let time_text = time::hm(m.ts);
-    let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2).max(1));
+    let tag = other_org(app, pane, m);
+    let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2 + width(&tag)).max(1));
     let mut header = picture(0);
-    header.extend([Span::styled(name, author_style), Span::raw("  "), Span::styled(time_text, t.faint())]);
+    header.push(Span::styled(name, author_style));
+    if !tag.is_empty() {
+        header.push(Span::styled(tag, t.faint()));
+    }
+    header.extend([Span::raw("  "), Span::styled(time_text, t.faint())]);
     out.push((Line::from(header), Kind::Content));
     // The slot is as high as it is however short the text: a message without text keeps it.
     let rows = lines.len().max(slot.map_or(1, |s| s.rows) - 1);
@@ -216,14 +223,16 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             spans.extend([chip, Span::raw(" ")]);
             room -= chip_column;
         }
+        let tag = other_org(app, pane, m);
         spans.extend([
-            Span::styled(clip(m.author.as_str(), room), author_style),
+            Span::styled(clip(m.author.as_str(), room.saturating_sub(width(&tag))), author_style),
+            Span::styled(tag, t.faint()),
             Span::styled(" · ", t.faint()),
             Span::styled(time::hm(m.ts), t.faint()),
         ]);
         out.push((Line::from(spans), Kind::Content));
     }
-    let (lines, _) = text_lines(app, m, text_w);
+    let (lines, _) = text_lines(app, pane, m, text_w);
     for (k, line) in lines.into_iter().enumerate() {
         let mut spans: Vec<Span<'static>> = Vec::new();
         if k == 0 && !stacked && !group {
@@ -249,6 +258,13 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
     out
 }
 
+/// ` ext` after the name of a sender of another organization (a Slack Connect peer); empty for
+/// one of the workspace's own.
+fn other_org(app: &App, pane: &Pane, m: &Shown) -> String {
+    let external = app.model.user(pane.target.workspace(), &m.user).is_some_and(|u| matches!(u.org, Org::External(_)));
+    if external { format!(" {}", app.i18n.label(Label::ListExternal)) } else { String::new() }
+}
+
 /// The text's column in the current density, for the rows under it.
 fn indent(app: &App, w: usize) -> usize {
     if app.settings.compact {
@@ -272,7 +288,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
     let indent = " ".repeat(indent_w);
     let mut out = Vec::new();
     let text_w = w.saturating_sub(indent_w).max(4);
-    if wrap(&emoji::replace(m.text.as_str()), text_w, MAX_TEXT_ROWS).1 {
+    if body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS).1 {
         let label = app.i18n.label(Label::MessageMore).to_string();
         out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(label, t.muted())]), Kind::Content));
     }

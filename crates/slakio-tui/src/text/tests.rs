@@ -62,3 +62,41 @@ fn punctuation_never_starts_a_line_on_its_own() {
         }
     }
 }
+
+#[test]
+fn wrap_styled_keeps_each_run_s_style_across_lines() {
+    use ratatui::style::{Modifier, Style};
+    let bold = Style::new().add_modifier(Modifier::BOLD);
+    let runs =
+        vec![("one ".to_string(), Style::new()), ("two three".to_string(), bold), (" four".to_string(), Style::new())];
+    let (lines, more) = wrap_styled(&runs, 9, 10, Style::new());
+    assert!(!more);
+    let shown: Vec<Vec<(String, Style)>> =
+        lines.iter().map(|l| l.iter().map(|s| (s.content.to_string(), s.style)).collect()).collect();
+    assert_eq!(
+        shown,
+        [
+            vec![("one ".to_string(), Style::new()), ("two ".to_string(), bold)],
+            vec![("three".to_string(), bold), (" ".to_string(), Style::new())],
+            vec![("four".to_string(), Style::new())],
+        ]
+    );
+}
+
+proptest::proptest! {
+    /// Styled or not, the lines hold the same text.
+    #[test]
+    fn wrap_styled_gives_wrap_s_lines(parts in proptest::collection::vec("[a-z \u{D55C}\u{0301}.]{0,12}", 0..8), w in 2usize..30) {
+        use ratatui::style::{Modifier, Style};
+        let runs: Vec<(String, Style)> = parts
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.clone(), if i % 2 == 0 { Style::new() } else { Style::new().add_modifier(Modifier::BOLD) }))
+            .collect();
+        let plain: String = parts.concat();
+        let (want, _) = wrap(&plain, w, 50);
+        let (got, _) = wrap_styled(&runs, w, 50, Style::new());
+        let got: Vec<String> = got.iter().map(|l| l.iter().map(|s| s.content.to_string()).collect()).collect();
+        proptest::prop_assert_eq!(got, want);
+    }
+}

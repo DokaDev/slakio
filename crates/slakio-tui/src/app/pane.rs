@@ -15,6 +15,7 @@
 //! ones below `bottom` fill what is left; a history that fits whole sits at the bottom.
 
 use super::timelines::Timeline;
+use crate::mrkdwn::Block;
 use slakio_core::layout::PaneId;
 use slakio_core::model::{Message, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Safe;
@@ -83,6 +84,8 @@ pub struct Shown {
     /// Written by the user.
     pub own: bool,
     pub text: Safe,
+    /// The text read as Slack's markup, once, when the message arrives.
+    pub body: Vec<Block>,
     pub thread: Option<ThreadSummary>,
     pub reactions: Vec<ShownReaction>,
     pub edited: bool,
@@ -91,12 +94,14 @@ pub struct Shown {
 impl Shown {
     /// `m` as drawn, by `author` (the sender's name, sanitised), `own` when the user wrote it.
     pub fn new(m: &Message, author: Safe, own: bool) -> Self {
+        let text = m.text.block();
         Self {
             ts: m.ts,
             user: m.user.clone(),
             author,
             own,
-            text: m.text.block(),
+            body: crate::mrkdwn::parse(text.as_str()),
+            text,
             thread: m.thread,
             reactions: m
                 .reactions
@@ -266,7 +271,8 @@ impl Pane {
 /// The user's own message (the demo's local echo), after the newest of `items`.
 pub fn echo(items: &mut Vec<Shown>, user: UserId, author: Safe, text: Safe) {
     let ts = items.last().map_or(Ts(0), |m| Ts(m.ts.0 + 1_000_000));
-    items.push(Shown { ts, user, author, own: true, text, thread: None, reactions: Vec::new(), edited: false });
+    let body = crate::mrkdwn::parse(text.as_str());
+    items.push(Shown { ts, user, author, own: true, text, body, thread: None, reactions: Vec::new(), edited: false });
 }
 
 #[cfg(test)]

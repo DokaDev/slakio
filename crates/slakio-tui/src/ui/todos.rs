@@ -133,7 +133,10 @@ fn item(f: &mut Frame, app: &App, i: usize, area: Rect) {
         spans.push(Span::styled("✓ ", t.muted()));
         left = left.saturating_sub(2);
     }
-    let text = clip(s.text.line().as_str(), left);
+    // Its markup read, as a thread's tab title reads it: the first line with text.
+    let safe = s.text.block();
+    let first = crate::mrkdwn::first_line(&crate::mrkdwn::parse(safe.as_str()), &|p| app.model.named(&s.workspace, p));
+    let text = clip(first.as_deref().unwrap_or_default().trim(), left);
     spans.push(Span::styled(text, if done { t.muted() } else { t.text() }));
     put(f, area, x, room, spans);
 }

@@ -1,0 +1,163 @@
+use super::*;
+use proptest::prelude::*;
+use slakio_core::sanitize::Remote;
+
+const B: Marks = Marks { bold: true, italic: false, strike: false };
+const I: Marks = Marks { bold: false, italic: true, strike: false };
+const N: Marks = Marks { bold: false, italic: false, strike: false };
+
+fn one(text: &str) -> Vec<Piece> {
+    match parse(text).as_slice() {
+        [Block::Line { quote: false, pieces }] => pieces.clone(),
+        other => panic!("{text:?}: {other:?}"),
+    }
+}
+
+fn t(s: &str, m: Marks) -> Piece {
+    Piece::Text(s.to_string(), m)
+}
+
+/// Every piece's text, as the drawing code shows it with no names known.
+fn flat(blocks: &[Block]) -> String {
+    let lines: Vec<String> = blocks
+        .iter()
+        .map(|b| match b {
+            Block::Line { quote, pieces } => {
+                let body: String = pieces.iter().map(|p| plain(p, &|_| None)).collect();
+                if *quote { format!("> {body}") } else { body }
+            }
+            Block::Code(c) => format!("|{c}"),
+        })
+        .collect();
+    lines.join("\n")
+}
+
+#[test]
+fn marks_open_and_close_as_slack_reads_them() {
+    assert_eq!(one("a *bold* b"), [t("a ", N), t("bold", B), t(" b", N)]);
+    assert_eq!(one("_it_"), [t("it", I)]);
+    assert_eq!(one("~gone~."), [t("gone", Marks { strike: true, ..N }), t(".", N)]);
+    assert_eq!(one("*_both_*"), [t("both", Marks { bold: true, italic: true, strike: false })]);
+    // Inside a word, after a blank, with no end, or empty: text.
+    assert_eq!(one("2*3*4"), [t("2*3*4", N)]);
+    assert_eq!(one("a * b *"), [t("a * b *", N)]);
+    assert_eq!(one("*open"), [t("*open", N)]);
+    assert_eq!(one("**"), [t("**", N)]);
+    assert_eq!(one("snake_case_name"), [t("snake_case_name", N)]);
+    // A mark does not nest in itself.
+    assert_eq!(one("*a *b* c*"), [t("a *b", B), t(" c*", N)]);
+}
+
+#[test]
+fn code_is_shown_as_written() {
+    assert_eq!(
+        one("run `*not bold* &lt;x&gt;` now"),
+        [t("run ", N), Piece::Code("*not bold* <x>".into()), t(" now", N)]
+    );
+    let blocks = parse("before\n```\nfn main() {\n    *x*\n}\n```\nafter");
+    assert_eq!(flat(&blocks), "before\n|fn main() {\n|    *x*\n|}\nafter");
+    // On one line, and a fence with no end is text.
+    assert_eq!(flat(&parse("```one line```")), "|one line");
+    assert_eq!(flat(&parse("``` no end")), "``` no end");
+}
+
+#[test]
+fn quotes_are_lines_that_start_with_a_quote_mark() {
+    assert_eq!(flat(&parse("&gt; said\nnot &gt; quoted\n>also")), "> said\nnot > quoted\n> also");
+}
+
+#[test]
+fn people_channels_broadcasts_groups_and_links() {
+    assert_eq!(
+        one("hi <@U1> in <#C2|general>"),
+        [
+            t("hi ", N),
+            Piece::User { id: "U1".into(), label: None, marks: N },
+            t(" in ", N),
+            Piece::Channel { id: "C2".into(), label: Some("general".into()), marks: N },
+        ]
+    );
+    assert_eq!(one("<!here>"), [Piece::Broadcast("here".into())]);
+    assert_eq!(one("<!subteam^S1|@ops>"), [Piece::Group(Some("@ops".into()))]);
+    assert_eq!(one("<!date^1392734382^{date}|Feb 18>"), [t("Feb 18", N)]);
+    assert_eq!(
+        one("<https://x.example/a?b=1&amp;c=2|the docs>"),
+        [Piece::Link { url: "https://x.example/a?b=1&c=2".into(), label: Some("the docs".into()), marks: N }]
+    );
+    assert_eq!(flat(&parse("<mailto:ops-desk>")), "ops-desk", "a mail address without its scheme");
+    // A bold link keeps its mark; `<>` and an unclosed `<` are text.
+    assert_eq!(one("*<https://x.example>*"), [Piece::Link { url: "https://x.example".into(), label: None, marks: B }]);
+    assert_eq!(one("a <> b < c"), [t("a <> b < c", N)]);
+    assert_eq!(flat(&parse("1 &lt; 2 &amp;&amp; 3 &gt; 2")), "1 < 2 && 3 > 2");
+}
+
+#[test]
+fn emoji_shortcodes_are_drawn_outside_code() {
+    assert_eq!(one(":+1: `:+1:`"), [t("👍 ", N), Piece::Code(":+1:".into())]);
+}
+
+#[test]
+fn a_first_line_is_the_first_with_text() {
+    let blocks = parse("\n*Deploy* <@U9> done");
+    let name = |p: &Piece| matches!(p, Piece::User { .. }).then(|| "Minsu".to_string());
+    assert_eq!(first_line(&blocks, &name).as_deref(), Some("Deploy @Minsu done"));
+}
+
+/// Every grapheme of `out` is one the sanitiser keeps as it is.
+fn safe(out: &str) -> Result<(), String> {
+    use unicode_segmentation::UnicodeSegmentation;
+    match out.graphemes(true).find(|g| *g != "\n" && Remote::new(*g).block().as_str() != *g) {
+        Some(g) => Err(format!("{g:?} is not safe")),
+        None => Ok(()),
+    }
+}
+
+/// Hostile texts, sanitised first as every message is: reading them keeps every character the
+/// sanitiser let through and adds none it would not.
+#[test]
+fn hostile_texts_stay_sanitised() {
+    let markup = ["*", "_", "<@", "<#C1|", "&gt; ", "```", "`", "<https://x.example|", ">"];
+    for h in slakio_world::hostile_strings() {
+        for m in markup {
+            let safe = Remote::new(format!("{m}{0}{m} {0}", h.text)).block();
+            let out = flat(&parse(safe.as_str()));
+            assert_eq!(self::safe(&out), Ok(()), "{}", h.what);
+        }
+    }
+}
+
+#[test]
+fn a_long_hostile_line_is_read_quickly() {
+    let line = "*a _b ~c `d <e ".repeat(3_000);
+    let started = std::time::Instant::now();
+    let _ = parse(&line);
+    assert!(started.elapsed() < std::time::Duration::from_secs(2), "{:?}", started.elapsed());
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    /// Any text: reading never panics, and what is shown has no control character, nor any the
+    /// sanitiser removes.
+    #[test]
+    fn any_text_reads_to_safe_text(raw in "\\PC{0,200}|[*_~`<>&|@#!:a-z \\n]{0,200}") {
+        let safe = Remote::new(raw).block();
+        let out = flat(&parse(safe.as_str()));
+        prop_assert_eq!(self::safe(&out), Ok(()));
+    }
+
+    /// Text with no markup in it reads as itself.
+    #[test]
+    fn plain_text_reads_as_itself(s in "[a-zA-Z0-9 ,.]{0,120}") {
+        prop_assert_eq!(flat(&parse(&s)), s);
+    }
+
+    /// Marks only style: the letters shown are those written, less the delimiters.
+    #[test]
+    fn marks_keep_every_letter(words in proptest::collection::vec(("[a-z]{1,8}", 0usize..4), 0..12)) {
+        let marks = ["", "*", "_", "~"];
+        let text: Vec<String> = words.iter().map(|(w, m)| format!("{0}{w}{0}", marks[*m])).collect();
+        let letters = |s: &str| s.chars().filter(char::is_ascii_lowercase).collect::<String>();
+        prop_assert_eq!(letters(&flat(&parse(&text.join(" ")))), letters(&text.join(" ")));
+    }
+}

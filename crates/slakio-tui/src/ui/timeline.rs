@@ -11,6 +11,7 @@
 //! Every row laid out is counted ([`rows_laid_out`]): the performance budget holds a frame to
 //! at most twice the rows the area shows, however long the history.
 
+pub mod body;
 pub mod message;
 
 use super::highlight;

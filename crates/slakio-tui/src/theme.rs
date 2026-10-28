@@ -337,9 +337,24 @@ impl Theme {
         self.accent().add_modifier(Modifier::BOLD)
     }
 
-    /// The "N replies" row of a message with a thread.
+    /// The "N replies" row of a message with a thread, and a link in a message.
     pub fn link(&self) -> Style {
         self.accent()
+    }
+
+    /// A person, channel or group named in a message: bold, in the accent; the user named (or
+    /// everyone, `@here`) in the warm color, as GUI Slack marks a mention of the user.
+    pub fn mention(&self, of_me: bool) -> Style {
+        match (self.plain(), of_me) {
+            (true, _) => self.bold(),
+            (false, true) => self.warm().add_modifier(Modifier::BOLD),
+            (false, false) => self.accent().add_modifier(Modifier::BOLD),
+        }
+    }
+
+    /// Code in a message (inline, or a code block's lines): the warm color; plain without color.
+    pub fn code(&self) -> Style {
+        if self.plain() { Style::new() } else { self.warm() }
     }
 
     /// A reaction chip: a pill on the raised background (the cursor line's color on a dark

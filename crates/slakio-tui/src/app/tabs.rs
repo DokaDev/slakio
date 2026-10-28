@@ -191,7 +191,7 @@ impl App {
             .into_iter()
             .flatten()
             .find_map(|tl| tl.position(*thread).map(|i| &tl.items[i]))
-            .and_then(|m| m.text.as_str().lines().find(|l| !l.trim().is_empty()));
+            .and_then(|m| crate::mrkdwn::first_line(&m.body, &|p| self.model.named(workspace, p)));
         format!("⤷ {}", first.map_or(name, |l| l.trim().to_string()))
     }
 

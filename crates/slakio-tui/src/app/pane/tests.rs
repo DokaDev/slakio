@@ -13,6 +13,7 @@ pub(crate) fn msg(ts: u64) -> Shown {
         author: Safe::default(),
         own: false,
         text: Safe::default(),
+        body: Vec::new(),
         thread: None,
         reactions: Vec::new(),
         edited: false,

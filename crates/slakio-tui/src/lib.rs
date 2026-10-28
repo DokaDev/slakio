@@ -13,6 +13,7 @@
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
 //! * [`input`] — Hangul typed where a key command was meant.
+//! * [`mrkdwn`] — Slack's message markup read into styled pieces.
 //! * [`text`] — display widths and wrapping; [`time`] — message dates and times.
 //!
 //! UI-independent logic lives in `slakio-core`.
@@ -27,6 +28,7 @@ pub mod input;
 pub mod keymap;
 pub mod kitty;
 pub mod many;
+pub mod mrkdwn;
 pub mod navbar;
 pub mod screen;
 pub mod tabbar;

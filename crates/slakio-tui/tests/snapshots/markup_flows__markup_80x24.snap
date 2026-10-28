@@ -1,0 +1,29 @@
+---
+source: crates/slakio-tui/tests/markup_flows.rs
+assertion_line: 104
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
+│▎Home                   @21 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @33 ││ ───────────────── 2026-01-05 ───────────────── │
+│ Files                      ││ KN  Kate Nam  09:00                            │
+│ To-dos                   6 ││     Deploy of api is cancelled done: run make  │
+├─▾──────────────────────────┤│     ship & ask @Minsu Kim or @Me in #alerts    │
+│ ▾ Favorites                ││                                                │
+│   # backend                ││ KN  Kate Nam  09:10                            │
+│   # incidents           3  ││     see the runbook or                         │
+│                            ││     https://status.example.com @here 🎉        │
+│ ▾ Ops                      ││                                                │
+│▎  # deploys                ││ KN  Kate Nam  09:20                            │
+│   # alerts                 ││     fn main() { println!("a very long line of… │
+│   # partner-shared ext     ││         *not bold*                             │
+│   # hostile-strings        ││                                                │
+│   # big-history            ││ KN  Kate Nam  09:30                            │
+│   # long-threads           ││     ▎ quoted line that is long enough to wrap  │
+│                            ││     ▎ under its bar when the pane is narrow    │
+│ ▾ Channels                 ││     after the quote                            │
+│   # announcements          │├─ Message #deploys ─────────────────────────────┤
+│   # design-review          ││ › Read only: nothing can be sent               │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys   │ k messages · ? help · Space more │ read only

@@ -157,8 +157,23 @@ impl Model {
         s.users.extend(new.users);
         s.sections.retain(|x| &x.workspace != ws);
         s.sections.extend(new.sections);
+        let mut conversations = new.conversations;
+        if snapshot.counts_failed {
+            // Counts Slack could not tell are unknown, not zero: those shown before stay.
+            let before: HashMap<&ConversationId, (u32, u32)> = s
+                .conversations
+                .iter()
+                .filter(|c| &c.workspace == ws)
+                .map(|c| (&c.id, (c.unread, c.mentions)))
+                .collect();
+            for c in &mut conversations {
+                if let Some(&(unread, mentions)) = before.get(&c.id) {
+                    (c.unread, c.mentions) = (unread, mentions);
+                }
+            }
+        }
         s.conversations.retain(|c| &c.workspace != ws);
-        s.conversations.extend(new.conversations);
+        s.conversations.extend(conversations);
         let mut items = s.saved.take().unwrap_or_default();
         items.retain(|i| &i.workspace != ws);
         match new.saved {
@@ -266,6 +281,22 @@ impl Model {
         let i = self.users.get(&(ws.clone(), id.clone())).copied();
         let i = i.or_else(|| self.snapshot.users.iter().position(|u| &u.id == id));
         i.map(|i| &self.snapshot.users[i])
+    }
+
+    /// The name the model knows for a person or channel a message of `ws` names (sanitised).
+    pub fn named(&self, ws: &WorkspaceId, piece: &crate::mrkdwn::Piece) -> Option<String> {
+        use crate::mrkdwn::Piece;
+        match piece {
+            Piece::User { id, .. } => {
+                self.user(ws, &UserId::new(id.as_str())).map(|u| u.display_name.line().into_string())
+            }
+            Piece::Channel { id, .. } => {
+                let conversation = slakio_core::model::ConversationId::new(id.as_str());
+                self.target(&Target::Conversation { workspace: ws.clone(), conversation })
+                    .map(|c| c.name.line().into_string())
+            }
+            _ => None,
+        }
     }
 
     pub fn workspace(&self, id: &WorkspaceId) -> Option<&Workspace> {
@@ -426,27 +457,27 @@ impl Model {
     pub fn section_counts(&self, i: usize) -> (u32, u32) {
         let s = &self.snapshot.sections[i];
         let convs = self.snapshot.conversations.iter().filter(|c| c.workspace == s.workspace && c.section == s.id);
-        convs.fold((0, 0), |(u, m), c| (u + u32::from(c.unread > 0 && !c.muted), m + c.mentions))
+        convs.fold((0, 0), |(u, m), c| (u + u32::from(c.badges().0 > 0), m + c.badges().1))
     }
 
     /// Unread mentions in workspace `ws`.
     pub fn workspace_mentions(&self, ws: &WorkspaceId) -> u32 {
-        self.snapshot.conversations.iter().filter(|c| &c.workspace == ws).map(|c| c.mentions).sum()
+        self.snapshot.conversations.iter().filter(|c| &c.workspace == ws).map(|c| c.badges().1).sum()
     }
 
     /// Workspace `ws` has an unread conversation that is not muted.
     pub fn workspace_unread(&self, ws: &WorkspaceId) -> bool {
-        self.snapshot.conversations.iter().any(|c| &c.workspace == ws && c.unread > 0 && !c.muted)
+        self.snapshot.conversations.iter().any(|c| &c.workspace == ws && c.badges().0 > 0)
     }
 
     /// Unread DM messages of workspace `ws`.
     pub fn dm_unread(&self, ws: &WorkspaceId) -> u32 {
-        self.snapshot.conversations.iter().filter(|c| &c.workspace == ws && c.is_dm()).map(|c| c.unread).sum()
+        self.snapshot.conversations.iter().filter(|c| &c.workspace == ws && c.is_dm()).map(|c| c.badges().0).sum()
     }
 
     /// Unread mentions across every workspace (what Activity collects).
     pub fn mentions(&self) -> u32 {
-        self.snapshot.conversations.iter().map(|c| c.mentions).sum()
+        self.snapshot.conversations.iter().map(|c| c.badges().1).sum()
     }
 }
 

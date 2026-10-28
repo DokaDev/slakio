@@ -2,6 +2,8 @@
 //! Ratatui's buffer uses), so wrapped lines fill exactly the cells they are given: W/F = 2,
 //! emoji presentation, ZWJ and flag sequences = 2, combining marks = 0.
 
+use ratatui::style::Style;
+use ratatui::text::Span;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -104,6 +106,44 @@ pub fn wrap(s: &str, w: usize, max_lines: usize) -> (Vec<String>, bool) {
         }
     }
     (out, false)
+}
+
+/// [`wrap`] for text in styled runs: the same lines, each as spans in the styles of the runs
+/// its text came from (`fallback` where a grapheme cannot be found again, such as a combining
+/// mark that joined the run before it).
+pub fn wrap_styled(
+    runs: &[(String, Style)],
+    w: usize,
+    max_lines: usize,
+    fallback: Style,
+) -> (Vec<Vec<Span<'static>>>, bool) {
+    let plain: String = runs.iter().map(|(s, _)| s.as_str()).collect();
+    let (lines, more) = wrap(&plain, w, max_lines);
+    let cells: Vec<(&str, Style)> = runs.iter().flat_map(|(s, st)| s.graphemes(true).map(move |g| (g, *st))).collect();
+    let mut k = 0;
+    let out = lines
+        .iter()
+        .map(|line| {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+            for g in line.graphemes(true) {
+                // The line's graphemes come in the text's order; only blanks and breaks are left
+                // out between them.
+                let style = match cells[k.min(cells.len())..].iter().position(|(cg, _)| *cg == g) {
+                    Some(at) => {
+                        k += at + 1;
+                        cells[k - 1].1
+                    }
+                    None => fallback,
+                };
+                match spans.last_mut() {
+                    Some(last) if last.style == style => last.content.to_mut().push_str(g),
+                    _ => spans.push(Span::styled(g.to_string(), style)),
+                }
+            }
+            spans
+        })
+        .collect();
+    (out, more)
 }
 
 /// `s` as runs of non-blanks and runs of blanks (a word keeps the punctuation written against
