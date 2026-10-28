@@ -163,3 +163,14 @@ fn signing_in_or_out_waits_for_another_that_changes_the_file() {
     signing_out.join().unwrap().unwrap();
     assert_eq!(load(&path).unwrap(), vec![other], "neither change is lost");
 }
+
+#[test]
+fn a_team_named_twice_counts_once() {
+    let path = scratch("twice");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let line =
+        |name: &str| format!("[[workspace]]\nteam = \"T0TEST\"\nname = \"{name}\"\nhost = \"h\"\nuser = \"u\"\n");
+    std::fs::write(&path, format!("{}{}", line("first"), line("second"))).unwrap();
+    let all = load(&path).unwrap();
+    assert_eq!(all.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["first"]);
+}

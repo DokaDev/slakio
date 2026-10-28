@@ -40,7 +40,8 @@ pub fn valid_team(team: &str) -> bool {
 }
 
 /// The workspaces in the file at `path`; none when it does not exist. A file that cannot be read
-/// or understood is a fault, never "none" (it is not written over).
+/// or understood is a fault, never "none" (it is not written over). A team named twice (a hand
+/// edit) counts once, as its first line says.
 pub fn load(path: &Path) -> Result<Vec<Account>, Fault> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
@@ -61,6 +62,11 @@ pub fn load(path: &Path) -> Result<Vec<Account>, Fault> {
         })
         .collect::<Option<Vec<_>>>()
         .ok_or_else(bad)
+        .map(|mut all| {
+            let mut seen = std::collections::HashSet::new();
+            all.retain(|a| seen.insert(a.team.clone()));
+            all
+        })
 }
 
 /// Write `accounts` to `path` (atomically).
