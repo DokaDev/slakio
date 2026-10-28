@@ -376,8 +376,12 @@ fn logout_removes_the_cache_even_when_the_sign_in_could_not_be_removed() {
     if first_run(&m).is_none() {
         return;
     }
-    // A workspaces file that cannot be read: the credentials step fails.
-    std::fs::write(m.dir.join("config").join("slakio").join("workspaces.toml"), "[[[ not toml").unwrap();
+    // A workspaces file that cannot be removed (a directory in its place): the credentials step
+    // fails. (One that only cannot be read no longer fails it: its team ids are found all the
+    // same.)
+    let file = m.dir.join("config").join("slakio").join("workspaces.toml");
+    std::fs::remove_file(&file).unwrap();
+    std::fs::create_dir_all(file.join("in-the-way")).unwrap();
     let out = m.logout();
     assert!(!out.status.success());
     let left: Vec<_> = std::fs::read_dir(m.cache_dir()).unwrap().flatten().map(|e| e.file_name()).collect();
