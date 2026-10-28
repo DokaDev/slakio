@@ -428,6 +428,7 @@
 "signin.desktop_title" = "Sign in from the Slack desktop app"
 "signin.desktop_found" = "The Slack app on this Mac is signed in to these workspaces:"
 "signin.desktop_more" = { one = "{count} more", other = "{count} more" }
+"signin.desktop_more_marked" = { one = "{count} more · {marked} marked", other = "{count} more · {marked} marked" }
 "signin.desktop_keys" = "Enter to sign in, Space to mark several, j/k or Up/Down to choose, p to paste a browser request (Cmd+V pastes one you copied already)."
 "signin.desktop_note" = "The prompt names \"security\", the system tool slakio reads the key with. Always Allow would let any program read that key without asking. slakio reads the Slack app's files and changes nothing; the sign-in goes to the macOS Keychain."
 "signin.desktop_allow" = "When macOS asks about \"Slack Safe Storage\", press Allow, not Always Allow."

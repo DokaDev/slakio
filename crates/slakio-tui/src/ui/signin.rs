@@ -52,8 +52,8 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
         bottom.extend(lines(Label::SigninDesktopNote, 4, t.muted()));
     }
     // As many rows as fit, the cursor's always among them; when not all fit, a muted line on the
-    // blank line above and the one below says how many more there are that way (the rows keep
-    // all their room).
+    // blank line above and the one below says how many more there are that way, and how many of
+    // them are marked (the rows keep all their room).
     let fixed = top.len() + bottom.len() + 4;
     let room = usize::from(area.height).saturating_sub(fixed).max(1);
     let scrolled = p.rows.len() > room;
@@ -61,15 +61,22 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
     let first = (p.selected + 1).saturating_sub(n).min(p.rows.len() - n);
     let (above, below) = (first, p.rows.len() - first - n);
     let rows = |f: &mut Frame, at: Rect| {
-        let mark = |f: &mut Frame, y: u16, arrow: &str, more: usize| {
+        let mark = |f: &mut Frame, y: u16, arrow: &str, hidden: std::ops::Range<usize>| {
+            let (more, marked) = (hidden.len(), hidden.filter(|&i| p.is_marked(i)).count());
             if more > 0 && y >= area.y && y < area.bottom() {
-                let text = format!("{arrow} {}", app.i18n.msg(&Msg::SigninDesktopMore { count: more as u64 }));
+                let count = more as u64;
+                let msg = if marked > 0 {
+                    Msg::SigninDesktopMoreMarked { count, marked: marked.to_string() }
+                } else {
+                    Msg::SigninDesktopMore { count }
+                };
+                let text = format!("{arrow} {}", app.i18n.msg(&msg));
                 f.buffer_mut().set_string(at.x + 1, y, clip(&text, usize::from(at.width).saturating_sub(2)), t.muted());
             }
         };
         if scrolled && at.height > 0 {
-            mark(f, at.y.saturating_sub(1), "↑", above);
-            mark(f, at.y + n as u16, "↓", below);
+            mark(f, at.y.saturating_sub(1), "↑", 0..above);
+            mark(f, at.y + n as u16, "↓", first + n..first + n + below);
         }
         for (i, row) in p.rows.iter().enumerate().skip(first).take(n) {
             let y = at.y + (i - first) as u16;

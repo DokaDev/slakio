@@ -419,6 +419,27 @@ fn a_scrolled_picker_at_80x24_keeps_its_rows_for_workspaces_and_the_marks_on_the
 }
 
 #[test]
+fn a_scrolled_picker_says_how_many_of_the_rows_out_of_view_are_marked() {
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_desktop(
+        (0..19)
+            .map(|i| PickerRow { team: format!("T{i}"), name: format!("Team {i:02}"), host: format!("t{i}.slack.com") })
+            .collect(),
+    );
+    // Team 00, 03 and 06 marked; the cursor on 09, so 05 to 09 show.
+    for k in 0..9 {
+        if k % 3 == 0 {
+            key(&mut app, KeyCode::Char(' '));
+        }
+        key(&mut app, KeyCode::Char('j'));
+    }
+    let shown = screen(&app, 80, 24, Instant::now());
+    assert!(shown.contains("✓ Team 06"), "{shown}");
+    assert!(shown.contains("↑ 5 more · 2 marked"), "two of the five above are marked: {shown}");
+    assert!(shown.contains("↓ 9 more") && !shown.contains("9 more ·"), "none below is: {shown}");
+}
+
+#[test]
 fn space_marks_several_and_enter_signs_in_to_them_in_the_pickers_order() {
     let mut app = picker();
     // Gamma first, then the first Acme: Enter takes them in the list's order.
