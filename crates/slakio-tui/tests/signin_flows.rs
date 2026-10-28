@@ -367,3 +367,37 @@ fn a_scrolled_picker_says_how_many_more_there_are_above_and_below() {
     let fits = at(&picker());
     assert!(!fits.contains("more") && !fits.contains('↑') && !fits.contains('↓'), "{fits}");
 }
+
+#[test]
+fn a_scrolled_picker_at_80x24_keeps_its_rows_for_workspaces_and_the_marks_on_the_blank_lines() {
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.offer_desktop(
+        (0..19)
+            .map(|i| PickerRow { team: format!("T{i}"), name: format!("Team {i:02}"), host: format!("t{i}.slack.com") })
+            .collect(),
+    );
+    for _ in 0..9 {
+        key(&mut app, KeyCode::Char('j'));
+    }
+    let shown = screen(&app, 80, 24, Instant::now());
+    let lines: Vec<&str> = shown.lines().collect();
+    let names = lines.iter().filter(|l| l.contains("Team ")).count();
+    assert!(names >= 5, "{names} of 19 shown: {shown}");
+    let pick = lines.iter().position(|l| l.contains("Pick one:")).unwrap();
+    assert!(lines[pick + 1].contains("↑ ") && lines[pick + 1].contains("more"), "{shown}");
+    assert!(lines[pick + 2].contains("Team "), "{shown}");
+    let allow = lines.iter().position(|l| l.contains("Slack Safe Storage")).unwrap();
+    assert!(lines[allow - 1].contains("↓ ") && lines[allow - 1].contains("more"), "{shown}");
+    assert!(lines[allow - 2].contains("Team "), "{shown}");
+    // At the top nothing is above: that line stays blank, the rows do not move.
+    let mut top = App::new(Lang::En, Theme::terminal());
+    top.offer_desktop(
+        (0..19)
+            .map(|i| PickerRow { team: format!("T{i}"), name: format!("Team {i:02}"), host: format!("t{i}.slack.com") })
+            .collect(),
+    );
+    let at_top = screen(&top, 80, 24, Instant::now());
+    let rows_at = |s: &str| s.lines().position(|l| l.contains("Team ")).unwrap();
+    assert_eq!(rows_at(&at_top), rows_at(&shown), "{at_top}");
+    assert!(!at_top.contains('↑'), "{at_top}");
+}
