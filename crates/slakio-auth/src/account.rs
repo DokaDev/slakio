@@ -69,7 +69,8 @@ pub fn load(path: &Path) -> Result<Vec<Account>, Fault> {
         })
 }
 
-/// Write `accounts` to `path` (atomically).
+/// Write `accounts` to `path` (atomically, readable by this user alone: it says which
+/// workspaces and users this account signs in as).
 pub fn save(path: &Path, accounts: &[Account]) -> Result<(), Fault> {
     let mut doc = toml_edit::DocumentMut::new();
     let mut tables = toml_edit::ArrayOfTables::new();
@@ -84,7 +85,7 @@ pub fn save(path: &Path, accounts: &[Account]) -> Result<(), Fault> {
     let text = format!(
         "# The workspaces slakio is signed in to. No secret is kept here: the credentials are in\n# the OS keychain (`slakio logout` removes both).\n{doc}"
     );
-    slakio_core::fsutil::atomic_write(path, text.as_bytes()).map_err(|e| Fault::io_at(&e, path))
+    slakio_core::fsutil::atomic_write_private(path, text.as_bytes()).map_err(|e| Fault::io_at(&e, path))
 }
 
 /// The credentials as one secret-store entry.
@@ -112,12 +113,11 @@ fn locked(path: &Path) -> Result<std::fs::File, Fault> {
     if let Some(dir) = lock.parent().filter(|d| !d.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir).map_err(|e| Fault::io_at(&e, dir))?;
     }
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(&lock)
-        .map_err(|e| Fault::io_at(&e, &lock))?;
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).truncate(false).write(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let file = options.open(&lock).map_err(|e| Fault::io_at(&e, &lock))?;
     file.lock().map_err(|e| Fault::io_at(&e, &lock))?;
     Ok(file)
 }
@@ -135,7 +135,7 @@ fn move_aside(path: &Path) -> Result<(), Fault> {
     let mut kept = std::fs::read(&to).unwrap_or_default();
     kept.extend_from_slice(&text);
     kept.push(b'\n');
-    slakio_core::fsutil::atomic_write(&to, &kept).map_err(|e| Fault::io_at(&e, &to))?;
+    slakio_core::fsutil::atomic_write_private(&to, &kept).map_err(|e| Fault::io_at(&e, &to))?;
     std::fs::remove_file(path).map_err(|e| Fault::io_at(&e, path))
 }
 

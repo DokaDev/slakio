@@ -174,3 +174,19 @@ fn a_team_named_twice_counts_once() {
     let all = load(&path).unwrap();
     assert_eq!(all.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["first"]);
 }
+
+#[cfg(unix)]
+#[test]
+fn the_workspaces_files_are_readable_by_this_user_alone() {
+    use std::os::unix::fs::PermissionsExt;
+    let (store, path) = (MemoryStore::new(), scratch("private"));
+    let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    keep(&store, &path, &account(), &Credentials::new(TOKEN, COOKIE)).unwrap();
+    assert_eq!(mode(&path), 0o600, "workspaces.toml");
+    assert_eq!(mode(&path.with_extension("lock")), 0o600, "workspaces.lock");
+    // One that cannot be read is moved aside, and the new one written: both private.
+    std::fs::write(&path, "[[workspace]]\nteam = \"T0TEST\"\n").unwrap();
+    keep(&store, &path, &account(), &Credentials::new(TOKEN, COOKIE)).unwrap();
+    assert_eq!(mode(&aside(&path)), 0o600, "workspaces.toml.unreadable");
+    assert_eq!(mode(&path), 0o600);
+}
