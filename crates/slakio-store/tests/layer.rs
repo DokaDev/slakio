@@ -40,7 +40,7 @@ async fn run(dir: &Path, workspace: &WorkspaceId, caps: Caps, reader: bool) -> R
     let cache =
         Cache::start(store, caps, system_clock(), Box::new(move |f| log.lock().unwrap().push(f.to_string()))).unwrap();
     let (inner, backend) = BackendHandle::pair(CAPS, 64);
-    let ui = layer::serve(inner, cache.clone(), workspace.clone());
+    let ui = layer::serve(inner, cache.clone(), workspace.clone(), layer::Waits::default(), Box::new(|_| {}));
     Run { ui, backend, cache, faults }
 }
 
@@ -334,7 +334,10 @@ async fn a_busy_cache_never_holds_a_request_back() {
     });
     let cache = Cache::start(store, Caps::default(), clock, Box::new(|_| {})).unwrap();
     let (inner, mut backend) = BackendHandle::pair(CAPS, 64);
-    let mut ui = layer::serve(inner, cache.clone(), ws.clone());
+    let slow: Arc<Mutex<Vec<String>>> = Arc::default();
+    let said = Arc::clone(&slow);
+    let on_slow = Box::new(move |f: &slakio_core::fault::Fault| said.lock().unwrap().push(f.to_string()));
+    let mut ui = layer::serve(inner, cache.clone(), ws.clone(), layer::Waits::default(), on_slow);
     let t = target(&w, "general");
     cache.put_page(page(&w, &t, None), None);
     let started = std::time::Instant::now();
@@ -348,6 +351,10 @@ async fn a_busy_cache_never_holds_a_request_back() {
     }
     assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
     assert!(ui.rx.try_recv().is_err(), "nothing cached was given: the cache did not answer in time");
+    let said = slow.lock().unwrap().clone();
+    assert_eq!(said.len(), 2, "one line for each read not waited for: {said:?}");
+    assert!(said[0].contains("boot snapshot") && said[0].contains("500 ms"), "{said:?}");
+    assert!(said[1].contains("newest page") && said[1].contains("100 ms"), "{said:?}");
     // The backend's answers go through as ever.
     backend
         .tx

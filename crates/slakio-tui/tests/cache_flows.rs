@@ -139,6 +139,8 @@ fn dirs(cmd: &mut Command, dir: &Path) {
         .env("XDG_DATA_HOME", dir.join("data"))
         .env("XDG_STATE_HOME", dir.join("state"))
         .env("XDG_CACHE_HOME", dir.join("cache"))
+        // A warm start draws from the cache however slow the machine (the read is waited for).
+        .env("SLAKIO_TEST_CACHE_WAIT_MS", "10000")
         .env("LC_ALL", "en_US.UTF-8")
         .env("TERM", "xterm-256color")
         .env_remove("TMUX")

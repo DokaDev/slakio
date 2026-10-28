@@ -222,7 +222,8 @@ back as `Remote`, so it still reaches the screen only through the sanitiser. No 
   boot, and the newest page of a conversation of the signed-in workspace, are answered from the
   cache first — `Event::CachedBoot` / `Event::CachedHistory`, queued for the UI before the
   request is handed on, so a start draws without waiting for Slack; the cache is waited for
-  100 ms at most (`READ_WAIT`), so a busy or slow cache never holds a request back — then by the
+  500 ms at most for a boot (`BOOT_WAIT`) and 100 ms for a page (`READ_WAIT`), so a busy or slow
+  cache never holds a request back (the error log says when it was not waited for) — then by the
   backend, whose answer replaces it in
   the UI and is kept. A cached answer ends nothing: the request still gets exactly one answer of
   the backend's. The UI marks what came from the cache (`cached` in the status line) until then,

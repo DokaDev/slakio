@@ -11,6 +11,7 @@ use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::WorkspaceId;
 use slakio_core::paths::Paths;
 use slakio_store::cache::system_clock;
+use slakio_store::layer::Waits;
 use slakio_store::{Cache, Caps, OpenError, Store, Tmutil};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -19,6 +20,10 @@ use std::time::Duration;
 /// `SLAKIO_TEST_TMUTIL`, debug builds only: a stand-in for `tmutil` the tests record calls with.
 /// Without it a debug build excludes nothing, so no development run or test touches Time Machine.
 const TEST_TMUTIL: &str = "SLAKIO_TEST_TMUTIL";
+
+/// `SLAKIO_TEST_CACHE_WAIT_MS`, debug builds only: how long a request waits for the cache's
+/// answer, so the tests' warm starts draw from the cache on a slow machine too.
+const TEST_CACHE_WAIT: &str = "SLAKIO_TEST_CACHE_WAIT_MS";
 
 /// The one-time notice of a failed exclusion from backups.
 const BACKUP_NOTICE: &str = "cache_backup_failed";
@@ -56,7 +61,11 @@ impl Local {
         notices: &mut Vec<Msg>,
     ) -> BackendHandle {
         match self.open(&format!("{team} {user}"), notices) {
-            Some(cache) => slakio_store::layer::serve(backend, cache, WorkspaceId::new(team)),
+            Some(cache) => {
+                let errors = self.paths.errors_log();
+                let log = Box::new(move |f: &Fault| ErrorLog::new(errors.clone()).record("cache", f));
+                slakio_store::layer::serve(backend, cache, WorkspaceId::new(team), waits(), log)
+            }
             None => backend,
         }
     }
@@ -124,6 +133,13 @@ impl Local {
             cache.flush(Duration::from_secs(2));
         }
     }
+}
+
+/// How long requests wait for the cache: the store's own bounds; in a debug build the tests'
+/// [`TEST_CACHE_WAIT`] when it is set.
+fn waits() -> Waits {
+    let test = cfg!(debug_assertions).then(|| std::env::var(TEST_CACHE_WAIT).ok()?.parse().ok()).flatten();
+    test.map_or_else(Waits::default, |ms| Waits { boot: Duration::from_millis(ms), page: Duration::from_millis(ms) })
 }
 
 /// How the cache directory is kept out of backups: `tmutil` on macOS; in a debug build only the

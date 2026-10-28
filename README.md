@@ -185,8 +185,9 @@ slakio keeps what it fetched — the workspace's channels, people and sections, 
 messages of the conversations you opened — in one SQLite file in a directory of its own,
 `slakio-store`, in the cache directory (`$SLAKIO_CACHE_DIR`, else `$XDG_CACHE_HOME/slakio`, else
 `~/Library/Caches/slakio` on macOS, `~/.cache/slakio` on Linux, `%LOCALAPPDATA%\slakio\cache` on
-Windows). A start draws from it without waiting for Slack (a cache slower than a tenth of a
-second is not waited for), then replaces what it showed with Slack's answer; with the network
+Windows). A start draws from it without waiting for Slack (a cache slower than half a second
+for the workspace, or a tenth of a second for a conversation's messages, is not waited for, and
+the error log says so), then replaces what it showed with Slack's answer; with the network
 off it shows the cache alone. No token, cookie or other secret is ever in it: the credentials
 stay in the keychain. It is the signed-in user's only: signing in as someone else starts it
 again from nothing.
