@@ -6,8 +6,14 @@
 //! The fake serves one workspace of the world, the first unless told another
 //! ([`FakeSlack::start_team`]): two fakes serve a user signed in to two workspaces. Its answers add fields no decoder knows and
 //! leave optional ones out now and then, so tolerant decoding is tested all the time.
+//!
+//! It also opens the live updates' socket ([`FakeSlack::push`] and the controls beside it); its
+//! opening requests are kept apart from the API's ([`FakeSlack::upgrades`]).
 
 mod shapes;
+mod socket;
+
+pub use socket::ClientFrame;
 
 use slakio_world::World;
 use std::collections::{HashMap, VecDeque};
@@ -68,6 +74,15 @@ struct Shared {
     faults: HashMap<String, VecDeque<Fault>>,
     /// How long every answer waits before it is sent (a slow network).
     delay: std::time::Duration,
+    /// The live updates sockets' opening requests, apart from [`Shared::log`] (the API's).
+    upgrades: Vec<Logged>,
+    /// The open sockets, to push to.
+    sockets: Vec<tokio::sync::mpsc::UnboundedSender<socket::Push>>,
+    /// How many of the next openings are refused (`503`).
+    refuse_sockets: usize,
+    /// A socket says hello when it opens (the default).
+    hello: bool,
+    client_frames: Vec<ClientFrame>,
 }
 
 /// A running fake Slack; it stops when dropped.
@@ -93,7 +108,7 @@ impl FakeSlack {
     pub async fn start_team(world: World, team: usize) -> std::io::Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let addr = listener.local_addr()?;
-        let shared = Arc::new(Mutex::new(Shared::default()));
+        let shared = Arc::new(Mutex::new(Shared { hello: true, ..Shared::default() }));
         let world = Arc::new(world);
         let task = {
             let shared = Arc::clone(&shared);
@@ -130,6 +145,58 @@ impl FakeSlack {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).delay = delay;
     }
 
+    /// The live updates sockets asked for so far (their opening requests), refused ones too.
+    pub fn upgrades(&self) -> Vec<Logged> {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).upgrades.clone()
+    }
+
+    /// The sockets open now.
+    pub fn open_sockets(&self) -> usize {
+        let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
+        s.sockets.retain(|t| !t.is_closed());
+        s.sockets.len()
+    }
+
+    /// Send `event` (a synthetic one, as JSON) over every open socket.
+    pub fn push(&self, event: &serde_json::Value) {
+        self.to_sockets(&socket::Push::Text(event.to_string()));
+    }
+
+    /// Ping every open socket.
+    pub fn ping(&self, payload: &[u8]) {
+        self.to_sockets(&socket::Push::Ping(payload.to_vec()));
+    }
+
+    /// Close every open socket with a close frame.
+    pub fn close_sockets(&self) {
+        self.to_sockets(&socket::Push::Close);
+    }
+
+    /// End every open socket's connection without a word (the network went away).
+    pub fn drop_sockets(&self) {
+        self.to_sockets(&socket::Push::Drop);
+    }
+
+    /// Refuse the next `n` openings (`503`).
+    pub fn refuse_sockets(&self, n: usize) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).refuse_sockets = n;
+    }
+
+    /// Whether a socket says hello when it opens (it does unless told otherwise).
+    pub fn set_hello(&self, hello: bool) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).hello = hello;
+    }
+
+    /// Every frame the clients sent over their sockets, in order.
+    pub fn client_frames(&self) -> Vec<ClientFrame> {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).client_frames.clone()
+    }
+
+    fn to_sockets(&self, push: &socket::Push) {
+        let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
+        s.sockets.retain(|t| t.send(push.clone()).is_ok());
+    }
+
     /// Answer the next request for `method` with `fault` (faults queue up per method).
     pub fn fail_next(&self, method: &str, fault: Fault) {
         let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -140,6 +207,11 @@ impl FakeSlack {
 /// Read one request from `stream` and answer it.
 async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Arc<Mutex<Shared>>) {
     let Some(logged) = read_request(&mut stream).await else { return };
+    let upgrade =
+        logged.headers.iter().any(|(k, v)| k.eq_ignore_ascii_case("upgrade") && v.eq_ignore_ascii_case("websocket"));
+    if upgrade {
+        return socket::serve(stream, logged, shared).await;
+    }
     let (fault, delay) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());

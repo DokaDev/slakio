@@ -14,9 +14,11 @@ publish.workspace = true
 
 [dependencies]
 serde_json.workspace = true
+# The live updates socket's opening: the digest of the key.
+sha1.workspace = true
 slakio-core.workspace = true
 slakio-world.workspace = true
-tokio = { workspace = true, features = ["net", "io-util", "rt", "sync", "time"] }
+tokio = { workspace = true, features = ["net", "io-util", "rt", "sync", "time", "macros"] }
 
 [lints]
 workspace = true
