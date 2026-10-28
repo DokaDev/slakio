@@ -43,16 +43,40 @@ fn key(t: &Target) -> Option<(String, String)> {
     }
 }
 
+/// The bytes the database of `conn` uses, as its transaction sees them.
+fn used_bytes(conn: &rusqlite::Connection) -> rusqlite::Result<u64> {
+    let p = |name: &str| conn.query_row(&format!("PRAGMA {name}"), [], |r| r.get::<_, i64>(0));
+    let used = (p("page_count")? - p("freelist_count")?).max(0) * p("page_size")?;
+    Ok(u64::try_from(used).unwrap_or(0))
+}
+
 impl Store {
     /// The bytes the database uses (its pages in use, free ones not counted).
     pub fn used_bytes(&self) -> rusqlite::Result<u64> {
-        let p = |name: &str| self.conn.query_row(&format!("PRAGMA {name}"), [], |r| r.get::<_, i64>(0));
-        let used = (p("page_count")? - p("freelist_count")?).max(0) * p("page_size")?;
-        Ok(u64::try_from(used).unwrap_or(0))
+        used_bytes(&self.conn)
+    }
+
+    /// Give at most `pages` of the pages a prune freed back to the file system: `true` while
+    /// more are left (and the step gave some back). The writer only.
+    pub fn vacuum(&self, pages: u32) -> rusqlite::Result<bool> {
+        if self.read_only() {
+            return Ok(false);
+        }
+        let free = || self.conn.query_row("PRAGMA freelist_count", [], |r| r.get::<_, i64>(0));
+        let before = free()?;
+        // SQLite gives one page back each time the statement is stepped: every step taken.
+        let mut st = self.conn.prepare(&format!("PRAGMA incremental_vacuum({pages})"))?;
+        let mut rows = st.query([])?;
+        while rows.next()?.is_some() {}
+        drop(rows);
+        drop(st);
+        let after = free()?;
+        Ok(after > 0 && after < before)
     }
 
     /// Apply `caps` at `now` (seconds since the Unix epoch), never touching a conversation of
-    /// `protect`. The writer only.
+    /// `protect`, in one transaction. The freed pages stay in the file until
+    /// [`Store::vacuum`]. The writer only.
     pub fn prune(&mut self, caps: Caps, protect: &HashSet<Target>, now: u64) -> rusqlite::Result<Pruned> {
         if self.read_only() {
             return Ok(Pruned::default());
@@ -61,8 +85,8 @@ impl Store {
         let kept = |k: &(String, String)| protect.contains(k);
         let mut out = Pruned::default();
         // Every conversation the cache has messages of, used longest ago first (never seen: 0).
-        let convs = |store: &Store| -> rusqlite::Result<Vec<((String, String), i64)>> {
-            let mut st = store.conn.prepare(
+        let convs = |conn: &rusqlite::Connection| -> rusqlite::Result<Vec<((String, String), i64)>> {
+            let mut st = conn.prepare(
                 "SELECT m.workspace, m.conversation, COALESCE(s.at, 0) AS at FROM messages m
                  LEFT JOIN seen s ON s.workspace = m.workspace AND s.conversation = m.conversation
                  GROUP BY m.workspace, m.conversation ORDER BY at, m.workspace, m.conversation",
@@ -101,26 +125,20 @@ impl Store {
                 params![k.0, k.1, caps.per_conversation],
             )?;
         }
-        tx.commit()?;
         // Over the size: whole conversations go, used longest ago first, until it fits.
-        if self.used_bytes()? > caps.max_bytes {
-            for (k, _) in convs(self)? {
+        if used_bytes(&tx)? > caps.max_bytes {
+            for (k, _) in convs(&tx)? {
                 if kept(&k) {
                     continue;
                 }
-                let n = self
-                    .conn
-                    .execute("DELETE FROM messages WHERE workspace = ?1 AND conversation = ?2", params![k.0, k.1])?;
-                self.conn.execute("DELETE FROM seen WHERE workspace = ?1 AND conversation = ?2", params![k.0, k.1])?;
-                out.messages += n;
+                out.messages += drop_conv(&k)?;
                 out.conversations += 1;
-                if self.used_bytes()? <= caps.max_bytes {
+                if used_bytes(&tx)? <= caps.max_bytes {
                     break;
                 }
             }
         }
-        // The freed pages go back to the file system.
-        self.conn.execute_batch("PRAGMA incremental_vacuum")?;
+        tx.commit()?;
         Ok(out)
     }
 }

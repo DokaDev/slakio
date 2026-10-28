@@ -117,19 +117,24 @@ impl Store {
     /// says whether older ones exist.
     pub fn newest_page(&self, target: &Target, limit: u32) -> rusqlite::Result<Option<Page>> {
         let Some((ws, conv)) = conversation(target) else { return Ok(None) };
-        let mut st = self
-            .conn
-            .prepare("SELECT * FROM messages WHERE workspace = ?1 AND conversation = ?2 ORDER BY ts DESC LIMIT ?3")?;
-        let mut messages: Vec<Message> = st.query_map(params![ws, conv, limit], message)?.collect::<Result<_, _>>()?;
+        // One read transaction: the messages and their people as one commit left them.
+        let tx = self.conn.unchecked_transaction()?;
+        let mut messages: Vec<Message> = tx
+            .prepare("SELECT * FROM messages WHERE workspace = ?1 AND conversation = ?2 ORDER BY ts DESC LIMIT ?3")?
+            .query_map(params![ws, conv, limit], message)?
+            .collect::<Result<_, _>>()?;
         if messages.is_empty() {
             return Ok(None);
         }
         messages.reverse();
-        let mut st = self.conn.prepare(
-            "SELECT * FROM users WHERE workspace = ?1 AND id IN
-                 (SELECT DISTINCT user FROM messages WHERE workspace = ?1 AND conversation = ?2) ORDER BY id",
-        )?;
-        let mut users = st.query_map(params![ws, conv], user)?.collect::<Result<Vec<_>, _>>()?;
+        let mut users = tx
+            .prepare(
+                "SELECT * FROM users WHERE workspace = ?1 AND id IN
+                     (SELECT DISTINCT user FROM messages WHERE workspace = ?1 AND conversation = ?2) ORDER BY id",
+            )?
+            .query_map(params![ws, conv], user)?
+            .collect::<Result<Vec<_>, _>>()?;
+        tx.commit()?;
         users.retain(|u| messages.iter().any(|m| m.user == u.id));
         Ok(Some(Page { target: target.clone(), messages, complete: false, users }))
     }

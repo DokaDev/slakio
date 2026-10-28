@@ -1,6 +1,6 @@
 //! The local cache of slakio: what an earlier run fetched from Slack — the last boot snapshot
 //! and the newest messages of the conversations opened — in one SQLite file in the cache
-//! directory, so a start draws at once, before any request, and then refreshes from Slack.
+//! directory, so a start draws at once, without waiting for Slack, and then refreshes from it.
 //!
 //! * [`db`] — opening it: private files, one writer at a time, a damaged or newer cache set up
 //!   again;

@@ -2,6 +2,9 @@
 //! another in the order asked, so a write never races another and the UI's loop never waits on
 //! the disk. Reads answer through a channel the caller awaits; writes are not waited for.
 //!
+//! A prune gives the pages it freed back to the file system a few at a time, the jobs asked for
+//! meanwhile going first, so a read waits behind it little.
+//!
 //! A job that fails goes to `on_fault` (the error log), and the cache carries on: a read that
 //! fails is "nothing cached", never a wrong answer. A database found damaged while in use is set
 //! up again from nothing.
@@ -11,8 +14,11 @@ use crate::prune::{Caps, Pruned};
 use slakio_core::backend::{Page, Snapshot};
 use slakio_core::fault::Fault;
 use slakio_core::model::{Target, Ts, WorkspaceId};
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use tokio::sync::{mpsc, oneshot};
+
+/// The most freed pages one step gives back to the file system.
+const VACUUM_PAGES: u32 = 256;
 
 /// Where a failed job's fault goes.
 pub type OnFault = Box<dyn Fn(&Fault) + Send>;
@@ -25,11 +31,26 @@ pub fn system_clock() -> Clock {
 }
 
 enum Job {
-    Snapshot { expected: Vec<WorkspaceId>, reply: oneshot::Sender<Option<Snapshot>> },
-    Newest { target: Target, limit: u32, reply: oneshot::Sender<Option<Page>> },
+    Snapshot {
+        expected: Vec<WorkspaceId>,
+        reply: oneshot::Sender<Option<Snapshot>>,
+    },
+    Newest {
+        target: Target,
+        limit: u32,
+        reply: oneshot::Sender<Option<Page>>,
+    },
     PutSnapshot(Box<Snapshot>),
-    PutPage { page: Box<Page>, before: Option<Ts> },
-    Prune { protect: HashSet<Target>, reply: Option<oneshot::Sender<Pruned>> },
+    PutPage {
+        page: Box<Page>,
+        before: Option<Ts>,
+    },
+    Prune {
+        protect: HashSet<Target>,
+        reply: Option<oneshot::Sender<Pruned>>,
+    },
+    /// The next step of giving freed pages back.
+    Vacuum,
     Flush(std::sync::mpsc::Sender<()>),
 }
 
@@ -117,7 +138,10 @@ fn run(
             on_fault(&f);
         }
     };
-    while let Some(job) = rx.blocking_recv() {
+    // Jobs taken from the channel ahead of a vacuum step, in the order asked.
+    let mut later: VecDeque<Job> = VecDeque::new();
+    loop {
+        let Some(job) = later.pop_front().or_else(|| rx.blocking_recv()) else { return };
         match job {
             Job::Snapshot { expected, reply } => {
                 let got = store.snapshot(&expected).unwrap_or_else(|e| {
@@ -151,7 +175,19 @@ fn run(
                 if let Some(r) = reply {
                     let _ = r.send(pruned);
                 }
+                later.push_back(Job::Vacuum);
             }
+            Job::Vacuum => match store.vacuum(VACUUM_PAGES) {
+                Ok(true) => {
+                    // More to give back: what was asked for meanwhile goes first.
+                    while let Ok(job) = rx.try_recv() {
+                        later.push_back(job);
+                    }
+                    later.push_back(Job::Vacuum);
+                }
+                Ok(false) => {}
+                Err(e) => failed(&mut store, &e),
+            },
             Job::Flush(done) => {
                 let _ = done.send(());
             }

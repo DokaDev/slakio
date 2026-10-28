@@ -297,7 +297,10 @@ impl Store {
     /// The last boot's snapshot when it lists exactly the workspaces `expected` (in order):
     /// `None` when there is none, or it is another sign-in's.
     pub fn snapshot(&self, expected: &[WorkspaceId]) -> Result<Option<Snapshot>, rusqlite::Error> {
-        let s = read(&self.conn)?;
+        // One read transaction: what another process commits meanwhile is not half seen.
+        let tx = self.conn.unchecked_transaction()?;
+        let s = read(&tx)?;
+        tx.commit()?;
         Ok(s.filter(|s| s.workspaces.iter().map(|w| &w.id).eq(expected.iter())))
     }
 }

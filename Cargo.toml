@@ -60,6 +60,8 @@ keyring-core = "1"
 # LevelDB), and decrypting the `d` cookie (AES-128-CBC with a PBKDF2-SHA1 key).
 # The local cache (slakio-store) is a SQLite file too, on every OS.
 rusqlite = { version = "0.37", features = ["bundled"] }
+# The cache's files opened without following a symbolic link (`O_NOFOLLOW`, Unix).
+libc = "0.2"
 rusty-leveldb = { version = "3", default-features = false, features = ["fs"] }
 aes = "0.8"
 cbc = { version = "0.1", features = ["block-padding", "alloc"] }

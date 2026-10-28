@@ -110,9 +110,37 @@ fn a_thread_in_protect_protects_nothing_and_a_read_only_cache_prunes_nothing() {
         Target::Thread { workspace: a.workspace().clone(), conversation: a.conversation().clone(), thread: Ts(1) };
     store.prune(Caps::default(), &[thread].into(), 100 * DAY).unwrap();
     assert_eq!(kept(&store, &a), 0, "too old, and a thread target is not its conversation");
-    let dir = store.dir().to_path_buf();
+    let dir = store.dir().parent().unwrap().to_path_buf();
     put(&mut store, &a, 10, 10, 0);
     let mut reader = Store::open(&dir).unwrap().store;
     assert_eq!(reader.prune(Caps::default(), &HashSet::new(), 100 * DAY).unwrap(), Pruned::default());
     assert_eq!(kept(&store, &a), 10);
+}
+
+fn pragma(store: &Store, name: &str) -> i64 {
+    store.conn.query_row(&format!("PRAGMA {name}"), [], |r| r.get(0)).unwrap()
+}
+
+#[test]
+fn a_prune_is_one_step_and_its_freed_pages_go_back_a_few_at_a_time() {
+    let mut store = writer("prune-vacuum");
+    let convs: Vec<Target> = (0..4).map(|i| other("T1", &format!("C{i}"))).collect();
+    for (i, t) in convs.iter().enumerate() {
+        put(&mut store, t, 100, 2_000, 1_000 + i as u64);
+    }
+    let file_pages = pragma(&store, "page_count");
+    store.prune(Caps { max_bytes: 1, ..Caps::default() }, &HashSet::new(), 1_010).unwrap();
+    assert!(convs.iter().all(|t| kept(&store, t) == 0));
+    // The prune itself gives nothing back: the file keeps its size until the vacuum steps.
+    assert_eq!(pragma(&store, "page_count"), file_pages);
+    let free = pragma(&store, "freelist_count");
+    assert!(free > 20, "{free}");
+    let mut steps = 0;
+    while store.vacuum(8).unwrap() {
+        steps += 1;
+        assert_eq!(pragma(&store, "freelist_count"), free - 8 * steps, "at most 8 pages a step");
+    }
+    assert_eq!(pragma(&store, "freelist_count"), 0, "every freed page went back in the end");
+    assert!(pragma(&store, "page_count") < file_pages);
+    assert!(!store.vacuum(8).unwrap(), "nothing left: no step more");
 }

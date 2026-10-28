@@ -70,3 +70,30 @@ fn tmutil_is_run_with_addexclusion_and_the_directory_and_its_failure_is_an_error
     let missing = Tmutil { program: dir.join("no-such-program") };
     assert!(missing.exclude(&ok).is_err());
 }
+
+#[cfg(unix)]
+#[test]
+fn tmutil_is_given_an_absolute_path_never_one_that_reads_as_an_option() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = scratch("tmutil-abs");
+    let program = dir.join("tmutil");
+    let log = dir.join("args");
+    std::fs::write(&program, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\n", log.display())).unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+    Tmutil { program }.exclude(Path::new("-p")).unwrap();
+    let args = std::fs::read_to_string(&log).unwrap();
+    let lines: Vec<&str> = args.lines().collect();
+    assert_eq!(lines.len(), 2, "{args}");
+    assert!(lines[1].starts_with('/') && lines[1].ends_with("/-p"), "{args}");
+}
+
+#[test]
+fn only_the_caches_own_directory_is_excluded_never_the_one_named() {
+    let dir = scratch("backup-own").join("named");
+    let store = Store::open(&dir).unwrap().store;
+    let fake = Fake { calls: RefCell::default(), fail: false };
+    store.exclude_from_backups(&fake).unwrap();
+    let excluded = fake.calls.borrow()[0].clone();
+    assert!(excluded.is_absolute(), "{}", excluded.display());
+    assert_eq!(excluded, std::path::absolute(dir.join(crate::db::DIR)).unwrap());
+}

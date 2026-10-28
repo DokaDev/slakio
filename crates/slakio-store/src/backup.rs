@@ -1,4 +1,4 @@
-//! Keeping the cache out of backups. On macOS the cache directory is excluded from Time Machine
+//! Keeping the cache out of backups. On macOS the cache's own directory is excluded from Time Machine
 //! with `tmutil addexclusion <dir>`, which marks the directory itself (a sticky exclusion, kept in
 //! its extended attributes): it holds for whichever volume or backup disk, and goes with the
 //! directory. Done once per cache: once it worked, the cache remembers it, and later starts run
@@ -30,9 +30,11 @@ impl Default for Tmutil {
 
 impl Exclude for Tmutil {
     fn exclude(&self, dir: &Path) -> Result<(), String> {
+        // An absolute path: never one that could read as an option (`-p`).
+        let dir = std::path::absolute(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let out = std::process::Command::new(&self.program)
             .arg("addexclusion")
-            .arg(dir)
+            .arg(&dir)
             .stdin(std::process::Stdio::null())
             .output()
             .map_err(|e| format!("{} did not start: {e}", self.program.display()))?;

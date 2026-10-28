@@ -318,3 +318,43 @@ async fn pages_of_a_run_are_kept_from_the_size_prune_that_follows_them() {
     r.backend_next().await;
     assert!(r.ui.rx.try_recv().is_err(), "{:?}", r.ui.rx.try_recv());
 }
+
+#[tokio::test]
+async fn a_busy_cache_never_holds_a_request_back() {
+    let (dir, w) = (scratch("busy"), world());
+    first_run(&dir, &w).await;
+    let ws = snapshot(&w).workspaces[0].id.clone();
+    let store = open(&dir, false).await;
+    // The cache's thread is held in a write (its clock does not answer) until the test lets go.
+    let (release, held) = std::sync::mpsc::channel::<()>();
+    let held = Mutex::new(held);
+    let clock = Box::new(move || {
+        let _ = held.lock().unwrap().recv_timeout(Duration::from_secs(20));
+        0
+    });
+    let cache = Cache::start(store, Caps::default(), clock, Box::new(|_| {})).unwrap();
+    let (inner, mut backend) = BackendHandle::pair(CAPS, 64);
+    let mut ui = layer::serve(inner, cache.clone(), ws.clone());
+    let t = target(&w, "general");
+    cache.put_page(page(&w, &t, None), None);
+    let started = std::time::Instant::now();
+    for (id, command) in [(1, Command::Boot), (2, history(&t, None))] {
+        ui.send(Request { id: Generation(id), workspace: None, command: command.clone() }).unwrap();
+        let req = tokio::time::timeout(Duration::from_secs(2), backend.rx.recv())
+            .await
+            .expect("handed on while the cache is busy")
+            .unwrap();
+        assert_eq!((req.id, req.command), (Generation(id), command));
+    }
+    assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+    assert!(ui.rx.try_recv().is_err(), "nothing cached was given: the cache did not answer in time");
+    // The backend's answers go through as ever.
+    backend
+        .tx
+        .send(Envelope { generation: Generation(1), event: Event::Booted(Box::new(snapshot(&w))) })
+        .await
+        .unwrap();
+    let got = tokio::time::timeout(Duration::from_secs(5), ui.rx.recv()).await.unwrap().unwrap();
+    assert!(matches!(got.event, Event::Booted(_)), "{got:?}");
+    drop(release);
+}

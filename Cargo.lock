@@ -2281,6 +2281,7 @@ dependencies = [
 name = "slakio-store"
 version = "0.0.6"
 dependencies = [
+ "libc",
  "rusqlite",
  "slakio-core",
  "slakio-world",

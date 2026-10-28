@@ -16,8 +16,11 @@ publish.workspace = true
 [dependencies]
 rusqlite.workspace = true
 slakio-core.workspace = true
-# The cache in front of a backend: channels and a task of its own.
-tokio = { workspace = true, features = ["rt", "sync", "macros"] }
+# The cache in front of a backend: channels and a task of its own; a read waited for only so long.
+tokio = { workspace = true, features = ["rt", "sync", "macros", "time"] }
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
 
 [dev-dependencies]
 slakio-world.workspace = true

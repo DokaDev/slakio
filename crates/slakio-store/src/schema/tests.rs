@@ -61,3 +61,29 @@ fn a_database_of_a_newer_version_is_left_alone() {
     assert_eq!(migrate(&mut conn, MIGRATIONS).unwrap(), Schema::Newer(99));
     assert_eq!(version(&conn).unwrap(), 99, "not changed");
 }
+
+#[test]
+fn a_version_one_file_on_disk_is_brought_up_keeping_what_it_holds() {
+    use crate::db::{DIR, FILE, Store};
+    let named = crate::testutil::scratch("migrate-disk").join("cache");
+    // A file as the first version leaves it: written through the store, closed.
+    let mut store = Store::open(&named).unwrap().store;
+    assert_eq!(version(&store.conn).unwrap(), 1);
+    store.put_snapshot(slakio_world::World::new(3).snapshot()).unwrap();
+    store.set_meta("kept", "yes").unwrap();
+    drop(store);
+    // Opened again by a later version, from the file.
+    let path = named.join(DIR).join(FILE);
+    let mut next = MIGRATIONS.to_vec();
+    next.push("ALTER TABLE seen ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;");
+    let mut conn = Connection::open(&path).unwrap();
+    assert_eq!(migrate(&mut conn, &next).unwrap(), Schema::Current);
+    drop(conn);
+    let conn = Connection::open(&path).unwrap();
+    assert_eq!(version(&conn).unwrap() as usize, next.len(), "the new version is on disk");
+    let kept: String = conn.query_row("SELECT value FROM meta WHERE key = 'kept'", [], |r| r.get(0)).unwrap();
+    assert_eq!(kept, "yes");
+    let workspaces: i64 = conn.query_row("SELECT COUNT(*) FROM workspaces", [], |r| r.get(0)).unwrap();
+    assert!(workspaces > 0, "the snapshot is still there");
+    conn.execute("INSERT INTO seen (workspace, conversation, at, pinned) VALUES ('T', 'C', 1, 1)", []).unwrap();
+}
