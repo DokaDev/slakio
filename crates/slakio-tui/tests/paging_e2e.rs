@@ -35,11 +35,12 @@ impl Drop for Machine {
 }
 
 impl Machine {
-    fn new() -> Self {
+    /// A machine of its own for test `name` (tests run at once in one process).
+    fn new(name: &str) -> Self {
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().unwrap();
         let world = World::new(7);
         let fake = rt.block_on(FakeSlack::start(World::new(7))).unwrap();
-        let dir = std::env::temp_dir().join(format!("slakio-paging-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("slakio-paging-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let config = dir.join("config").join("slakio");
         std::fs::create_dir_all(&config).unwrap();
@@ -85,7 +86,7 @@ fn click(run: &mut Run, name: &str) {
 
 #[test]
 fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
-    let m = Machine::new();
+    let m = Machine::new("429");
     let Some(mut run) = m.start() else { return };
     run.wait_for("the list", |t| t.contains("big-history"));
     click(&mut run, "big-history");
@@ -131,7 +132,7 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
 
 #[test]
 fn an_older_page_slack_answered_internal_error_is_asked_again_by_r() {
-    let m = Machine::new();
+    let m = Machine::new("internal-error");
     let Some(mut run) = m.start() else { return };
     run.wait_for("the list", |t| t.contains("big-history"));
     click(&mut run, "big-history");
@@ -153,7 +154,7 @@ fn an_older_page_slack_answered_internal_error_is_asked_again_by_r() {
 
 #[test]
 fn gg_in_the_1200_reply_thread_reaches_its_own_message_without_a_request() {
-    let m = Machine::new();
+    let m = Machine::new("thread");
     let Some(mut run) = m.start() else { return };
     run.wait_for("the list", |t| t.contains("long-threads"));
     click(&mut run, "long-threads");
