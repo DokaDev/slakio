@@ -6,6 +6,8 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{Label, Lang};
+use slakio_core::model::WorkspaceId;
+use slakio_tui::app::model::SignedIn;
 use slakio_tui::app::signin::{Pasted, Picker, PickerRow, SignIn};
 use slakio_tui::app::{App, Effect};
 use slakio_tui::theme::Theme;
@@ -97,11 +99,18 @@ fn once_signed_in_the_app_connects_and_says_where() {
     let now = Instant::now();
     let mut app = signing_in();
     app.handle_event(Event::Paste("x".into()), now);
-    app.signed_in(Capabilities { demo: false, read_only: true }, "Example".into(), now);
+    let signed = [
+        SignedIn { id: WorkspaceId::new("T1"), name: "Kept".into(), read_only: true },
+        SignedIn { id: WorkspaceId::new("T2"), name: "Example".into(), read_only: true },
+    ];
+    app.signed_in(Capabilities { demo: false, read_only: false }, &signed, &["Example".into()], now);
     assert_eq!(app.sign_in(), None);
-    assert!(app.read_only());
-    assert_eq!(app.take_commands().len(), 1, "it asks for the workspace");
+    assert!(app.read_only(), "each workspace is read-only");
+    let asked = app.take_commands();
+    let boots: Vec<_> = asked.iter().map(|r| r.workspace.clone()).collect();
+    assert_eq!(boots, vec![Some(signed[0].id.clone()), Some(signed[1].id.clone())], "each workspace is asked for");
     assert!(screen(&app, 100, 30, now).contains("Signed in to Example"));
+    assert_eq!(app.model.workspaces().len(), 2, "the one signed in to before stays listed");
 }
 
 #[test]
@@ -206,7 +215,7 @@ fn the_cursor_moves_and_enter_picks_the_selected_workspace() {
     key(&mut app, KeyCode::Char('k'));
     assert!(matches!(app.sign_in(), Some(SignIn::Desktop(Picker { selected: 1, .. }))));
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.take_effects(), vec![Effect::DesktopPick("T2".into())], "picked by team id");
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(vec!["T2".into()])], "picked by team id");
     assert!(matches!(app.sign_in(), Some(SignIn::DesktopChecking(_))));
 }
 
@@ -235,10 +244,13 @@ fn a_failed_pick_returns_to_the_picker_with_the_reason_and_the_keys() {
     let flat = screen(&app, 100, 30, Instant::now()).split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(flat.contains("Press Enter to try again, or p to paste a request"), "{flat}");
     assert!(!flat.contains("Run slakio login"), "already there: {flat}");
-    assert!(flat.contains("Enter to sign in, j/k or Up/Down to choose"), "the keys stay: {flat}");
+    assert!(
+        flat.contains("Enter to sign in, Space to mark several, j/k or Up/Down to choose"),
+        "the keys stay: {flat}"
+    );
     // Enter tries again.
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.take_effects(), vec![Effect::DesktopPick("T1".into())]);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(vec!["T1".into()])]);
 }
 
 #[test]
@@ -252,7 +264,11 @@ fn the_picker_says_its_keys_on_the_status_line_and_in_the_help() {
     key(&mut app, KeyCode::Char('?'));
     let help = screen(&app, 120, 40, Instant::now());
     assert!(help.contains("Sign-in: Slack desktop app workspaces"), "{help}");
-    assert!(help.contains("Sign in with this workspace") && help.contains("Paste a browser request instead"), "{help}");
+    assert!(
+        help.contains("Sign in to the marked workspaces") && help.contains("Paste a browser request instead"),
+        "{help}"
+    );
+    assert!(help.contains("Mark this workspace to sign in to it too"), "{help}");
 }
 
 #[test]
@@ -383,7 +399,7 @@ fn a_scrolled_picker_at_80x24_keeps_its_rows_for_workspaces_and_the_marks_on_the
     let lines: Vec<&str> = shown.lines().collect();
     let names = lines.iter().filter(|l| l.contains("Team ")).count();
     assert!(names >= 5, "{names} of 19 shown: {shown}");
-    let pick = lines.iter().position(|l| l.contains("Pick one:")).unwrap();
+    let pick = lines.iter().position(|l| l.contains("signed in to these workspaces:")).unwrap();
     assert!(lines[pick + 1].contains("↑ ") && lines[pick + 1].contains("more"), "{shown}");
     assert!(lines[pick + 2].contains("Team "), "{shown}");
     let allow = lines.iter().position(|l| l.contains("Slack Safe Storage")).unwrap();
@@ -400,4 +416,54 @@ fn a_scrolled_picker_at_80x24_keeps_its_rows_for_workspaces_and_the_marks_on_the
     let rows_at = |s: &str| s.lines().position(|l| l.contains("Team ")).unwrap();
     assert_eq!(rows_at(&at_top), rows_at(&shown), "{at_top}");
     assert!(!at_top.contains('↑'), "{at_top}");
+}
+
+#[test]
+fn space_marks_several_and_enter_signs_in_to_them_in_the_pickers_order() {
+    let mut app = picker();
+    // Gamma first, then the first Acme: Enter takes them in the list's order.
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Char('k'));
+    key(&mut app, KeyCode::Char('k'));
+    key(&mut app, KeyCode::Char(' '));
+    // The second Acme marked and unmarked again.
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Char(' '));
+    let Some(SignIn::Desktop(p)) = app.sign_in() else { panic!("the picker") };
+    assert_eq!((p.is_marked(0), p.is_marked(1), p.is_marked(2)), (true, false, true));
+    for (w, h) in [(120, 40), (80, 24)] {
+        let shown = screen(&app, w, h, Instant::now());
+        let marked: Vec<&str> = shown.lines().filter(|l| l.contains('✓')).collect();
+        assert_eq!(marked.len(), 2, "{w}x{h}: {shown}");
+        assert!(marked[0].contains("acme.slack.com") && marked[1].contains("Gamma"), "{w}x{h}: {shown}");
+        insta::assert_snapshot!(format!("signin_desktop_marked_{w}x{h}"), shown);
+    }
+    let status = screen(&app, 120, 40, Instant::now()).lines().last().unwrap().to_string();
+    assert!(status.contains("Space mark"), "{status}");
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(vec!["T1".into(), "T3".into()])]);
+    // While they are checked, the marks stay; a failure brings the picker back with them.
+    assert!(screen(&app, 120, 40, Instant::now()).contains('✓'));
+    app.sign_in_failed(Label::SigninRefused);
+    let Some(SignIn::Desktop(p)) = app.sign_in() else { panic!("the picker again") };
+    assert_eq!(p.marked, vec!["T3".to_string(), "T1".to_string()], "as marked, for another try");
+    assert_eq!(p.chosen(), vec!["T1".to_string(), "T3".to_string()]);
+}
+
+#[test]
+fn enter_with_nothing_marked_signs_in_to_the_one_under_the_cursor() {
+    let mut app = picker();
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.take_effects(), vec![Effect::DesktopPick(vec!["T2".into()])]);
+    // No picker rows: Enter does nothing.
+    let mut empty = App::new(Lang::En, Theme::terminal());
+    empty.offer_desktop(Vec::new());
+    key(&mut empty, KeyCode::Enter);
+    assert!(empty.take_effects().is_empty());
 }

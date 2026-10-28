@@ -103,6 +103,7 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(Action::SignIn(SignInAction::Pick), Label::HintSignin),
             Pair(Action::SignIn(SignInAction::Down), Action::SignIn(SignInAction::Up), Label::HintChoose),
             One(Action::SignIn(SignInAction::Paste), Label::HintPasteRequest),
+            One(Action::SignIn(SignInAction::Mark), Label::HintMark),
             One(QUIT, Label::HintQuit),
             One(HELP, Label::HintHelp),
         ],

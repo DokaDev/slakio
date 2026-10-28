@@ -15,8 +15,8 @@ pub enum Effect {
     Record { context: &'static str, fault: Fault },
     /// Sign in with a pasted request ([`super::signin`]).
     SignIn(Pasted),
-    /// Sign in with the desktop workspace of this team id, picked in the picker
-    /// ([`super::signin`]); the binary reads its credentials (the keychain may prompt) and checks
-    /// them with Slack.
-    DesktopPick(String),
+    /// Sign in with the desktop workspaces of these team ids, picked in the picker, in its order
+    /// ([`super::signin`]); the binary reads their credentials (the keychain may prompt) and
+    /// checks them with Slack, one after the other.
+    DesktopPick(Vec<String>),
 }

@@ -25,7 +25,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 
 | Keys | Action | Id |
 |---|---|---|
-| `Enter` | Sign in with this workspace | `signin.pick` |
+| `Enter` | Sign in to the marked workspaces, else to this one | `signin.pick` |
+| `Space` | Mark this workspace to sign in to it too (again: unmark it) | `signin.mark` |
 | `j` | Next workspace | `signin.down` |
 | `Down` | Next workspace | `signin.down` |
 | `k` | Previous workspace | `signin.up` |

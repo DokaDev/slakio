@@ -24,8 +24,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, state: SignIn) {
     }
 }
 
-/// The desktop-workspace picker: the workspaces the Slack app is signed in to, one row each (the
-/// name, and the host muted on the right) with the app's selection bar; the keychain-prompt
+/// The desktop-workspace picker: the workspaces the Slack app is signed in to, one row each (a
+/// check when marked, the name, and the host muted on the right) with the app's selection bar; the keychain-prompt
 /// advice on a line of its own (also while checking and after a failure); then where it stands
 /// and the keys, and the explanation.
 fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool) {
@@ -78,9 +78,13 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
             }
             let picked = i == p.selected;
             let host_w = width(&row.host).min(usize::from(at.width) / 2);
-            let room = usize::from(at.width).saturating_sub(host_w + 4);
+            let room = usize::from(at.width).saturating_sub(host_w + 6);
             let buf = f.buffer_mut();
-            buf.set_string(at.x + 1, y, clip(&row.name, room), if picked { t.bold() } else { t.text() });
+            // A marked workspace (signed in to with the others marked) has a check before it.
+            if p.is_marked(i) {
+                buf.set_string(at.x + 1, y, "✓", t.accent());
+            }
+            buf.set_string(at.x + 3, y, clip(&row.name, room), if picked { t.bold() } else { t.text() });
             let hx = at.right().saturating_sub(host_w as u16 + 1);
             buf.set_string(hx, y, clip(&row.host, host_w), t.muted());
             if picked {

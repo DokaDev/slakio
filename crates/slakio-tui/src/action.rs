@@ -239,8 +239,10 @@ pub enum DialogAction {
 pub enum SignInAction {
     Down,
     Up,
-    /// Sign in with the workspace under the cursor.
+    /// Sign in to the marked workspaces, else to the one under the cursor.
     Pick,
+    /// Mark the workspace under the cursor (or unmark it) to sign in to several at once.
+    Mark,
     /// Paste a browser request instead.
     Paste,
 }
@@ -412,6 +414,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     spec_of(Action::SignIn(SignInAction::Down), "signin.down", Label::ActionSigninDown, &[]),
     spec_of(Action::SignIn(SignInAction::Up), "signin.up", Label::ActionSigninUp, &[]),
     spec_of(Action::SignIn(SignInAction::Pick), "signin.pick", Label::ActionSigninPick, &[]),
+    spec_of(Action::SignIn(SignInAction::Mark), "signin.mark", Label::ActionSigninMark, &[]),
     spec_of(Action::SignIn(SignInAction::Paste), "signin.paste", Label::ActionSigninPaste, &[]),
 ];
 

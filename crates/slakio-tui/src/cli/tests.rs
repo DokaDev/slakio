@@ -25,7 +25,10 @@ fn login_and_logout() {
     assert_eq!(parse(&["login"]), Ok(Cli::Login { config: None, offline: false, paste: false }));
     assert_eq!(parse(&["--offline", "login"]), Ok(Cli::Login { config: None, offline: true, paste: false }));
     assert_eq!(parse(&["login", "--paste"]), Ok(Cli::Login { config: None, offline: false, paste: true }));
-    assert_eq!(parse(&["logout"]), Ok(Cli::Logout));
+    assert_eq!(parse(&["logout"]), Ok(Cli::Logout(Which::Only)));
+    assert_eq!(parse(&["logout", "acme"]), Ok(Cli::Logout(Which::Named("acme".into()))));
+    assert_eq!(parse(&["logout", "--all"]), Ok(Cli::Logout(Which::All)));
+    assert_eq!(parse(&["--all", "logout"]), Ok(Cli::Logout(Which::All)));
     for args in [
         &["login", "--demo"][..],
         &["logout", "--offline"],
@@ -33,6 +36,10 @@ fn login_and_logout() {
         &["login", "x"],
         &["--paste"],
         &["logout", "--paste"],
+        &["logout", "a", "b"],
+        &["logout", "a", "--all"],
+        &["login", "--all"],
+        &["--all"],
     ] {
         assert!(parse(args).unwrap_err().contains("usage: slakio"), "{args:?}");
     }

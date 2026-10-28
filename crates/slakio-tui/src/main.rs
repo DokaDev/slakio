@@ -22,6 +22,7 @@ use slakio_core::secret::{Credentials, MemoryStore, STORE_ENV, SecretStore, Stor
 use slakio_slack::governor::{Governor, Limits, SystemClock};
 use slakio_slack::request::Endpoints;
 use slakio_slack::{SlackError, login};
+use slakio_tui::app::model::SignedIn as SignedInTo;
 use slakio_tui::app::signin::Pasted;
 use slakio_tui::app::status::Level;
 use slakio_tui::app::{App, Effect, Settings};
@@ -31,7 +32,7 @@ use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
 use slakio_tui::theme::{Background, Look};
 use slakio_tui::ui;
 use slakio_world::World;
-use std::io::{self, IsTerminal, Read, Stdout, Write};
+use std::io::{self, IsTerminal, Stdout, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -42,9 +43,9 @@ fn main() -> ExitCode {
     let mut stats = stats::Stats::from_env();
     // `login`: sign in first; `logout`: sign out and end.
     let (cli_config, demo, offline, login, logout, paste) = match parse_args(std::env::args_os().skip(1)) {
-        Ok(Cli::Run { config, demo, offline }) => (config, demo, offline, false, false, false),
-        Ok(Cli::Login { config, offline, paste }) => (config, false, offline, true, false, paste),
-        Ok(Cli::Logout) => (None, false, false, false, true, false),
+        Ok(Cli::Run { config, demo, offline }) => (config, demo, offline, false, None, false),
+        Ok(Cli::Login { config, offline, paste }) => (config, false, offline, true, None, paste),
+        Ok(Cli::Logout(which)) => (None, false, false, false, Some(which), false),
         Ok(Cli::Help) => {
             print!("{HELP}");
             return ExitCode::SUCCESS;
@@ -92,8 +93,8 @@ fn main() -> ExitCode {
     };
     let lang = i18n::detect_lang(&cfg.language, |k| std::env::var(k).ok());
     let workspaces = paths.workspaces_file();
-    if logout {
-        return signin::sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), &paths);
+    if let Some(which) = logout {
+        return signin::sign_out(&*store, workspaces.as_deref(), &i18n::I18n::new(lang), &paths, &which);
     }
     // One governor for the whole process: the sign-in check counts toward its cap too.
     let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
@@ -104,7 +105,7 @@ fn main() -> ExitCode {
         workspaces,
         governor,
         errors: paths.errors_log(),
-        test_addr: test_addr(),
+        test_addrs: test_addrs(),
         desktop: None,
         local,
     };
@@ -126,9 +127,9 @@ fn main() -> ExitCode {
     app.fold_views(cfg.nav_rows == "collapsed");
     // A sign-in piped in (`pbpaste | slakio login`): checked, kept, said, and the program ends.
     if login && !io::stdin().is_terminal() {
-        return sign_in_piped(&wiring, &i18n::I18n::new(lang));
+        return signin::sign_in_piped(&wiring, &i18n::I18n::new(lang));
     }
-    // The one place that names a concrete backend: the demo, else the signed-in workspace;
+    // The one place that names a concrete backend: the demo, else the signed-in workspaces;
     // without one the app offers to sign in (also asked for with `slakio login`).
     let (kind, sign_in) = if demo {
         (Some(BackendKind::Demo(Box::new(DemoBackend::new(World::demo())))), None)
@@ -136,10 +137,8 @@ fn main() -> ExitCode {
         (None, Some(None))
     } else {
         match wiring.signed_in() {
-            Ok(Some((credentials, endpoints, a))) => {
-                (Some(BackendKind::Slack { credentials, endpoints, team: a.team, user: a.user }), None)
-            }
-            Ok(None) => (None, Some(None)),
+            Ok(kept) if !kept.is_empty() => (Some(BackendKind::Slack(kept)), None),
+            Ok(_) => (None, Some(None)),
             Err(fault) => {
                 ErrorLog::new(paths.errors_log()).record("signin", &fault);
                 (None, Some(Some(Label::SigninStoreRead)))
@@ -149,12 +148,7 @@ fn main() -> ExitCode {
     if let Some(why) = sign_in {
         wiring.desktop = signin::offer_sign_in_screen(&mut app, desktop_ok, why).map(Arc::new);
     }
-    let capabilities = kind.as_ref().map(|k| match k {
-        BackendKind::Demo(b) => b.capabilities(),
-        BackendKind::Slack { .. } => slakio_slack::adapter::CAPABILITIES,
-    });
-    if let Some(caps) = capabilities {
-        app.connect(caps);
+    if kind.is_some() {
         // Asked once, where the view switcher can preview the answer; the answer is saved.
         if cfg.icons == "ask" && config_path.is_some() && cfg_err.is_none() {
             app.ask_icons();
@@ -190,10 +184,14 @@ fn main() -> ExitCode {
         let (mut terminal, enhanced) = term::setup_terminal()?;
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
         let backend = kind.map(|k| match k {
-            BackendKind::Demo(b) => exchange::serve(b),
-            BackendKind::Slack { credentials, endpoints, team, user } => {
+            BackendKind::Demo(b) => {
+                app.connect(b.capabilities());
+                exchange::serve(b)
+            }
+            BackendKind::Slack(kept) => {
                 let mut notices = Vec::new();
-                let handle = wiring.local.front(wiring.serve(credentials, endpoints), &team, &user, &mut notices);
+                let (handle, signed) = wiring.connect(kept, &mut notices);
+                app.connect_workspaces(handle.capabilities, &signed);
                 // Queued: a boot that fails at once (offline) does not hide them.
                 for n in notices {
                     app.status.queue(n, Level::Warning, Instant::now());
@@ -222,8 +220,8 @@ fn main() -> ExitCode {
 enum BackendKind {
     /// The invented workspace (`--demo`): nothing connects anywhere.
     Demo(Box<DemoBackend>),
-    /// Slack, read-only, for the signed-in workspace.
-    Slack { credentials: Credentials, endpoints: Endpoints, team: String, user: String },
+    /// Slack, read-only, for every signed-in workspace (in the workspaces file's order).
+    Slack(Vec<Kept>),
 }
 
 /// What signing in and the Slack backend need: the secret store, the workspaces file, the
@@ -235,7 +233,7 @@ struct Wiring {
     workspaces: Option<PathBuf>,
     governor: Arc<Governor>,
     errors: Option<PathBuf>,
-    test_addr: Option<std::net::SocketAddr>,
+    test_addrs: Vec<(Option<String>, std::net::SocketAddr)>,
     /// What the sign-in screen's desktop scan found (no secret but the tokens; the cookie is
     /// read only when a workspace is picked).
     desktop: Option<Arc<slakio_auth::Found>>,
@@ -243,46 +241,134 @@ struct Wiring {
     local: store::Local,
 }
 
-/// `SLAKIO_TEST_SLACK_ADDR`: a loopback address the tests' fake Slack listens on, used instead
-/// of the workspace's hosts. Debug builds only; a release build never reads it.
-fn test_addr() -> Option<std::net::SocketAddr> {
+/// `SLAKIO_TEST_SLACK_ADDR`: the loopback addresses the tests' fake Slacks listen on, used
+/// instead of the workspaces' hosts: one address for every host, or `<host>=<address>` pairs
+/// separated by commas (a host not named then reaches nothing). Debug builds only; a release
+/// build never reads it.
+fn test_addrs() -> Vec<(Option<String>, std::net::SocketAddr)> {
     if !cfg!(debug_assertions) {
-        return None;
+        return Vec::new();
     }
-    std::env::var("SLAKIO_TEST_SLACK_ADDR").ok()?.parse().ok().filter(|a: &std::net::SocketAddr| a.ip().is_loopback())
+    let Ok(value) = std::env::var("SLAKIO_TEST_SLACK_ADDR") else { return Vec::new() };
+    let loopback = |a: &str| a.parse().ok().filter(|a: &std::net::SocketAddr| a.ip().is_loopback());
+    value
+        .split(',')
+        .filter_map(|part| match part.split_once('=') {
+            Some((host, addr)) => Some((Some(host.to_string()), loopback(addr)?)),
+            None => Some((None, loopback(part)?)),
+        })
+        .collect()
 }
 
-/// A pasted request that signed in: the workspace kept, and how to reach it.
-struct SignedIn {
+/// A signed-in workspace: as the workspaces file names it, its credentials, and how to reach it.
+struct Kept {
     account: Account,
     credentials: Credentials,
     endpoints: Endpoints,
 }
 
+/// Signing in from the app ended: the workspaces it signed in to (their names), every
+/// signed-in workspace now (those signed in to before too), and why one asked for did not sign
+/// in, if one did not.
+struct Done {
+    names: Vec<String>,
+    kept: Vec<Kept>,
+    failed: Option<Label>,
+}
+
 impl Wiring {
     fn endpoints(&self, host: &str) -> Option<Endpoints> {
-        match self.test_addr {
-            Some(addr) => Endpoints::local(addr),
-            None => Endpoints::workspace(host),
+        if self.test_addrs.is_empty() {
+            return Endpoints::workspace(host);
+        }
+        let to = self.test_addrs.iter().find(|(h, _)| h.as_deref().is_none_or(|h| h == host))?;
+        Endpoints::local(to.1)
+    }
+
+    /// Every signed-in workspace whose credentials the store has, in the file's order. One
+    /// whose credentials cannot be read is left out (the error log says why) and the others are
+    /// used; only when none can be had is that a fault.
+    fn signed_in(&self) -> Result<Vec<Kept>, slakio_core::fault::Fault> {
+        let Some(path) = &self.workspaces else { return Ok(Vec::new()) };
+        let (mut kept, mut fault) = (Vec::new(), None);
+        for account in account::load(path)? {
+            let Some(endpoints) = self.endpoints(&account.host) else { continue };
+            match account::credentials(&*self.store, &account) {
+                Ok(Some(credentials)) => kept.push(Kept { account, credentials, endpoints }),
+                Ok(None) => {}
+                Err(f) => {
+                    self.record(&f);
+                    fault = Some(f);
+                }
+            }
+        }
+        match fault {
+            Some(f) if kept.is_empty() => Err(f),
+            _ => Ok(kept),
         }
     }
 
-    /// The signed-in workspace's credentials, endpoints and account; `None` when none is signed
-    /// in.
-    fn signed_in(&self) -> Result<Option<(Credentials, Endpoints, Account)>, slakio_core::fault::Fault> {
-        let Some(path) = &self.workspaces else { return Ok(None) };
-        let Some(a) = account::load(path)?.into_iter().next() else { return Ok(None) };
-        let Some(endpoints) = self.endpoints(&a.host) else { return Ok(None) };
-        Ok(account::credentials(&*self.store, &a)?.map(|c| (c, endpoints, a)))
+    /// [`Wiring::signed_in`], off the loop's thread (the keychain may ask).
+    async fn all_kept(&self) -> Result<Vec<Kept>, Label> {
+        let w = self.clone();
+        match tokio::task::spawn_blocking(move || w.signed_in()).await {
+            Ok(Ok(kept)) if !kept.is_empty() => Ok(kept),
+            _ => Err(Label::SigninStoreRead),
+        }
     }
 
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
         slakio_slack::serve(slakio_slack::Client::new(credentials, endpoints, Arc::clone(&self.governor)))
     }
 
+    /// One backend per workspace of `kept`, each with the cache in front of it (what to tell
+    /// about the cache goes to `notices`), behind one handle; and the workspaces as the app
+    /// lists them.
+    fn connect(&self, kept: Vec<Kept>, notices: &mut Vec<Msg>) -> (BackendHandle, Vec<SignedInTo>) {
+        let mut handles = Vec::with_capacity(kept.len());
+        let mut signed = Vec::with_capacity(kept.len());
+        for k in kept {
+            let (team, user) = (&k.account.team, &k.account.user);
+            let handle = self.local.front(self.serve(k.credentials, k.endpoints), team, user, notices);
+            let id = slakio_core::model::WorkspaceId::new(team);
+            let read_only = handle.capabilities.read_only;
+            signed.push(SignedInTo { id: id.clone(), name: k.account.name.clone(), read_only });
+            handles.push((id, handle));
+        }
+        (slakio_tui::many::serve(handles), signed)
+    }
+
+    /// Sign in with a pasted request ([`Wiring::sign_in`]), then gather every signed-in
+    /// workspace.
+    async fn sign_in_app(self, text: Pasted) -> Result<Done, Label> {
+        let one = self.clone().sign_in(text).await?;
+        let kept = self.all_kept().await?;
+        Ok(Done { names: vec![words::shown(&one.account.name)], kept, failed: None })
+    }
+
+    /// Sign in with each of the picked desktop workspaces `teams`, one after the other; one that
+    /// does not sign in holds none of the others back (the first reason is kept). Then gather
+    /// every signed-in workspace.
+    async fn sign_in_desktop_all(self, teams: Vec<String>) -> Result<Done, Label> {
+        let (mut names, mut failed) = (Vec::new(), None);
+        for team in teams {
+            match self.clone().sign_in_desktop(team).await {
+                Ok(k) => names.push(words::shown(&k.account.name)),
+                Err(why) => {
+                    failed.get_or_insert(why);
+                }
+            }
+        }
+        if names.is_empty() {
+            return Err(failed.unwrap_or(Label::SigninDesktopFailed));
+        }
+        let kept = self.all_kept().await?;
+        Ok(Done { names, kept, failed })
+    }
+
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
     /// not. Nothing is kept unless Slack accepted it.
-    async fn sign_in(self, text: Pasted) -> Result<SignedIn, Label> {
+    async fn sign_in(self, text: Pasted) -> Result<Kept, Label> {
         let pasted = slakio_auth::parse(&text.0).map_err(words::paste_label)?;
         drop(text);
         self.finish(pasted.credentials, pasted.host).await
@@ -291,7 +377,7 @@ impl Wiring {
     /// Sign in with the picked desktop workspace `team` (matched by team id in what the sign-in
     /// screen's scan found, never by position): read its credentials (the macOS keychain may
     /// prompt, off the loop's thread), then check and keep them.
-    async fn sign_in_desktop(self, team: String) -> Result<SignedIn, Label> {
+    async fn sign_in_desktop(self, team: String) -> Result<Kept, Label> {
         let found = self.desktop.clone().ok_or(Label::SigninDesktopFailed)?;
         let ws = found.workspaces().iter().find(|w| w.team == team).ok_or(Label::SigninDesktopFailed)?;
         let host = ws.host.clone();
@@ -326,7 +412,7 @@ impl Wiring {
 
     /// Check `credentials` for the workspace at `host` with one `client.userBoot` and keep them
     /// if Slack accepts; the words for why not otherwise. Nothing is kept unless Slack accepted.
-    async fn finish(self, credentials: Credentials, host: String) -> Result<SignedIn, Label> {
+    async fn finish(self, credentials: Credentials, host: String) -> Result<Kept, Label> {
         let endpoints = self.endpoints(&host).ok_or(Label::SigninNotWorkspace)?;
         let client = slakio_slack::Client::new(credentials.clone(), endpoints.clone(), Arc::clone(&self.governor));
         let who = login::check(&client).await.map_err(|e| {
@@ -341,7 +427,7 @@ impl Wiring {
         let creds = credentials.clone();
         let stored = tokio::task::spawn_blocking(move || account::keep(&*store, &path, &kept, &creds)).await;
         match stored {
-            Ok(Ok(())) => Ok(SignedIn { account, credentials, endpoints }),
+            Ok(Ok(())) => Ok(Kept { account, credentials, endpoints }),
             Ok(Err(fault)) => {
                 self.record(&fault);
                 Err(Label::SigninStoreFailed)
@@ -365,43 +451,24 @@ fn check_label(e: &SlackError) -> Label {
     }
 }
 
-/// A paste was checked: with a sign-in the app connects to its workspace, else says why not.
-fn signed_in(done: Result<SignedIn, Label>, app: &mut App, backend: &mut Option<BackendHandle>, wiring: &Wiring) {
+/// Signing in from the app ended: with a sign-in the app connects to every signed-in
+/// workspace (the ones signed in to before too, each booted again), else says why not.
+fn signed_in(done: Result<Done, Label>, app: &mut App, backend: &mut Option<BackendHandle>, wiring: &Wiring) {
     match done {
-        Ok(s) => {
+        Ok(d) => {
             let mut notices = Vec::new();
-            let (team, user) = (&s.account.team, &s.account.user);
-            *backend = Some(wiring.local.front(wiring.serve(s.credentials, s.endpoints), team, user, &mut notices));
-            app.signed_in(slakio_slack::adapter::CAPABILITIES, words::shown(&s.account.name), Instant::now());
+            let (handle, signed) = wiring.connect(d.kept, &mut notices);
+            app.signed_in(handle.capabilities, &signed, &d.names, Instant::now());
+            *backend = Some(handle);
+            if let Some(why) = d.failed {
+                notices.insert(0, Msg::Label(why));
+            }
             // Queued after "Signed in to …", which stays readable.
             for n in notices {
                 app.status.queue(n, Level::Warning, Instant::now());
             }
         }
         Err(why) => app.sign_in_failed(why),
-    }
-}
-
-/// `slakio login` with the paste on standard input.
-fn sign_in_piped(wiring: &Wiring, i18n: &i18n::I18n) -> ExitCode {
-    let mut text = Pasted(String::new());
-    let read = io::stdin().take(slakio_auth::curl::PASTE_MAX as u64 + 1).read_to_string(&mut text.0);
-    let result = match read {
-        Err(_) => Err(Label::SigninEmpty),
-        Ok(_) => match tokio::runtime::Builder::new_current_thread().enable_all().build() {
-            Ok(rt) => rt.block_on(wiring.clone().sign_in(text)),
-            Err(_) => Err(Label::SigninFailed),
-        },
-    };
-    match result {
-        Ok(s) => {
-            println!("{}", i18n.msg(&Msg::SigninSignedIn { workspace: words::shown(&s.account.name) }));
-            ExitCode::SUCCESS
-        }
-        Err(why) => {
-            eprintln!("{}", i18n.label(why));
-            ExitCode::FAILURE
-        }
     }
 }
 
@@ -429,7 +496,7 @@ async fn run(
     let mut cursor = Cursor::default();
     let mut redraw = true;
     // A paste being checked with Slack.
-    let mut signing_in: Option<tokio::task::JoinHandle<Result<SignedIn, Label>>> = None;
+    let mut signing_in: Option<tokio::task::JoinHandle<Result<Done, Label>>> = None;
     // Debug builds only: panic after the first frame, for the test that the panic hook
     // restores the terminal (tests/signals.rs).
     let panic_after_frame = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_PANIC").is_some_and(|v| v == "1");
@@ -446,8 +513,10 @@ async fn run(
                     out.flush()?;
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
-                Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in(pasted))),
-                Effect::DesktopPick(team) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop(team))),
+                Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_app(pasted))),
+                Effect::DesktopPick(teams) => {
+                    signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(teams)));
+                }
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

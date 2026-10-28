@@ -108,7 +108,7 @@ fn every_action_is_registered() {
     };
     let sign_in = {
         use SignInAction::*;
-        [Down, Up, Pick, Paste].map(Action::SignIn)
+        [Down, Up, Pick, Mark, Paste].map(Action::SignIn)
     };
     let app = {
         use AppAction::*;

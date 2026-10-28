@@ -233,6 +233,7 @@ pub const DEFAULTS: &[Binding] = &[
     app(Ctx::Root, "ctrl+c", AppAction::Interrupt),
     // The sign-in screen's picker of the Slack desktop app's workspaces.
     bind(Ctx::SignIn, "enter", Action::SignIn(SignInAction::Pick)),
+    bind(Ctx::SignIn, "space", Action::SignIn(SignInAction::Mark)),
     bind(Ctx::SignIn, "j", Action::SignIn(SignInAction::Down)),
     bind(Ctx::SignIn, "down", Action::SignIn(SignInAction::Down)),
     bind(Ctx::SignIn, "k", Action::SignIn(SignInAction::Up)),

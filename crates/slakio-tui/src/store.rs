@@ -1,8 +1,10 @@
-//! The local cache as the binary sets it up (`slakio-store`): opened for the signed-in workspace
-//! when its backend starts, put in front of it, kept out of Time Machine backups on macOS, and
-//! removed with `slakio logout`. It is the signed-in user's only: another sign-in finds it
-//! emptied. Whatever goes wrong with it, the app runs without it and says so once (the notices
-//! are queued, so each is seen); the detail goes to the error log. The demo never uses it.
+//! The local cache as the binary sets it up (`slakio-store`): opened once, when the first
+//! workspace's backend starts, and put in front of every signed-in workspace's backend (one
+//! cache, a part per workspace); kept out of Time Machine backups on macOS; removed with
+//! `slakio logout` (one workspace's part when signing out of one of several). Each workspace's
+//! part is the user signed in to it's only: another sign-in finds that part emptied. Whatever
+//! goes wrong with it, the app runs without it and says so once (the notices are queued, so
+//! each is seen); the detail goes to the error log. The demo never uses it.
 
 use slakio_core::backend::BackendHandle;
 use slakio_core::config::Config;
@@ -28,13 +30,44 @@ const TEST_CACHE_WAIT: &str = "SLAKIO_TEST_CACHE_WAIT_MS";
 /// The one-time notice of a failed exclusion from backups.
 const BACKUP_NOTICE: &str = "cache_backup_failed";
 
+/// How long making a workspace's part its user's may take before it goes on without the cache.
+const CLAIM_WAIT: Duration = Duration::from_secs(2);
+
 /// What opening the cache needs, and the cache once open.
 #[derive(Clone)]
 pub(crate) struct Local {
     on: bool,
     caps: Caps,
     paths: Paths,
-    opened: Arc<Mutex<Option<Cache>>>,
+    /// Opened (or tried) once for the process: a second open of the same process would find its
+    /// own lock and read only.
+    opened: Arc<Mutex<Opening>>,
+}
+
+#[derive(Default)]
+struct Opening {
+    tried: bool,
+    cache: Option<Cache>,
+}
+
+/// Add `msg` to `notices` unless it is there already (several workspaces, one notice).
+fn notice(notices: &mut Vec<Msg>, msg: Msg) {
+    if !notices.contains(&msg) {
+        notices.push(msg);
+    }
+}
+
+/// The error log, written off the caller's thread: a slow disk never holds up the task that
+/// noticed the cache was slow.
+fn log_off_thread(errors: Option<PathBuf>) -> slakio_store::layer::OnSlow {
+    Box::new(move |f: &Fault| {
+        let (errors, f) = (errors.clone(), f.clone());
+        let write = move || ErrorLog::new(errors).record("cache", &f);
+        match tokio::runtime::Handle::try_current() {
+            Ok(rt) => drop(rt.spawn_blocking(write)),
+            Err(_) => write(),
+        }
+    })
 }
 
 impl Local {
@@ -52,7 +85,7 @@ impl Local {
     }
 
     /// `backend`, the backend of workspace `team` signed in as `user`, with the cache in front of
-    /// it when it can be had; what to tell the user about it goes to `notices`.
+    /// it when it can be had; what to tell the user about it goes to `notices` (once each).
     pub(crate) fn front(
         &self,
         backend: BackendHandle,
@@ -60,49 +93,60 @@ impl Local {
         user: &str,
         notices: &mut Vec<Msg>,
     ) -> BackendHandle {
-        match self.open(&format!("{team} {user}"), notices) {
-            Some(cache) => {
-                let errors = self.paths.errors_log();
-                let log = Box::new(move |f: &Fault| ErrorLog::new(errors.clone()).record("cache", f));
+        let Some(cache) = self.cache(notices) else { return backend };
+        // Another sign-in's part: emptied by the writer, not used by a reader.
+        match cache.claim(team, user, CLAIM_WAIT) {
+            Some(Ok(true)) => {
+                let log = log_off_thread(self.paths.errors_log());
                 slakio_store::layer::serve(backend, cache, WorkspaceId::new(team), waits(), log)
             }
-            None => backend,
+            Some(Ok(false)) => {
+                notice(notices, Msg::Label(Label::CacheInUse));
+                backend
+            }
+            Some(Err(fault)) => {
+                self.record(&fault);
+                notice(notices, Msg::Label(Label::CacheFailed));
+                backend
+            }
+            None => {
+                self.record(&Fault::other("cache: a workspace's part could not be claimed in time"));
+                notice(notices, Msg::Label(Label::CacheFailed));
+                backend
+            }
         }
     }
 
-    fn open(&self, owner: &str, notices: &mut Vec<Msg>) -> Option<Cache> {
+    /// The cache, opened the first time it is asked for (what opening it found goes to
+    /// `notices`); `None` when it is off or could not be had.
+    fn cache(&self, notices: &mut Vec<Msg>) -> Option<Cache> {
+        let mut o = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
+        if !std::mem::replace(&mut o.tried, true) {
+            o.cache = self.open(notices);
+        }
+        o.cache.clone()
+    }
+
+    fn open(&self, notices: &mut Vec<Msg>) -> Option<Cache> {
         let dir = self.paths.cache.as_ref().filter(|_| self.on)?;
-        let mut opened = match Store::open(dir) {
+        let opened = match Store::open(dir) {
             Ok(o) => o,
             Err(OpenError::InUse) => {
-                notices.push(Msg::Label(Label::CacheInUse));
+                notice(notices, Msg::Label(Label::CacheInUse));
                 return None;
             }
             Err(OpenError::Failed(fault)) => {
                 self.record(&fault);
-                notices.push(Msg::Label(Label::CacheFailed));
+                notice(notices, Msg::Label(Label::CacheFailed));
                 return None;
             }
         };
         if opened.rebuilt {
             self.record(&Fault::other("cache: unreadable or of a newer version; set up again"));
-            notices.push(Msg::Label(Label::CacheRebuilt));
-        }
-        // Another sign-in's cache: emptied by the writer, not used by a reader.
-        match opened.store.claim(owner) {
-            Ok(true) => {}
-            Ok(false) => {
-                notices.push(Msg::Label(Label::CacheInUse));
-                return None;
-            }
-            Err(fault) => {
-                self.record(&fault);
-                notices.push(Msg::Label(Label::CacheFailed));
-                return None;
-            }
+            notice(notices, Msg::Label(Label::CacheRebuilt));
         }
         if opened.store.read_only() {
-            notices.push(Msg::Label(Label::CacheReadOnly));
+            notice(notices, Msg::Label(Label::CacheReadOnly));
         } else if let Some(tmutil) = exclusion() {
             // Once: a cache that was excluded remembers it.
             if let Err(why) = opened.store.exclude_from_backups(&tmutil) {
@@ -115,13 +159,10 @@ impl Local {
         let errors = self.paths.errors_log();
         let log = Box::new(move |f: &Fault| ErrorLog::new(errors.clone()).record("cache", f));
         match Cache::start(opened.store, self.caps, system_clock(), log) {
-            Ok(cache) => {
-                *self.opened.lock().unwrap_or_else(PoisonError::into_inner) = Some(cache.clone());
-                Some(cache)
-            }
+            Ok(cache) => Some(cache),
             Err(e) => {
                 self.record(&Fault::io(&e));
-                notices.push(Msg::Label(Label::CacheFailed));
+                notice(notices, Msg::Label(Label::CacheFailed));
                 None
             }
         }
@@ -129,7 +170,7 @@ impl Local {
 
     /// Before the process ends: what the cache was asked to keep is written (two seconds at most).
     pub(crate) fn flush(&self) {
-        if let Some(cache) = self.opened.lock().unwrap_or_else(PoisonError::into_inner).take() {
+        if let Some(cache) = self.opened.lock().unwrap_or_else(PoisonError::into_inner).cache.take() {
             cache.flush(Duration::from_secs(2));
         }
     }
@@ -157,6 +198,22 @@ pub(crate) fn remove(paths: &Paths) -> Result<(), Fault> {
         Some(dir) if dir.exists() => slakio_store::db::remove(dir),
         _ => Ok(()),
     }
+}
+
+/// `slakio logout <workspace>` while other workspaces stay signed in: workspace `team`'s part of
+/// the cache is removed, the others' kept. `Err(None)`: a slakio runs and writes the cache, so
+/// nothing was removed (it is to be quit first).
+pub(crate) fn forget(paths: &Paths, team: &str) -> Result<(), Option<Fault>> {
+    let Some(dir) = paths.cache.as_ref().filter(|d| d.join(slakio_store::db::DIR).exists()) else { return Ok(()) };
+    let mut opened = match Store::open(dir) {
+        Ok(o) => o,
+        Err(OpenError::InUse) => return Err(None),
+        Err(OpenError::Failed(f)) => return Err(Some(f)),
+    };
+    if opened.store.read_only() {
+        return Err(None);
+    }
+    opened.store.forget(team).map_err(Some)
 }
 
 /// A slakio runs and uses the cache (it holds the writer's lock).

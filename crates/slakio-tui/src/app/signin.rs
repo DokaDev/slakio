@@ -1,10 +1,12 @@
 //! Signing in from the app. `slakio login` (and the first run without a workspace) first offers
-//! the workspaces the Slack desktop app is signed in to, as a picker; the chosen one goes to the
-//! binary by team id ([`Effect::DesktopPick`]), which reads its credentials (the macOS keychain
+//! the workspaces the Slack desktop app is signed in to, as a picker: `Space` marks several,
+//! `Enter` signs in to the marked ones (else the one under the cursor); they go to the binary by
+//! team id ([`Effect::DesktopPick`]), which reads its credentials (the macOS keychain
 //! may prompt), asks Slack whether they sign in and keeps them. Pressing `p` (or no desktop app) falls back to
 //! the paste flow: the screen says how to copy a request, what is pasted there goes to the binary
 //! ([`Effect::SignIn`]). The pasted text is never kept by the app, drawn or printed.
 
+use super::model::SignedIn;
 use super::{App, Effect};
 use crate::action::SignInAction;
 use crate::keymap::Ctx;
@@ -37,13 +39,33 @@ pub struct PickerRow {
     pub host: String,
 }
 
-/// The desktop-workspace picker: its rows, the one under the cursor, and the reason the last pick
-/// did not sign in, if any.
+/// The desktop-workspace picker: its rows, the one under the cursor, the ones marked (by team
+/// id) to sign in to together, and the reason the last pick did not sign in, if any.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Picker {
     pub rows: Vec<PickerRow>,
     pub selected: usize,
+    pub marked: Vec<String>,
     pub note: Option<Label>,
+}
+
+impl Picker {
+    /// Row `i` is marked.
+    pub fn is_marked(&self, i: usize) -> bool {
+        self.rows.get(i).is_some_and(|r| self.marked.contains(&r.team))
+    }
+
+    /// What `Enter` signs in to: the marked workspaces in the picker's order, else the one under
+    /// the cursor.
+    pub fn chosen(&self) -> Vec<String> {
+        let marked: Vec<String> =
+            self.rows.iter().filter(|r| self.marked.contains(&r.team)).map(|r| r.team.clone()).collect();
+        if marked.is_empty() {
+            self.rows.get(self.selected).map(|r| r.team.clone()).into_iter().collect()
+        } else {
+            marked
+        }
+    }
 }
 
 /// Pasted text that may hold a token and cookies: its `Debug` print says nothing of it, and
@@ -74,7 +96,7 @@ impl App {
 
     /// Offer the desktop app's signed-in workspaces as a picker. The pick is reported by team id.
     pub fn offer_desktop(&mut self, rows: Vec<PickerRow>) {
-        self.sign_in = Some(SignIn::Desktop(Picker { rows, selected: 0, note: None }));
+        self.sign_in = Some(SignIn::Desktop(Picker { rows, selected: 0, marked: Vec::new(), note: None }));
     }
 
     /// Where signing in stands; `None` when the app does not offer it.
@@ -96,12 +118,13 @@ impl App {
         }
     }
 
-    /// Signed in to `workspace` (Slack's name, already sanitised): the app connects to the
-    /// backend that can do `caps`.
-    pub fn signed_in(&mut self, caps: Capabilities, workspace: String, now: Instant) {
+    /// Signed in to `workspaces` (Slack's names, already sanitised), the ones of `signed` that
+    /// are new: the app connects to the backend of every workspace of `signed`, which can do
+    /// `caps`.
+    pub fn signed_in(&mut self, caps: Capabilities, signed: &[SignedIn], workspaces: &[String], now: Instant) {
         self.sign_in = None;
-        self.connect(caps);
-        self.info(Msg::SigninSignedIn { workspace }, now);
+        self.connect_workspaces(caps, signed);
+        self.info(Msg::SigninSignedIn { workspace: workspaces.join(", ") }, now);
     }
 
     /// The desktop picker has the keyboard (its keys are [`Ctx::SignIn`]'s).
@@ -116,11 +139,21 @@ impl App {
         match a {
             SignInAction::Down => p.selected = (p.selected + 1).min(p.rows.len().saturating_sub(1)),
             SignInAction::Up => p.selected = p.selected.saturating_sub(1),
-            SignInAction::Pick => {
+            SignInAction::Mark => {
                 let Some(team) = p.rows.get(p.selected).map(|r| r.team.clone()) else { return };
+                match p.marked.iter().position(|t| *t == team) {
+                    Some(at) => drop(p.marked.remove(at)),
+                    None => p.marked.push(team),
+                }
+            }
+            SignInAction::Pick => {
+                let teams = p.chosen();
+                if teams.is_empty() {
+                    return;
+                }
                 let p = Picker { note: None, ..p.clone() };
                 self.sign_in = Some(SignIn::DesktopChecking(p));
-                self.effects.push(Effect::DesktopPick(team));
+                self.effects.push(Effect::DesktopPick(teams));
             }
             SignInAction::Paste => self.offer_sign_in(None),
         }

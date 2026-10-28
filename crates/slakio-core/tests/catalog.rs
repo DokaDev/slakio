@@ -316,6 +316,10 @@ const SAME_IN_KO: &[&str] = &[
     "status.dms",
     // Only placeholders and a dash: the which-key popup's title (the keys, the group's name).
     "guide.title",
+    // Only placeholders and punctuation: a workspace's name and why its start failed; a
+    // workspace's name and host in the list `slakio logout` prints.
+    "fail.workspace",
+    "logout.listed",
 ];
 
 #[test]

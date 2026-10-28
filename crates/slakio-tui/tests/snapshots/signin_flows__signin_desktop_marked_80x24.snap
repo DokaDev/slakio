@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/signin_flows.rs
+expression: shown
+---
+
+  Sign in from the Slack desktop app
+
+  The Slack app on this Mac is signed in to these workspaces:
+
+   ✓ Acme Corp                                                 acme.slack.com
+     Acme Corp                                              acme-eu.slack.com
+   ✓ Gamma                                                    gamma.slack.com
+
+  When macOS asks about "Slack Safe Storage", press Allow, not Always Allow.
+
+  Enter to sign in, Space to mark several, j/k or Up/Down to choose, p to
+  paste a browser request (Cmd+V pastes one you copied already).
+
+  The prompt names "security", the system tool slakio reads the key with.
+  Always Allow would let any program read that key without asking. slakio
+  reads the Slack app's files and changes nothing; the sign-in goes to the
+  macOS Keychain.
+
+  Ctrl+Q  Quit
+  ?       Keyboard help
+
+
+ NORMAL               │ Enter sign in · j/k choose · p paste a request · ? help
