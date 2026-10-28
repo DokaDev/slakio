@@ -48,7 +48,7 @@ fn the_view_switcher_and_the_brackets_select_views() {
     assert_eq!(s.nav_cursor, 0, "Home is the first");
     s.update(ShellAction::NavNext, &m, 10, &mut f);
     s.update(ShellAction::NavSelect, &m, 10, &mut f);
-    assert_eq!((s.workspace, s.view, f), (0, View::Dms, Region::List));
+    assert_eq!((s.workspace.clone(), s.view, f), (None, View::Dms, Region::List), "the first workspace");
     s.update(ShellAction::FocusNav, &m, 10, &mut f);
     for _ in 0..20 {
         s.update(ShellAction::NavNext, &m, 10, &mut f);
@@ -65,7 +65,7 @@ fn the_view_switcher_and_the_brackets_select_views() {
     s.update(ShellAction::ViewNext, &m, 10, &mut f);
     assert_eq!(s.view, View::Home);
     s.select_workspace(1, &m);
-    assert_eq!((s.workspace, s.view, s.nav_cursor), (1, View::Home, 0));
+    assert_eq!((s.workspace.clone(), s.view, s.nav_cursor), (Some(m.workspaces()[1].id.clone()), View::Home, 0));
     s.update(ShellAction::Show(View::Dms), &m, 10, &mut f);
     assert_eq!(View::ALL[s.nav_cursor], View::Dms, "the view switcher follows");
     assert!(View::Files.is_placeholder() && !View::Todos.is_placeholder());
@@ -125,7 +125,10 @@ fn clamping_after_a_smaller_model_keeps_cursors_valid() {
     let mut s = Shell::default();
     let mut f = Region::List;
     s.update(ShellAction::ListLast, &m, 10, &mut f);
-    s.workspace = 1;
+    s.select_workspace(1, &m);
     s.clamp(&Model::default(), 10);
-    assert_eq!((s.workspace, s.list_cursor), (0, 0));
+    assert_eq!((s.current(&Model::default()), s.list_cursor), (None, 0));
+    // The workspace chosen stays chosen: shown again once the model lists it again.
+    s.clamp(&m, 10);
+    assert_eq!(s.current(&m).map(|w| &w.id), Some(&m.workspaces()[1].id));
 }

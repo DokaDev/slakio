@@ -42,7 +42,9 @@ pub struct Request {
 /// A request to the backend.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
-    /// Load the workspaces, people, sidebar sections and conversations.
+    /// Load the workspaces, people, sidebar sections and conversations: of the request's
+    /// workspace when it names one (answered with that workspace's part only), else of every
+    /// workspace the backend has.
     Boot,
     /// Up to `limit` messages of `target` older than `before` (the newest when `None`). Answered
     /// with [`Event::History`].
@@ -106,6 +108,21 @@ pub struct Snapshot {
     pub saved: Option<Vec<SavedItem>>,
     /// When the backend took this snapshot: reminders due before it are overdue.
     pub taken: Ts,
+}
+
+impl Snapshot {
+    /// What of this snapshot belongs to workspace `ws` (its own boot answer, when every
+    /// workspace boots on its own); the clock is kept.
+    pub fn only(&self, ws: &WorkspaceId) -> Snapshot {
+        Snapshot {
+            workspaces: self.workspaces.iter().filter(|w| &w.id == ws).cloned().collect(),
+            users: self.users.iter().filter(|u| &u.workspace == ws).cloned().collect(),
+            sections: self.sections.iter().filter(|s| &s.workspace == ws).cloned().collect(),
+            conversations: self.conversations.iter().filter(|c| &c.workspace == ws).cloned().collect(),
+            saved: self.saved.as_ref().map(|items| items.iter().filter(|s| &s.workspace == ws).cloned().collect()),
+            taken: self.taken,
+        }
+    }
 }
 
 /// Something the backend tells the UI.

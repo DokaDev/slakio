@@ -80,7 +80,8 @@ fn filter(f: &mut Frame, app: &App, area: Rect) {
 fn group(f: &mut Frame, app: &App, g: Group, area: Rect) {
     let t = &app.theme;
     let folded = app.shell.groups.contains(&g);
-    let n = app.model.group_items(app.shell.workspace, g, &app.shell.todo).len();
+    let ws = app.shell.current_id(&app.model);
+    let n = ws.map_or(0, |ws| app.model.group_items(&ws, g, &app.shell.todo).len());
     // To-dos' groups always count; Home's Saved, as Home's sections, only when folded.
     let used = if g != Group::Saved || folded { right(f, area, &n.to_string(), t.muted()) } else { 0 };
     put(f, area, 1, 1, vec![Span::styled(if folded { "▸" } else { "▾" }, t.faint())]);
@@ -115,8 +116,9 @@ fn due_badge(app: &App, i: usize) -> Option<(String, Style)> {
 fn item(f: &mut Frame, app: &App, i: usize, area: Rect) {
     let t = &app.theme;
     let s = app.model.saved(i);
-    let author = app.model.user(&s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
-    if let Some(chip) = avatar_chip(app, &s.author, &author) {
+    let author =
+        app.model.user(&s.workspace, &s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
+    if let Some(chip) = avatar_chip(app, &s.workspace, &s.author, &author) {
         put(f, area, item_x(app), avatar::WIDTH as u16, vec![chip]);
     }
     let badge = if s.state == SavedState::InProgress { due_badge(app, i) } else { None };
@@ -139,7 +141,8 @@ fn item(f: &mut Frame, app: &App, i: usize, area: Rect) {
 fn meta(f: &mut Frame, app: &App, i: usize, area: Rect) {
     let t = &app.theme;
     let s = app.model.saved(i);
-    let author = app.model.user(&s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
+    let author =
+        app.model.user(&s.workspace, &s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
     let target = Target::Conversation { workspace: s.workspace.clone(), conversation: s.conversation.clone() };
     let place = app.model.target(&target).map(breadcrumb).unwrap_or_default();
     let date = crate::time::date(s.ts);

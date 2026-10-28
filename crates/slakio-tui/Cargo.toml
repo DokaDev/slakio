@@ -42,6 +42,7 @@ unicode-width.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 insta.workspace = true
 # The binary signing in against the tests' fake Slack.
 slakio-fake.workspace = true

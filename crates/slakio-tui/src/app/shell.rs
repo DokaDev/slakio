@@ -13,11 +13,11 @@
 //! │   # backend   3 │
 //! ```
 
-use super::model::{Model, Row};
+use super::model::{Model, Row, RowKey};
 use super::todos::{Group, TodoView};
 use crate::action::ShellAction;
 use slakio_core::i18n::Label;
-use slakio_core::model::{SectionId, Target};
+use slakio_core::model::{SectionId, Target, Workspace, WorkspaceId};
 
 /// A conversation to open from the list: `focus` moves the keyboard to it (`Enter`), else the
 /// list keeps it (`l`, a peek).
@@ -89,8 +89,9 @@ pub struct Shell {
     pub nav_cursor: usize,
     /// The views are folded to one row, the view shown (`nav_rows = "collapsed"`).
     pub nav_folded: bool,
-    /// The workspace the list panel shows.
-    pub workspace: usize,
+    /// The workspace the list panel shows, by id (the first one listed until one is chosen, or
+    /// when the one chosen is no longer listed).
+    pub workspace: Option<WorkspaceId>,
     pub view: View,
     /// Index into the list's rows.
     pub list_cursor: usize,
@@ -112,7 +113,7 @@ impl Default for Shell {
             // On the view shown (Home).
             nav_cursor: 0,
             nav_folded: false,
-            workspace: 0,
+            workspace: None,
             view: View::Home,
             list_cursor: 0,
             list_top: 0,
@@ -126,8 +127,34 @@ impl Default for Shell {
 }
 
 impl Shell {
+    /// The workspace the list panel shows.
+    pub fn current<'m>(&self, model: &'m Model) -> Option<&'m Workspace> {
+        self.workspace.as_ref().and_then(|id| model.workspace(id)).or_else(|| model.workspaces().first())
+    }
+
+    /// The id of the workspace the list panel shows.
+    pub fn current_id(&self, model: &Model) -> Option<WorkspaceId> {
+        self.current(model).map(|w| w.id.clone())
+    }
+
     pub fn rows(&self, model: &Model) -> Vec<Row> {
-        model.rows(self.workspace, self.view, &self.collapsed, &self.groups, &self.todo)
+        let Some(ws) = self.current(model) else { return vec![] };
+        model.rows(&ws.id, self.view, &self.collapsed, &self.groups, &self.todo)
+    }
+
+    /// The id of the row under the cursor, to find it again once the rows change.
+    pub fn anchor(&self, model: &Model) -> Option<RowKey> {
+        self.rows(model).get(self.list_cursor).and_then(|r| model.key(*r))
+    }
+
+    /// Put the cursor back on the row `anchor` names, when the rows still have it; the
+    /// workspace shown stays the one chosen.
+    pub fn restore(&mut self, anchor: Option<RowKey>, model: &Model, list_height: usize) {
+        let Some(anchor) = anchor else { return };
+        if let Some(at) = self.rows(model).iter().position(|r| model.key(*r).as_ref() == Some(&anchor)) {
+            self.list_cursor = at;
+            self.scroll(list_height);
+        }
     }
 
     /// Apply `action`. `list_height` is the number of rows the list panel shows (for scrolling
@@ -337,7 +364,8 @@ impl Shell {
 
     /// Show workspace `ws` (index into the model's workspaces), from its Home.
     pub fn select_workspace(&mut self, ws: usize, model: &Model) {
-        self.workspace = ws.min(model.workspaces().len().saturating_sub(1));
+        let n = model.workspaces().len();
+        self.workspace = model.workspaces().get(ws.min(n.saturating_sub(1))).map(|w| w.id.clone());
         self.view = View::Home;
         self.nav_cursor = 0;
         self.home_cursor(model);
@@ -413,10 +441,9 @@ impl Shell {
 
     /// Keep the cursors inside what the model holds (after a new boot answer).
     pub fn clamp(&mut self, model: &Model, list_height: usize) {
-        let n = model.workspaces().len();
-        self.workspace = self.workspace.min(n.saturating_sub(1));
         self.nav_cursor = self.nav_cursor.min(View::ALL.len() - 1);
-        if model.is_loaded() && std::mem::take(&mut self.pending_home) {
+        let loaded = self.current(model).is_some_and(|w| model.is_loaded_in(&w.id));
+        if loaded && std::mem::take(&mut self.pending_home) {
             self.home_cursor(model);
         }
         self.list_cursor = self.list_cursor.min(self.rows(model).len().saturating_sub(1));

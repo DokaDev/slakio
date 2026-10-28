@@ -43,7 +43,7 @@ use ratatui::symbols::border;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use slakio_core::i18n::{Label, Localized, Msg};
-use slakio_core::model::{Presence, UserId};
+use slakio_core::model::{Presence, UserId, WorkspaceId};
 use std::time::Instant;
 
 /// Draw the whole screen at `now` (notices that ran out are not drawn).
@@ -192,12 +192,13 @@ fn presence_mark(p: Presence) -> Option<(&'static str, Presence)> {
 }
 
 /// A person's avatar chip: their initials on their color ([`crate::avatar`]); `None` with
-/// avatars off. `name` is the sanitised name drawn beside it.
-fn avatar_chip(app: &App, id: &UserId, name: &str) -> Option<Span<'static>> {
+/// avatars off. `name` is the sanitised name drawn beside it; `ws` is the workspace it is seen
+/// from.
+fn avatar_chip(app: &App, ws: &WorkspaceId, id: &UserId, name: &str) -> Option<Span<'static>> {
     if !app.settings.avatars {
         return None;
     }
-    let handle = || app.model.user(id).map(|u| u.name.line().as_str().to_string()).unwrap_or_default();
+    let handle = || app.model.user(ws, id).map(|u| u.name.line().as_str().to_string()).unwrap_or_default();
     Some(Span::styled(avatar::initials(name, handle), app.theme.avatar(avatar::slot(id))))
 }
 

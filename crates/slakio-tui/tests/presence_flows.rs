@@ -28,7 +28,7 @@ fn presence_of(d: &Demo, name: &str) -> Presence {
     let model = &d.app.model;
     let Row::Conversation(i) = d.app.list_rows()[index_of(d, name)] else { unreachable!() };
     let ConversationKind::Dm { user } = &model.conversation(i).kind else { panic!("{name} is not a DM") };
-    model.user(user).expect("the peer").presence
+    model.user(&model.conversation(i).workspace, user).expect("the peer").presence
 }
 
 /// The index of the DM named `name` among the list's rows.

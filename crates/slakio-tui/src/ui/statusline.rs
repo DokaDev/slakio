@@ -40,7 +40,12 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
         Ctx::SignIn => Place::SignIn,
         Ctx::ViewSwitcher => Place::ViewSwitcher,
         // To-dos that cannot be known have nothing to filter or sort.
-        Ctx::List if app.shell.view == crate::app::shell::View::Todos && !app.model.saved_known() => Place::ListEmpty,
+        Ctx::List
+            if app.shell.view == crate::app::shell::View::Todos
+                && !app.shell.current(&app.model).is_some_and(|w| app.model.saved_known(&w.id)) =>
+        {
+            Place::ListEmpty
+        }
         Ctx::List => match app.shell.rows(&app.model).get(app.shell.list_cursor) {
             Some(Row::Section(_) | Row::Group(_)) => Place::ListSection,
             Some(Row::Filter) => Place::ListFilter,
@@ -149,7 +154,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     };
 
     // Where you are.
-    let ws = app.backend.and_then(|_| app.model.workspaces().get(app.shell.workspace));
+    let ws = app.backend.and_then(|_| app.shell.current(&app.model));
     let mut ws_name = ws.map(|w| w.name.line().into_string());
     let stripe = ws.map(|w| Span::styled("▌", t.workspace(w.color)));
     let main = app.work.home().and_then(|p| app.model.target(&p.target));

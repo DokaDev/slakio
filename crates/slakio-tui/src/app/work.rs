@@ -69,7 +69,9 @@ static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending:
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {
-    let author = model.user(&m.user).map_or_else(|| sanitize_line(m.user.as_str()), |u| u.display_name.line());
+    let author = model
+        .user(target.workspace(), &m.user)
+        .map_or_else(|| sanitize_line(m.user.as_str()), |u| u.display_name.line());
     let own = model.me(target.workspace()) == Some(&m.user);
     Shown::new(m, author, own)
 }
@@ -528,7 +530,7 @@ impl Work {
             return false;
         }
         let text = draft.take();
-        let author = model.user(&me).map_or_else(Safe::default, |u| u.display_name.line());
+        let author = model.user(target.workspace(), &me).map_or_else(Safe::default, |u| u.display_name.line());
         echo(&mut self.timelines.entry(&target).items, me, author, sanitize_block(&text));
         if let Some(p) = self.focused_mut() {
             p.echoed();

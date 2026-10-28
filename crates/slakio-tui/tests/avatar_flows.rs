@@ -155,7 +155,7 @@ fn a_dm_row_is_its_peers_chip_with_the_presence_mark_at_its_corner() {
         let x = list.x + 1;
         match &c.kind {
             ConversationKind::Dm { user } => {
-                let u = d.app.model.user(user).unwrap();
+                let u = d.app.model.user(&c.workspace, user).unwrap();
                 let slot = avatar::slot(user) % theme.avatars.len();
                 // A muted DM's chip is muted, on the group chip's background.
                 let bg = if c.muted { theme.avatar_muted().bg } else { theme.avatar(slot).bg };

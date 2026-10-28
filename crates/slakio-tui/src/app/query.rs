@@ -204,7 +204,7 @@ impl App {
 
     /// The workspace shown (index into the model's workspaces).
     pub fn workspace(&self) -> usize {
-        self.shell.workspace
+        self.shell.current(&self.model).and_then(|w| self.model.position(&w.id)).unwrap_or(0)
     }
 
     /// The view under the view switcher's cursor (index into [`super::shell::View::ALL`]).

@@ -66,7 +66,7 @@ pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use shell::Shell;
-use slakio_core::backend::{Capabilities, Generation};
+use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
 use status::{Level, Status};
 use std::time::{Duration, Instant};
@@ -142,8 +142,8 @@ pub struct App {
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: Option<signin::SignIn>,
-    /// The generation of the last boot request (older answers are dropped), and why it failed.
-    boot: (Generation, Option<slakio_core::backend::FailKind>),
+    /// The last boot request of each workspace (older answers are dropped), and why it failed.
+    boots: Vec<answers::Boot>,
     effects: Vec<Effect>,
     /// The last click (for a double click): when, and where.
     last_click: Option<(Instant, Position)>,
@@ -178,7 +178,7 @@ impl App {
             dialog: None,
             backend: None,
             sign_in: None,
-            boot: (Generation::default(), None),
+            boots: Vec::new(),
             effects: Vec::new(),
             last_click: None,
             tab_drag: None,

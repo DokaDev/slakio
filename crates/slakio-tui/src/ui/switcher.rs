@@ -32,8 +32,8 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         }
         let row = Rect { y, height: 1, ..inner };
         let unread = Unread {
-            mentions: app.model.workspace_mentions(i),
-            any: app.model.workspace_unread(i),
+            mentions: app.model.workspace_mentions(&w.id),
+            any: app.model.workspace_unread(&w.id),
             ..Unread::default()
         };
         let mark = unread.badge();
@@ -41,7 +41,7 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         let buf = f.buffer_mut();
         buf.set_string(row.x + 1, y, "▌", t.workspace(w.color));
         let room = usize::from(row.width).saturating_sub(4 + mark_w);
-        let name_style = if i == app.shell.workspace { t.current() } else { t.text() };
+        let name_style = if i == app.workspace() { t.current() } else { t.text() };
         buf.set_string(row.x + 2, y, clip(w.name.line().as_str(), room), name_style);
         if let Some(m) = &mark {
             let x = row.right().saturating_sub(mark_w as u16 + 1);

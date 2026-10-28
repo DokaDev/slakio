@@ -25,7 +25,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
     let focused = matches!(app.focus(), Focus::List | Focus::ViewSwitcher);
     let Some(parts) = app.list_parts() else { return };
     if let Some(chip) = app.chip_bar() {
-        let ws = app.model.workspaces().get(app.shell.workspace);
+        let ws = app.shell.current(&app.model);
         let title = t.title(focused);
         for p in &chip.pieces {
             let style = match p.part {
@@ -53,7 +53,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
             continue;
         };
         let shown = view == app.shell.view;
-        let own = app.view_unread(app.shell.workspace, view);
+        let own = app.view_unread(app.workspace(), view);
         let hidden = app.hidden_mark();
         let buf = f.buffer_mut();
         for p in &row.pieces {

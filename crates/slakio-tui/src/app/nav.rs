@@ -35,7 +35,7 @@ impl App {
     pub fn view_unread(&self, ws: usize, v: View) -> Unread {
         let Some(w) = self.model.workspaces().get(ws) else { return Unread::default() };
         if v == View::Todos {
-            let (todos, overdue) = self.model.todo_count(ws);
+            let (todos, overdue) = self.model.todo_count(&w.id);
             return Unread { todos, overdue, ..Unread::default() };
         }
         let mut u = Unread::default();
@@ -65,16 +65,16 @@ impl App {
     pub fn chip_bar(&self) -> Option<Bar> {
         self.backend?;
         let title = self.list_parts()?.title;
-        let ws = self.model.workspaces().get(self.shell.workspace)?;
-        let others = (0..self.model.workspaces().len())
-            .filter(|w| *w != self.shell.workspace)
+        let ws = self.shell.current(&self.model)?;
+        let others = (self.model.workspaces().iter())
+            .filter(|w| w.id != ws.id)
             .filter_map(|w| {
                 let u = Unread {
-                    mentions: self.model.workspace_mentions(w),
-                    any: self.model.workspace_unread(w),
+                    mentions: self.model.workspace_mentions(&w.id),
+                    any: self.model.workspace_unread(&w.id),
                     ..Unread::default()
                 };
-                let letter = self.model.workspaces()[w].name.line().as_str().chars().next()?.to_uppercase().to_string();
+                let letter = w.name.line().as_str().chars().next()?.to_uppercase().to_string();
                 u.badge().map(|m| (letter, m))
             })
             .collect();
@@ -102,7 +102,7 @@ impl App {
             .map(|v| Item {
                 glyph: icons.then(|| v.glyph()),
                 label: self.i18n.label(v.label()).to_string(),
-                badge: self.view_unread(self.shell.workspace, *v).badge(),
+                badge: self.view_unread(self.workspace(), *v).badge(),
             })
             .collect();
         let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
@@ -120,7 +120,7 @@ impl App {
         View::ALL
             .iter()
             .filter(|v| **v != self.shell.view)
-            .map(|v| (*v, self.view_unread(self.shell.workspace, *v)))
+            .map(|v| (*v, self.view_unread(self.workspace(), *v)))
             .filter(|(_, u)| u.badge().is_some())
             .max_by_key(|(_, u)| (u.level(), u.mentions, u.overdue))
     }
@@ -144,7 +144,7 @@ impl App {
     pub(super) fn open_switcher(&mut self) {
         if self.backend.is_some() && !self.model.workspaces().is_empty() {
             self.help = None;
-            self.switcher = Some(self.shell.workspace);
+            self.switcher = Some(self.workspace());
         }
     }
 

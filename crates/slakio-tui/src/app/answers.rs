@@ -3,18 +3,50 @@
 //! failed request ends what waited for it — the list's "Loading", a page asked for, a change to
 //! a saved item — and the status line says why; nothing waits for an answer that never comes.
 
-use super::model::Model;
+use super::model::{Model, SignedIn};
 use super::{App, Effect};
-use slakio_core::backend::{Capabilities, Command, Envelope, Event, FailKind, Generation, Request};
+use slakio_core::backend::{Capabilities, Command, Envelope, Event, FailKind, Generation, Request, Snapshot};
 use slakio_core::fault::Fault;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::model::WorkspaceId;
 use std::time::Instant;
 
+/// A boot asked for: of one workspace, or of every workspace the backend has (`None`).
+#[derive(Clone, Debug)]
+pub(crate) struct Boot {
+    pub workspace: Option<WorkspaceId>,
+    /// The last request (an answer to an older one is dropped).
+    pub id: Generation,
+    /// Why it failed, when it did.
+    pub failed: Option<FailKind>,
+    /// Nothing can be changed in the workspace.
+    pub read_only: bool,
+}
+
 impl App {
-    /// Use a backend that can do `caps`: asks it for the workspaces.
+    /// Use a backend that can do `caps`: asks it for every workspace at once.
     pub fn connect(&mut self, caps: Capabilities) {
         self.backend = Some(caps);
-        self.boot = (self.work.requests.ask(None, Command::Boot), None);
+        let id = self.work.requests.ask(None, Command::Boot);
+        self.boots = vec![Boot { workspace: None, id, failed: None, read_only: caps.read_only }];
+    }
+
+    /// Use a backend of the workspaces `signed` (signed in to, in the switcher's order), each
+    /// asked for on its own: one that fails or never answers holds none of the others back.
+    pub fn connect_workspaces(&mut self, caps: Capabilities, signed: &[SignedIn]) {
+        self.backend = Some(caps);
+        self.model.sign_ins(signed);
+        self.shell.clamp(&self.model, self.list_height());
+        self.work.clamp(&self.model);
+        self.boots = signed
+            .iter()
+            .map(|s| Boot {
+                workspace: Some(s.id.clone()),
+                id: self.work.requests.ask(Some(s.id.clone()), Command::Boot),
+                failed: None,
+                read_only: caps.read_only || s.read_only,
+            })
+            .collect();
     }
 
     /// The requests for the backend queued since the last call.
@@ -22,9 +54,16 @@ impl App {
         self.work.take_requests()
     }
 
-    /// The backend changes nothing: no change is offered.
+    /// The boot of the workspace shown (or of every workspace).
+    fn boot_here(&self) -> Option<&Boot> {
+        let ws = self.shell.current_id(&self.model);
+        let own = self.boots.iter().find(|b| b.workspace.is_some() && b.workspace == ws);
+        own.or_else(|| self.boots.iter().find(|b| b.workspace.is_none()))
+    }
+
+    /// Nothing can be changed in the workspace shown: no change is offered.
     pub fn read_only(&self) -> bool {
-        self.backend.is_some_and(|c| c.read_only)
+        self.backend.is_some_and(|c| c.read_only) || self.boot_here().is_some_and(|b| b.read_only)
     }
 
     /// Write in the focused pane's composer; a read-only backend sends nothing, so it says so
@@ -38,31 +77,43 @@ impl App {
     }
 
     /// What is shown came from the local cache and the backend has not answered with its own:
-    /// the list, or the active pane's messages.
+    /// the list of the workspace shown, or the active pane's messages.
     pub fn showing_cached(&self) -> bool {
-        self.model.is_cached() || self.work.active_cached()
+        self.shell.current(&self.model).is_some_and(|w| self.model.is_cached_in(&w.id)) || self.work.active_cached()
     }
 
-    /// Why the last request for the workspaces failed, if it did.
+    /// Why the last request for the workspace shown failed, if it did.
     pub fn boot_failed(&self) -> Option<&FailKind> {
-        self.boot.1.as_ref()
+        self.boot_here()?.failed.as_ref()
     }
 
-    /// What could not be loaded where retrying would ask again — the workspaces, else the active
-    /// pane's messages — and why; `None` when nothing failed there.
+    /// Why the last request for workspace `ws` failed, if it did.
+    pub fn boot_failed_in(&self, ws: &WorkspaceId) -> Option<&FailKind> {
+        let own = self.boots.iter().find(|b| b.workspace.as_ref() == Some(ws));
+        own.or_else(|| self.boots.iter().find(|b| b.workspace.is_none()))?.failed.as_ref()
+    }
+
+    /// What could not be loaded where retrying would ask again — the workspace shown, else the
+    /// active pane's messages — and why; `None` when nothing failed there.
     pub fn failed_here(&self) -> Option<&FailKind> {
-        self.boot.1.as_ref().or_else(|| self.work.active_failed())
+        self.boot_failed().or_else(|| self.work.active_failed())
     }
 
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
-    /// workspaces, else the active pane's messages. Only when asked: nothing retries on its own.
+    /// workspace shown, else the active pane's messages. Only when asked: nothing retries on its
+    /// own.
     pub(super) fn retry(&mut self, now: Instant) {
-        match &self.boot.1 {
-            Some(kind) if kind.retryable() => self.boot = (self.work.requests.ask(None, Command::Boot), None),
+        match self.boot_here().map(|b| (b.workspace.clone(), b.failed.clone())) {
+            Some((ws, Some(kind))) if kind.retryable() => {
+                let id = self.work.requests.ask(ws.clone(), Command::Boot);
+                if let Some(b) = self.boots.iter_mut().find(|b| b.workspace == ws) {
+                    (b.id, b.failed) = (id, None);
+                }
+            }
             // Asking again cannot help: say why once more.
-            Some(kind) => self.warn(Msg::Label(failure(kind)), now),
-            None if self.work.retry() => {}
-            None => self.info(Msg::Label(Label::StatusNothingToRetry), now),
+            Some((_, Some(kind))) => self.warn(Msg::Label(failure(&kind)), now),
+            _ if self.work.retry() => {}
+            _ => self.info(Msg::Label(Label::StatusNothingToRetry), now),
         }
     }
 
@@ -70,23 +121,10 @@ impl App {
     /// answer to an older request is dropped.
     pub fn on_backend(&mut self, envelope: Envelope, now: Instant) -> bool {
         let id = envelope.generation;
+        let boot = self.boots.iter().position(|b| b.id == id);
         match envelope.event {
-            Event::Booted(snapshot) if id == self.boot.0 => {
-                self.model = Model::new(*snapshot);
-                self.boot.1 = None;
-                self.shell.clamp(&self.model, self.list_height());
-                self.work.clamp(&self.model);
-                true
-            }
-            Event::Booted(_) => false,
-            // The cache's snapshot draws only while the backend's own has not come.
-            Event::CachedBoot(snapshot) if id == self.boot.0 && (!self.model.is_loaded() || self.model.is_cached()) => {
-                self.model = Model::cached(*snapshot);
-                self.shell.clamp(&self.model, self.list_height());
-                self.work.clamp(&self.model);
-                true
-            }
-            Event::CachedBoot(_) => false,
+            Event::Booted(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, false)),
+            Event::CachedBoot(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, true)),
             Event::CachedHistory(page) => {
                 self.model.add_users(&page.users);
                 self.work.on_cached_page(id, &page, &self.model)
@@ -101,11 +139,31 @@ impl App {
         }
     }
 
+    /// The answer of boot `b` (the cache's, when `cached`: drawn only while the backend's own
+    /// has not come). The list's cursor stays on the row it was on.
+    fn on_boot(&mut self, b: usize, snapshot: &Snapshot, cached: bool) -> bool {
+        let anchor = self.shell.anchor(&self.model);
+        match self.boots[b].workspace.clone() {
+            None if !cached => self.model = Model::new(snapshot.clone()),
+            None if !self.model.is_loaded() || self.model.is_cached() => self.model = Model::cached(snapshot.clone()),
+            Some(ws) if !cached || !self.model.is_fresh(&ws) => self.model.merge(&ws, snapshot, cached),
+            _ => return false,
+        }
+        if !cached {
+            self.boots[b].failed = None;
+        }
+        let h = self.list_height();
+        self.shell.clamp(&self.model, h);
+        self.shell.restore(anchor, &self.model, h);
+        self.work.clamp(&self.model);
+        true
+    }
+
     /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
-        let waited = if id == self.boot.0 {
-            self.boot.1 = Some(kind.clone());
+        let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
+            b.failed = Some(kind.clone());
             true
         } else {
             self.work.on_failed(id, kind.clone()) || self.on_save_failed(id)

@@ -59,9 +59,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let rows = app.shell.rows(&app.model);
     // Unknown is not empty: what could not be loaded, or is not available, says so.
     let faint = |l: Label| ratatui::text::Text::styled(app.i18n.label(l).to_string(), t.faint());
+    let ws = app.shell.current_id(&app.model);
     let unknown = match app.boot_failed() {
-        _ if app.model.is_loaded() => {
-            (app.shell.view == View::Todos && !app.model.saved_known()).then(|| faint(Label::ListUnavailable))
+        _ if ws.as_ref().is_some_and(|w| app.model.is_loaded_in(w)) => {
+            let known = ws.as_ref().is_some_and(|w| app.model.saved_known(w));
+            (app.shell.view == View::Todos && !known).then(|| faint(Label::ListUnavailable))
         }
         Some(kind) => Some(super::failed_text(app, Label::ListFailed, kind)),
         None => Some(faint(Label::ListLoading)),
@@ -175,7 +177,9 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             };
             // A DM shows its peer's presence in place of `@`: the shape tells it, the color helps.
             let presence = match &c.kind {
-                ConversationKind::Dm { user } => app.model.user(user).and_then(|u| presence_mark(u.presence)),
+                ConversationKind::Dm { user } => {
+                    app.model.user(&c.workspace, user).and_then(|u| presence_mark(u.presence))
+                }
                 _ => None,
             };
             let prefix = match presence {
@@ -200,7 +204,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             // With avatars, a DM starts with its peer's chip and the presence mark at its
             // corner, a group DM with a chip of how many people are in it; the name follows.
             let chip = avatars_on(app, c).then(|| match &c.kind {
-                ConversationKind::Dm { user } => avatar_chip(app, user, c.name.line().as_str()),
+                ConversationKind::Dm { user } => avatar_chip(app, &c.workspace, user, c.name.line().as_str()),
                 ConversationKind::GroupDm { users } => {
                     let n = if users.len() > 9 { "9+".to_string() } else { format!("{:<2}", users.len()) };
                     Some(Span::styled(n, t.avatar_group()))

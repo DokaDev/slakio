@@ -162,7 +162,7 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
         return out;
     }
     let art = Art::Initials(avatar::initials(m.author.as_str(), || {
-        app.model.user(&m.user).map(|u| u.name.line().as_str().to_string()).unwrap_or_default()
+        app.model.user(pane.target.workspace(), &m.user).map(|u| u.name.line().as_str().to_string()).unwrap_or_default()
     }));
     let art_style = t.avatar(avatar::slot(&m.user));
     let picture = |k: usize| -> Vec<Span<'static>> {
@@ -197,7 +197,8 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
     let group = grouped(pane, tl, i);
     let author_style = if m.own { t.own_author() } else { t.author() };
     let chip_column = avatar::WIDTH + 1;
-    let chip = if group { None } else { super::super::avatar_chip(app, &m.user, m.author.as_str()) };
+    let chip =
+        if group { None } else { super::super::avatar_chip(app, pane.target.workspace(), &m.user, m.author.as_str()) };
     let chip_w = if app.settings.avatars { chip_column } else { 0 };
     let stacked_chip = stacked && chip_w > 0 && w.saturating_sub(TIME_WIDTH + 2) > chip_column + 4;
     let (indent_w, text_w) = if stacked {
