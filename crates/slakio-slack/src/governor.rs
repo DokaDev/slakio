@@ -7,6 +7,10 @@
 //! * a **request cap** per minute, with a share that background work cannot use, so what the
 //!   user asked for goes first; a budget per hour; and a ceiling for the life of the process
 //!   that, once reached, stops all network until the program is started again;
+//! * **fair between workspaces** — each workspace's client has a [`Lane`] of its own: it holds
+//!   at most [`Limits::lane_in_flight`] of the slots and [`Limits::lane_waiting`] of the waiting
+//!   places, so one busy workspace never leaves another without a slot; the caps and budgets
+//!   are shared;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
 //!   one); the others go on.
@@ -63,6 +67,10 @@ pub struct Limits {
     pub in_flight: usize,
     /// Requests waiting for a slot; more are refused as busy.
     pub waiting: usize,
+    /// Of the slots, the most one workspace's lane holds at once.
+    pub lane_in_flight: usize,
+    /// Of the waiting places, the most one workspace's lane takes.
+    pub lane_waiting: usize,
 }
 
 impl Default for Limits {
@@ -74,6 +82,8 @@ impl Default for Limits {
             per_process: 10_000,
             in_flight: 8,
             waiting: 64,
+            lane_in_flight: 6,
+            lane_waiting: 48,
         }
     }
 }
@@ -152,10 +162,20 @@ impl std::fmt::Debug for Governor {
     }
 }
 
-/// A request let through: it holds a slot until dropped.
+/// A request let through: it holds a slot (and its lane's, when it came through one) until
+/// dropped.
 #[derive(Debug)]
 pub struct Admitted {
     _slot: OwnedSemaphorePermit,
+    _lane: Option<OwnedSemaphorePermit>,
+}
+
+/// One workspace's share of the rails ([`Governor::lane`]).
+#[derive(Debug)]
+pub struct Lane {
+    slots: Arc<Semaphore>,
+    waiting: AtomicUsize,
+    limit: usize,
 }
 
 impl Governor {
@@ -203,6 +223,37 @@ impl Governor {
         c.paused.get(&method).filter(|until| **until > now).map(|until| *until - now)
     }
 
+    /// A lane of its own for one workspace's requests.
+    pub fn lane(&self) -> Lane {
+        Lane {
+            slots: Arc::new(Semaphore::new(self.limits.lane_in_flight.clamp(1, self.limits.in_flight.max(1)))),
+            waiting: AtomicUsize::new(0),
+            limit: self.limits.lane_waiting,
+        }
+    }
+
+    /// [`Governor::admit`] for a request of `lane`: it first waits for one of its lane's slots
+    /// (refused as busy when its lane's waiting places are taken), then for one of the process's.
+    pub async fn admit_in(&self, lane: &Lane, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
+        let off = || SlackError::Offline { why: "the network is switched off" };
+        if !self.is_on() {
+            return Err(off());
+        }
+        if lane.waiting.fetch_add(1, Ordering::SeqCst) >= lane.limit {
+            lane.waiting.fetch_sub(1, Ordering::SeqCst);
+            return Err(SlackError::Busy);
+        }
+        let own = tokio::select! {
+            slot = Arc::clone(&lane.slots).acquire_owned() => slot.ok(),
+            () = self.stopped() => None,
+        };
+        lane.waiting.fetch_sub(1, Ordering::SeqCst);
+        let Some(own) = own else { return Err(off()) };
+        let mut admitted = self.admit(method, priority).await?;
+        admitted._lane = Some(own);
+        Ok(admitted)
+    }
+
     /// Let a request for `method` of `priority` through, waiting for a slot when all are
     /// taken: nothing may be sent without it.
     pub async fn admit(&self, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
@@ -230,7 +281,7 @@ impl Governor {
             return Err(off());
         }
         self.count(priority)?;
-        Ok(Admitted { _slot: slot })
+        Ok(Admitted { _slot: slot, _lane: None })
     }
 
     /// Count a request against the caps, or refuse it.

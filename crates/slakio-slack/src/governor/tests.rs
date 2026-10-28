@@ -148,3 +148,39 @@ fn a_rate_limited_method_waits_its_retry_after_and_the_others_go_on() {
         assert_eq!(g.sent(), 3, "a paused method is never counted");
     });
 }
+
+#[test]
+fn a_busy_workspace_never_takes_every_slot_from_another() {
+    rt().block_on(async {
+        let limits = Limits { in_flight: 4, lane_in_flight: 3, lane_waiting: 1, ..Limits::default() };
+        let (g, _) = governor(limits, true);
+        let (a, b) = (g.lane(), g.lane());
+        let mut held = Vec::new();
+        for _ in 0..3 {
+            held.push(g.admit_in(&a, M, Priority::User).await.unwrap());
+        }
+        // A's fourth waits for one of A's own slots, though the process has one free.
+        let waiting = g.admit_in(&a, M, Priority::User);
+        tokio::pin!(waiting);
+        assert!(tokio::time::timeout(Duration::from_millis(50), &mut waiting).await.is_err(), "A waits");
+        // Meanwhile B gets the free slot at once.
+        let b1 = tokio::time::timeout(Duration::from_millis(50), g.admit_in(&b, M, Priority::User)).await;
+        let b1 = b1.expect("B is not held back by A").unwrap();
+        // A's waiting places are taken by the one waiting: another of A's is refused as busy.
+        assert!(matches!(g.admit_in(&a, M, Priority::User).await, Err(SlackError::Busy)));
+        drop(held.pop());
+        let a4 = tokio::time::timeout(Duration::from_secs(1), &mut waiting).await.expect("A's turn").unwrap();
+        assert_eq!(g.sent(), 5);
+        drop((a4, b1, held));
+        // Switched off: a lane's waiting ends too.
+        let (g, _) = governor(Limits { in_flight: 1, lane_in_flight: 1, ..Limits::default() }, true);
+        let lane = g.lane();
+        let first = g.admit_in(&lane, M, Priority::User).await.unwrap();
+        let second = g.admit_in(&lane, M, Priority::User);
+        tokio::pin!(second);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut second).await.is_err());
+        g.stop();
+        assert!(matches!(second.await, Err(SlackError::Offline { .. })));
+        drop(first);
+    });
+}

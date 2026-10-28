@@ -176,13 +176,8 @@ fn at_80_columns_a_notice_and_the_cached_mark_leave_the_open_conversations_name_
 #[test]
 fn every_korean_cache_notice_fits_forty_cells() {
     use slakio_core::i18n::{I18n, Label, Lang};
-    let notices = [
-        Label::CacheRebuilt,
-        Label::CacheReadOnly,
-        Label::CacheInUse,
-        Label::CacheFailed,
-        Label::CacheBackupFailed,
-    ];
+    let notices =
+        [Label::CacheRebuilt, Label::CacheReadOnly, Label::CacheInUse, Label::CacheFailed, Label::CacheBackupFailed];
     for lang in [Lang::Ko] {
         let i18n = I18n::new(lang);
         for l in notices {

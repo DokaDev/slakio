@@ -1,8 +1,8 @@
 //! One workspace's client: every call passes the allowlist, then the process's rails
-//! ([`Governor`]), then goes out in the web client's format and comes back decoded.
+//! ([`Governor`], through this workspace's own lane of it), then goes out in the web client's format and comes back decoded.
 
 use crate::error::SlackError;
-use crate::governor::{Governor, Priority};
+use crate::governor::{Governor, Lane, Priority};
 use crate::method::Method;
 use crate::request::{Call, Endpoints, Ids, Os, RandomIds, Session, prepare};
 use crate::response::decode;
@@ -16,6 +16,8 @@ pub struct Client {
     credentials: Credentials,
     endpoints: Endpoints,
     governor: Arc<Governor>,
+    /// This workspace's share of the governor's slots.
+    lane: Lane,
     state: Mutex<(Session, RandomIds)>,
 }
 
@@ -23,7 +25,8 @@ impl Client {
     pub fn new(credentials: Credentials, endpoints: Endpoints, governor: Arc<Governor>) -> Self {
         let mut ids = RandomIds::default();
         let session = Session::new(&mut ids);
-        Self { credentials, endpoints, governor, state: Mutex::new((session, ids)) }
+        let lane = governor.lane();
+        Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)) }
     }
 
     /// Signed in to `team`: later requests carry it.
@@ -34,7 +37,7 @@ impl Client {
     /// Call `call` and decode its answer as `T`. With the network off, or the cap reached,
     /// nothing is sent; switching the network off while it is in flight ends it.
     pub async fn call<T: DeserializeOwned>(&self, call: &Call, priority: Priority) -> Result<T, SlackError> {
-        let _slot = self.governor.admit(call.method, priority).await?;
+        let _slot = self.governor.admit_in(&self.lane, call.method, priority).await?;
         let prepared = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;
