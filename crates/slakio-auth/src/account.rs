@@ -222,14 +222,28 @@ pub fn credentials(store: &dyn SecretStore, account: &Account) -> Result<Option<
     }
 }
 
+/// What signing out of every workspace did.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Forgotten {
+    /// The workspaces signed out of, those the file names first. One known by its team id alone
+    /// (an entry no file names) has that id as its name and no host.
+    pub accounts: Vec<Account>,
+    /// Why the store could not list its entries, when it could not: an entry no file names was
+    /// not looked for, so one may be left.
+    pub unlisted: Option<Fault>,
+}
+
 /// Sign out of every workspace: every secret-store entry found is removed — those `path` names,
 /// those a file that cannot be read (or one moved aside) names, and every other the store holds
-/// — then the files. The workspaces signed out of; one known by its team id alone is named by
-/// it. When an entry cannot be removed (or the store cannot list them), the files stay.
-pub fn forget(store: &dyn SecretStore, path: &Path) -> Result<Vec<Account>, Fault> {
+/// — then the files. When an entry cannot be removed, the files stay. When the store cannot list
+/// its entries but every one the files name is removed, the files go all the same and
+/// [`Forgotten::unlisted`] says so: running it again cannot find more until the store lists.
+pub fn forget(store: &dyn SecretStore, path: &Path) -> Result<Forgotten, Fault> {
     let _lock = locked(path)?;
     let mut accounts = load(path).unwrap_or_default();
-    let listed = store.accounts().map_err(|Unavailable(f)| f);
+    let listed = store
+        .accounts()
+        .map_err(|Unavailable(f)| Fault { detail: format!("listing slakio's keychain entries: {}", f.detail), ..f });
     let mut teams = salvaged(path);
     teams.extend(salvaged(&aside(path)));
     teams.extend(listed.clone().unwrap_or_default().into_iter().filter(|t| valid_team(t)));
@@ -241,14 +255,13 @@ pub fn forget(store: &dyn SecretStore, path: &Path) -> Result<Vec<Account>, Faul
     for a in &accounts {
         store.delete(&a.team).map_err(|Unavailable(f)| f)?;
     }
-    listed?;
     for file in [path.to_path_buf(), aside(path)] {
         match std::fs::remove_file(&file) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(Fault::io_at(&e, &file)),
             _ => {}
         }
     }
-    Ok(accounts)
+    Ok(Forgotten { accounts, unlisted: listed.err() })
 }
 
 #[cfg(test)]

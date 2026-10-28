@@ -7,11 +7,13 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 /// In-memory store. [`MemoryStore::failing`] behaves like a store that cannot be used (every
-/// call fails).
+/// call fails); [`MemoryStore::unlisted`] like one that cannot list its entries (a locked
+/// keychain searched without a prompt) but reads, writes and removes them.
 #[derive(Default)]
 pub struct MemoryStore {
     map: Mutex<HashMap<String, String>>,
     unavailable: Option<Fault>,
+    unlisted: Option<Fault>,
 }
 
 impl MemoryStore {
@@ -26,7 +28,12 @@ impl MemoryStore {
 
     /// Every call fails with `fault`.
     pub fn failing(fault: Fault) -> Self {
-        Self { map: Mutex::default(), unavailable: Some(fault) }
+        Self { map: Mutex::default(), unavailable: Some(fault), unlisted: None }
+    }
+
+    /// Listing the entries fails with `fault`; every other call works.
+    pub fn unlisted(fault: Fault) -> Self {
+        Self { unlisted: Some(fault), ..Self::default() }
     }
 
     fn check(&self) -> Result<std::sync::MutexGuard<'_, HashMap<String, String>>, Unavailable> {
@@ -49,6 +56,9 @@ impl SecretStore for MemoryStore {
         Ok(self.check()?.remove(account).is_some())
     }
     fn accounts(&self) -> Result<Vec<String>, Unavailable> {
+        if let Some(f) = &self.unlisted {
+            return Err(Unavailable(f.clone()));
+        }
         let mut all: Vec<String> = self.check()?.keys().cloned().collect();
         all.sort();
         Ok(all)

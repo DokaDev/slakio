@@ -322,6 +322,24 @@ fn signing_out_of_one_workspace_while_a_slakio_runs_changes_nothing_and_says_to_
 }
 
 #[test]
+fn signing_out_of_all_while_a_slakio_runs_says_the_cache_once_and_names_both_workspaces_shown() {
+    let m = Machine::new("logout-all-running", &[0, 1]);
+    let Some(run) = m.start(1, (100, 30), &[]) else { return };
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    let out = m.cli(&["logout", "--all"], "");
+    let said = text(&out);
+    assert!(!out.status.success(), "{said}");
+    for i in 0..2 {
+        let line = format!("Signed out of {}: its credentials are removed from the keychain\n", m.name(i));
+        assert!(said.contains(&line), "{said}");
+    }
+    assert_eq!(said.matches("cache is deleted").count(), 1, "one cache, said once: {said}");
+    assert!(said.contains("The local cache is deleted"), "{said}");
+    assert!(said.contains("still shows these workspaces: quit it"), "{said}");
+    run.quit();
+}
+
+#[test]
 fn signing_out_of_one_workspace_holds_the_cache_from_before_its_credentials_go() {
     let m = Machine::new("logout-held", &[0, 1]);
     let Some(run) = m.start(1, (100, 30), &[]) else { return };

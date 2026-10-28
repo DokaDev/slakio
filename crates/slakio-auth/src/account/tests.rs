@@ -28,10 +28,10 @@ fn signing_in_keeps_the_secret_in_the_store_and_only_names_in_the_file() {
     assert!(!text.contains(TOKEN) && !text.contains(COOKIE), "{text}");
     assert_eq!(load(&path).unwrap(), vec![account()]);
     assert_eq!(credentials(&store, &account()).unwrap(), Some(creds));
-    assert_eq!(forget(&store, &path).unwrap(), vec![account()]);
+    assert_eq!(forget(&store, &path).unwrap().accounts, vec![account()]);
     assert!(!path.exists());
     assert_eq!(store.get("T0TEST"), Ok(None));
-    assert_eq!(forget(&store, &path).unwrap(), vec![], "signing out twice is not an error");
+    assert_eq!(forget(&store, &path).unwrap().accounts, vec![], "signing out twice is not an error");
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn signing_in_to_another_workspace_keeps_the_first_and_signing_out_of_one_keeps_
     // The last one: the file goes too.
     assert_eq!(forget_one(&store, &path, "T1OTHER").unwrap(), Some(other));
     assert!(!path.exists());
-    assert_eq!(forget(&store, &path).unwrap(), vec![]);
+    assert_eq!(forget(&store, &path).unwrap().accounts, vec![]);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn signing_out_of_every_workspace_removes_every_secret() {
     let other = Account { team: "T1OTHER".into(), ..account() };
     keep(&store, &path, &account(), &creds).unwrap();
     keep(&store, &path, &other, &creds).unwrap();
-    assert_eq!(forget(&store, &path).unwrap(), vec![account(), other]);
+    assert_eq!(forget(&store, &path).unwrap().accounts, vec![account(), other]);
     assert_eq!((store.get("T0TEST"), store.get("T1OTHER")), (Ok(None), Ok(None)));
 }
 
@@ -133,14 +133,14 @@ fn an_unreadable_file_is_moved_aside_and_signing_out_of_all_still_finds_its_work
     assert!(kept.contains("T0TEST") && kept.contains("T1OTHER"), "not written over: {kept}");
     // An entry no file names (left by an earlier failure) goes too.
     store.set("T3ORPHAN", "v1\na\nb\n").unwrap();
-    let gone: Vec<String> = forget(&store, &path).unwrap().into_iter().map(|a| a.team).collect();
+    let gone: Vec<String> = forget(&store, &path).unwrap().accounts.into_iter().map(|a| a.team).collect();
     assert_eq!(gone, ["T2THIRD", "T0TEST", "T1OTHER", "T3ORPHAN"]);
     assert_eq!(store.accounts().unwrap(), Vec::<String>::new(), "no secret is left");
     assert!(!path.exists() && !aside(&path).exists());
     // Unreadable and not moved aside yet: its team ids are found all the same.
     keep(&store, &path, &account(), &creds).unwrap();
     std::fs::write(&path, "[[workspace]]\nteam = \"T0TEST\"\n").unwrap();
-    assert_eq!(forget(&store, &path).unwrap().len(), 1);
+    assert_eq!(forget(&store, &path).unwrap().accounts.len(), 1);
     assert_eq!(store.get("T0TEST"), Ok(None));
 }
 
@@ -189,4 +189,24 @@ fn the_workspaces_files_are_readable_by_this_user_alone() {
     keep(&store, &path, &account(), &Credentials::new(TOKEN, COOKIE)).unwrap();
     assert_eq!(mode(&aside(&path)), 0o600, "workspaces.toml.unreadable");
     assert_eq!(mode(&path), 0o600);
+}
+
+#[test]
+fn signing_out_of_all_when_the_store_cannot_list_finishes_and_says_what_was_not_looked_for() {
+    let path = scratch("unlisted");
+    let store = MemoryStore::unlisted(Fault::new(FaultKind::SecretStore, "interaction not allowed"));
+    let creds = Credentials::new(TOKEN, COOKIE);
+    let other = Account { team: "T1OTHER".into(), ..account() };
+    keep(&store, &path, &account(), &creds).unwrap();
+    keep(&store, &path, &other, &creds).unwrap();
+    let done = forget(&store, &path).unwrap();
+    assert_eq!(done.accounts, vec![account(), other], "every entry the file names is removed");
+    assert_eq!((store.get("T0TEST"), store.get("T1OTHER")), (Ok(None), Ok(None)));
+    let why = done.unlisted.expect("it says the entries could not be listed");
+    assert!(why.detail.contains("listing") && why.detail.contains("interaction not allowed"), "{why:?}");
+    assert!(!path.exists(), "the files go: nothing more can be found until the store lists");
+    // A store that lists says nothing of the kind.
+    let (store, path) = (MemoryStore::new(), scratch("listed"));
+    keep(&store, &path, &account(), &creds).unwrap();
+    assert_eq!(forget(&store, &path).unwrap().unlisted, None);
 }

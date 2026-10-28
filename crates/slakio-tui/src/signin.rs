@@ -137,9 +137,11 @@ fn sign_out_one(
 
 /// `slakio logout --all` (or of the one workspace there is): every signed-in workspace's
 /// credentials leave the store, then the file, and the local cache goes whether or not that
-/// worked: nothing of the sign-in is left. What it says names the cache only when it is gone. A
-/// slakio still running keeps showing what it showed until it is quit, so the user is told to
-/// quit it (and the exit says failure).
+/// worked: nothing of the sign-in is left. What it says names the cache only when it is gone,
+/// once (it is one cache), and a keychain entry no workspace names by its team id. When the
+/// keychain could not be searched for such entries, it says so and still ends well: the ones the
+/// file names are gone. A slakio still running keeps showing what it showed until it is quit,
+/// so the user is told to quit it (and the exit says failure).
 fn sign_out_all(store: &dyn SecretStore, path: Option<&std::path::Path>, i18n: &i18n::I18n, paths: &Paths) -> ExitCode {
     let errors = || ErrorLog::new(paths.errors_log());
     let forgot = path.map(|p| account::forget(store, p));
@@ -147,18 +149,20 @@ fn sign_out_all(store: &dyn SecretStore, path: Option<&std::path::Path>, i18n: &
     let cache = crate::store::remove(paths);
     let gone = cache.is_ok();
     let mut ok = gone;
+    let mut several = false;
     match forgot {
-        None => println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept })),
-        Some(Ok(names)) if names.is_empty() => {
-            println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept }));
-        }
-        Some(Ok(names)) => {
-            for a in names {
-                let workspace = shown(&a.name);
-                let msg = if gone { Msg::LogoutDone { workspace } } else { Msg::LogoutDoneCacheKept { workspace } };
-                println!("{}", i18n.msg(&msg));
+        Some(Ok(done)) if !done.accounts.is_empty() => {
+            several = done.accounts.len() > 1;
+            for line in signed_out_lines(i18n, &done.accounts, gone) {
+                println!("{line}");
             }
+            unlisted(i18n, paths, done.unlisted);
         }
+        Some(Ok(done)) => {
+            println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept }));
+            unlisted(i18n, paths, done.unlisted);
+        }
+        None => println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept })),
         Some(Err(fault)) => {
             errors().record("logout", &fault);
             eprintln!("{}", i18n.label(Label::LogoutFailed));
@@ -170,10 +174,43 @@ fn sign_out_all(store: &dyn SecretStore, path: Option<&std::path::Path>, i18n: &
         eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
     }
     if running {
-        eprintln!("{}", i18n.label(Label::LogoutStillRunning));
+        eprintln!("{}", i18n.label(if several { Label::LogoutStillRunningSeveral } else { Label::LogoutStillRunning }));
         ok = false;
     }
     if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+}
+
+/// What signing out of `accounts` says, one line each, then (when the cache is `gone` too) that
+/// it is deleted: with one workspace, on its line; with several, once at the end. A keychain
+/// entry no workspace names (no host) is named by its team id.
+fn signed_out_lines(i18n: &i18n::I18n, accounts: &[account::Account], gone: bool) -> Vec<String> {
+    let several = accounts.len() > 1;
+    let mut lines: Vec<String> = accounts
+        .iter()
+        .map(|a| {
+            let workspace = if a.host.is_empty() {
+                i18n.msg(&Msg::LogoutUnnamed { team: a.team.clone() }).to_string()
+            } else {
+                shown(&a.name)
+            };
+            let msg =
+                if gone && !several { Msg::LogoutDone { workspace } } else { Msg::LogoutDoneCacheKept { workspace } };
+            i18n.msg(&msg).to_string()
+        })
+        .collect();
+    if gone && several {
+        lines.push(i18n.label(Label::LogoutCacheDeleted).to_string());
+    }
+    lines
+}
+
+/// The keychain could not be searched for entries no workspace names (`why`): one warning line,
+/// and the reason in the error log.
+fn unlisted(i18n: &i18n::I18n, paths: &Paths, why: Option<slakio_core::fault::Fault>) {
+    if let Some(fault) = why {
+        ErrorLog::new(paths.errors_log()).record("logout", &fault);
+        eprintln!("{}", i18n.label(Label::LogoutUnlisted));
+    }
 }
 
 /// `SLAKIO_TEST_CREDENTIALS` (`<team>|<token>|<cookie>`, several separated by `;`), debug builds
@@ -214,5 +251,54 @@ pub(crate) fn sign_in_piped(wiring: &crate::Wiring, i18n: &i18n::I18n) -> ExitCo
             eprintln!("{}", i18n.label(why));
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn named(team: &str, name: &str) -> account::Account {
+        account::Account { team: team.into(), name: name.into(), host: format!("{name}.slack.com"), user: "U1".into() }
+    }
+
+    #[test]
+    fn signing_out_of_all_says_the_cache_is_deleted_once_and_names_an_unnamed_entry_by_its_team() {
+        let unnamed = account::Account {
+            team: "TORPHAN1".into(),
+            name: "TORPHAN1".into(),
+            host: String::new(),
+            user: String::new(),
+        };
+        let all = [named("T1", "a-team"), named("T2", "b-team"), unnamed];
+        let en = i18n::I18n::new(i18n::Lang::En);
+        let lines = signed_out_lines(&en, &all, true);
+        assert_eq!(
+            lines,
+            [
+                "Signed out of a-team: its credentials are removed from the keychain",
+                "Signed out of b-team: its credentials are removed from the keychain",
+                "Signed out of team TORPHAN1 (not in the workspaces file): its credentials are removed from the keychain",
+                "The local cache is deleted",
+            ]
+        );
+        // Korean says it the same way: once, at the end; the entry by its team id.
+        let ko = i18n::I18n::new(i18n::Lang::Ko);
+        let lines = signed_out_lines(&ko, &all, true);
+        let cache = ko.label(Label::LogoutCacheDeleted).to_string();
+        assert_eq!(lines.iter().filter(|l| l.contains(&cache)).count(), 1, "{lines:?}");
+        assert_eq!(lines.last(), Some(&cache));
+        assert!(
+            lines[2].contains("TORPHAN1")
+                && lines[2].contains(&*ko.msg(&Msg::LogoutUnnamed { team: "TORPHAN1".into() }))
+        );
+        // The cache kept: no line says it is deleted.
+        assert!(signed_out_lines(&en, &all, false).iter().all(|l| !l.contains("cache")));
+        // One workspace: one line, the cache on it.
+        let one = signed_out_lines(&en, &[named("T1", "a-team")], true);
+        assert_eq!(
+            one,
+            ["Signed out of a-team: its credentials are removed from the keychain, and the local cache is deleted"]
+        );
     }
 }

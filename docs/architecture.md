@@ -275,9 +275,12 @@ with `Space`); the ones signed in to before keep their entries. `slakio logout <
 removes that workspace's keychain entry, its line of the file and its part of the cache;
 `slakio logout --all` (or with one workspace, `slakio logout`) removes every keychain entry it
 finds — those the file names, the team ids of a file that cannot be read, and every other entry
-of the `slakio` service — and then the file, so nothing is left behind. A `workspaces.toml` that
+of the `slakio` service — and then the file, so nothing is left behind. When the keychain cannot
+be listed (locked, no prompt possible) but every entry the file names is removed, it still ends
+well and warns that entries no workspace names were not looked for. A `workspaces.toml` that
 cannot be read is never written over: signing in moves it aside to `workspaces.toml.unreadable`
-first. Changes of the file hold `workspaces.lock` beside it, and `slakio logout <workspace>`
+first. Both are written readable by the user alone (`0600`), and so is `workspaces.lock`.
+Changes of the file hold `workspaces.lock` beside it, and `slakio logout <workspace>`
 holds the cache as its writer from before the credentials go until the part is removed. The paste and the credentials are wiped from memory when dropped (`zeroize`);
 the parser reads the paste in one pass and gives up on more than a few candidate values. With `SLAKIO_SECRET_STORE=memory` (every test)
 the keychain is never touched. A debug build may sign in to a fake Slack on the loopback address
