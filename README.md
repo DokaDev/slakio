@@ -204,8 +204,8 @@ again from nothing.
 - A second slakio while one runs reads the cache but does not write it, and says so. A cache that
   cannot be read (damaged, or written by a newer slakio) is started again from nothing, with one
   line in the status line (shown after any other notice, so each is seen). `slakio logout`
-  removes it, also when the keychain could not be changed; quit a running slakio first (logout
-  says so when one runs). Deleting the directory is always safe.
+  removes it, also when the keychain could not be changed, and says so; a slakio still running
+  keeps showing the workspace until it is quit (logout says so when one runs). Deleting the directory is always safe.
 
 ## Install
 

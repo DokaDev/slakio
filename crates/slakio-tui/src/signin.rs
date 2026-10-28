@@ -40,9 +40,9 @@ pub(crate) fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<
 }
 
 /// `slakio logout`: every signed-in workspace's credentials leave the store, then the file, and
-/// the local cache goes whether or not that worked: nothing of the sign-in is left. A slakio
-/// still running keeps what it shows, so the user is told to quit it (and the exit says
-/// failure).
+/// the local cache goes whether or not that worked: nothing of the sign-in is left. What it says
+/// names the cache only when it is gone. A slakio still running keeps showing what it showed
+/// until it is quit, so the user is told to quit it (and the exit says failure).
 pub(crate) fn sign_out(
     store: &dyn SecretStore,
     path: Option<&std::path::Path>,
@@ -50,13 +50,21 @@ pub(crate) fn sign_out(
     paths: &Paths,
 ) -> ExitCode {
     let errors = || ErrorLog::new(paths.errors_log());
-    let mut ok = true;
-    match path.map(|p| account::forget(store, p)) {
-        None => println!("{}", i18n.label(Label::LogoutNone)),
-        Some(Ok(gone)) if gone.is_empty() => println!("{}", i18n.label(Label::LogoutNone)),
-        Some(Ok(gone)) => {
-            for a in gone {
-                println!("{}", i18n.msg(&Msg::LogoutDone { workspace: shown(&a.name) }));
+    let forgot = path.map(|p| account::forget(store, p));
+    let running = crate::store::in_use(paths);
+    let cache = crate::store::remove(paths);
+    let gone = cache.is_ok();
+    let mut ok = gone;
+    match forgot {
+        None => println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept })),
+        Some(Ok(names)) if names.is_empty() => {
+            println!("{}", i18n.label(if gone { Label::LogoutNone } else { Label::LogoutNoneCacheKept }));
+        }
+        Some(Ok(names)) => {
+            for a in names {
+                let workspace = shown(&a.name);
+                let msg = if gone { Msg::LogoutDone { workspace } } else { Msg::LogoutDoneCacheKept { workspace } };
+                println!("{}", i18n.msg(&msg));
             }
         }
         Some(Err(fault)) => {
@@ -65,11 +73,9 @@ pub(crate) fn sign_out(
             ok = false;
         }
     }
-    let running = crate::store::in_use(paths);
-    if let Err(fault) = crate::store::remove(paths) {
+    if let Err(fault) = cache {
         errors().record("logout", &fault);
         eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
-        ok = false;
     }
     if running {
         eprintln!("{}", i18n.label(Label::LogoutStillRunning));

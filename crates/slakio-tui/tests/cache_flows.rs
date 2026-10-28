@@ -401,7 +401,7 @@ fn a_second_slakio_draws_from_the_cache_without_writing_it_and_says_so() {
     let Some(first) = m.start(2, &[]) else { return };
     first.wait_for("the first one up", |t| t.contains("backend"));
     let Some(second) = m.start(3, &[]) else { return };
-    second.wait_for("the notice", |t| t.contains("Another slakio runs: cache read only"));
+    second.wait_for("the notice", |t| t.contains("Another slakio is open: cache not updated"));
     second.wait_for("the cached list", |t| t.contains("backend"));
     second.quit();
     first.quit();
@@ -431,7 +431,7 @@ fn a_cache_that_is_not_a_database_is_started_again_with_one_notice() {
     }
     damage(&m);
     let Some(run) = m.start(2, &[]) else { return };
-    run.wait_for("the notice", |t| t.contains("Cache unreadable: started again"));
+    run.wait_for("the notice", |t| t.contains("The cache was damaged: it starts empty"));
     run.wait_for("the workspace, fetched again", |t| t.contains("backend"));
     run.quit();
     let log = std::fs::read_to_string(m.dir.join("state").join("slakio").join("errors.log")).unwrap();
@@ -439,7 +439,7 @@ fn a_cache_that_is_not_a_database_is_started_again_with_one_notice() {
     // Set up again and written: the next start draws from it.
     let Some(run) = m.start(3, &[("SLAKIO_NETWORK", "off")]) else { return };
     run.wait_for("the cached list", |t| t.contains("backend") && t.contains("cached"));
-    assert!(!run.output().contains("Cache unreadable"));
+    assert!(!run.output().contains("The cache was damaged"));
     run.quit();
 }
 
@@ -490,7 +490,7 @@ fn a_cache_notice_is_seen_after_the_offline_warning_that_comes_at_the_same_time(
     damage(&m);
     let Some(run) = m.start(2, &[("SLAKIO_NETWORK", "off")]) else { return };
     run.wait_for("why nothing is fetched", |t| t.contains(OFFLINE));
-    run.wait_for("the cache's notice, after it", |t| t.contains("Cache unreadable: started again"));
+    run.wait_for("the cache's notice, after it", |t| t.contains("The cache was damaged: it starts empty"));
     run.quit();
 }
 
@@ -504,7 +504,7 @@ fn a_second_slakio_offline_still_says_it_reads_the_cache_only() {
     first.wait_for("the first one up", |t| t.contains("backend"));
     let Some(second) = m.start(3, &[("SLAKIO_NETWORK", "off")]) else { return };
     second.wait_for("why nothing is fetched", |t| t.contains(OFFLINE));
-    second.wait_for("the cache's notice, after it", |t| t.contains("Another slakio runs: cache read only"));
+    second.wait_for("the cache's notice, after it", |t| t.contains("Another slakio is open: cache not updated"));
     second.quit();
     first.quit();
 }
@@ -518,7 +518,7 @@ fn two_cache_notices_at_once_are_each_seen() {
     damage(&m);
     failing_tmutil(&m);
     let Some(run) = m.start(2, &[]) else { return };
-    run.wait_for("the first notice", |t| t.contains("Cache unreadable: started again"));
+    run.wait_for("the first notice", |t| t.contains("The cache was damaged: it starts empty"));
     run.wait_for("the second one, after it", |t| t.contains("Cache not kept out of Time Machine"));
     run.quit();
 }
@@ -564,9 +564,17 @@ fn logout_while_a_slakio_runs_removes_the_cache_and_says_to_quit_it() {
     let Some(run) = m.start(2, &[]) else { return };
     run.wait_for("it up", |t| t.contains("backend"));
     let out = m.logout();
-    let said = String::from_utf8_lossy(&out.stderr).into_owned();
+    let (done, said) =
+        (String::from_utf8_lossy(&out.stdout).into_owned(), String::from_utf8_lossy(&out.stderr).into_owned());
     assert!(!out.status.success(), "{said}");
-    assert!(said.contains("A slakio is still running: quit it"), "{said}");
+    assert!(done.contains("removed from the keychain, and the local cache is deleted"), "{done}");
+    assert!(said.contains("A slakio is still running and still shows this workspace: quit it"), "{said}");
+    assert!(!said.contains("logout again"), "nothing is left for a second logout: {said}");
     assert!(!m.store_dir().join("cache.sqlite3").exists(), "removed all the same");
     run.quit();
+    // Run again all the same: it says nothing is left, not only that nobody is signed in.
+    let again = m.logout();
+    assert!(again.status.success(), "{}", String::from_utf8_lossy(&again.stderr));
+    let again = String::from_utf8_lossy(&again.stdout).into_owned();
+    assert!(again.contains("Not signed in: no local cache is left"), "{again}");
 }

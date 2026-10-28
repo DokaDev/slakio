@@ -9,7 +9,7 @@ read-only, one workspace, no live updates yet; not affiliated with or endorsed b
 
 usage: slakio [--demo] [--offline] [--config <path>]
        slakio login [--paste]   sign in (from the Slack desktop app, or a paste)
-       slakio logout            sign out: remove the credentials from the keychain
+       slakio logout            sign out: remove the credentials and the local cache
 
   --demo             try the interface with an invented workspace (nothing
                      connects anywhere)
