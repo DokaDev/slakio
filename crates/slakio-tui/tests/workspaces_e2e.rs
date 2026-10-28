@@ -287,17 +287,18 @@ fn signing_in_from_the_app_adds_the_workspace_and_keeps_the_one_signed_in_to() {
         return;
     };
     run.wait_for("the paste screen", |t| t.contains("Waiting for the paste"));
+    run.wait_for("it says A stays", |t| t.contains("this adds another workspace") && t.contains(&m.name(0)));
     let paste = format!(
         "curl 'https://{}/api/client.counts' -H 'cookie: b=1; d={COOKIE}' --data-raw 'token={TOKEN}'",
         HOSTS[1]
     );
     run.type_bytes(format!("\x1b[200~{paste}\x1b[201~").as_bytes());
     run.wait_for("signed in to B", |t| t.contains(&format!("Signed in to {}", m.name(1))));
-    // Both are listed and booted: A, signed in to before, first.
-    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    // Both are listed and booted, A (signed in to before) first; B, just added, is shown.
     wait_until("B booted", || m.methods(1).iter().filter(|x| *x == "client.userBoot").count() >= 2);
-    run.type_bytes(b" Wj\r");
     run.wait_for("B's channels", |t| t.contains(&m.channel(1)));
+    run.type_bytes(b" Wk\r");
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
     run.quit();
     let file = m.file();
     assert!(file.contains(HOSTS[0]) && file.contains(HOSTS[1]), "{file}");

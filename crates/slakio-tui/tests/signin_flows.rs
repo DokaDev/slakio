@@ -103,7 +103,7 @@ fn once_signed_in_the_app_connects_and_says_where() {
         SignedIn { id: WorkspaceId::new("T1"), name: "Kept".into(), read_only: true },
         SignedIn { id: WorkspaceId::new("T2"), name: "Example".into(), read_only: true },
     ];
-    app.signed_in(Capabilities { demo: false, read_only: false }, &signed, &["Example".into()], now);
+    app.signed_in(Capabilities { demo: false, read_only: false }, &signed, None, &["Example".into()], now);
     assert_eq!(app.sign_in(), None);
     assert!(app.read_only(), "each workspace is read-only");
     let asked = app.take_commands();
@@ -111,6 +111,33 @@ fn once_signed_in_the_app_connects_and_says_where() {
     assert_eq!(boots, vec![Some(signed[0].id.clone()), Some(signed[1].id.clone())], "each workspace is asked for");
     assert!(screen(&app, 100, 30, now).contains("Signed in to Example"));
     assert_eq!(app.model.workspaces().len(), 2, "the one signed in to before stays listed");
+}
+
+#[test]
+fn signing_in_beside_a_workspace_says_it_adds_one_and_lands_on_the_one_added() {
+    let now = Instant::now();
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.sign_in_beside(vec!["A company".into()]);
+    app.offer_sign_in(None);
+    let said = "Signed in to A company already: this adds another workspace";
+    for (w, h) in [(120, 40), (80, 24)] {
+        assert!(screen(&app, w, h, now).contains(said), "{w}x{h}: {}", screen(&app, w, h, now));
+    }
+    app.offer_desktop(vec![PickerRow { team: "T2".into(), name: "B side".into(), host: "b.slack.com".into() }]);
+    assert!(screen(&app, 120, 40, now).contains(said), "the picker says it too");
+    // Nothing is said at the first sign-in.
+    let mut first = App::new(Lang::En, Theme::terminal());
+    first.offer_sign_in(None);
+    assert!(!screen(&first, 120, 40, now).contains("already"));
+    // Signed in: the one just added is shown, the first stays first in the switcher.
+    let signed = [
+        SignedIn { id: WorkspaceId::new("T1"), name: "A company".into(), read_only: true },
+        SignedIn { id: WorkspaceId::new("T2"), name: "B side".into(), read_only: true },
+    ];
+    app.signed_in(Capabilities { demo: false, read_only: true }, &signed, Some(&signed[1].id), &["B side".into()], now);
+    assert_eq!(app.workspace(), 1, "B, just added, is shown");
+    assert_eq!(app.model.workspaces()[0].id, signed[0].id);
+    assert!(app.signed_in_already().is_empty(), "signing in is done");
 }
 
 #[test]

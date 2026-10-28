@@ -12,6 +12,7 @@ use crate::action::SignInAction;
 use crate::keymap::Ctx;
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::model::WorkspaceId;
 use std::time::Instant;
 
 /// Where signing in stands.
@@ -28,6 +29,14 @@ pub enum SignIn {
     Checking,
     /// The last paste did not sign in, for this reason; another may.
     Failed(Label),
+}
+
+/// Signing in as the app offers it: where it stands (`None` when it is not offered), and the
+/// workspaces signed in to already, which stay (what is signed in to is added beside them).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Offer {
+    pub state: Option<SignIn>,
+    pub beside: Vec<String>,
 }
 
 /// One workspace of the desktop picker: its team id, its name and its host (Slack's text,
@@ -91,51 +100,72 @@ impl App {
     /// No workspace is signed in: the screen offers the paste flow, with `why` the last attempt
     /// (or reading the keychain) failed, if it did.
     pub fn offer_sign_in(&mut self, why: Option<Label>) {
-        self.sign_in = Some(why.map_or(SignIn::Waiting, SignIn::Failed));
+        self.sign_in.state = Some(why.map_or(SignIn::Waiting, SignIn::Failed));
     }
 
     /// Offer the desktop app's signed-in workspaces as a picker. The pick is reported by team id.
     pub fn offer_desktop(&mut self, rows: Vec<PickerRow>) {
-        self.sign_in = Some(SignIn::Desktop(Picker { rows, selected: 0, marked: Vec::new(), note: None }));
+        self.sign_in.state = Some(SignIn::Desktop(Picker { rows, selected: 0, marked: Vec::new(), note: None }));
+    }
+
+    /// Signing in adds a workspace beside `workspaces` (signed in to already, Slack's names,
+    /// already sanitised), which stay signed in: the screen says so.
+    pub fn sign_in_beside(&mut self, workspaces: Vec<String>) {
+        self.sign_in.beside = workspaces;
+    }
+
+    /// The workspaces signed in to already that signing in adds one beside (none at first).
+    pub fn signed_in_already(&self) -> &[String] {
+        &self.sign_in.beside
     }
 
     /// Where signing in stands; `None` when the app does not offer it.
     pub fn sign_in(&self) -> Option<SignIn> {
-        self.sign_in.clone()
+        self.sign_in.state.clone()
     }
 
     /// The paste being checked did not sign in, for `why`.
     pub fn sign_in_failed(&mut self, why: Label) {
-        match &self.sign_in {
+        match &self.sign_in.state {
             // A desktop pick that failed returns to the picker with the reason shown.
             Some(SignIn::DesktopChecking(p)) => {
                 let mut p = p.clone();
                 p.note = Some(why);
-                self.sign_in = Some(SignIn::Desktop(p));
+                self.sign_in.state = Some(SignIn::Desktop(p));
             }
-            Some(_) => self.sign_in = Some(SignIn::Failed(why)),
+            Some(_) => self.sign_in.state = Some(SignIn::Failed(why)),
             None => {}
         }
     }
 
     /// Signed in to `workspaces` (Slack's names, already sanitised), the ones of `signed` that
-    /// are new: the app connects to the backend of every workspace of `signed`, which can do
-    /// `caps`.
-    pub fn signed_in(&mut self, caps: Capabilities, signed: &[SignedIn], workspaces: &[String], now: Instant) {
-        self.sign_in = None;
+    /// are new, the first of them `added`: the app connects to the backend of every workspace of
+    /// `signed`, which can do `caps`, and shows the one just added.
+    pub fn signed_in(
+        &mut self,
+        caps: Capabilities,
+        signed: &[SignedIn],
+        added: Option<&WorkspaceId>,
+        workspaces: &[String],
+        now: Instant,
+    ) {
+        self.sign_in = Offer::default();
         self.connect_workspaces(caps, signed);
+        if let Some(at) = added.and_then(|ws| signed.iter().position(|s| &s.id == ws)) {
+            self.shell.select_workspace(at, &self.model);
+        }
         self.info(Msg::SigninSignedIn { workspace: workspaces.join(", ") }, now);
     }
 
     /// The desktop picker has the keyboard (its keys are [`Ctx::SignIn`]'s).
     pub(super) fn picking(&self) -> bool {
-        matches!(self.sign_in, Some(SignIn::Desktop(_)))
+        matches!(self.sign_in.state, Some(SignIn::Desktop(_)))
     }
 
     /// An action of the desktop picker: move, pick (the binary reads and checks that workspace),
     /// or switch to the paste flow.
     pub(super) fn sign_in_action(&mut self, a: SignInAction) {
-        let Some(SignIn::Desktop(p)) = &mut self.sign_in else { return };
+        let Some(SignIn::Desktop(p)) = &mut self.sign_in.state else { return };
         match a {
             SignInAction::Down => p.selected = (p.selected + 1).min(p.rows.len().saturating_sub(1)),
             SignInAction::Up => p.selected = p.selected.saturating_sub(1),
@@ -152,7 +182,7 @@ impl App {
                     return;
                 }
                 let p = Picker { note: None, ..p.clone() };
-                self.sign_in = Some(SignIn::DesktopChecking(p));
+                self.sign_in.state = Some(SignIn::DesktopChecking(p));
                 self.effects.push(Effect::DesktopPick(teams));
             }
             SignInAction::Paste => self.offer_sign_in(None),
@@ -165,15 +195,15 @@ impl App {
     pub(super) fn paste(&mut self, text: String) {
         match self.key_context() {
             Ctx::SignIn => {
-                self.sign_in = Some(SignIn::Checking);
+                self.sign_in.state = Some(SignIn::Checking);
                 self.effects.push(Effect::SignIn(Pasted(text)));
             }
-            Ctx::Root if matches!(self.sign_in, Some(SignIn::Waiting | SignIn::Failed(_))) => {
-                self.sign_in = Some(SignIn::Checking);
+            Ctx::Root if matches!(self.sign_in.state, Some(SignIn::Waiting | SignIn::Failed(_))) => {
+                self.sign_in.state = Some(SignIn::Checking);
                 self.effects.push(Effect::SignIn(Pasted(text)));
             }
             // Checking: one sign-in at a time.
-            Ctx::Root if self.sign_in.is_some() => {}
+            Ctx::Root if self.sign_in.state.is_some() => {}
             Ctx::ComposerInsert => {
                 if let Some(c) = self.work.draft_mut() {
                     c.insert(&text);

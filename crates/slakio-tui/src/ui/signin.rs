@@ -36,6 +36,7 @@ fn draw_picker(f: &mut Frame, app: &App, area: Rect, p: &Picker, checking: bool)
         wrap(&text(l), usize::from(w), max).0.into_iter().map(|s| Line::styled(s, style)).collect()
     };
     let mut top = vec![Line::styled(text(Label::SigninDesktopTitle), t.current()), Line::default()];
+    top.extend(beside(app, usize::from(w)));
     top.extend(lines(Label::SigninDesktopFound, 2, t.text()));
     top.push(Line::default());
     let mut bottom = vec![Line::default()];
@@ -149,6 +150,7 @@ fn draw_paste(f: &mut Frame, app: &App, area: Rect, state: SignIn) {
     let w = area.width.saturating_sub(4).min(WIDTH);
     let text = |l: Label| app.i18n.label(l).to_string();
     let mut lines: Vec<Line<'static>> = vec![Line::styled(text(Label::SigninTitle), t.current()), Line::default()];
+    lines.extend(beside(app, usize::from(w)));
     for step in [Label::SigninStep1, Label::SigninStep2, Label::SigninStep3, Label::SigninStep4] {
         lines.extend(step_lines(&text(step), usize::from(w)).into_iter().map(|l| Line::styled(l, t.text())));
     }
@@ -163,6 +165,20 @@ fn draw_paste(f: &mut Frame, app: &App, area: Rect, state: SignIn) {
     lines.push(Line::default());
     lines.extend(wrap(&text(said), usize::from(w), 3).0.into_iter().map(|line| Line::styled(line, style)));
     render_centered(f, app, area, w, lines);
+}
+
+/// Signed in to other workspaces already: a muted line (`w` wide) that says they stay and this
+/// adds one, then a blank line; nothing at the first sign-in.
+fn beside(app: &App, w: usize) -> Vec<Line<'static>> {
+    let already = app.signed_in_already();
+    if already.is_empty() {
+        return Vec::new();
+    }
+    let said = app.i18n.msg(&Msg::SigninAdds { workspace: already.join(", ") }).to_string();
+    let mut lines: Vec<Line<'static>> =
+        wrap(&said, w, 2).0.into_iter().map(|l| Line::styled(l, app.theme.muted())).collect();
+    lines.push(Line::default());
+    lines
 }
 
 /// The browser's menu path, kept on one line.

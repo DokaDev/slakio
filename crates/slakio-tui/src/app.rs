@@ -141,7 +141,7 @@ pub struct App {
     pub(crate) dialog: Option<Dialog>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
-    sign_in: Option<signin::SignIn>,
+    sign_in: signin::Offer,
     /// The last boot request of each workspace (older answers are dropped), and why it failed.
     boots: Vec<answers::Boot>,
     effects: Vec<Effect>,
@@ -177,7 +177,7 @@ impl App {
             help: None,
             dialog: None,
             backend: None,
-            sign_in: None,
+            sign_in: signin::Offer::default(),
             boots: Vec::new(),
             effects: Vec::new(),
             last_click: None,

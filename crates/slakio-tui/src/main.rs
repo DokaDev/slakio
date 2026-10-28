@@ -146,6 +146,9 @@ fn main() -> ExitCode {
         }
     };
     if let Some(why) = sign_in {
+        // `slakio login` while signed in: what it signs in to is added beside those.
+        let kept = wiring.workspaces.as_deref().and_then(|p| account::load(p).ok()).unwrap_or_default();
+        app.sign_in_beside(kept.iter().map(|a| words::shown(&a.name)).collect());
         wiring.desktop = signin::offer_sign_in_screen(&mut app, desktop_ok, why).map(Arc::new);
     }
     if kind.is_some() {
@@ -273,6 +276,8 @@ struct Kept {
 /// did not.
 struct Done {
     names: Vec<String>,
+    /// The first workspace signed in to (its team id): the app shows it.
+    added: Option<String>,
     connected: (BackendHandle, Vec<SignedInTo>, Vec<Msg>),
     failed: Option<Label>,
 }
@@ -351,17 +356,21 @@ impl Wiring {
     async fn sign_in_app(self, text: Pasted) -> Result<Done, Label> {
         let one = self.clone().sign_in(text).await?;
         let connected = self.connect_all().await?;
-        Ok(Done { names: vec![words::shown(&one.account.name)], connected, failed: None })
+        let added = Some(one.account.team.clone());
+        Ok(Done { names: vec![words::shown(&one.account.name)], added, connected, failed: None })
     }
 
     /// Sign in with each of the picked desktop workspaces `teams`, one after the other; one that
     /// does not sign in holds none of the others back (the first reason is kept). Then gather
     /// every signed-in workspace.
     async fn sign_in_desktop_all(self, teams: Vec<String>) -> Result<Done, Label> {
-        let (mut names, mut failed) = (Vec::new(), None);
+        let (mut names, mut added, mut failed) = (Vec::new(), None, None);
         for team in teams {
             match self.clone().sign_in_desktop(team).await {
-                Ok(k) => names.push(words::shown(&k.account.name)),
+                Ok(k) => {
+                    names.push(words::shown(&k.account.name));
+                    added.get_or_insert(k.account.team);
+                }
                 Err(why) => {
                     failed.get_or_insert(why);
                 }
@@ -371,7 +380,7 @@ impl Wiring {
             return Err(failed.unwrap_or(Label::SigninDesktopFailed));
         }
         let connected = self.connect_all().await?;
-        Ok(Done { names, connected, failed })
+        Ok(Done { names, added, connected, failed })
     }
 
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
@@ -465,7 +474,8 @@ fn signed_in(done: Result<Done, Label>, app: &mut App, backend: &mut Option<Back
     match done {
         Ok(d) => {
             let (handle, signed, mut notices) = d.connected;
-            app.signed_in(handle.capabilities, &signed, &d.names, Instant::now());
+            let added = d.added.map(slakio_core::model::WorkspaceId::new);
+            app.signed_in(handle.capabilities, &signed, added.as_ref(), &d.names, Instant::now());
             *backend = Some(handle);
             if let Some(why) = d.failed {
                 notices.insert(0, Msg::Label(why));

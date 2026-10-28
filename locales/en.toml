@@ -427,6 +427,7 @@
 "signin.failed" = "Slack did not answer as expected. Try again in a minute."
 "signin.store_failed" = "Could not save the sign-in to the keychain. Nothing was kept; paste again to retry."
 "signin.store_read" = "Could not read the sign-in from the keychain. Paste a new request to sign in again."
+"signin.adds" = "Signed in to {workspace} already: this adds another workspace"
 "signin.desktop_title" = "Sign in from the Slack desktop app"
 "signin.desktop_found" = "The Slack app on this Mac is signed in to these workspaces:"
 "signin.desktop_more" = { one = "{count} more", other = "{count} more" }

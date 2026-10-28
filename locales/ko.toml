@@ -404,6 +404,7 @@
 "signin.failed" = "Slack이 예상대로 답하지 않았습니다. 잠시 뒤 다시 해 보세요."
 "signin.store_failed" = "키체인에 저장하지 못했습니다. 아무것도 저장되지 않았으니 다시 붙여 넣으세요."
 "signin.store_read" = "키체인에서 로그인 정보를 읽지 못했습니다. 새 요청을 붙여 넣어 다시 로그인하세요."
+"signin.adds" = "{workspace}에 이미 로그인되어 있습니다: 워크스페이스를 하나 더 추가합니다"
 "signin.desktop_title" = "Slack 데스크톱 앱으로 로그인"
 "signin.desktop_found" = "이 Mac의 Slack 앱이 로그인된 워크스페이스입니다. 고르세요:"
 "signin.desktop_more" = "{count}개 더"
