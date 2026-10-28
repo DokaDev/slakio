@@ -137,6 +137,13 @@ impl Store {
                 }
             }
         }
+        // A bot's author of one name it posted as (`<bot>~<hash>`) that no message kept names
+        // any more: a bot that cycles through names cannot grow the people kept.
+        tx.execute(
+            "DELETE FROM users WHERE ord IS NULL AND instr(id, '~') > 0 AND NOT EXISTS
+                 (SELECT 1 FROM messages m WHERE m.workspace = users.workspace AND m.user = users.id)",
+            [],
+        )?;
         tx.commit()?;
         Ok(out)
     }

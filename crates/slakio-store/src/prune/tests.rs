@@ -164,3 +164,31 @@ fn a_thread_is_capped_aged_and_protected_as_a_conversation_is() {
     assert_eq!(kept(&store, &old), 0, "not opened for 99 days");
     assert_eq!(kept(&store, &shown), 5, "a thread shown is never pruned");
 }
+
+/// The authors of a bot's names that no kept message names any more go; those still named stay.
+#[test]
+fn a_bot_s_names_no_message_names_go() {
+    let mut store = writer("prune-bots");
+    let a = other("T1", "CA");
+    let bot = |id: &str| slakio_core::model::User {
+        id: UserId::new(id),
+        workspace: slakio_core::model::WorkspaceId::new("T1"),
+        name: Remote::new(id.to_string()),
+        display_name: Remote::new(id.to_string()),
+        org: slakio_core::model::Org::Own,
+        bot: true,
+        presence: slakio_core::model::Presence::Unknown,
+    };
+    let mut kept_msgs = messages(3, 5);
+    kept_msgs[2].user = UserId::new("BHOOK~0000000000000002");
+    let users = (0..50).map(|i| bot(&format!("BHOOK~{i:016x}"))).chain([bot("U1")]).collect();
+    let p = Page { target: a.clone(), messages: kept_msgs, complete: false, users, cut: false };
+    store.put_page(&p, None, 100).unwrap();
+    store.prune(Caps::default(), &HashSet::new(), 100).unwrap();
+    let page = store.newest_page(&a, 10).unwrap().unwrap();
+    let mut ids: Vec<String> = page.users.iter().map(|u| u.id.to_string()).collect();
+    ids.sort();
+    assert_eq!(ids, ["BHOOK~0000000000000002", "U1"]);
+    let rows: i64 = store.conn.query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0)).unwrap();
+    assert_eq!(rows, 2, "49 names no message names are gone");
+}
