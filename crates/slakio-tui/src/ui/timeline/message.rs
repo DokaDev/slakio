@@ -282,7 +282,8 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
                 name_w -= chip_w;
             }
             // The tags after the name, the name cut to leave them room: where both would leave
-            // it under [`NAME_MIN`] cells, `ext` goes first (a bot's mark shows while it fits).
+            // it under [`NAME_MIN`] cells, one goes: `app` first (`ext`, another organization, is
+            // what to trust less, so it shows while it fits).
             let full = tags(app, pane, m, true);
             let want = width(m.author.as_str()).min(NAME_MIN);
             let tag = if (name_w - 1).saturating_sub(width(&full)) >= want { full } else { tags(app, pane, m, false) };
@@ -310,15 +311,16 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
 
 /// What follows the sender's name: ` app` for a bot or an app (GUI Slack's APP badge: its name
 /// is whatever it chose to post as; a bot's per-name author id is one even when its person is
-/// no longer kept), ` ext` (with `ext`) for a sender of another organization (a Slack Connect
-/// peer); empty for a person of the workspace's own.
-fn tags(app: &App, pane: &Pane, m: &Shown, ext: bool) -> String {
+/// no longer kept), ` ext` for a sender of another organization (a Slack Connect peer); empty
+/// for a person of the workspace's own. Not `both`: one of them, `ext` where it applies.
+fn tags(app: &App, pane: &Pane, m: &Shown, both: bool) -> String {
     let user = app.model.user(pane.target.workspace(), &m.user);
+    let ext = user.is_some_and(|u| matches!(u.org, Org::External(_)));
     let mut out = String::new();
-    if user.is_some_and(|u| u.bot) || m.user.as_str().contains('~') {
+    if (user.is_some_and(|u| u.bot) || m.user.as_str().contains('~')) && (both || !ext) {
         out.push_str(&format!(" {}", app.i18n.label(Label::MessageApp)));
     }
-    if ext && user.is_some_and(|u| matches!(u.org, Org::External(_))) {
+    if ext {
         out.push_str(&format!(" {}", app.i18n.label(Label::ListExternal)));
     }
     out
