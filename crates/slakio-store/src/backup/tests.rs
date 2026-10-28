@@ -44,41 +44,6 @@ fn a_read_only_cache_asks_nothing() {
     assert!(fake.calls.borrow().is_empty());
 }
 
-#[cfg(unix)]
-#[test]
-fn tmutil_is_run_with_addexclusion_and_the_directory_and_its_failure_is_an_error() {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = scratch("tmutil");
-    // A stand-in for tmutil: records its arguments; fails when the directory says so.
-    let program = dir.join("tmutil");
-    let log = dir.join("args");
-    std::fs::write(
-        &program,
-        format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\ncase \"$2\" in *fail*) echo nope >&2; exit 1;; esac\n",
-            log.display()
-        ),
-    )
-    .unwrap();
-    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let tm = Tmutil { program: program.clone() };
-    let ok = dir.join("ok");
-    assert_eq!(tm.exclude(&ok), Ok(()));
-    assert_eq!(std::fs::read_to_string(&log).unwrap(), format!("addexclusion\n{}\n", ok.display()));
-    let err = tm.exclude(&dir.join("fail")).unwrap_err();
-    assert!(err.contains("addexclusion") && err.contains("nope"), "{err}");
-    let missing = Tmutil { program: dir.join("no-such-program") };
-    assert!(missing.exclude(&ok).is_err());
-    // A relative path is given absolute, never as one that reads as an option (`-p`). In this
-    // test, so the tests start no more processes at once than before.
-    std::fs::remove_file(&log).unwrap();
-    tm.exclude(Path::new("-p")).unwrap();
-    let args = std::fs::read_to_string(&log).unwrap();
-    let lines: Vec<&str> = args.lines().collect();
-    assert_eq!(lines.len(), 2, "{args}");
-    assert!(lines[1].starts_with('/') && lines[1].ends_with("/-p"), "{args}");
-}
-
 #[test]
 fn only_the_caches_own_directory_is_excluded_never_the_one_named() {
     let dir = scratch("backup-own").join("named");

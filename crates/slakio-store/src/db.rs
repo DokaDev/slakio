@@ -10,7 +10,9 @@
 //! on Windows), released when the process ends however it ends. A second slakio while one runs
 //! opens the database read-only: it draws from the cache but never writes it
 //! ([`Store::read_only`]); when there is nothing it could read it does without
-//! ([`OpenError::InUse`]).
+//! ([`OpenError::InUse`]). A lock let go a moment ago may still be held, for as long as a
+//! process being started shares the open file (until it runs its program): it is tried again for
+//! [`LOCK_WAIT`] before the cache is opened read-only.
 //!
 //! A database that cannot be read (not a database, damaged) or that a newer slakio wrote is set
 //! up again from nothing ([`Opened::rebuilt`]): it only holds what can be fetched again. Any
@@ -22,7 +24,7 @@ use rusqlite::{Connection, ErrorCode, OpenFlags};
 use slakio_core::fault::Fault;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// The directory of the cache's files, which the store makes inside the cache directory.
 pub const DIR: &str = "slakio-store";
@@ -34,6 +36,10 @@ const LOCK: &str = "cache.lock";
 const OWNER: &str = "owner";
 /// SQLite's files beside the database.
 const SIDE: [&str; 2] = ["-wal", "-shm"];
+/// How long a held writer's lock is tried again before the cache is opened read-only.
+pub const LOCK_WAIT: Duration = Duration::from_millis(50);
+/// The pause between two tries.
+const LOCK_STEP: Duration = Duration::from_millis(5);
 
 /// The cache, open.
 pub struct Store {
@@ -41,6 +47,8 @@ pub struct Store {
     dir: PathBuf,
     /// Held while this process writes the cache (`None`: read-only).
     lock: Option<File>,
+    /// Whose it is, once claimed: kept again when it is set up again.
+    owner: Option<String>,
 }
 
 impl std::fmt::Debug for Store {
@@ -84,17 +92,19 @@ pub fn is_corrupt(e: &rusqlite::Error) -> bool {
 impl Store {
     /// Open the cache in the cache directory `parent` (its own directory there made if missing).
     pub fn open(parent: &Path) -> Result<Opened, OpenError> {
+        Self::open_waiting(parent, LOCK_WAIT)
+    }
+
+    /// [`Store::open`], trying a held lock again for `wait`.
+    fn open_waiting(parent: &Path, wait: Duration) -> Result<Opened, OpenError> {
         let dir = &own_dir(parent).map_err(OpenError::Failed)?;
         let lock_path = dir.join(LOCK);
         let lock = private_file(&lock_path).map_err(|e| OpenError::Failed(io_fault(&e, &lock_path)))?;
         let path = dir.join(FILE);
-        match lock.try_lock() {
-            Ok(()) => {}
-            Err(TryLockError::WouldBlock) => {
-                let conn = open_read_only(&path).ok_or(OpenError::InUse)?;
-                return Ok(Opened { store: Store { conn, dir: dir.to_path_buf(), lock: None }, rebuilt: false });
-            }
-            Err(TryLockError::Error(e)) => return Err(OpenError::Failed(io_fault(&e, &lock_path))),
+        if !locked(&lock, wait).map_err(|e| OpenError::Failed(io_fault(&e, &lock_path)))? {
+            let conn = open_read_only(&path).ok_or(OpenError::InUse)?;
+            let store = Store { conn, dir: dir.to_path_buf(), lock: None, owner: None };
+            return Ok(Opened { store, rebuilt: false });
         }
         let (conn, rebuilt) = match open_writer(&path) {
             Ok(conn) => (conn, false),
@@ -104,7 +114,7 @@ impl Store {
             }
             Err(Unusable::Fault(f)) => return Err(OpenError::Failed(f)),
         };
-        Ok(Opened { store: Store { conn, dir: dir.to_path_buf(), lock: Some(lock) }, rebuilt })
+        Ok(Opened { store: Store { conn, dir: dir.to_path_buf(), lock: Some(lock), owner: None }, rebuilt })
     }
 
     /// Another process writes the cache: this one only reads it.
@@ -117,13 +127,14 @@ impl Store {
     /// `owner`'s and this process only reads it, so it is not to be used.
     pub fn claim(&mut self, owner: &str) -> Result<bool, Fault> {
         if self.meta(OWNER)?.as_deref() == Some(owner) {
+            self.owner = Some(owner.to_owned());
             return Ok(true);
         }
         if self.read_only() {
             return Ok(false);
         }
+        self.owner = Some(owner.to_owned());
         self.rebuild()?;
-        self.set_meta(OWNER, owner)?;
         Ok(true)
     }
 
@@ -132,7 +143,8 @@ impl Store {
         &self.dir
     }
 
-    /// Set the cache up again from nothing (it was found damaged while in use). The writer only.
+    /// Set the cache up again from nothing (it was found damaged while in use), still the claimed
+    /// owner's. The writer only.
     pub fn rebuild(&mut self) -> Result<(), Fault> {
         if self.read_only() {
             return Err(Fault::other("cache: read-only, not rebuilt"));
@@ -141,7 +153,10 @@ impl Store {
         drop(gone);
         remove_files(&self.dir)?;
         self.conn = open_writer(&self.dir.join(FILE)).map_err(Unusable::into_fault)?;
-        Ok(())
+        match &self.owner {
+            Some(owner) => self.set_meta(OWNER, owner),
+            None => Ok(()),
+        }
     }
 
     /// A value the cache keeps about itself.
@@ -186,6 +201,20 @@ impl Unusable {
 
 fn sql(e: &rusqlite::Error) -> Unusable {
     if is_corrupt(e) { Unusable::Damaged } else { Unusable::Fault(fault(e)) }
+}
+
+/// Take the writer's `lock`, trying again for `wait` while another holds it. `false`: another
+/// still holds it.
+fn locked(lock: &File, wait: Duration) -> std::io::Result<bool> {
+    let deadline = Instant::now() + wait;
+    loop {
+        match lock.try_lock() {
+            Ok(()) => return Ok(true),
+            Err(TryLockError::WouldBlock) if Instant::now() < deadline => std::thread::sleep(LOCK_STEP),
+            Err(TryLockError::WouldBlock) => return Ok(false),
+            Err(TryLockError::Error(e)) => return Err(e),
+        }
+    }
 }
 
 /// The database at `path` for writing, at the current schema.
@@ -254,13 +283,16 @@ pub fn remove_files(dir: &Path) -> Result<(), Fault> {
 
 /// Remove the cache of the cache directory `parent`: [`remove_files`], the lock file and the
 /// cache's own directory: nothing of it is left (a link in its place goes, never what it
-/// names). `slakio logout`.
+/// names). `slakio logout`. The files a development version kept in `parent` itself go too.
 pub fn remove(parent: &Path) -> Result<(), Fault> {
     let dir = parent.join(DIR);
     let gone = |r: std::io::Result<()>, p: &Path| match r {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(io_fault(&e, p)),
         _ => Ok(()),
     };
+    remove_files(parent)?;
+    let old_lock = parent.join(LOCK);
+    gone(std::fs::remove_file(&old_lock), &old_lock)?;
     match std::fs::symlink_metadata(&dir) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Ok(m) if !m.is_dir() => return gone(std::fs::remove_file(&dir), &dir),

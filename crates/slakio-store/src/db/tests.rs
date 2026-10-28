@@ -73,6 +73,31 @@ fn a_second_process_with_nothing_to_read_does_without() {
 }
 
 #[test]
+fn a_lock_let_go_a_moment_later_is_taken_not_read_only() {
+    let named = scratch("lock-retry").join("cache");
+    let dir = named.join(DIR);
+    // Held, as by a process being started that shares the lock's open file, then let go.
+    std::fs::create_dir_all(&dir).unwrap();
+    let held = File::create(dir.join(LOCK)).unwrap();
+    held.try_lock().unwrap();
+    let letting_go = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(20));
+        drop(held);
+    });
+    // A wait longer than the default, so a slow machine's late wake-up still falls inside it.
+    let store = Store::open_waiting(&named, Duration::from_secs(10)).unwrap().store;
+    letting_go.join().unwrap();
+    assert!(!store.read_only(), "the lock let go within the wait is taken");
+    drop(store);
+    // Never let go within the wait: read-only, after trying for the wait.
+    let held = File::create(dir.join(LOCK)).unwrap();
+    held.try_lock().unwrap();
+    let started = Instant::now();
+    assert!(Store::open(&named).unwrap().store.read_only());
+    assert!(started.elapsed() >= LOCK_WAIT, "{:?}", started.elapsed());
+}
+
+#[test]
 fn a_cache_that_is_not_a_database_is_set_up_again() {
     for (tag, junk) in [
         ("junk", b"this is not a database at all, not even close".repeat(200)),
@@ -123,6 +148,27 @@ fn a_cache_rebuilt_while_in_use_is_empty_and_still_written() {
 }
 
 #[test]
+fn a_cache_rebuilt_while_in_use_is_still_the_sign_ins() {
+    let named = scratch("rebuild-owner").join("cache");
+    let world = World::new(3);
+    let ids: Vec<_> = world.snapshot().workspaces.iter().map(|w| w.id.clone()).collect();
+    let mut store = Store::open(&named).unwrap().store;
+    assert!(store.claim("T1 UA").unwrap());
+    store.rebuild().unwrap();
+    assert_eq!(store.meta(OWNER).unwrap().as_deref(), Some("T1 UA"));
+    store.put_snapshot(world.snapshot()).unwrap();
+    // A second slakio of the same sign-in meanwhile uses it.
+    let mut reader = Store::open(&named).unwrap().store;
+    assert!(reader.read_only() && reader.claim("T1 UA").unwrap());
+    drop(reader);
+    drop(store);
+    // The next start keeps what the run wrote after the rebuild.
+    let mut store = Store::open(&named).unwrap().store;
+    assert!(store.claim("T1 UA").unwrap());
+    assert!(store.snapshot(&ids).unwrap().is_some());
+}
+
+#[test]
 fn a_directory_that_cannot_be_made_is_a_fault() {
     let dir = scratch("nodir");
     let file = dir.join("a-file");
@@ -137,6 +183,10 @@ fn removing_the_cache_leaves_nothing_of_it() {
     store.put_snapshot(World::new(3).snapshot()).unwrap();
     drop(store);
     std::fs::write(dir.join("kept"), "the user's").unwrap();
+    // A development version's files, kept in the cache directory itself.
+    for name in [FILE, "cache.sqlite3-wal", "cache.sqlite3-shm", LOCK] {
+        std::fs::write(dir.join(name), "old").unwrap();
+    }
     remove(&dir).unwrap();
     let left: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name()).collect();
     assert_eq!(left, ["kept"], "nothing of the cache is left, and nothing else goes");
