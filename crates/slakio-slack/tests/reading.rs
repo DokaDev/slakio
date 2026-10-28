@@ -346,7 +346,9 @@ fn a_thread_is_read_forward_once_and_served_backwards() {
             .filter(|l| l.fields().iter().any(|(k, _)| *k == "cursor"))
             .count();
         assert_eq!(cursors, calls - 1, "each after the first by the cursor Slack gave");
-        // Older pages, back to the thread's own message, without asking Slack again.
+        // Older pages, back to the thread's own message, without asking Slack again: no page,
+        // and no name either (every author was looked up when it was read).
+        let sent = r.fake.log().len();
         let mut seen = newest.messages;
         loop {
             let p = r.page(&thread, seen.first().map(|m| m.ts)).await;
@@ -358,6 +360,7 @@ fn a_thread_is_read_forward_once_and_served_backwards() {
         assert_eq!(ts(&seen), ts(&whole));
         assert_eq!(seen[0].ts, first.ts, "the thread starts with its own message");
         assert_eq!(r.calls("conversations.replies"), calls, "served from what was read");
+        assert_eq!(r.fake.methods()[sent..], [] as [String; 0], "no request at all");
         assert!(!newest.cut, "read to its end");
         // Opening it again reads what is new only: from the last reply kept on, one request.
         let again = r.page(&thread, None).await;

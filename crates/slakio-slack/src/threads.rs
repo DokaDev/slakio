@@ -135,6 +135,17 @@ impl Threads {
         Ok(self.slice(&key, before, limit))
     }
 
+    /// Who wrote in the kept thread at `thread` of `channel`, each once (none when it is not
+    /// kept).
+    pub(crate) fn authors(&self, channel: &str, thread: Ts) -> Vec<String> {
+        let kept = self.lock();
+        let Some((t, _)) = kept.map.get(&(channel.to_string(), thread)) else { return Vec::new() };
+        let mut out: Vec<String> = t.messages.iter().map(|m| m.user.as_str().to_string()).collect();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, Kept> {
         self.kept.lock().unwrap_or_else(PoisonError::into_inner)
     }

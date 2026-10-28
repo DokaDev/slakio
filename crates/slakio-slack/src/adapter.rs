@@ -185,12 +185,15 @@ async fn history(
         }
     };
     // The authors by name: what the view brought, else looked up (in batches); not the user,
-    // nor a bot (named by the name it posts as).
-    let authors: Vec<String> = messages
-        .iter()
-        .map(|m| m.user.as_str())
-        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != *u) && !bots.contains_key(*u))
-        .map(str::to_string)
+    // nor a bot (named by the name it posts as). A thread's are all looked up when it is read,
+    // so its older pages, served from what was kept, ask for nothing.
+    let everyone: Vec<String> = match (&target, before) {
+        (Target::Thread { thread, .. }, None) => ctx.threads.authors(&channel, *thread),
+        _ => messages.iter().map(|m| m.user.as_str().to_string()).collect(),
+    };
+    let authors: Vec<String> = everyone
+        .into_iter()
+        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != u) && !bots.contains_key(u))
         .collect();
     let mut users = ctx.people.names(client, &authors, priority).await;
     if let Some(ws) = ctx.people.team() {
