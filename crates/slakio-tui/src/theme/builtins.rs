@@ -5,12 +5,14 @@ use ratatui::style::Color;
 
 /// Workspace colors of the dark truecolor themes: twelve that read on a dark background and stay
 /// apart from each other. Workspaces take them in sign-in order, so the first is a blue, never a
-/// red (red is an error's and the mention pills'); the red comes last.
+/// red (red is an error's and the mention pills'); the red comes last. A theme leaves out those
+/// near its accent ([`Theme::workspace`]): with a blue accent the first is the teal, with a teal
+/// one the second is the violet.
 pub const WORKSPACE_COLORS: [Color; 12] = [
     rgb(0x5B8DEF),
     rgb(0x4FB3A9),
-    rgb(0xE6C35C),
     rgb(0xC792EA),
+    rgb(0xE6C35C),
     rgb(0xE5935A),
     rgb(0x8FC77A),
     rgb(0x5CC6D9),
@@ -26,8 +28,8 @@ pub const WORKSPACE_COLORS: [Color; 12] = [
 pub const WORKSPACE_COLORS_LIGHT: [Color; 12] = [
     rgb(0x2F5FC4),
     rgb(0x0E7C72),
-    rgb(0x8A6A00),
     rgb(0x8A4FC2),
+    rgb(0x8A6A00),
     rgb(0xB35A12),
     rgb(0x3F7F2A),
     rgb(0x0B7A94),

@@ -1,5 +1,6 @@
 use super::*;
 use ratatui::buffer::Buffer;
+use slakio_core::model::WorkspaceColor;
 
 fn luminance(c: Color) -> f64 {
     let Color::Rgb(r, g, b) = c else { panic!("{c:?} is not RGB") };
@@ -96,7 +97,7 @@ fn workspace_colors_read_on_every_theme() {
 #[test]
 fn the_first_workspace_color_is_not_a_red() {
     for t in BUILTINS {
-        let first = t.workspaces[0];
+        let first = t.workspace(WorkspaceColor(0)).fg.unwrap();
         assert_ne!(first, t.error, "{}: the first workspace color is the error color", t.name);
         assert_ne!(first, Color::Red, "{}", t.name);
         if matches!(first, Color::Rgb(..)) {
@@ -181,9 +182,34 @@ fn workspace_colours_differ_and_wrap_around() {
         for (i, a) in t.workspaces.iter().enumerate() {
             assert!(!t.workspaces[i + 1..].contains(a), "{}: slot {i}", t.name);
         }
-        let n = t.workspaces.len() as u8;
+        let n = t.workspace_colors().count() as u8;
         assert_eq!(t.workspace(WorkspaceColor(n + 1)), t.workspace(WorkspaceColor(1)));
     }
+}
+
+/// A workspace's stripe sits beside the focus frame: in every theme it is clearly apart from
+/// the accent (Oklab, [`workspace::APART`]).
+/// Where a palette color is near it the next one takes its place, so tokyo-night's first
+/// workspace is not the blue of its accent, nor light's second the teal of its own.
+#[test]
+fn workspace_colors_stay_apart_from_the_accent() {
+    for t in truecolor() {
+        for slot in 0..t.workspaces.len() as u8 {
+            let c = t.workspace(WorkspaceColor(slot)).fg.unwrap();
+            let d = workspace::distance(c, t.accent).unwrap();
+            assert!(d >= workspace::APART, "{}: workspace {slot} {c:?} is {d:.3} from the accent", t.name);
+        }
+        // The colors left all differ, and enough are left.
+        let shown: Vec<Color> = t.workspace_colors().collect();
+        assert!(shown.len() >= 8, "{}: {} workspace colors", t.name, shown.len());
+    }
+    let first_two = |t: &Theme| [0, 1].map(|s| t.workspace(WorkspaceColor(s)).fg.unwrap());
+    assert_eq!(first_two(&TOKYO_NIGHT_NIGHT), [rgb(0x4FB3A9), rgb(0xC792EA)]);
+    assert_eq!(first_two(&DARK), [rgb(0x5B8DEF), rgb(0xC792EA)]);
+    assert_eq!(first_two(&LIGHT), [rgb(0x2F5FC4), rgb(0x8A4FC2)]);
+    assert_eq!(first_two(&DRACULA), [rgb(0x5B8DEF), rgb(0x4FB3A9)]);
+    // The 16 colors are the terminal's own: none is left out.
+    assert_eq!(TERMINAL.workspace_colors().count(), TERMINAL.workspaces.len());
 }
 
 /// A row with gray text and a red badge, painted as each kind of selection.

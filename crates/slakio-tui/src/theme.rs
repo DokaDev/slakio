@@ -22,7 +22,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use slakio_core::model::{Presence, WorkspaceColor};
+use slakio_core::model::Presence;
 
 mod builtins;
 pub use builtins::*;
@@ -130,7 +130,8 @@ pub struct Theme {
     pub mode_visual: Color,
     pub mode_command: Color,
     pub mode_fg: Color,
-    /// Workspace colors, by [`WorkspaceColor`] slot (wrapping around).
+    /// Workspace colors, by [`slakio_core::model::WorkspaceColor`] slot (wrapping around), less
+    /// those near `accent` ([`Theme::workspace`]).
     pub workspaces: &'static [Color],
     /// Avatar chips, a person's by a slot of their id ([`crate::avatar::slot`]), under
     /// [`Self::mode_fg`] text.
@@ -440,11 +441,6 @@ impl Theme {
             && ((0..self.avatars.len()).any(|i| self.avatar(i).bg == Some(c)) || self.avatar_group().bg == Some(c))
     }
 
-    /// The style of workspace color `c`.
-    pub fn workspace(&self, c: WorkspaceColor) -> Style {
-        Style::new().fg(self.workspaces[usize::from(c.0) % self.workspaces.len()])
-    }
-
     /// Paint `how` over the row `row` already drawn, whatever it is drawn on (the app's
     /// background, a popup's surface). Its first cell is the gutter: where the theme has no
     /// background for `how`, a bar there marks the row. Muted and faint text, and text the bar
@@ -524,6 +520,7 @@ impl Theme {
 }
 
 mod bars;
+mod workspace;
 
 #[cfg(test)]
 mod tests;
