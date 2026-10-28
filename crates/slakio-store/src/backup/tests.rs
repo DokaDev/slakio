@@ -69,18 +69,10 @@ fn tmutil_is_run_with_addexclusion_and_the_directory_and_its_failure_is_an_error
     assert!(err.contains("addexclusion") && err.contains("nope"), "{err}");
     let missing = Tmutil { program: dir.join("no-such-program") };
     assert!(missing.exclude(&ok).is_err());
-}
-
-#[cfg(unix)]
-#[test]
-fn tmutil_is_given_an_absolute_path_never_one_that_reads_as_an_option() {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = scratch("tmutil-abs");
-    let program = dir.join("tmutil");
-    let log = dir.join("args");
-    std::fs::write(&program, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\n", log.display())).unwrap();
-    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
-    Tmutil { program }.exclude(Path::new("-p")).unwrap();
+    // A relative path is given absolute, never as one that reads as an option (`-p`). In this
+    // test, so the tests start no more processes at once than before.
+    std::fs::remove_file(&log).unwrap();
+    tm.exclude(Path::new("-p")).unwrap();
     let args = std::fs::read_to_string(&log).unwrap();
     let lines: Vec<&str> = args.lines().collect();
     assert_eq!(lines.len(), 2, "{args}");
