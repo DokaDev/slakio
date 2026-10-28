@@ -181,6 +181,10 @@ fn a_hung_or_gone_workspace_holds_nothing_back() {
         // B's backend goes away: its retry fails at once as offline, A still opens.
         drop(end);
         tokio::task::yield_now().await;
+        t.keys("r").await;
+        assert_eq!(t.d.app.boot_failed_in(&ib), Some(&FailKind::Offline), "B's retry fails as offline");
+        assert!(t.d.screen().contains("Could not load"), "{}", t.d.screen());
+        assert!(t.d.app.model.is_loaded_in(&ia), "A is still listed");
         t.keys("space W k enter").await;
         let rows = t.d.app.list_rows();
         let first = rows.iter().position(|r| matches!(r, Row::Conversation(_))).unwrap();
@@ -194,19 +198,26 @@ fn a_hung_or_gone_workspace_holds_nothing_back() {
 #[test]
 fn a_retry_asks_again_for_the_workspace_shown_only() {
     rt().block_on(async {
-        // B fails once (a network error, which may pass), then works.
+        // B fails once (a network error, which may pass), then works; after the retry's answer,
+        // a late answer to the first ask comes (a list without B's conversations), then a late
+        // failure of it.
         let (h, mut end) = BackendHandle::pair(READ_ONLY, 8);
         tokio::spawn(async move {
             let mut demo = exchange::serve(Box::new(DemoBackend::new(World::demo())));
-            let mut first = true;
+            let mut first = None;
             while let Some(r) = end.rx.recv().await {
-                if std::mem::take(&mut first) {
+                let Some(stale) = first else {
+                    first = Some(r.id);
                     let _ = end.tx.send(Envelope::failed(r.id, FailKind::Network, "test")).await;
                     continue;
-                }
+                };
                 demo.tx.send(r).await.unwrap();
                 let e = demo.rx.recv().await.unwrap();
                 let _ = end.tx.send(e).await;
+                let mut old = World::demo().snapshot().only(&ids().1);
+                old.conversations.clear();
+                let _ = end.tx.send(Envelope { generation: stale, event: Event::Booted(Box::new(old)) }).await;
+                let _ = end.tx.send(Envelope::failed(stale, FailKind::Network, "late")).await;
             }
         });
         let a_boots = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -228,8 +239,9 @@ fn a_retry_asks_again_for_the_workspace_shown_only() {
         assert_eq!(t.d.app.boot_failed_in(&ids().1), Some(&FailKind::Network));
         t.keys("space W j enter").await;
         t.keys("r").await;
-        assert_eq!(t.d.app.boot_failed_in(&ids().1), None, "B came back");
+        assert_eq!(t.d.app.boot_failed_in(&ids().1), None, "B came back; the first ask's late failure is dropped");
         assert!(t.d.app.model.is_loaded_in(&ids().1));
+        assert!(!t.names(1).is_empty(), "the first ask's late list is dropped");
         assert_eq!(a_boots.load(std::sync::atomic::Ordering::SeqCst), 1, "A was not asked again");
     });
 }

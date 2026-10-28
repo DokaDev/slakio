@@ -105,20 +105,27 @@ impl App {
     }
 
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
-    /// workspace shown, else the active pane's messages. Only when asked: nothing retries on its
-    /// own.
+    /// workspace shown (also one still loading: its backend may hang or be gone), else the
+    /// active pane's messages. Only when asked: nothing retries on its own.
     pub(super) fn retry(&mut self, now: Instant) {
-        match self.boot_here().map(|b| (b.workspace.clone(), b.failed.clone())) {
-            Some((ws, Some(kind))) if kind.retryable() => {
-                let id = self.work.requests.ask(ws.clone(), Command::Boot);
-                if let Some(b) = self.boots.iter_mut().find(|b| b.workspace == ws) {
-                    (b.id, b.failed) = (id, None);
-                }
-            }
+        let here = self.boot_here().map(|b| (b.workspace.clone(), b.failed.clone()));
+        let loading = matches!(&here, Some((Some(ws), None)) if !self.model.is_loaded_in(ws));
+        match here {
+            Some((ws, Some(kind))) if kind.retryable() => self.boot_again(ws),
             // Asking again cannot help: say why once more.
             Some((_, Some(kind))) => self.warn(Msg::Label(failure(&kind)), now),
+            // An answer to the older ask, should it still come, is dropped.
+            Some((ws, None)) if loading => self.boot_again(ws),
             _ if self.work.retry() => {}
             _ => self.info(Msg::Label(Label::StatusNothingToRetry), now),
+        }
+    }
+
+    /// Ask again for the boot of `ws`: the answer to the one asked before is dropped.
+    fn boot_again(&mut self, ws: Option<WorkspaceId>) {
+        let id = self.work.requests.ask(ws.clone(), Command::Boot);
+        if let Some(b) = self.boots.iter_mut().find(|b| b.workspace == ws) {
+            (b.id, b.failed) = (id, None);
         }
     }
 
