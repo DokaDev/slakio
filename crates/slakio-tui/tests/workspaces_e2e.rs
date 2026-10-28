@@ -167,7 +167,7 @@ fn a_workspace_slack_refuses_leaves_the_other_working() {
     let a = m.channel(0);
     run.wait_for("A's channels", |t| t.contains(&a));
     let name_b = m.name(1);
-    run.wait_for("whose start failed", |t| t.contains(&format!("{name_b}: Signed out")));
+    run.wait_for("whose start failed", |t| t.contains(&format!("{name_b}: signed out, run slakio login")));
     run.type_bytes(b" Wj\r");
     run.wait_for("B's list says it could not be loaded", |t| t.contains("Could not load"));
     // A still opens a conversation.

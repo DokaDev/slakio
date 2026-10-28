@@ -189,6 +189,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         })
     };
     let msg_max = notice.map_or(NOTICE_MAX, |n| notice_max(app, &n.msg));
+    // A notice about a workspace wears that workspace's stripe, not the one of the workspace shown.
+    let notice_stripe = notice.and_then(|n| named(&n.msg)).and_then(|name| {
+        let w = app.model.workspaces().iter().find(|w| w.name.line().into_string() == name)?;
+        Some(Span::styled("▌", t.workspace(w.color)))
+    });
+    let stripe_w = usize::from(notice_stripe.is_some());
     let demo = app.backend.and_then(|c| {
         let mark = if c.demo {
             Label::StatusDemo
@@ -252,7 +258,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     };
     let need = |ws_name: &Option<String>, place_text: &Option<String>, hints: &[(String, String)]| {
         // A notice is worth more than the hints: they make room for it.
-        let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + width(m).min(msg_max));
+        let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + stripe_w + width(m).min(msg_max));
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
@@ -387,10 +393,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let mut line = left(&ws_name, &place_text);
     let right_spans = right(&hints);
     if let Some((m, style)) = msg {
-        let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 3);
+        let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 3 + stripe_w);
         if room > 0 {
             let m = notice.map_or_else(|| clip(&m, room), |n| fit_notice(app, &n.msg, room));
             line.push(sep());
+            line.extend(notice_stripe);
             line.push(Span::styled(m, style));
         }
     }
@@ -401,38 +408,47 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
 /// The most cells the hints make room for a notice.
 const NOTICE_MAX: usize = 48;
 
-/// The most of a workspace's name a notice about it keeps when the line is short.
-const NOTICE_NAME: usize = 16;
+/// The most of a workspace's name the hints make room for in a notice about it.
+const NOTICE_NAME: usize = 24;
+
+/// The least of a workspace's name a notice about it keeps, however short the line.
+const NOTICE_NAME_KEPT: usize = 8;
+
+/// The name of the workspace notice `msg` is about.
+fn named(msg: &Msg) -> Option<&str> {
+    match msg {
+        Msg::FailWorkspace { workspace, .. } | Msg::FailWorkspaceAuth { workspace } => Some(workspace),
+        _ => None,
+    }
+}
+
+/// Notice `msg` about a workspace, with `name` for the workspace's.
+fn renamed(msg: &Msg, name: String) -> Msg {
+    match msg {
+        Msg::FailWorkspace { why, .. } => Msg::FailWorkspace { workspace: name, why: why.clone() },
+        Msg::FailWorkspaceAuth { .. } => Msg::FailWorkspaceAuth { workspace: name },
+        other => other.clone(),
+    }
+}
 
 /// The room the hints make for notice `msg`: [`NOTICE_MAX`], or more for one about a workspace,
 /// so its whole reason fits beside its name cut to [`NOTICE_NAME`] cells.
 fn notice_max(app: &App, msg: &Msg) -> usize {
-    match msg {
-        Msg::FailWorkspace { workspace, why } => {
-            let short = clip(workspace, NOTICE_NAME);
-            let w = width(&app.i18n.msg(&Msg::FailWorkspace { workspace: short, why: why.clone() }));
-            NOTICE_MAX.max(w)
-        }
-        _ => NOTICE_MAX,
-    }
+    let Some(name) = named(msg) else { return NOTICE_MAX };
+    NOTICE_MAX.max(width(&app.i18n.msg(&renamed(msg, clip(name, NOTICE_NAME)))))
 }
 
-/// Notice `msg` in `room` cells. One about a workspace gives up its name (cut with `…`, then
-/// left out) before its reason, which says what to do.
+/// Notice `msg` in `room` cells. One about a workspace always names it: its name is cut with
+/// `…` (never under [`NOTICE_NAME_KEPT`] cells) before the words after it lose their end.
 fn fit_notice(app: &App, msg: &Msg, room: usize) -> String {
     let whole = app.i18n.msg(msg).to_string();
-    let Msg::FailWorkspace { workspace, why } = msg else { return clip(&whole, room) };
+    let Some(name) = named(msg) else { return clip(&whole, room) };
     if width(&whole) <= room {
         return whole;
     }
-    let around = width(&whole).saturating_sub(width(workspace));
-    let name_room = room.saturating_sub(around);
-    // A name cut under a few cells says nothing: the reason alone.
-    if name_room < 4.min(width(workspace)) || name_room == 0 {
-        return clip(why, room);
-    }
-    let short = clip(workspace, name_room);
-    app.i18n.msg(&Msg::FailWorkspace { workspace: short, why: why.clone() }).to_string()
+    let around = width(&whole).saturating_sub(width(name));
+    let kept = room.saturating_sub(around).max(NOTICE_NAME_KEPT.min(width(name)));
+    clip(&app.i18n.msg(&renamed(msg, clip(name, kept))), room)
 }
 
 /// `spans` at the right end of `area`, when they fit.

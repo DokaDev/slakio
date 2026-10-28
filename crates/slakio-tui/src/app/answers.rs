@@ -197,6 +197,10 @@ impl App {
             // With several workspaces, the words say whose start failed.
             let name = whose.filter(|_| self.boots.len() > 1).and_then(|ws| self.model.workspace(&ws).cloned());
             match name {
+                // A refused sign-in has words of its own, short enough to keep the name.
+                Some(w) if kind == FailKind::Auth => {
+                    self.warn(Msg::FailWorkspaceAuth { workspace: w.name.line().into_string() }, now);
+                }
                 Some(w) => {
                     let why = self.i18n.label(failure(&kind)).to_string();
                     self.warn(Msg::FailWorkspace { workspace: w.name.line().into_string(), why }, now);

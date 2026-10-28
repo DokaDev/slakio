@@ -159,7 +159,7 @@ fn a_workspace_that_fails_leaves_the_other_listed_with_its_own_row_and_words() {
         assert_eq!(t.d.app.boot_failed_in(&b), Some(&FailKind::Auth));
         assert_eq!(t.d.app.boot_failed(), None, "A is shown: nothing failed here");
         let status = t.d.status_line();
-        assert!(status.contains("B side: Signed out"), "the words say whose start failed: {status}");
+        assert!(status.contains("B side: signed out, run slakio login"), "the words say whose start failed: {status}");
         t.keys("space W j enter").await;
         let shown = t.d.screen();
         assert!(shown.contains("│ Could not load "), "{shown}");
@@ -180,10 +180,9 @@ fn a_workspace_slack_refuses_says_why_and_what_to_do_after_its_notice_is_gone() 
             let names = ["A company", "Acme Engineering EU"];
             let mut t = Two::named(w, h, world(true), failing(FailKind::Auth), lang, names);
             t.settle().await;
-            // The notice keeps its reason whole: the name gives way.
+            // The notice names the workspace and says what to do.
             let status = t.d.status_line();
-            let why = t.d.app.i18n.label(slakio_core::i18n::Label::FailAuth).to_string();
-            assert!(status.contains(&why), "{lang:?} {w}x{h}: the whole reason: {status}");
+            assert!(status.contains("▌Acme En"), "{lang:?} {w}x{h}: whose start failed: {status}");
             assert!(status.contains("slakio login"), "{status}");
             t.keys("space W").await;
             // The switcher marks it, where its count would be.
@@ -195,7 +194,7 @@ fn a_workspace_slack_refuses_says_why_and_what_to_do_after_its_notice_is_gone() 
             t.d.now = Instant::now() + Duration::from_secs(7);
             let shown = t.d.screen();
             let status = t.d.status_line();
-            assert!(!status.contains(&why), "the notice is gone: {status}");
+            assert!(!status.contains("slakio login"), "the notice is gone: {status}");
             let list: String =
                 shown.lines().map(|l| l.chars().take(30).collect::<String>()).collect::<Vec<_>>().join("\n");
             assert!(list.contains("slakio"), "{lang:?} {w}x{h}: {shown}");
@@ -209,6 +208,39 @@ fn a_workspace_slack_refuses_says_why_and_what_to_do_after_its_notice_is_gone() 
             if (lang, w) == (Lang::En, 120) {
                 assert!(shown.contains("│ Could not load "), "{shown}");
                 assert!(shown.contains("│ Signed out: run slakio "), "{shown}");
+            }
+        }
+    });
+}
+
+/// At every width, in either language, the notice about a refused workspace begins with its own
+/// stripe and name (cut, never left out), so it never reads as the shown workspace's, and keeps
+/// `slakio login` whole.
+#[test]
+fn a_refused_workspace_s_notice_names_it_in_its_own_color_at_every_width() {
+    rt().block_on(async {
+        for lang in [Lang::En, Lang::Ko] {
+            for name in ["B side", "Acme Engineering EU"] {
+                for (w, h) in [(120, 40), (100, 30), (80, 24)] {
+                    let mut t = Two::named(w, h, world(true), failing(FailKind::Auth), lang, ["A company", name]);
+                    t.settle().await;
+                    let status = t.d.status_line();
+                    let at = format!("{lang:?} {name} {w}x{h}: {status}");
+                    // At least eight cells of the name: seven letters and `…` when it is cut.
+                    let kept: String = name.chars().take(7).collect();
+                    assert!(status.contains(&format!("│ ▌{kept}")), "{at}");
+                    assert!(status.contains("slakio login"), "{at}");
+                    if w == 120 || name.len() <= 8 {
+                        assert!(status.contains(&format!("▌{name}: ")), "the whole name: {at}");
+                    }
+                    // Its stripe is B's color; the place's is A's.
+                    let buf = t.d.buffer();
+                    let stripes: Vec<_> =
+                        (0..w).map(|x| &buf[(x, h - 1)]).filter(|c| c.symbol() == "▌").map(|c| c.fg).collect();
+                    let color = |i: usize| t.d.app.theme.workspace(t.d.app.model.workspaces()[i].color).fg.unwrap();
+                    assert_eq!(stripes, [color(0), color(1)], "{at}");
+                    assert_ne!(color(0), color(1));
+                }
             }
         }
     });

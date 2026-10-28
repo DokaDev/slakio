@@ -381,6 +381,8 @@
 "fail.api" = "Slack refused the request"
 # A failure of one workspace's start: its name, then why (one of the fail.* words).
 "fail.workspace" = "{workspace}: {why}"
+# A workspace whose sign-in Slack refused at its start: short, so its name fits beside it.
+"fail.workspace_auth" = "{workspace}: signed out, run slakio login"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"
 "hint.todo_save" = "to Saved"

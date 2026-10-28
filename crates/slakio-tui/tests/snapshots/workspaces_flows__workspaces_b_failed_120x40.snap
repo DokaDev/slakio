@@ -41,4 +41,4 @@ expression: t.d.snap()
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › Home │ B side: Signed out: run slakio login to sign in again    │ Tab next pane · ? help │ read only
+ NORMAL  ▌B side › Home │ ▌B side: signed out, run slakio login       │ Tab next pane · ? help · Space more │ read only
