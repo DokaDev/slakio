@@ -199,3 +199,50 @@ fn only_a_workspaces_own_host_is_a_workspace() {
         assert!(Endpoints::workspace(no).is_none(), "{no}");
     }
 }
+
+#[test]
+fn the_socket_opens_as_the_web_client_opens_it() {
+    let (creds, session, _) = setup(Some("T1"));
+    let endpoints = Endpoints::workspace("example.slack.com").unwrap();
+    let with_ds = Credentials::new(TOKEN, "cookie-TEST%2F1").with_ds("ds-TEST");
+    let o = opening(&with_ds, &session, &endpoints, &mut FixedIds, Os::Mac).unwrap();
+    assert_eq!(
+        o.url,
+        format!(
+            "wss://wss-primary.slack.com/?token={TOKEN}&sync_desync=1&slack_client=desktop&start_args=%3Fagent%3Dclient\
+             %26org_wide_aware%3Dtrue%26agent_version%3D1785403654%26eac_cache_ts%3Dtrue%26cache_ts%3D0\
+             %26name_tagging%3Dtrue%26only_self_subteams%3Dtrue%26connect_only%3Dtrue%26ms_latest%3Dtrue\
+             &no_query_on_subscribe=1&flannel=3&lazy_channels=1&gateway_server=T1-1&batch_presence_aware=1"
+        )
+    );
+    // 16 random bytes, in base64.
+    assert_eq!(o.key, "q6urq6urq6urq6urq6urqw==");
+    assert_eq!(
+        o.headers,
+        vec![
+            ("Connection", "Upgrade".to_string()),
+            ("Pragma", "no-cache".to_string()),
+            ("Cache-Control", "no-cache".to_string()),
+            ("User-Agent", MAC_UA.to_string()),
+            ("Upgrade", "websocket".to_string()),
+            ("Origin", "https://app.slack.com".to_string()),
+            ("Sec-WebSocket-Version", "13".to_string()),
+            ("Accept-Language", "en-US,en;q=0.9".to_string()),
+            ("Cookie", "d=cookie-TEST%2F1; d-s=ds-TEST".to_string()),
+            ("Sec-WebSocket-Key", "q6urq6urq6urq6urq6urqw==".to_string()),
+        ]
+    );
+    // No token or cookie in its debug print.
+    let printed = format!("{o:?}");
+    assert!(!printed.contains(TOKEN) && !printed.contains("cookie-TEST"), "{printed}");
+    // On this machine: the fake's address.
+    let local = Endpoints::local("127.0.0.1:9".parse().unwrap()).unwrap();
+    let o = opening(&creds, &session, &local, &mut FixedIds, Os::Mac).unwrap();
+    assert!(o.url.starts_with("ws://127.0.0.1:9/?token="), "{}", o.url);
+}
+
+#[test]
+fn the_socket_needs_a_signed_in_workspace() {
+    let (creds, session, endpoints) = setup(None);
+    assert!(matches!(opening(&creds, &session, &endpoints, &mut FixedIds, Os::Mac), Err(SlackError::Offline { .. })));
+}

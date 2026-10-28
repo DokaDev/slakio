@@ -46,26 +46,38 @@ pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };
 
-/// Run the backend of `client` on a task of its own (inside a Tokio runtime).
+/// Run the backend of `client` on a task of its own (inside a Tokio runtime), without live
+/// updates: it answers requests only.
 pub fn serve(client: Client) -> BackendHandle {
     let (handle, end) = BackendHandle::pair(CAPABILITIES, BOUND);
-    tokio::spawn(run(Arc::new(client), end));
+    tokio::spawn(run(Arc::new(client), end, Arc::default()));
+    handle
+}
+
+/// [`serve`], with the workspace's live updates pushed as well once it has booted
+/// ([`crate::live`]), connecting as `realtime` says.
+pub fn serve_live(client: Client, realtime: crate::live::Realtime) -> BackendHandle {
+    let (handle, end) = BackendHandle::pair(CAPABILITIES, BOUND);
+    let (client, session) = (Arc::new(client), Arc::<Session>::default());
+    tokio::spawn(crate::live::run(Arc::clone(&client), Arc::clone(&session), end.tx.clone(), realtime));
+    tokio::spawn(run(client, end, session));
     handle
 }
 
 /// What the backend learns in a session: the user's own id once booted (whose reactions are
 /// "mine"), the people named so far, the threads read.
 #[derive(Default)]
-struct Session {
-    me: Me,
-    people: People,
-    threads: Threads,
+pub(crate) struct Session {
+    pub(crate) me: Me,
+    pub(crate) people: People,
+    pub(crate) threads: Threads,
+    /// Told each time a boot succeeded (the live updates wait for the first).
+    pub(crate) booted: tokio::sync::Notify,
 }
 
 pub use crate::people::LOOKUP_BATCH;
 
-async fn run(client: Arc<Client>, mut end: BackendEnd) {
-    let session: Arc<Session> = Arc::default();
+async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut tasks = JoinSet::new();
     let mut in_flight: HashMap<Target, AbortHandle> = HashMap::new();
     // The open under way, to cancel when a newer one comes.
@@ -82,7 +94,19 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
         let Request { id, command, .. } = request;
         match command {
             Command::Boot => {
-                tasks.spawn(async move { answer(&tx, id, boot(&client, &ctx.me, &ctx.people).await).await });
+                tasks.spawn(async move {
+                    let booted = boot(&client, &ctx.me, &ctx.people).await;
+                    if booted.is_ok() {
+                        ctx.booted.notify_one();
+                    }
+                    answer(&tx, id, booted).await;
+                });
+            }
+            Command::Catchup { target, limit } => {
+                tasks.spawn(async move {
+                    let page = catch_up(&client, &ctx, target, limit).await;
+                    answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                });
             }
             Command::History { target, before, limit } => {
                 if let Some(older) = in_flight.remove(&target) {
@@ -184,22 +208,56 @@ async fn history(
             (messages, complete, bots, false)
         }
     };
-    // The authors by name: what the view brought, else looked up (in batches); not the user,
-    // nor a bot (named by the name it posts as). A thread's are all looked up when it is read,
-    // so its older pages, served from what was kept, ask for nothing.
-    let everyone: Vec<String> = match (&target, before) {
-        (Target::Thread { thread, .. }, None) => ctx.threads.authors(&channel, *thread),
-        _ => messages.iter().map(|m| m.user.as_str().to_string()).collect(),
+    // A thread's authors are all looked up when it is read, so its older pages, served from what
+    // was kept, ask for nothing.
+    let everyone: Option<Vec<String>> = match (&target, before) {
+        (Target::Thread { thread, .. }, None) => Some(ctx.threads.authors(&channel, *thread)),
+        _ => None,
     };
+    let page = Page { target, messages, complete, users: Vec::new(), cut };
+    Ok(named(client, ctx, page, everyone, bots, me.as_ref(), priority).await)
+}
+
+/// `page` with its authors by name (`everyone`'s, when given, else its messages'): what the view
+/// brought, else looked up (in batches); not the user, nor a bot (named by the name it posts as).
+async fn named(
+    client: &Client,
+    ctx: &Session,
+    mut page: Page,
+    everyone: Option<Vec<String>>,
+    bots: Bots,
+    me: Option<&UserId>,
+    priority: Priority,
+) -> Page {
+    let everyone = everyone.unwrap_or_else(|| page.messages.iter().map(|m| m.user.as_str().to_string()).collect());
     let authors: Vec<String> = everyone
         .into_iter()
-        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != u) && !bots.contains_key(u))
+        .filter(|u| !u.is_empty() && me.is_none_or(|me| me.as_str() != u) && !bots.contains_key(u))
         .collect();
-    let mut users = ctx.people.names(client, &authors, priority).await;
+    page.users = ctx.people.names(client, &authors, priority).await;
     if let Some(ws) = ctx.people.team() {
-        users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
+        page.users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
     }
-    Ok(Page { target, messages, complete, users, cut })
+    page
+}
+
+/// The newest `limit` messages of conversation `target` read again after live updates were lost:
+/// `conversations.history` with no bound, in the background share of the request budget, so it
+/// never waits for, nor cancels, an open.
+async fn catch_up(client: &Client, ctx: &Session, target: Target, limit: u32) -> Result<Page, SlackError> {
+    let Target::Conversation { conversation, .. } = &target else {
+        return Err(SlackError::Api { code: "thread_not_caught_up".to_string() });
+    };
+    let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    let count = limit.clamp(1, PAGE_MAX).to_string();
+    let params = [("channel", conversation.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
+    let call = Call::form(Method::ConversationsHistory, &params);
+    let history: wire::History = client.call(&call, Priority::Background).await?;
+    // Unknown is not complete: only Slack's own "no more" says the start is in this page.
+    let complete = history.has_more == Some(false);
+    let (messages, bots) = read(history.messages.unwrap_or_default(), me.as_ref());
+    let page = Page { target, messages, complete, users: Vec::new(), cut: false };
+    Ok(named(client, ctx, page, None, bots, me.as_ref(), Priority::Background).await)
 }
 
 /// Pages of deleted messages only read past at most, in one older page.
@@ -297,7 +355,7 @@ pub(crate) fn read(raw: Vec<wire::Message>, me: Option<&UserId>) -> (Vec<Message
 
 /// A bot of workspace `ws` as a person: named as it posts; of another organization when its
 /// team is another than `ws`.
-fn bot(ws: &str, id: String, b: Bot) -> User {
+pub(crate) fn bot(ws: &str, id: String, b: Bot) -> User {
     let org = match b.team {
         Some(t) if !t.is_empty() && t != ws => Org::External(Remote::new(t)),
         _ => Org::Own,

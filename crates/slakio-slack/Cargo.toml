@@ -21,8 +21,10 @@ rustls.workspace = true
 rustls-platform-verifier.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# The live updates socket's opening: the digest the server answers the key with.
+sha1.workspace = true
 slakio-core.workspace = true
-tokio = { workspace = true, features = ["net", "rt", "sync", "time", "macros"] }
+tokio = { workspace = true, features = ["net", "rt", "sync", "time", "macros", "io-util"] }
 tokio-rustls.workspace = true
 
 [dev-dependencies]

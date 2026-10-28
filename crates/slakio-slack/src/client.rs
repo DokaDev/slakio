@@ -4,7 +4,7 @@
 use crate::error::SlackError;
 use crate::governor::{Governor, Lane, Priority};
 use crate::method::Method;
-use crate::request::{Call, Endpoints, Ids, Os, RandomIds, Session, prepare};
+use crate::request::{Call, Endpoints, Ids, Os, RandomIds, Session, opening, prepare};
 use crate::response::decode;
 use serde::de::DeserializeOwned;
 use slakio_core::secret::Credentials;
@@ -53,6 +53,26 @@ impl Client {
             self.governor.pause(call.method, *retry_after);
         }
         answer
+    }
+
+    /// Open the live updates' socket: past the kill switch and the cap (an opening counts as
+    /// one request), to the realtime host only. Switching the network off while it opens ends it.
+    pub(crate) async fn open_socket(&self) -> Result<crate::http::Upgraded, SlackError> {
+        self.governor.dial()?;
+        let opening = {
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+            let (session, ids) = &mut *state;
+            opening(&self.credentials, session, &self.endpoints, ids, Os::current())?
+        };
+        tokio::select! {
+            socket = crate::http::socket(&self.endpoints, &opening) => socket,
+            () = self.governor.stopped() => Err(SlackError::Offline { why: "the network was switched off" }),
+        }
+    }
+
+    /// The process's rails.
+    pub(crate) fn governor(&self) -> &Governor {
+        &self.governor
     }
 
     /// Call the method named `name` with form parameters `params`: a name that is not on the

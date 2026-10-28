@@ -12,7 +12,8 @@
 //! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
 //!   the names of the people messages and DMs name, looked up in batches and kept;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
-//!   behind the UI's handle.
+//!   behind the UI's handle; [`live`] — the workspace's live updates (a socket that only
+//!   receives).
 //!
 //! **The only way out is [`Client`]** (and [`serve`], which uses it): a request is built from
 //! an allowed [`Method`] and sent only after the governor lets it through. Building a request
@@ -38,6 +39,7 @@ pub mod client;
 pub mod error;
 pub mod governor;
 pub(crate) mod http;
+pub mod live;
 pub mod login;
 pub mod method;
 pub(crate) mod people;
@@ -46,8 +48,9 @@ pub mod response;
 pub(crate) mod threads;
 pub mod wire;
 
-pub use adapter::serve;
+pub use adapter::{serve, serve_live};
 pub use client::Client;
 pub use error::SlackError;
 pub use governor::{Governor, Limits, Priority};
+pub use live::Realtime;
 pub use method::Method;

@@ -26,6 +26,8 @@ pub const DEFAULT_VERSION_TS: &str = "1785403654";
 pub struct Endpoints {
     api: String,
     edge: String,
+    /// Where the live updates' socket opens (`wss://…/` or, on this machine, `ws://…/`).
+    pub(crate) socket: String,
     pub(crate) server: Server,
 }
 
@@ -40,6 +42,10 @@ pub(crate) enum Server {
 
 /// The edge cache's host.
 pub const EDGE_HOST: &str = "edgeapi.slack.com";
+
+/// The live updates' host: the web client's socket. Nothing is sent to it but the opening
+/// request and what the socket's protocol needs to stay open (answers to its pings, a close).
+pub const SOCKET_HOST: &str = "wss-primary.slack.com";
 
 /// Host names under `slack.com` that are Slack's own, never a workspace's.
 const NOT_WORKSPACES: &[&str] = &[
@@ -80,6 +86,7 @@ impl Endpoints {
         addr.ip().is_loopback().then(|| Self {
             api: format!("http://{addr}/api/"),
             edge: format!("http://{addr}"),
+            socket: format!("ws://{addr}/"),
             server: Server::Local(addr),
         })
     }
@@ -90,6 +97,7 @@ impl Endpoints {
         workspace_host(host).then(|| Self {
             api: format!("https://{host}/api/"),
             edge: format!("https://{EDGE_HOST}"),
+            socket: format!("wss://{SOCKET_HOST}/"),
             server: Server::Slack { api_host: host.to_string() },
         })
     }
@@ -334,6 +342,85 @@ pub(crate) fn prepare(
     };
     headers.push(("Cookie", cookie));
     Ok(Prepared { url, headers, body })
+}
+
+/// The opening request of the live updates' socket: its address (the token in it, as the web
+/// client sends it) and headers in order (the browser's smaller set for a socket: no `Accept`,
+/// no `Sec-Fetch-*`, no client hints, no `Priority`), the `Host` left to the wire. Its `Debug`
+/// print leaves out the address's query and the cookie.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct Opening {
+    pub(crate) url: String,
+    pub(crate) headers: Vec<(&'static str, String)>,
+    /// `Sec-WebSocket-Key`, whose digest the server must answer with.
+    pub(crate) key: String,
+}
+
+impl std::fmt::Debug for Opening {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let url = self.url.split('?').next().unwrap_or_default();
+        let headers: Vec<&str> = self.headers.iter().map(|(n, _)| *n).collect();
+        f.debug_struct("Opening").field("url", &url).field("headers", &headers).finish_non_exhaustive()
+    }
+}
+
+/// The opening request of the live updates of a signed-in `session` (it needs the team).
+///
+/// Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the address's parameters
+/// and `start_args`, key for key as the official client sends them, and the socket's header set.
+pub(crate) fn opening(
+    credentials: &Credentials,
+    session: &Session,
+    endpoints: &Endpoints,
+    ids: &mut dyn Ids,
+    os: Os,
+) -> Result<Opening, SlackError> {
+    let Some(team) = &session.team else {
+        return Err(SlackError::Offline { why: "live updates need a signed-in workspace" });
+    };
+    let start_args = format!(
+        "?agent=client&org_wide_aware=true&agent_version={}&eac_cache_ts=true&cache_ts=0&name_tagging=true&only_self_subteams=true&connect_only=true&ms_latest=true",
+        session.version_ts
+    );
+    let gateway = format!("{team}-1");
+    let query = [
+        ("token", credentials.token()),
+        ("sync_desync", "1"),
+        ("slack_client", "desktop"),
+        ("start_args", start_args.as_str()),
+        ("no_query_on_subscribe", "1"),
+        ("flannel", "3"),
+        ("lazy_channels", "1"),
+        ("gateway_server", gateway.as_str()),
+        ("batch_presence_aware", "1"),
+    ];
+    let url = format!("{}?{}", endpoints.socket, pairs(query.into_iter()));
+    let key = crate::live::socket::base64(&hex_bytes(&ids.hex(16)));
+    let cookie = match credentials.cookie_ds() {
+        Some(ds) => format!("d={}; d-s={ds}", credentials.cookie()),
+        None => format!("d={}", credentials.cookie()),
+    };
+    let headers = vec![
+        ("Connection", "Upgrade".to_string()),
+        ("Pragma", "no-cache".to_string()),
+        ("Cache-Control", "no-cache".to_string()),
+        ("User-Agent", os.user_agent()),
+        ("Upgrade", "websocket".to_string()),
+        ("Origin", "https://app.slack.com".to_string()),
+        ("Sec-WebSocket-Version", "13".to_string()),
+        ("Accept-Language", "en-US,en;q=0.9".to_string()),
+        ("Cookie", cookie),
+        ("Sec-WebSocket-Key", key.clone()),
+    ];
+    Ok(Opening { url, headers, key })
+}
+
+/// The bytes of lowercase hex `s` (pairs of digits; anything else is left out).
+fn hex_bytes(s: &str) -> Vec<u8> {
+    s.as_bytes()
+        .chunks(2)
+        .filter_map(|p| std::str::from_utf8(p).ok().and_then(|h| u8::from_str_radix(h, 16).ok()))
+        .collect()
 }
 
 /// `k=v&k=v`, form-encoded.

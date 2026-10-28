@@ -362,6 +362,16 @@ impl Governor {
         Ok(())
     }
 
+    /// The live updates' socket may open now: the network is on and the caps have room. An
+    /// opening counts as one background request; what comes over the socket afterwards is not a
+    /// request and is not counted.
+    pub fn dial(&self) -> Result<(), SlackError> {
+        if !self.is_on() {
+            return Err(SlackError::Offline { why: "the network is switched off" });
+        }
+        self.count(Priority::Background)
+    }
+
     /// Requests let through so far.
     pub fn sent(&self) -> u32 {
         self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).total

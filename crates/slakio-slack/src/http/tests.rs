@@ -112,3 +112,24 @@ fn a_server_without_a_trusted_certificate_gets_nothing() {
         assert_eq!(e, net("the secure connection failed"));
     });
 }
+
+#[test]
+fn the_live_updates_reach_the_realtime_host_only() {
+    rt().block_on(async {
+        let endpoints = Endpoints::workspace("example.slack.com").unwrap();
+        let opening = |url: &str| Opening { url: url.to_string(), headers: Vec::new(), key: "k".to_string() };
+        for url in [
+            "wss://example.slack.com/?token=x",
+            "wss://wss-backup.slack.com/?token=x",
+            "wss://wss-primary.slack.com.evil.test/?token=x",
+            "ws://wss-primary.slack.com/?token=x",
+            "https://wss-primary.slack.com/?token=x",
+            "wss://edgeapi.slack.com/",
+        ] {
+            assert!(matches!(socket(&endpoints, &opening(url)).await, Err(e) if e == ONLY_SLACK), "{url}");
+        }
+        let local = Endpoints::local("127.0.0.1:9".parse().unwrap()).unwrap();
+        let other = socket(&local, &opening("ws://127.0.0.2:9/?token=x")).await;
+        assert!(matches!(other, Err(e) if e == ONLY_LOCAL));
+    });
+}
