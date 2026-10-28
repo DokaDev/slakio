@@ -43,12 +43,13 @@ fn a_second_process_reads_the_cache_but_never_writes_it() {
     first.put_snapshot(world.snapshot()).unwrap();
     let mut second = Store::open(&dir).unwrap().store;
     assert!(second.read_only(), "the lock is held: read-only");
-    assert_eq!(second.snapshot(&ids).unwrap().as_ref(), Some(world.snapshot()), "it reads what the first wrote");
+    let read = second.snapshot(&ids[..1]).unwrap();
+    assert_eq!(read, Some(world.snapshot().only(&ids[0])), "it reads what the first wrote");
     // Its writes are nothing.
     second.put_snapshot(World::new(4).snapshot()).unwrap();
     second.set_meta("k", "v").unwrap();
     assert!(second.rebuild().is_err());
-    assert_eq!(first.snapshot(&ids).unwrap().as_ref(), Some(world.snapshot()));
+    assert_eq!(first.snapshot(&ids[..1]).unwrap(), Some(world.snapshot().only(&ids[0])));
     assert_eq!(first.meta("k").unwrap(), None);
     drop(second);
     drop(first);
@@ -152,19 +153,21 @@ fn a_cache_rebuilt_while_in_use_is_still_the_sign_ins() {
     let named = scratch("rebuild-owner").join("cache");
     let world = World::new(3);
     let ids: Vec<_> = world.snapshot().workspaces.iter().map(|w| w.id.clone()).collect();
+    let (a, b) = (ids[0].as_str(), ids[1].as_str());
     let mut store = Store::open(&named).unwrap().store;
-    assert!(store.claim("T1 UA").unwrap());
+    assert!(store.claim(a, "UA").unwrap() && store.claim(b, "UB").unwrap());
     store.rebuild().unwrap();
-    assert_eq!(store.meta(OWNER).unwrap().as_deref(), Some("T1 UA"));
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap().as_deref(), Some("UA"));
+    assert_eq!(store.meta(&format!("{OWNER}{b}")).unwrap().as_deref(), Some("UB"), "every workspace's owner");
     store.put_snapshot(world.snapshot()).unwrap();
     // A second slakio of the same sign-in meanwhile uses it.
     let mut reader = Store::open(&named).unwrap().store;
-    assert!(reader.read_only() && reader.claim("T1 UA").unwrap());
+    assert!(reader.read_only() && reader.claim(a, "UA").unwrap());
     drop(reader);
     drop(store);
     // The next start keeps what the run wrote after the rebuild.
     let mut store = Store::open(&named).unwrap().store;
-    assert!(store.claim("T1 UA").unwrap());
+    assert!(store.claim(a, "UA").unwrap() && store.claim(b, "UB").unwrap());
     assert!(store.snapshot(&ids).unwrap().is_some());
 }
 
@@ -226,33 +229,66 @@ fn a_symbolic_link_in_place_of_the_cache_or_its_files_is_refused() {
 }
 
 #[test]
-fn the_cache_is_one_sign_ins_and_another_finds_it_empty() {
+fn each_workspaces_part_is_one_sign_ins_and_another_finds_it_empty() {
     let named = scratch("owner").join("cache");
     let world = World::new(3);
     let ids: Vec<_> = world.snapshot().workspaces.iter().map(|w| w.id.clone()).collect();
+    let (a, b) = (ids[0].as_str(), ids[1].as_str());
     let mut store = Store::open(&named).unwrap().store;
-    assert!(store.claim("T1 UA").unwrap());
+    assert!(store.claim(a, "UA").unwrap() && store.claim(b, "UB").unwrap());
     store.put_snapshot(world.snapshot()).unwrap();
-    assert!(store.claim("T1 UA").unwrap(), "the same sign-in keeps it");
+    assert!(store.claim(a, "UA").unwrap(), "the same sign-in keeps it");
     assert!(store.snapshot(&ids).unwrap().is_some());
-    // Another process while this one writes: another user's cache is not to be used.
+    // Another process while this one writes: another user's part is not to be used.
     let mut reader = Store::open(&named).unwrap().store;
     assert!(reader.read_only());
-    assert!(!reader.claim("T1 UB").unwrap());
-    assert!(reader.claim("T1 UA").unwrap());
+    assert!(!reader.claim(a, "UX").unwrap());
+    assert!(reader.claim(a, "UA").unwrap());
     drop(reader);
     drop(store);
-    // Another user of the same workspace signed in: nothing of the first one's is read.
+    // Another user of workspace A signed in: nothing of the first one's A is read; B's part,
+    // another sign-in's, is left as it was.
     let mut store = Store::open(&named).unwrap().store;
-    assert!(store.claim("T1 UB").unwrap());
-    assert_eq!(store.snapshot(&ids).unwrap(), None);
-    assert_eq!(store.meta(OWNER).unwrap().as_deref(), Some("T1 UB"));
+    assert!(store.claim(a, "UX").unwrap());
+    assert_eq!(store.snapshot(&ids[..1]).unwrap(), None);
+    assert!(store.snapshot(&ids[1..]).unwrap().is_some(), "B is kept");
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap().as_deref(), Some("UX"));
+    assert_eq!(store.meta(&format!("{OWNER}{b}")).unwrap().as_deref(), Some("UB"));
     drop(store);
-    // A cache that does not say whose it is: emptied too.
+    // A part that does not say whose it is: emptied too, and only it.
     let mut store = Store::open(&scratch("owner-none").join("cache")).unwrap().store;
     store.put_snapshot(world.snapshot()).unwrap();
-    assert!(store.claim("T1 UA").unwrap());
-    assert_eq!(store.snapshot(&ids).unwrap(), None);
+    assert!(store.claim(a, "UA").unwrap());
+    assert_eq!(store.snapshot(&ids[..1]).unwrap(), None);
+    assert!(store.snapshot(&ids[1..]).unwrap().is_some());
+}
+
+#[test]
+fn signing_out_of_one_workspace_removes_its_part_only() {
+    let named = scratch("forget").join("cache");
+    let world = World::new(3);
+    let ids: Vec<_> = world.snapshot().workspaces.iter().map(|w| w.id.clone()).collect();
+    let (a, b) = (ids[0].as_str(), ids[1].as_str());
+    let mut store = Store::open(&named).unwrap().store;
+    assert!(store.claim(a, "UA").unwrap() && store.claim(b, "UB").unwrap());
+    store.put_snapshot(world.snapshot()).unwrap();
+    let c = world.snapshot().conversations.iter().find(|c| c.workspace.as_str() == a).unwrap();
+    let t = slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() };
+    let (messages, _) = world.history(&c.id, None, 5);
+    let page = slakio_core::backend::Page { target: t.clone(), messages, complete: false, users: vec![] };
+    store.put_page(&page, None, 1).unwrap();
+    let mut reader = Store::open(&named).unwrap().store;
+    assert!(reader.forget(a).is_err(), "a reader removes nothing");
+    drop(reader);
+    store.forget(a).unwrap();
+    assert_eq!(store.snapshot(&ids[..1]).unwrap(), None);
+    assert_eq!(store.newest_page(&t, 5).unwrap(), None, "its messages went too");
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap(), None);
+    assert!(store.snapshot(&ids[1..]).unwrap().is_some());
+    assert_eq!(store.meta(&format!("{OWNER}{b}")).unwrap().as_deref(), Some("UB"));
+    // Set up again later: A is no one's any more.
+    store.rebuild().unwrap();
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap(), None);
 }
 
 #[test]
@@ -266,20 +302,22 @@ fn the_journal_is_wal_and_a_file_system_without_it_is_not_used() {
     assert!(wal(&mode).is_err(), "{mode}: refused");
 }
 
-#[cfg(unix)]
 #[test]
-fn a_claim_that_could_not_empty_the_cache_leaves_it_the_sign_in_it_was() {
-    use std::os::unix::fs::PermissionsExt;
+fn a_claim_that_could_not_empty_a_part_leaves_it_the_sign_in_it_was() {
     let named = scratch("claim-failed").join("cache");
+    let world = World::new(3);
+    let ids: Vec<_> = world.snapshot().workspaces.iter().map(|w| w.id.clone()).collect();
+    let a = ids[0].as_str();
     let mut store = Store::open(&named).unwrap().store;
-    assert!(store.claim("T1 UA").unwrap());
-    let dir = store.dir().to_path_buf();
-    // Its files cannot be removed: the rebuild for another sign-in fails.
-    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
-    let failed = store.claim("T1 UB");
-    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
-    assert!(failed.is_err());
-    // Set up again later (found damaged): still the first sign-in's, never the one that failed.
+    assert!(store.claim(a, "UA").unwrap());
+    store.put_snapshot(world.snapshot()).unwrap();
+    // Nothing can be written: emptying it for another sign-in fails.
+    store.conn.pragma_update(None, "query_only", true).unwrap();
+    assert!(store.claim(a, "UB").is_err());
+    store.conn.pragma_update(None, "query_only", false).unwrap();
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap().as_deref(), Some("UA"), "never the one that failed");
+    assert!(store.snapshot(&ids[..1]).unwrap().is_some(), "nothing half removed");
+    // Set up again later (found damaged): still the first sign-in's.
     store.rebuild().unwrap();
-    assert_eq!(store.meta(OWNER).unwrap().as_deref(), Some("T1 UA"));
+    assert_eq!(store.meta(&format!("{OWNER}{a}")).unwrap().as_deref(), Some("UA"));
 }

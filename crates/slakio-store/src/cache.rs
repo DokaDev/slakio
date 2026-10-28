@@ -15,6 +15,7 @@ use slakio_core::backend::{Page, Snapshot};
 use slakio_core::fault::Fault;
 use slakio_core::model::{Target, Ts, WorkspaceId};
 use std::collections::{HashSet, VecDeque};
+use std::sync::{Arc, Mutex, PoisonError};
 use tokio::sync::{mpsc, oneshot};
 
 /// The most freed pages one step gives back to the file system.
@@ -51,14 +52,22 @@ enum Job {
     },
     /// The next step of giving freed pages back.
     Vacuum,
+    Claim {
+        team: String,
+        user: String,
+        reply: std::sync::mpsc::Sender<Result<bool, Fault>>,
+    },
     Flush(std::sync::mpsc::Sender<()>),
 }
 
 /// The cache's thread, as its users see it. Cloned freely; the thread ends with the last clone.
+/// Every workspace's backend shares one: the conversations any of them asked for are kept from
+/// pruning together.
 #[derive(Clone, Debug)]
 pub struct Cache {
     tx: mpsc::UnboundedSender<Job>,
     read_only: bool,
+    protect: Arc<Mutex<HashSet<Target>>>,
 }
 
 impl Cache {
@@ -69,7 +78,7 @@ impl Cache {
         std::thread::Builder::new()
             .name("slakio-cache".into())
             .spawn(move || run(store, caps, &*clock, &*on_fault, rx))?;
-        Ok(Self { tx, read_only })
+        Ok(Self { tx, read_only, protect: Arc::default() })
     }
 
     /// Another process writes the cache: this one only reads it.
@@ -101,16 +110,35 @@ impl Cache {
         let _ = self.tx.send(Job::PutPage { page: Box::new(page), before });
     }
 
-    /// Prune to the caps, never touching `protect`.
-    pub fn prune(&self, protect: HashSet<Target>) {
-        let _ = self.tx.send(Job::Prune { protect, reply: None });
+    /// Keep `target` from pruning for the life of the process (a pane may show it).
+    pub fn protect(&self, target: Target) {
+        self.protect.lock().unwrap_or_else(PoisonError::into_inner).insert(target);
+    }
+
+    fn protected(&self) -> HashSet<Target> {
+        self.protect.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+
+    /// Prune to the caps, never touching a conversation kept from it ([`Cache::protect`]), of
+    /// whichever workspace.
+    pub fn prune(&self) {
+        let _ = self.tx.send(Job::Prune { protect: self.protected(), reply: None });
     }
 
     /// [`Cache::prune`], and what it removed.
-    pub async fn pruned(&self, protect: HashSet<Target>) -> Option<Pruned> {
+    pub async fn pruned(&self) -> Option<Pruned> {
         let (reply, answer) = oneshot::channel();
-        self.tx.send(Job::Prune { protect, reply: Some(reply) }).ok()?;
+        self.tx.send(Job::Prune { protect: self.protected(), reply: Some(reply) }).ok()?;
         answer.await.ok()
+    }
+
+    /// Make workspace `team`'s part `user`'s ([`Store::claim`]), waiting at most `wait` (`None`
+    /// when it took longer, or the thread is gone).
+    pub fn claim(&self, team: &str, user: &str, wait: std::time::Duration) -> Option<Result<bool, Fault>> {
+        let (reply, answer) = std::sync::mpsc::channel();
+        let job = Job::Claim { team: team.to_owned(), user: user.to_owned(), reply };
+        self.tx.send(job).ok()?;
+        answer.recv_timeout(wait).ok()
     }
 
     /// Wait (at most `wait`) until every job asked for so far is done: before the process ends,
@@ -188,6 +216,9 @@ fn run(
                 Ok(false) => {}
                 Err(e) => failed(&mut store, &e),
             },
+            Job::Claim { team, user, reply } => {
+                let _ = reply.send(store.claim(&team, &user));
+            }
             Job::Flush(done) => {
                 let _ = done.send(());
             }

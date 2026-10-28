@@ -284,8 +284,10 @@ async fn a_conversation_asked_for_during_the_run_is_never_pruned() {
         r.backend_next().await;
         assert!(matches!(r.ui_next().await.event, Event::CachedHistory(_)), "{t:?} was pruned");
     }
-    let all: std::collections::HashSet<Target> = std::collections::HashSet::new();
-    let pruned = r.cache.pruned(all).await.unwrap();
+    drop(r);
+    // The next run has asked for nothing yet: its prune takes them.
+    let r = run(&dir, &ws, caps, false).await;
+    let pruned = r.cache.pruned().await.unwrap();
     assert!(pruned.conversations >= 4, "with nothing protected, the next prune takes them: {pruned:?}");
     drop(r);
     let mut r = run(&dir, &ws, Caps::default(), false).await;
@@ -364,4 +366,77 @@ async fn a_busy_cache_never_holds_a_request_back() {
     let got = tokio::time::timeout(Duration::from_secs(5), ui.rx.recv()).await.unwrap().unwrap();
     assert!(matches!(got.event, Event::Booted(_)), "{got:?}");
     drop(release);
+}
+
+/// A second front, for workspace `workspace`, on the same cache as `r`.
+fn second_front(r: &Run, workspace: &WorkspaceId) -> (BackendHandle, BackendEnd) {
+    let (inner, backend) = BackendHandle::pair(CAPS, 64);
+    let ui = layer::serve(inner, r.cache.clone(), workspace.clone(), layer::Waits::default(), Box::new(|_| {}));
+    (ui, backend)
+}
+
+#[tokio::test]
+async fn two_workspaces_share_one_cache_and_each_keeps_its_own_part() {
+    let (dir, w) = (scratch("two"), world());
+    let (a, b) = (w.snapshot().workspaces[0].id.clone(), w.snapshot().workspaces[1].id.clone());
+    let mut r = run(&dir, &a, Caps::default(), false).await;
+    // Each workspace claimed through the cache's thread, for its own user.
+    let wait = Duration::from_secs(5);
+    let c = r.cache.clone();
+    let claims =
+        tokio::task::spawn_blocking(move || (c.claim(a.as_str(), "UA", wait), c.claim(b.as_str(), "UB", wait)));
+    let (a_claim, b_claim) = claims.await.unwrap();
+    assert!(matches!((a_claim, b_claim), (Some(Ok(true)), Some(Ok(true)))));
+    let (a, b) = (w.snapshot().workspaces[0].id.clone(), w.snapshot().workspaces[1].id.clone());
+    let (mut ui_b, mut end_b) = second_front(&r, &b);
+    // Both boot; each answer is of its own workspace (B's backend even names A's data: not kept).
+    r.ask(1, Command::Boot);
+    ui_b.send(Request { id: Generation(2), workspace: Some(b.clone()), command: Command::Boot }).unwrap();
+    let req_a = r.backend_next().await;
+    let req_b = end_b.rx.recv().await.unwrap();
+    r.answer(req_a.id, Event::Booted(Box::new(w.snapshot().only(&a)))).await;
+    let whole = w.snapshot().clone();
+    end_b.tx.send(Envelope { generation: req_b.id, event: Event::Booted(Box::new(whole)) }).await.unwrap();
+    r.ui_next().await;
+    ui_b.rx.recv().await.unwrap();
+    // A boots again, smaller: B's part is not touched.
+    r.ask(3, Command::Boot);
+    let again = r.backend_next().await;
+    let mut smaller = w.snapshot().only(&a);
+    smaller.conversations.truncate(1);
+    r.answer(again.id, Event::Booted(Box::new(smaller.clone()))).await;
+    while !matches!(r.ui_next().await.event, Event::Booted(_)) {}
+    r.settled().await;
+    r.no_faults();
+    drop((r, ui_b, end_b));
+    let store = open(&dir, false).await;
+    assert_eq!(store.snapshot(std::slice::from_ref(&a)).unwrap(), Some(smaller));
+    assert_eq!(store.snapshot(std::slice::from_ref(&b)).unwrap(), Some(w.snapshot().only(&b)), "B's own part");
+}
+
+#[tokio::test]
+async fn a_conversation_one_workspace_shows_is_kept_from_another_workspaces_prune() {
+    let (dir, w) = (scratch("two-protect"), world());
+    first_run(&dir, &w).await;
+    let a = w.snapshot().workspaces[0].id.clone();
+    let b = w.snapshot().workspaces[1].id.clone();
+    let mut r = run(&dir, &a, Caps { max_bytes: 1, ..Caps::default() }, false).await;
+    let shown = target(&w, "general");
+    r.ask(1, history(&shown, None));
+    r.backend_next().await;
+    assert!(matches!(r.ui_next().await.event, Event::CachedHistory(_)));
+    // B's front boots and prunes (after its first boot) with a one-byte cap.
+    let (mut ui_b, mut end_b) = second_front(&r, &b);
+    ui_b.send(Request { id: Generation(2), workspace: Some(b.clone()), command: Command::Boot }).unwrap();
+    let req = end_b.rx.recv().await.unwrap();
+    end_b
+        .tx
+        .send(Envelope { generation: req.id, event: Event::Booted(Box::new(w.snapshot().only(&b))) })
+        .await
+        .unwrap();
+    while !matches!(ui_b.rx.recv().await.unwrap().event, Event::Booted(_)) {}
+    r.settled().await;
+    r.ask(3, history(&shown, None));
+    r.backend_next().await;
+    assert!(matches!(r.ui_next().await.event, Event::CachedHistory(_)), "A's open conversation outlived B's prune");
 }

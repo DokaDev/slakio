@@ -32,8 +32,9 @@ pub const DIR: &str = "slakio-store";
 pub const FILE: &str = "cache.sqlite3";
 /// The writer's lock.
 const LOCK: &str = "cache.lock";
-/// The key under which the cache keeps whose it is.
-const OWNER: &str = "owner";
+/// The prefix of the keys under which the cache keeps whose each workspace's part is
+/// (`owner:<team>` = the signed-in user).
+const OWNER: &str = "owner:";
 /// SQLite's files beside the database.
 const SIDE: [&str; 2] = ["-wal", "-shm"];
 /// How long a held writer's lock is tried again before the cache is opened read-only.
@@ -47,8 +48,9 @@ pub struct Store {
     dir: PathBuf,
     /// Held while this process writes the cache (`None`: read-only).
     lock: Option<File>,
-    /// Whose it is, once claimed: kept again when it is set up again.
-    owner: Option<String>,
+    /// Whose each workspace's part is, once claimed (team, user): kept again when it is set up
+    /// again.
+    owners: Vec<(String, String)>,
 }
 
 impl std::fmt::Debug for Store {
@@ -103,7 +105,7 @@ impl Store {
         let path = dir.join(FILE);
         if !locked(&lock, wait).map_err(|e| OpenError::Failed(io_fault(&e, &lock_path)))? {
             let conn = open_read_only(&path).ok_or(OpenError::InUse)?;
-            let store = Store { conn, dir: dir.to_path_buf(), lock: None, owner: None };
+            let store = Store { conn, dir: dir.to_path_buf(), lock: None, owners: Vec::new() };
             return Ok(Opened { store, rebuilt: false });
         }
         let (conn, rebuilt) = match open_writer(&path) {
@@ -114,7 +116,7 @@ impl Store {
             }
             Err(Unusable::Fault(f)) => return Err(OpenError::Failed(f)),
         };
-        Ok(Opened { store: Store { conn, dir: dir.to_path_buf(), lock: Some(lock), owner: None }, rebuilt })
+        Ok(Opened { store: Store { conn, dir: dir.to_path_buf(), lock: Some(lock), owners: Vec::new() }, rebuilt })
     }
 
     /// Another process writes the cache: this one only reads it.
@@ -122,22 +124,44 @@ impl Store {
         self.lock.is_none()
     }
 
-    /// Make the cache `owner`'s (the signed-in workspace and user): one that another sign-in
-    /// kept, or that does not say whose it is, is emptied first. `Ok(false)`: it is not
-    /// `owner`'s and this process only reads it, so it is not to be used.
-    pub fn claim(&mut self, owner: &str) -> Result<bool, Fault> {
-        if self.meta(OWNER)?.as_deref() == Some(owner) {
-            self.owner = Some(owner.to_owned());
+    /// Make workspace `team`'s part of the cache `user`'s (the one signed in to it): a part that
+    /// another sign-in kept, or that does not say whose it is, is emptied first; the other
+    /// workspaces' parts are left as they are. `Ok(false)`: it is not `user`'s and this process
+    /// only reads the cache, so that part is not to be used.
+    pub fn claim(&mut self, team: &str, user: &str) -> Result<bool, Fault> {
+        let key = format!("{OWNER}{team}");
+        if self.meta(&key)?.as_deref() == Some(user) {
+            self.own(team, user);
             return Ok(true);
         }
         if self.read_only() {
             return Ok(false);
         }
-        // Only once emptied is it `owner`'s: a rebuild that failed leaves it the one it was.
-        self.rebuild()?;
-        self.set_meta(OWNER, owner)?;
-        self.owner = Some(owner.to_owned());
+        // Emptied and given its owner in one transaction: one that fails leaves it as it was.
+        let tx = self.conn.transaction().map_err(|e| fault(&e))?;
+        forget_in(&tx, team).map_err(|e| fault(&e))?;
+        tx.execute("INSERT INTO meta (key, value) VALUES (?1, ?2)", [&key, user]).map_err(|e| fault(&e))?;
+        tx.commit().map_err(|e| fault(&e))?;
+        self.own(team, user);
         Ok(true)
+    }
+
+    fn own(&mut self, team: &str, user: &str) {
+        self.owners.retain(|(t, _)| t != team);
+        self.owners.push((team.to_owned(), user.to_owned()));
+    }
+
+    /// Remove everything of workspace `team` (signed out of): its snapshot, messages and owner;
+    /// the other workspaces' parts stay. The writer only.
+    pub fn forget(&mut self, team: &str) -> Result<(), Fault> {
+        if self.read_only() {
+            return Err(Fault::other("cache: read-only, nothing removed"));
+        }
+        let tx = self.conn.transaction().map_err(|e| fault(&e))?;
+        forget_in(&tx, team).map_err(|e| fault(&e))?;
+        tx.commit().map_err(|e| fault(&e))?;
+        self.owners.retain(|(t, _)| t != team);
+        Ok(())
     }
 
     /// The directory the cache is in.
@@ -155,10 +179,10 @@ impl Store {
         drop(gone);
         remove_files(&self.dir)?;
         self.conn = open_writer(&self.dir.join(FILE)).map_err(Unusable::into_fault)?;
-        match &self.owner {
-            Some(owner) => self.set_meta(OWNER, owner),
-            None => Ok(()),
+        for (team, user) in &self.owners {
+            self.set_meta(&format!("{OWNER}{team}"), user)?;
         }
+        Ok(())
     }
 
     /// A value the cache keeps about itself.
@@ -268,6 +292,18 @@ fn side_path(path: &Path, side: &str) -> PathBuf {
     let mut s = path.as_os_str().to_os_string();
     s.push(side);
     PathBuf::from(s)
+}
+
+/// Delete every row of workspace `team` inside `tx`, and what the cache keeps about it.
+fn forget_in(tx: &rusqlite::Transaction<'_>, team: &str) -> rusqlite::Result<()> {
+    for table in ["workspaces", "users", "sections", "conversations", "saved", "messages", "seen"] {
+        let column = if table == "workspaces" { "id" } else { "workspace" };
+        tx.execute(&format!("DELETE FROM {table} WHERE {column} = ?1"), [team])?;
+    }
+    for prefix in ["snapshot.taken:", "snapshot.saved:", OWNER] {
+        tx.execute("DELETE FROM meta WHERE key = ?1", [format!("{prefix}{team}")])?;
+    }
+    Ok(())
 }
 
 /// Remove the database and its journal files in `dir` (the lock stays: [`remove`] takes it):

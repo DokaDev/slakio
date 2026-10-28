@@ -1,6 +1,7 @@
-//! The last boot snapshot: written whole when the backend answers a boot, read back whole at
-//! the next start. One snapshot is kept; a new one replaces it, and what the cache held for a
-//! workspace the new one no longer lists (signed in elsewhere) goes with it.
+//! The last boot snapshot of each workspace: written when the backend answers that workspace's
+//! boot, read back at the next start. A workspace's new snapshot replaces its own part only; the
+//! other workspaces' parts are never touched by it (signing out of one removes its part:
+//! [`Store::forget`]).
 //!
 //! Every list keeps its order (`ord`); every enum is a small number, and one this version does
 //! not know is damage (an error), never a guess.
@@ -200,15 +201,20 @@ fn saved(r: &Row<'_>) -> rusqlite::Result<SavedItem> {
     })
 }
 
-fn write(tx: &Transaction<'_>, s: &Snapshot) -> rusqlite::Result<()> {
-    for table in ["workspaces", "sections", "conversations", "saved"] {
-        tx.execute(&format!("DELETE FROM {table}"), [])?;
+/// Keep workspace `ws`'s part of `s` in place of the one before; the other workspaces' parts
+/// are not touched. `ord` is its place in `s`.
+fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> rusqlite::Result<()> {
+    let id = ws.as_str();
+    for table in ["sections", "conversations", "saved"] {
+        tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?1"), [id])?;
     }
-    tx.execute("UPDATE users SET ord = NULL", [])?;
-    for (i, w) in s.workspaces.iter().enumerate() {
+    tx.execute("DELETE FROM workspaces WHERE id = ?1", [id])?;
+    tx.execute("UPDATE users SET ord = NULL WHERE workspace = ?1", [id])?;
+    let s = s.only(ws);
+    for w in &s.workspaces {
         tx.execute(
-            "INSERT INTO workspaces (ord, id, name, color, me) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![int(i as u64)?, w.id.as_str(), w.name.unsanitized(), w.color.0, w.me.as_str()],
+            "INSERT INTO workspaces (id, ord, name, color, me) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![w.id.as_str(), int(ord as u64)?, w.name.unsanitized(), w.color.0, w.me.as_str()],
         )?;
     }
     for (i, u) in s.users.iter().enumerate() {
@@ -216,14 +222,8 @@ fn write(tx: &Transaction<'_>, s: &Snapshot) -> rusqlite::Result<()> {
     }
     for (i, sec) in s.sections.iter().enumerate() {
         tx.execute(
-            "INSERT INTO sections (ord, id, workspace, name, kind) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                int(i as u64)?,
-                sec.id.as_str(),
-                sec.workspace.as_str(),
-                sec.name.unsanitized(),
-                section_code(sec.kind)
-            ],
+            "INSERT INTO sections (workspace, ord, id, name, kind) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, int(i as u64)?, sec.id.as_str(), sec.name.unsanitized(), section_code(sec.kind)],
         )?;
     }
     for (i, c) in s.conversations.iter().enumerate() {
@@ -233,31 +233,36 @@ fn write(tx: &Transaction<'_>, s: &Snapshot) -> rusqlite::Result<()> {
         put_saved(tx, i, item)?;
     }
     let known = if s.saved.is_some() { "known" } else { "unknown" };
-    for (k, v) in [("snapshot.taken", s.taken.0.to_string()), ("snapshot.saved", known.to_string())] {
+    for (k, v) in [("snapshot.taken:", s.taken.0.to_string()), ("snapshot.saved:", known.to_string())] {
         tx.execute(
             "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = ?2",
-            [k, &v],
+            [&format!("{k}{id}"), &v],
         )?;
-    }
-    // A workspace no longer listed: nothing of it stays.
-    for table in ["users", "messages", "seen"] {
-        tx.execute(&format!("DELETE FROM {table} WHERE workspace NOT IN (SELECT id FROM workspaces)"), [])?;
     }
     Ok(())
 }
 
-fn all<T>(conn: &Connection, sql: &str, f: impl Fn(&Row<'_>) -> rusqlite::Result<T>) -> rusqlite::Result<Vec<T>> {
+fn all<T>(
+    conn: &Connection,
+    sql: &str,
+    ws: &str,
+    f: impl Fn(&Row<'_>) -> rusqlite::Result<T>,
+) -> rusqlite::Result<Vec<T>> {
     let mut st = conn.prepare(sql)?;
-    st.query_map([], |r| f(r))?.collect()
+    st.query_map([ws], |r| f(r))?.collect()
 }
 
-fn read(conn: &Connection) -> rusqlite::Result<Option<Snapshot>> {
+/// Workspace `ws`'s part, when the cache has one.
+fn read(conn: &Connection, ws: &WorkspaceId) -> rusqlite::Result<Option<Snapshot>> {
     use rusqlite::OptionalExtension;
-    let meta =
-        |k: &str| conn.query_row("SELECT value FROM meta WHERE key = ?1", [k], |r| r.get::<_, String>(0)).optional();
-    let (Some(taken), Some(known)) = (meta("snapshot.taken")?, meta("snapshot.saved")?) else { return Ok(None) };
+    let id = ws.as_str();
+    let meta = |k: &str| {
+        conn.query_row("SELECT value FROM meta WHERE key = ?1", [format!("{k}{id}")], |r| r.get::<_, String>(0))
+            .optional()
+    };
+    let (Some(taken), Some(known)) = (meta("snapshot.taken:")?, meta("snapshot.saved:")?) else { return Ok(None) };
     let taken = Ts(taken.parse().map_err(|_| damaged("snapshot time"))?);
-    let workspaces = all(conn, "SELECT * FROM workspaces ORDER BY ord", |r| {
+    let workspaces = all(conn, "SELECT * FROM workspaces WHERE id = ?1", id, |r| {
         Ok(Workspace {
             id: WorkspaceId::new(r.get::<_, String>("id")?),
             name: Remote::new(r.get::<_, String>("name")?),
@@ -265,8 +270,11 @@ fn read(conn: &Connection) -> rusqlite::Result<Option<Snapshot>> {
             me: UserId::new(r.get::<_, String>("me")?),
         })
     })?;
-    let users = all(conn, "SELECT * FROM users WHERE ord IS NOT NULL ORDER BY ord", user)?;
-    let sections = all(conn, "SELECT * FROM sections ORDER BY ord", |r| {
+    if workspaces.is_empty() {
+        return Ok(None);
+    }
+    let users = all(conn, "SELECT * FROM users WHERE workspace = ?1 AND ord IS NOT NULL ORDER BY ord", id, user)?;
+    let sections = all(conn, "SELECT * FROM sections WHERE workspace = ?1 ORDER BY ord", id, |r| {
         Ok(Section {
             id: SectionId::new(r.get::<_, String>("id")?),
             workspace: WorkspaceId::new(r.get::<_, String>("workspace")?),
@@ -274,9 +282,9 @@ fn read(conn: &Connection) -> rusqlite::Result<Option<Snapshot>> {
             kind: section_kind(r.get("kind")?)?,
         })
     })?;
-    let conversations = all(conn, "SELECT * FROM conversations ORDER BY ord", conversation)?;
+    let conversations = all(conn, "SELECT * FROM conversations WHERE workspace = ?1 ORDER BY ord", id, conversation)?;
     let saved = match known.as_str() {
-        "known" => Some(all(conn, "SELECT * FROM saved ORDER BY ord", saved)?),
+        "known" => Some(all(conn, "SELECT * FROM saved WHERE workspace = ?1 ORDER BY ord", id, saved)?),
         "unknown" => None,
         _ => return Err(damaged("saved marker")),
     };
@@ -284,24 +292,46 @@ fn read(conn: &Connection) -> rusqlite::Result<Option<Snapshot>> {
 }
 
 impl Store {
-    /// Keep `snapshot` as the last boot's, in place of the one before (the writer only).
+    /// Keep each workspace's part of `snapshot` as its last boot's, in place of the one before;
+    /// a workspace `snapshot` does not list keeps its own (the writer only).
     pub fn put_snapshot(&mut self, snapshot: &Snapshot) -> rusqlite::Result<()> {
         if self.read_only() {
             return Ok(());
         }
         let tx = self.conn.transaction()?;
-        write(&tx, snapshot)?;
+        for (ord, w) in snapshot.workspaces.iter().enumerate() {
+            write(&tx, ord, &w.id, snapshot)?;
+        }
         tx.commit()
     }
 
-    /// The last boot's snapshot when it lists exactly the workspaces `expected` (in order):
-    /// `None` when there is none, or it is another sign-in's.
+    /// The last boots' snapshot of the workspaces `expected`, in that order, when the cache has a
+    /// part of each one; `None` otherwise.
     pub fn snapshot(&self, expected: &[WorkspaceId]) -> Result<Option<Snapshot>, rusqlite::Error> {
         // One read transaction: what another process commits meanwhile is not half seen.
         let tx = self.conn.unchecked_transaction()?;
-        let s = read(&tx)?;
+        let mut whole = Snapshot { saved: Some(Vec::new()), ..Snapshot::default() };
+        let mut unknown = false;
+        for ws in expected {
+            let Some(s) = read(&tx, ws)? else {
+                tx.commit()?;
+                return Ok(None);
+            };
+            whole.workspaces.extend(s.workspaces);
+            whole.users.extend(s.users);
+            whole.sections.extend(s.sections);
+            whole.conversations.extend(s.conversations);
+            match s.saved {
+                Some(items) => whole.saved.get_or_insert_with(Vec::new).extend(items),
+                None => unknown = true,
+            }
+            whole.taken = whole.taken.max(s.taken);
+        }
         tx.commit()?;
-        Ok(s.filter(|s| s.workspaces.iter().map(|w| &w.id).eq(expected.iter())))
+        if unknown {
+            whole.saved = None;
+        }
+        Ok((!expected.is_empty()).then_some(whole))
     }
 }
 

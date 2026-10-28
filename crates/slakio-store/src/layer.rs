@@ -12,15 +12,15 @@
 //! - Everything else goes through untouched, both ways: the UI's request still gets exactly one
 //!   answer of the backend's (a cached one is extra and ends nothing).
 //!
-//! Every conversation asked for during the run is kept from pruning (a pane may show it). The
-//! cache is pruned after the first boot the backend answers, and after every
+//! Every conversation asked for during the run, by any workspace's front, is kept from pruning
+//! (a pane may show it); one cache is shared by every workspace's front. The cache is pruned after the first boot the backend answers, and after every
 //! [`PRUNE_EVERY`] pages.
 
 use crate::cache::Cache;
 use slakio_core::backend::{BackendEnd, BackendHandle, Command, Envelope, Event, Generation, Request};
 use slakio_core::fault::Fault;
 use slakio_core::model::{Target, Ts, WorkspaceId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Duration;
 
 /// How many requests, and how many events, wait in the handle's channels at most.
@@ -87,13 +87,12 @@ struct Front {
 async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
     let cache = &front.cache;
     let mut asked: HashMap<Generation, Asked> = HashMap::new();
-    let mut protect: HashSet<Target> = HashSet::new();
     let (mut pages, mut booted) = (0u32, false);
     loop {
         tokio::select! {
             request = end.rx.recv() => {
                 let Some(request) = request else { return };
-                if let Some(cached) = ask(&request, &front, &mut protect, &mut asked).await
+                if let Some(cached) = ask(&request, &front, &mut asked).await
                     && end.tx.send(cached).await.is_err()
                 {
                     return;
@@ -110,17 +109,18 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                 let Some(envelope) = envelope else { return };
                 match (asked.remove(&envelope.generation), &envelope.event) {
                     (Some(Asked::Boot), Event::Booted(s)) => {
-                        cache.put_snapshot((**s).clone());
+                        // Of this workspace only: an answer never writes another's part.
+                        cache.put_snapshot(s.only(&front.workspace));
                         if !booted {
                             booted = true;
-                            cache.prune(protect.clone());
+                            cache.prune();
                         }
                     }
                     (Some(Asked::Page { before }), Event::History(p)) => {
                         cache.put_page((**p).clone(), before);
                         pages += 1;
                         if pages % PRUNE_EVERY == 0 {
-                            cache.prune(protect.clone());
+                            cache.prune();
                         }
                     }
                     _ => {}
@@ -134,12 +134,7 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
 }
 
 /// Note what `request` asks for, and the cache's answer to give first, if it has one.
-async fn ask(
-    request: &Request,
-    front: &Front,
-    protect: &mut HashSet<Target>,
-    asked: &mut HashMap<Generation, Asked>,
-) -> Option<Envelope> {
+async fn ask(request: &Request, front: &Front, asked: &mut HashMap<Generation, Asked>) -> Option<Envelope> {
     let id = request.id;
     match &request.command {
         Command::Boot => {
@@ -151,7 +146,7 @@ async fn ask(
         Command::History { target: target @ Target::Conversation { workspace: ws, .. }, before, limit }
             if *ws == front.workspace =>
         {
-            protect.insert(target.clone());
+            front.cache.protect(target.clone());
             asked.insert(id, Asked::Page { before: *before });
             if before.is_some() {
                 return None;

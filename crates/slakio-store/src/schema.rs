@@ -41,6 +41,43 @@ pub const MIGRATIONS: &[&str] = &[
          PRIMARY KEY (workspace, conversation, ts));
      CREATE TABLE seen (workspace TEXT NOT NULL, conversation TEXT NOT NULL, at INTEGER NOT NULL,
          PRIMARY KEY (workspace, conversation)) WITHOUT ROWID;",
+    // 2: a snapshot per workspace, so each workspace's boot replaces its own part only: the
+    // lists are in order within their workspace, the boot's time and whether its saved items
+    // are known kept per workspace, and whose each workspace's part is (`owner:<team>` = the
+    // user) in place of one owner of the whole cache ("<team> <user>").
+    "CREATE TABLE workspaces2 (id TEXT PRIMARY KEY, ord INTEGER NOT NULL, name TEXT NOT NULL,
+         color INTEGER NOT NULL, me TEXT NOT NULL) WITHOUT ROWID;
+     INSERT INTO workspaces2 SELECT id, ord, name, color, me FROM workspaces;
+     DROP TABLE workspaces;
+     ALTER TABLE workspaces2 RENAME TO workspaces;
+     CREATE TABLE sections2 (workspace TEXT NOT NULL, ord INTEGER NOT NULL, id TEXT NOT NULL,
+         name TEXT NOT NULL, kind INTEGER NOT NULL, PRIMARY KEY (workspace, ord)) WITHOUT ROWID;
+     INSERT INTO sections2 SELECT workspace, ord, id, name, kind FROM sections;
+     DROP TABLE sections;
+     ALTER TABLE sections2 RENAME TO sections;
+     CREATE TABLE conversations2 (workspace TEXT NOT NULL, ord INTEGER NOT NULL, id TEXT NOT NULL,
+         kind INTEGER NOT NULL, private INTEGER NOT NULL, peers TEXT NOT NULL, name TEXT NOT NULL,
+         section TEXT NOT NULL, external INTEGER NOT NULL, muted INTEGER NOT NULL,
+         unread INTEGER NOT NULL, mentions INTEGER NOT NULL, PRIMARY KEY (workspace, ord)) WITHOUT ROWID;
+     INSERT INTO conversations2 SELECT workspace, ord, id, kind, private, peers, name, section, external, muted,
+         unread, mentions FROM conversations;
+     DROP TABLE conversations;
+     ALTER TABLE conversations2 RENAME TO conversations;
+     CREATE TABLE saved2 (workspace TEXT NOT NULL, ord INTEGER NOT NULL, id TEXT NOT NULL,
+         conversation TEXT NOT NULL, ts INTEGER NOT NULL, thread INTEGER NOT NULL,
+         author TEXT NOT NULL, text TEXT NOT NULL, created INTEGER NOT NULL, due INTEGER,
+         state INTEGER NOT NULL, PRIMARY KEY (workspace, ord)) WITHOUT ROWID;
+     INSERT INTO saved2 SELECT workspace, ord, id, conversation, ts, thread, author, text, created, due, state
+         FROM saved;
+     DROP TABLE saved;
+     ALTER TABLE saved2 RENAME TO saved;
+     INSERT INTO meta (key, value) SELECT 'snapshot.taken:' || w.id, m.value FROM workspaces w, meta m
+         WHERE m.key = 'snapshot.taken';
+     INSERT INTO meta (key, value) SELECT 'snapshot.saved:' || w.id, m.value FROM workspaces w, meta m
+         WHERE m.key = 'snapshot.saved';
+     INSERT INTO meta (key, value) SELECT 'owner:' || substr(value, 1, instr(value, ' ') - 1),
+         substr(value, instr(value, ' ') + 1) FROM meta WHERE key = 'owner' AND instr(value, ' ') > 1;
+     DELETE FROM meta WHERE key IN ('snapshot.taken', 'snapshot.saved', 'owner');",
 ];
 
 /// Where a database stands against `migrations`.

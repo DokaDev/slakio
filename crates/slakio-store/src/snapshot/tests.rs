@@ -6,6 +6,13 @@ fn ids(s: &Snapshot) -> Vec<WorkspaceId> {
     s.workspaces.iter().map(|w| w.id.clone()).collect()
 }
 
+/// Each workspace's part comes back as that workspace's part of `s`.
+fn assert_parts(store: &Store, s: &Snapshot, what: &str) {
+    for ws in ids(s) {
+        assert_eq!(store.snapshot(std::slice::from_ref(&ws)).unwrap(), Some(s.only(&ws)), "{what}: {ws}");
+    }
+}
+
 #[test]
 fn a_snapshot_comes_back_exactly_as_it_was_kept() {
     for (tag, world) in [("demo", World::demo()), ("seed7", World::new(7)), ("seed11", World::new(11))] {
@@ -13,7 +20,9 @@ fn a_snapshot_comes_back_exactly_as_it_was_kept() {
         let s = world.snapshot();
         assert!(s.users.iter().any(|u| matches!(u.org, Org::External(_))), "{tag}: the world has a Slack Connect peer");
         store.put_snapshot(s).unwrap();
-        assert_eq!(store.snapshot(&ids(s)).unwrap().as_ref(), Some(s), "{tag}");
+        assert_parts(&store, s, tag);
+        let both = store.snapshot(&ids(s)).unwrap().unwrap();
+        assert_eq!(both.workspaces, s.workspaces, "{tag}: both, in the order asked");
     }
 }
 
@@ -51,36 +60,34 @@ fn nothing_kept_or_another_sign_ins_snapshot_is_none() {
     assert_eq!(store.snapshot(&ids(s)).unwrap(), None);
     store.put_snapshot(s).unwrap();
     assert_eq!(store.snapshot(&[WorkspaceId::new("TOTHER")]).unwrap(), None);
-    assert_eq!(store.snapshot(&ids(s)[..1]).unwrap(), None, "a part of it is not it");
+    let mut with_other = ids(s);
+    with_other.push(WorkspaceId::new("TOTHER"));
+    assert_eq!(store.snapshot(&with_other).unwrap(), None, "all asked for, or nothing");
+    assert_eq!(store.snapshot(&[]).unwrap(), None);
+    assert_eq!(store.snapshot(&ids(s)[..1]).unwrap(), Some(s.only(&ids(s)[0])), "one workspace's part alone");
 }
 
 #[test]
-fn a_new_snapshot_replaces_the_last_and_drops_the_workspaces_it_no_longer_lists() {
+fn a_workspaces_new_snapshot_replaces_its_own_part_and_never_another_s() {
     let world = World::new(5);
     let mut store = writer("snap-replace");
     store.put_snapshot(world.snapshot()).unwrap();
+    let (first, second) = (ids(world.snapshot())[0].clone(), ids(world.snapshot())[1].clone());
     let t = target(&world, "general");
     store.put_page(&page(&world, &t, None, 10), None, 100).unwrap();
-    // Signed in to the first workspace alone now.
-    let mut alone = world.snapshot().clone();
-    let first = alone.workspaces[0].id.clone();
-    alone.workspaces.truncate(1);
-    alone.users.retain(|u| u.workspace == first);
-    alone.sections.retain(|s| s.workspace == first);
-    alone.conversations.retain(|c| c.workspace == first);
-    store.put_snapshot(&alone).unwrap();
-    assert_eq!(store.snapshot(std::slice::from_ref(&first)).unwrap().as_ref(), Some(&alone));
-    assert!(store.newest_page(&t, 10).unwrap().is_some(), "the workspace still listed keeps its messages");
-    let gone: i64 = store
+    // The second workspace's boot again, with a conversation fewer.
+    let mut b = world.snapshot().only(&second);
+    b.conversations.pop();
+    store.put_snapshot(&b).unwrap();
+    assert_eq!(store.snapshot(std::slice::from_ref(&second)).unwrap().as_ref(), Some(&b));
+    assert_eq!(store.snapshot(std::slice::from_ref(&first)).unwrap(), Some(world.snapshot().only(&first)));
+    assert!(store.newest_page(&t, 10).unwrap().is_some(), "the other workspace keeps its messages");
+    // Nothing of a workspace its snapshot does not list is removed by it.
+    let kept: i64 = store
         .conn
-        .query_row("SELECT COUNT(*) FROM users WHERE workspace != ?1", [first.as_str()], |r| r.get(0))
+        .query_row("SELECT COUNT(*) FROM users WHERE workspace = ?1", [first.as_str()], |r| r.get(0))
         .unwrap();
-    assert_eq!(gone, 0, "nothing of the other workspace is left");
-    // Signed in elsewhere: the first's messages go too.
-    let mut elsewhere = alone.clone();
-    elsewhere.workspaces[0].id = WorkspaceId::new("TELSEWHERE");
-    store.put_snapshot(&elsewhere).unwrap();
-    assert!(store.newest_page(&t, 10).unwrap().is_none());
+    assert!(kept > 0);
 }
 
 #[test]
@@ -95,7 +102,7 @@ fn people_a_page_brought_are_not_in_the_snapshot_and_keep_its_order_otherwise() 
     stranger.id = UserId::new("UPAGEONLY");
     p.users = vec![stranger, s.users[3].clone()];
     store.put_page(&p, None, 100).unwrap();
-    assert_eq!(store.snapshot(&ids(s)).unwrap().as_ref(), Some(s), "the snapshot's people as they were, in order");
+    assert_parts(&store, s, "the snapshot's people as they were, in order");
 }
 
 #[test]
