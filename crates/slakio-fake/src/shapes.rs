@@ -3,7 +3,7 @@
 
 use crate::Logged;
 use serde_json::{Value, json};
-use slakio_core::model::{ConversationId, ConversationKind, Message, Ts};
+use slakio_core::model::{ConversationId, ConversationKind, Message, Org, Presence, Ts};
 use slakio_world::World;
 
 /// The answer to `request`.
@@ -14,6 +14,7 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
         "conversations.view" => view(world, request),
         "conversations.history" => history(world, request),
         "conversations.replies" => replies(world, request),
+        "dnd.teamInfo" => dnd_team(world, request),
         "users/info" => edge_users(world, request),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
@@ -71,6 +72,8 @@ fn user_boot(world: &World, team: usize) -> Value {
                 if n % 3 != 0 {
                     ch["is_private"] = json!(private);
                     ch["is_ext_shared"] = json!(c.external);
+                    ch["is_shared"] = json!(c.external);
+                    ch["is_org_shared"] = json!(false);
                     ch["is_archived"] = json!(false);
                 }
                 channels.push(ch);
@@ -83,6 +86,22 @@ fn user_boot(world: &World, team: usize) -> Value {
             }
         }
     }
+    // Muted conversations as Slack spells them now (notification prefs as JSON in a string),
+    // and every other one in the older comma-separated spelling too.
+    let muted: Vec<&str> =
+        s.conversations.iter().filter(|c| c.workspace == ws.id && c.muted).map(|c| c.id.as_str()).collect();
+    let mut prefs_channels = serde_json::Map::new();
+    for (n, id) in muted.iter().enumerate() {
+        if n % 2 == 0 {
+            prefs_channels.insert((*id).to_string(), json!({"muted": true, "desktop": "everything"}));
+        }
+    }
+    let legacy: Vec<&str> = muted.iter().copied().skip(1).step_by(2).collect();
+    let all_prefs = json!({"channels": prefs_channels, "global": {"global_desktop": "mentions"}}).to_string();
+    let dnd = match me.map(|u| u.presence) {
+        Some(Presence::Dnd) => dnd_on(),
+        _ => json!({"dnd_enabled": false, "next_dnd_start_ts": 1, "next_dnd_end_ts": 1, "snooze_enabled": false}),
+    };
     json!({
         "ok": true,
         "self": {"id": ws.me.as_str(), "name": me.map(|u| u.name.unsanitized()), "team_id": ws.id.as_str()},
@@ -90,7 +109,8 @@ fn user_boot(world: &World, team: usize) -> Value {
         "channels": channels,
         "ims": ims,
         "is_open": [],
-        "prefs": {},
+        "prefs": {"all_notifications_prefs": all_prefs, "muted_channels": legacy.join(","), "theme": "light"},
+        "dnd": dnd,
     })
 }
 
@@ -98,7 +118,9 @@ fn counts(world: &World, team: usize) -> Value {
     let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
     let (mut channels, mut ims, mut mpims) = (Vec::new(), Vec::new(), Vec::new());
     for c in world.snapshot().conversations.iter().filter(|c| c.workspace == ws.id) {
-        let entry = json!({"id": c.id.as_str(), "has_unreads": c.unread > 0, "mention_count": c.mentions, "last_read": "0000000000.000000"});
+        // A DM's mention count is its unread messages, as Slack counts them.
+        let mentions = if c.is_dm() { c.unread } else { c.mentions };
+        let entry = json!({"id": c.id.as_str(), "has_unreads": c.unread > 0, "mention_count": mentions, "last_read": "0000000000.000000"});
         match c.kind {
             ConversationKind::Channel { .. } => channels.push(entry),
             ConversationKind::Dm { .. } => ims.push(entry),
@@ -175,17 +197,46 @@ fn history(world: &World, request: &Logged) -> Value {
     out
 }
 
+/// A thread, as Slack pages it: forward from its own message, `limit` at a time, the next page
+/// named by `response_metadata.next_cursor` (here the offset, spelled as Slack's opaque ones are).
 fn replies(world: &World, request: &Logged) -> Value {
     let (Some(c), Some(ts)) = (channel(request), field(request, "ts").as_deref().and_then(ts_of)) else {
         return json!({"ok": false, "error": "thread_not_found"});
     };
-    let before = field(request, "latest").as_deref().and_then(ts_of);
-    let Some((messages, complete)) = world.thread(&c, ts, before, limit(request, "limit")) else {
+    let Some((all, _)) = world.thread(&c, ts, None, usize::MAX) else {
         return json!({"ok": false, "error": "thread_not_found"});
     };
-    // Replies come oldest first, the thread's own message first.
-    let list: Vec<Value> = messages.iter().enumerate().map(|(n, m)| message(m, n)).collect();
-    json!({"ok": true, "messages": list, "has_more": !complete})
+    let from: usize = field(request, "cursor")
+        .and_then(|c| c.strip_prefix("dGhyZWFk:").and_then(|n| n.parse().ok()))
+        .unwrap_or(0)
+        .min(all.len());
+    let to = (from + limit(request, "limit")).min(all.len());
+    let list: Vec<Value> = all[from..to].iter().enumerate().map(|(n, m)| message(m, n)).collect();
+    let more = to < all.len();
+    let next = if more { format!("dGhyZWFk:{to}") } else { String::new() };
+    json!({"ok": true, "messages": list, "has_more": more, "response_metadata": {"next_cursor": next}})
+}
+
+/// Do not disturb on now (from an hour ago for two hours).
+fn dnd_on() -> Value {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    json!({"dnd_enabled": true, "next_dnd_start_ts": now - 3600, "next_dnd_end_ts": now + 3600, "snooze_enabled": false})
+}
+
+/// `dnd.teamInfo`: the people of `users` (comma-separated) the world knows, those in do not
+/// disturb with it on now.
+fn dnd_team(world: &World, request: &Logged) -> Value {
+    let mut users = serde_json::Map::new();
+    for id in field(request, "users").unwrap_or_default().split(',').filter(|id| !id.is_empty()) {
+        let Some(u) = world.snapshot().users.iter().find(|u| u.id.as_str() == id) else { continue };
+        let dnd = if u.presence == Presence::Dnd {
+            dnd_on()
+        } else {
+            json!({"dnd_enabled": false, "next_dnd_start_ts": 1, "next_dnd_end_ts": 1})
+        };
+        users.insert(id.to_string(), dnd);
+    }
+    json!({"ok": true, "users": users})
 }
 
 /// A person of the world as Slack describes one; `None` for an id it does not know. Some leave
@@ -198,7 +249,8 @@ fn person(world: &World, id: &str) -> Option<Value> {
     }
     Some(json!({
         "id": id,
-        "team_id": u.workspace.as_str(),
+        // A Slack Connect peer belongs to a team of its own.
+        "team_id": match &u.org { Org::External(_) => "TPARTNER", Org::Own => u.workspace.as_str() },
         "name": u.name.unsanitized(),
         "real_name": u.display_name.unsanitized(),
         "is_bot": u.bot,
