@@ -61,9 +61,19 @@ fn gg_selects_the_oldest_loaded_and_wants_one_more_page() {
     tl.queued = true;
     assert_eq!(p.wants(&tl), None, "one is queued already");
     tl.queued = false;
-    tl.failed = Some(slakio_core::backend::FailKind::Network);
-    assert_eq!(p.wants(&tl), None, "a failed page waits for a retry");
-    tl.failed = None;
+    // A gesture asks again for an older page that failed, whatever Slack said, but not one the
+    // sign-in stopped, nor one waiting out Slack's pause.
+    use slakio_core::backend::FailKind;
+    for kind in [FailKind::Network, FailKind::Api { code: "internal_error".into() }, FailKind::CapReached] {
+        tl.failed = Some(kind);
+        assert_eq!(p.wants(&tl), Some(Some(Ts(400))), "{:?}", tl.failed);
+    }
+    tl.failed = Some(FailKind::Auth);
+    assert_eq!(p.wants(&tl), None, "signed out: asking again cannot help");
+    tl.failed = Some(FailKind::RateLimited { retry_after: None });
+    tl.retry_at = Some(std::time::Instant::now());
+    assert_eq!(p.wants(&tl), None, "asked again by itself after Slack's pause");
+    (tl.failed, tl.retry_at) = (None, None);
     p.older = false;
     arrive(&mut tl, 200, 400, false);
     assert_eq!(p.selected_index(&tl), Some(200), "the page lands above, the selection stays");

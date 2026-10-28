@@ -135,6 +135,10 @@ pub struct Pane {
     /// The last gesture moved up (or to the oldest): near the top, it wants one more older
     /// page. Asking for pages takes it back.
     pub older: bool,
+    /// `gg` in a thread: its older pages are asked for one after another, and its own message
+    /// is selected once loaded (they come from what the backend read of it, at once). Any other
+    /// move takes it back.
+    pub to_root: bool,
     /// Its composer is being written in (Insert mode); only the pane with the keyboard is.
     pub insert: bool,
     /// The auto thread panel this pane opened beside it, while open.
@@ -153,6 +157,7 @@ impl Pane {
             visual: None,
             bottom: Cell::new(None),
             older: false,
+            to_root: false,
             insert: false,
             thread: None,
             history: History::default(),
@@ -181,9 +186,12 @@ impl Pane {
     }
 
     /// The page of `tl` (this pane's timeline) to ask for next, if one is wanted: the newest
-    /// first, then an older one when the last gesture moved up near the top.
+    /// first, then an older one when the last gesture moved up near the top (also one that
+    /// failed, when it may be asked for again), or `gg` in a thread wants its start.
     pub fn wants(&self, tl: &Timeline) -> Option<Option<Ts>> {
-        if tl.pending.is_some() || tl.queued || tl.complete || tl.failed.is_some() {
+        let older = self.older || self.to_root;
+        let again = older && tl.older_failed().is_some() && tl.retryable();
+        if tl.pending.is_some() || tl.queued || tl.complete || (tl.failed.is_some() && !again) {
             return None;
         }
         if tl.cached {
@@ -191,7 +199,7 @@ impl Pane {
         }
         let Some(first) = tl.items.first() else { return Some(None) };
         let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
-        (self.older && near_top).then_some(Some(first.ts))
+        (self.to_root || (self.older && near_top)).then_some(Some(first.ts))
     }
 
     /// The selected message's index in `tl` (this pane's timeline).
@@ -208,6 +216,7 @@ impl Pane {
     /// first move selects the newest.
     pub fn step(&mut self, by: isize, tl: &Timeline) {
         self.older = by < 0;
+        self.to_root = false;
         let Some(last) = tl.items.len().checked_sub(1) else { return };
         let i = match self.selected_index(tl) {
             None => last,
@@ -218,6 +227,7 @@ impl Pane {
 
     /// Select the newest message of `tl` (this pane's timeline).
     pub fn select_newest(&mut self, tl: &Timeline) {
+        self.to_root = false;
         self.selected = tl.items.last().map(|m| m.ts);
     }
 
@@ -232,13 +242,15 @@ impl Pane {
         self.hits.borrow().iter().find(|h| h.y == y).copied()
     }
 
-    /// Select the oldest message loaded in `tl` (its timeline); one more older page is wanted.
+    /// Select the oldest message loaded in `tl` (its timeline); one more older page is wanted
+    /// (in a thread, every one up to its own message).
     pub fn select_oldest(&mut self, tl: &Timeline) {
         if tl.items.is_empty() {
             return;
         }
         self.select_index(0, tl);
         self.older = true;
+        self.to_root = self.is_thread() && !tl.complete;
     }
 
     /// The selected messages of `tl` (this pane's timeline): the VISUAL range, or the selected

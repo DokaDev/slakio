@@ -3,7 +3,8 @@
 //! gesture wants one more page at most ([`super::Work::fill`] queues it), and the pages queued
 //! go out one at a time, at least [`OLDER_GAP`] apart, whatever the gestures (holding `k`,
 //! pressing `gg` again and again). A page Slack asked to slow down for is asked for again by
-//! itself once Slack's pause passed.
+//! itself once Slack's pause passed. A thread's older pages are not paced: the backend serves
+//! them from what it read when the thread opened, without a request.
 
 use super::Work;
 use crate::app::pane::PAGE;
@@ -16,6 +17,40 @@ use std::time::{Duration, Instant};
 pub const OLDER_GAP: Duration = Duration::from_millis(1500);
 
 impl Work {
+    /// Ask for the pages the panes want; one request for a target however many panes show it.
+    /// A conversation's older page waits for its turn ([`Work::send_older`]), a thread's goes at
+    /// once; the gesture that wanted it is spent either way. A thread pane that `gg` sent to its
+    /// start selects the thread's own message once it is loaded.
+    pub(super) fn fill(&mut self) {
+        for id in self.ids() {
+            let Some(pane) = self.panes.get_mut(&id) else { continue };
+            let tl = self.timelines.entry(&pane.target);
+            let workspace = Some(pane.target.workspace().clone());
+            match pane.wants(tl) {
+                Some(None) => {
+                    let command = Command::History { target: pane.target.clone(), before: None, limit: PAGE };
+                    tl.pending = Some(self.requests.ask(workspace, command));
+                }
+                Some(Some(before)) => {
+                    (tl.failed, tl.retry_at) = (None, None);
+                    if pane.is_thread() {
+                        let command =
+                            Command::History { target: pane.target.clone(), before: Some(before), limit: PAGE };
+                        tl.pending = Some(self.requests.ask(workspace, command));
+                    } else {
+                        tl.queued = true;
+                    }
+                }
+                None => {}
+            }
+            if pane.to_root && tl.complete {
+                pane.select_index(0, tl);
+                pane.to_root = false;
+            }
+            pane.older = false;
+        }
+    }
+
     /// When an older page may be asked for next, if one is queued; or a failed page is asked
     /// for again by itself.
     pub fn deadline(&self) -> Option<Instant> {

@@ -7,7 +7,8 @@
 //!
 //! Older pages are asked for one at a time and only when a gesture wants one (moving up near the
 //! top, `gg`, `r`): one is queued, then sent when the pace allows ([`super::work`]). A page that
-//! failed stays failed until retried (`r`, or by itself once Slack's `Retry-After` passed).
+//! failed stays failed until retried (`r`, the next gesture that wants it, or by itself once
+//! Slack's `Retry-After` passed).
 //!
 //! A timeline lives while a pane shows its target: the work area drops the others, and opening
 //! the target again loads it afresh.
@@ -86,12 +87,22 @@ impl Timeline {
         self.failed.as_ref().filter(|_| !self.items.is_empty() && !self.cached && !self.loading_older())
     }
 
-    /// The failed page may be asked for again: for a reason that may pass, or an older page the
-    /// request limit stopped (the limit's window moves on).
+    /// The failed page may be asked for again now: for a reason that may pass, or an older page
+    /// whatever stopped it (an older page is always safe to ask for again; Slack's own errors,
+    /// such as `internal_error`, often pass) but the sign-in or a backend that changes nothing.
+    /// Not while Slack's pause runs: the page is asked for again by itself once it passed.
     pub fn retryable(&self) -> bool {
-        self.failed
-            .as_ref()
-            .is_some_and(|k| k.retryable() || (self.older_failed().is_some() && *k == FailKind::CapReached))
+        let older = self.older_failed().is_some();
+        self.retry_at.is_none()
+            && self
+                .failed
+                .as_ref()
+                .is_some_and(|k| k.retryable() || (older && !matches!(k, FailKind::Auth | FailKind::ReadOnly)))
+    }
+
+    /// The failed page waits out Slack's pause, to be asked for again by itself.
+    pub fn paused(&self) -> bool {
+        self.failed.is_some() && self.retry_at.is_some()
     }
 
     /// The index of the message at `ts`, when loaded.

@@ -141,7 +141,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     }
     // What could not be loaded here, for a reason that may pass: asking again comes first.
     if !resolved.is_empty()
-        && app.failed_here().is_some_and(slakio_core::backend::FailKind::retryable)
+        && app.can_retry()
         && let Some(k) = super::retry_key(app)
     {
         resolved.insert(0, (k, Label::HintRetry));

@@ -76,7 +76,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
                     text.lines.extend(lines.into_iter().map(|l| Line::styled(l, t.muted())));
                     text
                 }
-                None => super::failed_text(app, what, kind),
+                None => super::failed_text(app, what, kind.retryable()),
             })
         }
         None => Some(faint(Label::ListLoading)),

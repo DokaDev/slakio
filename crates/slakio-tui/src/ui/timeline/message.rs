@@ -121,15 +121,18 @@ pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected:
 }
 
 /// What is above the oldest message loaded: older ones on their way, older ones that failed
-/// (and the key that asks again), or the start of the conversation once a history read back
+/// (and the key that asks again, or, while Slack's pause runs, that they are asked for again
+/// shortly), or the start of the conversation once a history read back
 /// reached it. A blank row parts it from the message.
 fn start(app: &App, pane: &Pane, tl: &Timeline, w: usize) -> Vec<Laid> {
     let faint = app.theme.faint();
     let text = if tl.loading_older() {
         app.i18n.label(Label::PaneOlderLoading).to_string()
-    } else if let Some(kind) = tl.older_failed() {
+    } else if tl.older_failed().is_some() && tl.paused() {
+        app.i18n.label(Label::PaneOlderPaused).to_string()
+    } else if tl.older_failed().is_some() {
         let words = app.i18n.label(Label::PaneOlderFailed).to_string();
-        match crate::ui::retry_key(app).filter(|_| tl.retryable() || kind.retryable()) {
+        match crate::ui::retry_key(app).filter(|_| tl.retryable()) {
             Some(keys) => format!("{words} · {}", app.i18n.msg(&Msg::RetryHint { keys })),
             None => words,
         }

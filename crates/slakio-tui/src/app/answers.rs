@@ -116,6 +116,13 @@ impl App {
         self.boot_failed().or_else(|| self.work.active_failed())
     }
 
+    /// `r` asks again here now: the workspace shown failed for a reason that may pass, else the
+    /// active pane's page may be asked for again (not while Slack's pause runs: it is asked for
+    /// again by itself then).
+    pub fn can_retry(&self) -> bool {
+        self.boot_failed().map_or_else(|| self.work.active_retryable(), FailKind::retryable)
+    }
+
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
     /// workspace shown (also one still loading, or shown from the cache while Slack has not
     /// answered: its backend may hang or be gone), else the active pane's messages. Only when
@@ -130,7 +137,11 @@ impl App {
             // An answer to the older ask, should it still come, is dropped.
             Some((ws, None)) if loading => self.boot_again(ws),
             _ if self.work.retry() => {}
-            _ => self.info(Msg::Label(Label::StatusNothingToRetry), now),
+            // The page cannot be asked for again (now): say why once more.
+            _ => match self.work.active_failed().map(failure) {
+                Some(why) => self.warn(Msg::Label(why), now),
+                None => self.info(Msg::Label(Label::StatusNothingToRetry), now),
+            },
         }
     }
 

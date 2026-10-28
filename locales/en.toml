@@ -84,6 +84,7 @@
 # Above the oldest message loaded: older ones on their way, ones that failed, or the start.
 "pane.older_loading" = "Loading older messages…"
 "pane.older_failed" = "Older messages not loaded"
+"pane.older_paused" = "Older messages not loaded · trying again shortly"
 "pane.start" = "Start of the conversation"
 # A DM's title: its peer's presence.
 "presence.active" = "active"

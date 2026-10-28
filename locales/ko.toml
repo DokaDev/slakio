@@ -69,6 +69,7 @@
 "pane.thread_cut" = "이후 답글은 불러오지 않음"
 "pane.older_loading" = "이전 메시지를 불러오는 중…"
 "pane.older_failed" = "이전 메시지를 불러오지 못함"
+"pane.older_paused" = "이전 메시지를 불러오지 못함 · 잠시 후 다시 시도함"
 "pane.start" = "대화의 처음"
 "presence.active" = "활동 중"
 "presence.away" = "자리 비움"

@@ -34,11 +34,11 @@
 use super::composer::Composer;
 use super::drafts::DraftStore;
 use super::model::Model;
-use super::pane::{History, PAGE, Pane, Shown, echo};
+use super::pane::{History, Pane, Shown, echo};
 use super::requests::Requests;
 use super::timelines::{Timeline, TimelineStore};
 use crate::screen::THREAD_SHARE;
-use slakio_core::backend::{Command, FailKind, Generation, Page, Request};
+use slakio_core::backend::{FailKind, Generation, Page, Request};
 use slakio_core::layout::tabs::{Tab, Tabs};
 use slakio_core::layout::{Dir, Node, PaneId};
 use slakio_core::model::{Message, Target};
@@ -253,25 +253,6 @@ impl Work {
         self.panes.remove(&id)
     }
 
-    /// Ask for the pages the panes want; one request for a target however many panes show it.
-    /// An older page waits for its turn ([`Work::send_older`]); the gesture that wanted it is
-    /// spent either way.
-    fn fill(&mut self) {
-        for id in self.ids() {
-            let Some(pane) = self.panes.get_mut(&id) else { continue };
-            let tl = self.timelines.entry(&pane.target);
-            match pane.wants(tl) {
-                Some(None) => {
-                    let command = Command::History { target: pane.target.clone(), before: None, limit: PAGE };
-                    tl.pending = Some(self.requests.ask(Some(pane.target.workspace().clone()), command));
-                }
-                Some(Some(_)) => tl.queued = true,
-                None => {}
-            }
-            pane.older = false;
-        }
-    }
-
     /// Drop the messages of the targets no pane shows, and the empty drafts. A draft with text
     /// stays for when its target is opened again.
     fn prune(&mut self) {
@@ -484,6 +465,11 @@ impl Work {
     pub fn active_failed(&self) -> Option<&FailKind> {
         let pane = self.active().and_then(|id| self.panes.get(&id))?;
         self.timeline(pane).failed.as_ref()
+    }
+
+    /// The active pane's failed page may be asked for again now ([`Timeline::retryable`]).
+    pub fn active_retryable(&self) -> bool {
+        self.active().and_then(|id| self.panes.get(&id)).is_some_and(|p| self.timeline(p).retryable())
     }
 
     /// The active pane's messages (its newest page, or an older one) could not be loaded, for a

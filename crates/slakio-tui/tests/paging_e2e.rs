@@ -2,7 +2,9 @@
 //! against the tests' fake Slack: `gg` pressed again and again sends a few paced requests, never
 //! a burst, and the request count stays far under the governor's caps; a page Slack refuses with
 //! 429 shows a row, is asked for again by itself after `Retry-After`, and paging goes on; on a
-//! slow network a page on its way shows a loading row. Unix only.
+//! slow network a page on its way shows a loading row. One Slack refuses with an error of its
+//! own (`internal_error`) is asked for again by `r`, once. In the 1,200-reply thread, read whole
+//! when it opened, one `gg` reaches the thread's own message without a request. Unix only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line and passes; with
 //! `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead.
@@ -124,5 +126,61 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     m.fake.set_delay(Duration::ZERO);
     let total = m.fake.log().len();
     assert!(total < 60, "far under the per-minute cap: {total} requests");
+    run.quit();
+}
+
+#[test]
+fn an_older_page_slack_answered_internal_error_is_asked_again_by_r() {
+    let m = Machine::new();
+    let Some(mut run) = m.start() else { return };
+    run.wait_for("the list", |t| t.contains("big-history"));
+    click(&mut run, "big-history");
+    wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+    run.wait_for("its messages", |t| t.contains("#big-history") && t.contains("Message #big-history"));
+    m.fake.fail_next("conversations.history", Fault::Api("internal_error".into()));
+    run.type_bytes(b"kgg");
+    wait_until("the refused page", || m.calls("conversations.history") == 1);
+    run.wait_for("the failed row with its key", |t| t.contains("Older messages not loaded · r retry"));
+    std::thread::sleep(Duration::from_millis(1600));
+    assert_eq!(m.calls("conversations.history"), 1, "nothing asked again by itself");
+    run.type_bytes(b"r");
+    wait_until("asked again", || m.calls("conversations.history") == 2);
+    run.wait_for("the row gone", |t| !t.contains("Older messages not loaded"));
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(m.calls("conversations.history"), 2, "exactly one more request");
+    run.quit();
+}
+
+#[test]
+fn gg_in_the_1200_reply_thread_reaches_its_own_message_without_a_request() {
+    let m = Machine::new();
+    let Some(mut run) = m.start() else { return };
+    run.wait_for("the list", |t| t.contains("long-threads"));
+    click(&mut run, "long-threads");
+    wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+    run.wait_for("its messages", |t| t.contains("Message #long-threads"));
+    // The oldest message has the thread: page back to it (paced), open it; it is read whole
+    // (200 replies a request).
+    for _ in 0..6 {
+        if run.output().contains("1,200 replies · last") {
+            break;
+        }
+        run.type_bytes(b"gg");
+        std::thread::sleep(Duration::from_millis(1700));
+    }
+    run.wait_for("the thread's message", |t| t.contains("1,200 replies · last"));
+    run.type_bytes(b"gg\r");
+    wait_until("the thread read", || m.calls("conversations.replies") >= 7);
+    run.wait_for("the thread panel", |t| t.contains("⤷ Thread") && t.contains(" Reply "));
+    std::thread::sleep(Duration::from_millis(300));
+    let sent = m.fake.log().len();
+    let t0 = Instant::now();
+    run.type_bytes(b"gg");
+    run.wait_for("the thread's own message", |t| t.contains("─ 1,200 replies ─"));
+    let took = t0.elapsed();
+    std::thread::sleep(Duration::from_millis(300));
+    let methods = m.fake.methods();
+    assert_eq!(methods.len(), sent, "no request for pages read already: {:?}", &methods[sent..]);
+    assert!(took < Duration::from_secs(5), "at once, not paced: {took:?}");
     run.quit();
 }

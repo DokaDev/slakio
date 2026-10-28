@@ -59,8 +59,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         } else if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
             ratatui::text::Text::styled(app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string(), t.faint())
-        } else if let Some(kind) = &tl.failed {
-            super::failed_text(app, Label::PaneFailed, kind)
+        } else if tl.failed.is_some() {
+            super::failed_text(app, Label::PaneFailed, tl.retryable())
         } else {
             ratatui::text::Text::styled(app.i18n.label(Label::PaneLoading).to_string(), t.faint())
         };
