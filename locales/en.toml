@@ -441,3 +441,4 @@
 "cache.failed" = "Cache could not be opened"
 "cache.backup_failed" = "Cache not kept out of Time Machine"
 "logout.cache_failed" = "The local cache could not be removed"
+"logout.still_running" = "A slakio is still running: quit it, then run slakio logout again"

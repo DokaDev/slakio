@@ -23,6 +23,7 @@ use slakio_slack::governor::{Governor, Limits, SystemClock};
 use slakio_slack::request::Endpoints;
 use slakio_slack::{SlackError, login};
 use slakio_tui::app::signin::Pasted;
+use slakio_tui::app::status::Level;
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange;
@@ -97,7 +98,7 @@ fn main() -> ExitCode {
     // One governor for the whole process: the sign-in check counts toward its cap too.
     let governor = Governor::new(Limits::default(), Box::new(SystemClock::default()), network);
     signin::test_credentials(&*store, store_kind);
-    let local = store::Local::new(&paths, &cfg, network);
+    let local = store::Local::new(&paths, &cfg);
     let mut wiring = Wiring {
         store,
         workspaces,
@@ -135,8 +136,8 @@ fn main() -> ExitCode {
         (None, Some(None))
     } else {
         match wiring.signed_in() {
-            Ok(Some((credentials, endpoints, team))) => {
-                (Some(BackendKind::Slack { credentials, endpoints, team }), None)
+            Ok(Some((credentials, endpoints, a))) => {
+                (Some(BackendKind::Slack { credentials, endpoints, team: a.team, user: a.user }), None)
             }
             Ok(None) => (None, Some(None)),
             Err(fault) => {
@@ -190,11 +191,12 @@ fn main() -> ExitCode {
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
         let backend = kind.map(|k| match k {
             BackendKind::Demo(b) => exchange::serve(b),
-            BackendKind::Slack { credentials, endpoints, team } => {
+            BackendKind::Slack { credentials, endpoints, team, user } => {
                 let mut notices = Vec::new();
-                let handle = wiring.local.front(wiring.serve(credentials, endpoints), &team, &mut notices);
+                let handle = wiring.local.front(wiring.serve(credentials, endpoints), &team, &user, &mut notices);
+                // Queued: a boot that fails at once (offline) does not hide them.
                 for n in notices {
-                    app.warn(n, Instant::now());
+                    app.status.queue(n, Level::Warning, Instant::now());
                 }
                 handle
             }
@@ -221,7 +223,7 @@ enum BackendKind {
     /// The invented workspace (`--demo`): nothing connects anywhere.
     Demo(Box<DemoBackend>),
     /// Slack, read-only, for the signed-in workspace.
-    Slack { credentials: Credentials, endpoints: Endpoints, team: String },
+    Slack { credentials: Credentials, endpoints: Endpoints, team: String, user: String },
 }
 
 /// What signing in and the Slack backend need: the secret store, the workspaces file, the
@@ -265,13 +267,13 @@ impl Wiring {
         }
     }
 
-    /// The signed-in workspace's credentials, endpoints and team id; `None` when none is signed
+    /// The signed-in workspace's credentials, endpoints and account; `None` when none is signed
     /// in.
-    fn signed_in(&self) -> Result<Option<(Credentials, Endpoints, String)>, slakio_core::fault::Fault> {
+    fn signed_in(&self) -> Result<Option<(Credentials, Endpoints, Account)>, slakio_core::fault::Fault> {
         let Some(path) = &self.workspaces else { return Ok(None) };
         let Some(a) = account::load(path)?.into_iter().next() else { return Ok(None) };
         let Some(endpoints) = self.endpoints(&a.host) else { return Ok(None) };
-        Ok(account::credentials(&*self.store, &a)?.map(|c| (c, endpoints, a.team)))
+        Ok(account::credentials(&*self.store, &a)?.map(|c| (c, endpoints, a)))
     }
 
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
@@ -368,11 +370,12 @@ fn signed_in(done: Result<SignedIn, Label>, app: &mut App, backend: &mut Option<
     match done {
         Ok(s) => {
             let mut notices = Vec::new();
-            *backend =
-                Some(wiring.local.front(wiring.serve(s.credentials, s.endpoints), &s.account.team, &mut notices));
+            let (team, user) = (&s.account.team, &s.account.user);
+            *backend = Some(wiring.local.front(wiring.serve(s.credentials, s.endpoints), team, user, &mut notices));
             app.signed_in(slakio_slack::adapter::CAPABILITIES, words::shown(&s.account.name), Instant::now());
+            // Queued after "Signed in to …", which stays readable.
             for n in notices {
-                app.warn(n, Instant::now());
+                app.status.queue(n, Level::Warning, Instant::now());
             }
         }
         Err(why) => app.sign_in_failed(why),

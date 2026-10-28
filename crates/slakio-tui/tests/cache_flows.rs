@@ -69,6 +69,11 @@ impl Machine {
         self.dir.join("cache").join("slakio")
     }
 
+    /// The cache's own directory in it, which slakio makes (and alone changes).
+    fn store_dir(&self) -> PathBuf {
+        self.cache_dir().join("slakio-store")
+    }
+
     fn requests(&self) -> usize {
         self.fake.log().len()
     }
@@ -313,13 +318,30 @@ fn first_run(m: &Machine) -> Option<Vec<String>> {
     Some(words)
 }
 
+/// The kept cache made unreadable (not a database).
+fn damage(m: &Machine) {
+    std::fs::write(m.store_dir().join("cache.sqlite3"), b"not a database ".repeat(500)).unwrap();
+    for side in ["-wal", "-shm"] {
+        let _ = std::fs::remove_file(m.store_dir().join(format!("cache.sqlite3{side}")));
+    }
+}
+
+/// A stand-in for tmutil that records its arguments and fails.
+fn failing_tmutil(m: &Machine) {
+    use std::os::unix::fs::PermissionsExt;
+    let log = m.dir.join("tmutil.log");
+    std::fs::write(m.dir.join("tmutil"), format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit 1\n", log.display()))
+        .unwrap();
+    std::fs::set_permissions(m.dir.join("tmutil"), std::fs::Permissions::from_mode(0o700)).unwrap();
+}
+
 #[test]
 fn a_warm_start_with_the_network_off_draws_from_the_cache_and_asks_slack_nothing() {
     let m = Machine::new("offline");
     let Some(words) = first_run(&m) else { return };
-    assert!(m.cache_dir().join("cache.sqlite3").is_file(), "the first run kept a cache");
+    assert!(m.store_dir().join("cache.sqlite3").is_file(), "the first run kept a cache");
     let excluded = m.tmutil_calls();
-    assert_eq!(excluded, format!("addexclusion\n{}\n", m.cache_dir().display()), "excluded from backups once");
+    assert_eq!(excluded, format!("addexclusion\n{}\n", m.store_dir().display()), "excluded from backups once");
     let before = m.requests();
     let Some(mut run) = m.start(2, &[("SLAKIO_NETWORK", "off")]) else { return };
     run.wait_for("the cached list, marked as cached", |t| t.contains("backend") && t.contains("read only · cached"));
@@ -386,11 +408,7 @@ fn a_second_slakio_draws_from_the_cache_without_writing_it_and_says_so() {
 #[test]
 fn a_failed_exclusion_from_backups_is_said_once_and_tried_again() {
     let m = Machine::new("tmfail");
-    use std::os::unix::fs::PermissionsExt;
-    let log = m.dir.join("tmutil.log");
-    std::fs::write(m.dir.join("tmutil"), format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit 1\n", log.display()))
-        .unwrap();
-    std::fs::set_permissions(m.dir.join("tmutil"), std::fs::Permissions::from_mode(0o700)).unwrap();
+    failing_tmutil(&m);
     let Some(run) = m.start(1, &[]) else { return };
     run.wait_for("the notice", |t| t.contains("Cache not kept out of Time Machine"));
     run.wait_for("the workspace", |t| t.contains("backend"));
@@ -409,10 +427,7 @@ fn a_cache_that_is_not_a_database_is_started_again_with_one_notice() {
     if first_run(&m).is_none() {
         return;
     }
-    std::fs::write(m.cache_dir().join("cache.sqlite3"), b"not a database ".repeat(500)).unwrap();
-    for side in ["-wal", "-shm"] {
-        let _ = std::fs::remove_file(m.cache_dir().join(format!("cache.sqlite3{side}")));
-    }
+    damage(&m);
     let Some(run) = m.start(2, &[]) else { return };
     run.wait_for("the notice", |t| t.contains("Cache unreadable: started again"));
     run.wait_for("the workspace, fetched again", |t| t.contains("backend"));
@@ -442,7 +457,7 @@ fn logout_removes_the_cache_and_cache_off_keeps_nothing() {
     if first_run(&m).is_none() {
         return;
     }
-    assert!(!m.cache_dir().join("cache.sqlite3").exists(), "cache = off keeps nothing");
+    assert!(!m.store_dir().join("cache.sqlite3").exists(), "cache = off keeps nothing");
     assert_eq!(m.tmutil_calls(), "", "and excludes nothing");
 }
 
@@ -452,9 +467,104 @@ fn nothing_secret_is_kept_in_the_cache() {
     if first_run(&m).is_none() {
         return;
     }
-    for e in std::fs::read_dir(m.cache_dir()).unwrap().flatten() {
+    let files: Vec<_> = std::fs::read_dir(m.store_dir()).unwrap().flatten().collect();
+    assert!(files.iter().any(|e| e.file_name() == "cache.sqlite3"), "the cache's files are looked at");
+    for e in files {
         let bytes = std::fs::read(e.path()).unwrap();
         let text = String::from_utf8_lossy(&bytes);
         assert!(!text.contains("TESTTOKEN") && !text.contains("TESTCOOKIE"), "{}", e.path().display());
     }
+}
+
+/// The words of the boot that fails with the network off.
+const OFFLINE: &str = "Offline: Slack is not being asked";
+
+#[test]
+fn a_cache_notice_is_seen_after_the_offline_warning_that_comes_at_the_same_time() {
+    let m = Machine::new("offline-rebuilt");
+    if first_run(&m).is_none() {
+        return;
+    }
+    damage(&m);
+    let Some(run) = m.start(2, &[("SLAKIO_NETWORK", "off")]) else { return };
+    run.wait_for("why nothing is fetched", |t| t.contains(OFFLINE));
+    run.wait_for("the cache's notice, after it", |t| t.contains("Cache unreadable: started again"));
+    run.quit();
+}
+
+#[test]
+fn a_second_slakio_offline_still_says_it_reads_the_cache_only() {
+    let m = Machine::new("second-offline");
+    if first_run(&m).is_none() {
+        return;
+    }
+    let Some(first) = m.start(2, &[]) else { return };
+    first.wait_for("the first one up", |t| t.contains("backend"));
+    let Some(second) = m.start(3, &[("SLAKIO_NETWORK", "off")]) else { return };
+    second.wait_for("why nothing is fetched", |t| t.contains(OFFLINE));
+    second.wait_for("the cache's notice, after it", |t| t.contains("Another slakio runs: cache read only"));
+    second.quit();
+    first.quit();
+}
+
+#[test]
+fn two_cache_notices_at_once_are_each_seen() {
+    let m = Machine::new("two-notices");
+    if first_run(&m).is_none() {
+        return;
+    }
+    damage(&m);
+    failing_tmutil(&m);
+    let Some(run) = m.start(2, &[]) else { return };
+    run.wait_for("the first notice", |t| t.contains("Cache unreadable: started again"));
+    run.wait_for("the second one, after it", |t| t.contains("Cache not kept out of Time Machine"));
+    run.quit();
+}
+
+#[test]
+fn another_user_of_the_workspace_never_sees_the_first_ones_cache() {
+    let m = Machine::new("other-user");
+    if first_run(&m).is_none() {
+        return;
+    }
+    let file = m.dir.join("config").join("slakio").join("workspaces.toml");
+    let me = m.world.snapshot().workspaces[0].me.to_string();
+    let text = std::fs::read_to_string(&file).unwrap().replace(&format!("user = \"{me}\""), "user = \"UOTHER\"");
+    assert!(text.contains("UOTHER"));
+    std::fs::write(&file, text).unwrap();
+    let Some(run) = m.start(2, &[("SLAKIO_NETWORK", "off")]) else { return };
+    run.wait_for("why nothing is fetched", |t| t.contains(OFFLINE));
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(!run.output().contains("cached") && !run.output().contains("backend"), "{}", run.output());
+    run.quit();
+}
+
+#[test]
+fn logout_removes_the_cache_even_when_the_sign_in_could_not_be_removed() {
+    let m = Machine::new("logout-failed");
+    if first_run(&m).is_none() {
+        return;
+    }
+    // A workspaces file that cannot be read: the credentials step fails.
+    std::fs::write(m.dir.join("config").join("slakio").join("workspaces.toml"), "[[[ not toml").unwrap();
+    let out = m.logout();
+    assert!(!out.status.success());
+    let left: Vec<_> = std::fs::read_dir(m.cache_dir()).unwrap().flatten().map(|e| e.file_name()).collect();
+    assert!(left.is_empty(), "the cache went all the same: {left:?}");
+}
+
+#[test]
+fn logout_while_a_slakio_runs_removes_the_cache_and_says_to_quit_it() {
+    let m = Machine::new("logout-running");
+    if first_run(&m).is_none() {
+        return;
+    }
+    let Some(run) = m.start(2, &[]) else { return };
+    run.wait_for("it up", |t| t.contains("backend"));
+    let out = m.logout();
+    let said = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert!(!out.status.success(), "{said}");
+    assert!(said.contains("A slakio is still running: quit it"), "{said}");
+    assert!(!m.store_dir().join("cache.sqlite3").exists(), "removed all the same");
+    run.quit();
 }

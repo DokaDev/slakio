@@ -419,3 +419,4 @@
 "cache.failed" = "캐시를 열 수 없습니다"
 "cache.backup_failed" = "캐시를 Time Machine 백업에서 빼지 못했습니다"
 "logout.cache_failed" = "로컬 캐시를 지우지 못했습니다"
+"logout.still_running" = "slakio가 아직 실행 중입니다: 종료한 뒤 slakio logout을 다시 실행하세요"

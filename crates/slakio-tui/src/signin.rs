@@ -39,8 +39,10 @@ pub(crate) fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<
     None
 }
 
-/// `slakio logout`: every signed-in workspace's credentials leave the store, then the file, then
-/// the local cache: nothing of the sign-in is left.
+/// `slakio logout`: every signed-in workspace's credentials leave the store, then the file, and
+/// the local cache goes whether or not that worked: nothing of the sign-in is left. A slakio
+/// still running keeps what it shows, so the user is told to quit it (and the exit says
+/// failure).
 pub(crate) fn sign_out(
     store: &dyn SecretStore,
     path: Option<&std::path::Path>,
@@ -48,29 +50,32 @@ pub(crate) fn sign_out(
     paths: &Paths,
 ) -> ExitCode {
     let errors = || ErrorLog::new(paths.errors_log());
-    let Some(path) = path else {
-        println!("{}", i18n.label(Label::LogoutNone));
-        return ExitCode::SUCCESS;
-    };
-    match account::forget(store, path) {
-        Ok(gone) if gone.is_empty() => println!("{}", i18n.label(Label::LogoutNone)),
-        Ok(gone) => {
+    let mut ok = true;
+    match path.map(|p| account::forget(store, p)) {
+        None => println!("{}", i18n.label(Label::LogoutNone)),
+        Some(Ok(gone)) if gone.is_empty() => println!("{}", i18n.label(Label::LogoutNone)),
+        Some(Ok(gone)) => {
             for a in gone {
                 println!("{}", i18n.msg(&Msg::LogoutDone { workspace: shown(&a.name) }));
             }
         }
-        Err(fault) => {
+        Some(Err(fault)) => {
             errors().record("logout", &fault);
             eprintln!("{}", i18n.label(Label::LogoutFailed));
-            return ExitCode::FAILURE;
+            ok = false;
         }
     }
+    let running = crate::store::in_use(paths);
     if let Err(fault) = crate::store::remove(paths) {
         errors().record("logout", &fault);
         eprintln!("{}", i18n.label(Label::LogoutCacheFailed));
-        return ExitCode::FAILURE;
+        ok = false;
     }
-    ExitCode::SUCCESS
+    if running {
+        eprintln!("{}", i18n.label(Label::LogoutStillRunning));
+        ok = false;
+    }
+    if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
 
 /// `SLAKIO_TEST_CREDENTIALS` (`<team>|<token>|<cookie>`), debug builds with the memory store

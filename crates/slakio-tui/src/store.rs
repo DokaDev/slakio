@@ -1,7 +1,8 @@
 //! The local cache as the binary sets it up (`slakio-store`): opened for the signed-in workspace
 //! when its backend starts, put in front of it, kept out of Time Machine backups on macOS, and
-//! removed with `slakio logout`. Whatever goes wrong with it, the app runs without it and says so
-//! once; the detail goes to the error log. The demo never uses it.
+//! removed with `slakio logout`. It is the signed-in user's only: another sign-in finds it
+//! emptied. Whatever goes wrong with it, the app runs without it and says so once (the notices
+//! are queued, so each is seen); the detail goes to the error log. The demo never uses it.
 
 use slakio_core::backend::BackendHandle;
 use slakio_core::config::Config;
@@ -26,40 +27,43 @@ const BACKUP_NOTICE: &str = "cache_backup_failed";
 #[derive(Clone)]
 pub(crate) struct Local {
     on: bool,
-    /// Requests may be sent: a start without network fails its boot with a warning that takes
-    /// the status line's one slot, so a one-time notice is not counted as shown then.
-    network: bool,
     caps: Caps,
     paths: Paths,
     opened: Arc<Mutex<Option<Cache>>>,
 }
 
 impl Local {
-    pub(crate) fn new(paths: &Paths, cfg: &Config, network: bool) -> Self {
+    pub(crate) fn new(paths: &Paths, cfg: &Config) -> Self {
         let caps = Caps {
             per_conversation: cfg.cache_messages,
             max_bytes: u64::from(cfg.cache_max_mb) * 1024 * 1024,
             max_days: cfg.cache_days,
         };
-        Self { on: cfg.cache == "on", network, caps, paths: paths.clone(), opened: Arc::default() }
+        Self { on: cfg.cache == "on", caps, paths: paths.clone(), opened: Arc::default() }
     }
 
     fn record(&self, fault: &Fault) {
         ErrorLog::new(self.paths.errors_log()).record("cache", fault);
     }
 
-    /// `backend`, the backend of workspace `team`, with the cache in front of it when it can be
-    /// had; what to tell the user about it goes to `notices`.
-    pub(crate) fn front(&self, backend: BackendHandle, team: &str, notices: &mut Vec<Msg>) -> BackendHandle {
-        match self.open(notices) {
+    /// `backend`, the backend of workspace `team` signed in as `user`, with the cache in front of
+    /// it when it can be had; what to tell the user about it goes to `notices`.
+    pub(crate) fn front(
+        &self,
+        backend: BackendHandle,
+        team: &str,
+        user: &str,
+        notices: &mut Vec<Msg>,
+    ) -> BackendHandle {
+        match self.open(&format!("{team} {user}"), notices) {
             Some(cache) => slakio_store::layer::serve(backend, cache, WorkspaceId::new(team)),
             None => backend,
         }
     }
 
-    fn open(&self, notices: &mut Vec<Msg>) -> Option<Cache> {
+    fn open(&self, owner: &str, notices: &mut Vec<Msg>) -> Option<Cache> {
         let dir = self.paths.cache.as_ref().filter(|_| self.on)?;
-        let opened = match Store::open(dir) {
+        let mut opened = match Store::open(dir) {
             Ok(o) => o,
             Err(OpenError::InUse) => {
                 notices.push(Msg::Label(Label::CacheInUse));
@@ -75,13 +79,26 @@ impl Local {
             self.record(&Fault::other("cache: unreadable or of a newer version; set up again"));
             notices.push(Msg::Label(Label::CacheRebuilt));
         }
+        // Another sign-in's cache: emptied by the writer, not used by a reader.
+        match opened.store.claim(owner) {
+            Ok(true) => {}
+            Ok(false) => {
+                notices.push(Msg::Label(Label::CacheInUse));
+                return None;
+            }
+            Err(fault) => {
+                self.record(&fault);
+                notices.push(Msg::Label(Label::CacheFailed));
+                return None;
+            }
+        }
         if opened.store.read_only() {
             notices.push(Msg::Label(Label::CacheReadOnly));
         } else if let Some(tmutil) = exclusion() {
             // Once: a cache that was excluded remembers it.
             if let Err(why) = opened.store.exclude_from_backups(&tmutil) {
                 self.record(&Fault::other(format!("cache: not excluded from backups: {why}")));
-                if !self.network || self.paths.first_time(BACKUP_NOTICE) {
+                if self.paths.first_time(BACKUP_NOTICE) {
                     notices.push(Msg::Label(Label::CacheBackupFailed));
                 }
             }
@@ -124,4 +141,9 @@ pub(crate) fn remove(paths: &Paths) -> Result<(), Fault> {
         Some(dir) if dir.exists() => slakio_store::db::remove(dir),
         _ => Ok(()),
     }
+}
+
+/// A slakio runs and uses the cache (it holds the writer's lock).
+pub(crate) fn in_use(paths: &Paths) -> bool {
+    paths.cache.as_deref().is_some_and(slakio_store::db::in_use)
 }

@@ -1,7 +1,12 @@
 //! The status line's message slot: one transient notice at a time. A warning is not replaced by
 //! a weaker (info) notice while it shows, so the reason something did not work stays readable.
+//!
+//! A notice that must be seen (the start's notices about the cache) is queued instead: it shows
+//! once the slot is free, and when another notice takes the slot from it, it shows again after
+//! that one, so each is seen at least once whatever comes at the same time.
 
 use slakio_core::i18n::Msg;
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 /// How long an info notice shows.
@@ -26,6 +31,10 @@ pub struct Notice {
 #[derive(Clone, Debug, Default)]
 pub struct Status {
     notice: Option<Notice>,
+    /// The notice showing was queued: taken from the slot early, it is queued again.
+    queued: bool,
+    /// Notices that must be seen, waiting for the slot, in order.
+    waiting: VecDeque<(Msg, Level)>,
 }
 
 impl Status {
@@ -39,8 +48,28 @@ impl Status {
         if self.notice(now).is_some_and(|n| n.level > level) {
             return;
         }
+        if self.queued
+            && let Some(n) = self.notice.take().filter(|n| n.until > now)
+        {
+            self.waiting.push_front((n.msg, n.level));
+        }
+        self.put(msg.into(), level, now, false);
+    }
+
+    /// Show `msg` from `now` on when nothing shows, else as soon as what shows (and what was
+    /// queued before it) is done: it is seen at least once.
+    pub fn queue(&mut self, msg: impl Into<Msg>, level: Level, now: Instant) {
+        if self.notice(now).is_none() && self.waiting.is_empty() {
+            self.put(msg.into(), level, now, true);
+        } else {
+            self.waiting.push_back((msg.into(), level));
+        }
+    }
+
+    fn put(&mut self, msg: Msg, level: Level, now: Instant, queued: bool) {
         let until = now + if level == Level::Warning { WARNING_FOR } else { INFO_FOR };
-        self.notice = Some(Notice { msg: msg.into(), level, until });
+        self.notice = Some(Notice { msg, level, until });
+        self.queued = queued;
     }
 
     /// When the screen changes next by itself (the notice goes away), if ever.
@@ -48,12 +77,19 @@ impl Status {
         self.notice.as_ref().map(|n| n.until)
     }
 
-    /// Forget a notice whose time is up at `now`. `true` when one went (the screen changed).
+    /// Forget a notice whose time is up at `now`, and show the next one waiting. `true` when
+    /// one went (the screen changed).
     pub fn expire(&mut self, now: Instant) -> bool {
         if self.notice.as_ref().is_some_and(|n| n.until <= now) {
             self.notice = None;
+            if let Some((msg, level)) = self.waiting.pop_front() {
+                self.put(msg, level, now, true);
+            }
             return true;
         }
         false
     }
 }
+
+#[cfg(test)]
+mod tests;
