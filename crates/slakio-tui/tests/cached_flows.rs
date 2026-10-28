@@ -154,3 +154,19 @@ fn a_failed_page_keeps_the_cached_messages_and_a_retry_asks_for_the_newest_again
         s.b.held[0].command
     );
 }
+
+#[test]
+fn at_80_columns_a_notice_and_the_cached_mark_leave_the_open_conversations_name_whole() {
+    let mut s = cached_boot();
+    s.d.app.resize(80, 24);
+    s.b.fail(0, FailKind::Offline);
+    s.pump();
+    s.d.list_cursor_on("backend-old");
+    s.keys("enter");
+    let (cached, _) = cached_page(&mut s);
+    s.b.push(cached);
+    s.pump();
+    let line = s.d.status_line();
+    assert!(line.contains("Offline") && line.contains("cached"), "{line}");
+    assert!(line.contains("#backend-old"), "the place is not cut while the line has room: {line}");
+}

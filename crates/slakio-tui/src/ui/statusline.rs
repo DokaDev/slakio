@@ -242,15 +242,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
-    // the next pane, the view switcher), the workspace's name (cut with `…`, eight cells kept), the other hints by
-    // worth, the middle of the place, the place's first key and help, the name. Then what is left is filled again: a dropped hint comes back where cutting
-    // the name makes room for it, and the name grows into the rest, so no run of blank cells is
-    // left between the two sides.
+    // the next pane, the view switcher), the workspace's name (cut with `…`, eight cells kept),
+    // the other hints by worth, the middle of the place, the place's first key and help, the
+    // name, the place under ten cells. Then what is left is filled again: a dropped hint comes
+    // back where cutting the name makes room for it, and the name grows into the rest, so no run
+    // of blank cells is left between the two sides.
     let over = |ws: &Option<String>, pl: &Option<String>, h: &[usize]| {
         let pick: Vec<(String, String)> = h.iter().map(|&j| all_hints[j].clone()).collect();
         need(ws, pl, &pick).saturating_sub(w)
     };
     let full_name = ws_name.clone();
+    let full_place = place_text.clone();
     // The name cut by `by` cells, never under eight (or its own width).
     let cut = |by: usize| -> Option<String> {
         full_name.as_ref().map(|n| clip(n, width(n).saturating_sub(by).max(8.min(width(n)))))
@@ -304,15 +306,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         }
         chosen.retain(|&j| j != i);
     }
+    // The name goes before the place is cut under ten cells, and the place is cut again from
+    // its whole text, so the room the name gave is the place's.
+    if over(&ws_name, &place_text, &chosen) > 0 {
+        ws_name = None;
+        place_text.clone_from(&full_place);
+    }
     if let Some(p) = place_text.as_mut() {
         let excess = over(&ws_name, &Some(p.clone()), &chosen);
         if excess > 0 {
             *p = clip_middle(p, width(p).saturating_sub(excess).max(4));
         }
-    }
-
-    if over(&ws_name, &place_text, &chosen) > 0 {
-        ws_name = None;
     }
     // The name is cut for more hints only where it had to be cut anyway.
     let cut_room = if ws_name == full_name { 0 } else { name_room };
