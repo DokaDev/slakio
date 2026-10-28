@@ -38,7 +38,7 @@ impl Backend for DemoBackend {
                         self.world.thread(conversation, *thread, before, limit).unwrap_or((Vec::new(), true))
                     }
                 };
-                Event::History(Box::new(Page { target, messages, complete, users: Vec::new() }))
+                Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: false }))
             }
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {

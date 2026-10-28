@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/pane_flows.rs
+assertion_line: 188
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────╮
-│▎Home                   @21 ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
+│▎Home                   @24 ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
 │ DMs                    ●11 ││  JP   Jiho Park  13:43                                                                 │
-│ Activity               @33 ││       beforeafter                                                                      │
+│ Activity               @36 ││       beforeafter                                                                      │
 │ Files                      ││       :blink: 2                                                                        │
 │ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│  JP   Jiho Park  14:04                                                                 │
@@ -31,7 +32,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50          ││                                                                                        │
 │   # feed-cache-119         ││  SR   Sam Rivera  16:40                                                                │
 │   # feed-customer-161      ││       after apc                                                                        │
-│   # feed-customer-167      ││                                                                                        │
+│   # feed-customer-167   1  ││                                                                                        │
 │   # feed-dashboard-22      ││  RO   Ryan Oh  17:07                                                                   │
 │   # feed-dashboard-41      ││       c1 red                                                                           │
 │   # feed-design-34         ││                                                                                        │

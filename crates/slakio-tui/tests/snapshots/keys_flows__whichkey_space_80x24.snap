@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/keys_flows.rs
+assertion_line: 327
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│▎Home                   @21 ││                                                │
+│▎Home                   @24 ││                                                │
 │ DMs                    ●11 ││                                                │
-│ Activity               @33 ││                                                │
+│ Activity               @36 ││                                                │
 │ Files                      ││                                                │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│                                                │

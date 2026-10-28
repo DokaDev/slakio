@@ -206,7 +206,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             };
             // A DM: its unread messages (unless muted), red only when one mentions the user. A
             // channel: its mentions, red. Red is for mentions only (ui-ux-spec).
-            // A muted conversation never badges: faint, and no count.
+            // Muted: faint; a channel shows its mentions only, a DM nothing.
             let (unread_n, mentions) = c.badges();
             let count = match (c.is_dm(), unread) {
                 (true, true) => unread_n,

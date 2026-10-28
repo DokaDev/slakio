@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/pane_flows.rs
+assertion_line: 52
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
-│▎Home                   @21 ││  JH   Jiwon Han  05:58                                                                 │
+│▎Home                   @24 ││  JH   Jiwon Han  05:58                                                                 │
 │ DMs                    ●11 ││       Rolling back                                                                     │
-│ Activity               @33 ││                                                                                        │
+│ Activity               @36 ││                                                                                        │
 │ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
 │ To-dos                   6 ││       Schema production after invoice cache is should                                  │
 ├─▾──────────────────────────┤│                                                                                        │
@@ -31,7 +32,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50          ││       broken should for                                                                │
 │   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││  ＊   ＊＊＊  06:59                                                                    │
-│   # feed-customer-167      ││       Confirmed                                                                        │
+│   # feed-customer-167   1  ││       Confirmed                                                                        │
 │   # feed-dashboard-22      ││                                                                                        │
 │   # feed-dashboard-41      ││  KN   Kate Nam  07:05                                                                  │
 │   # feed-design-34         ││       Ticket review pager pager production on build alert the on draft                 │

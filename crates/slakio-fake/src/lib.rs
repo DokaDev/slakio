@@ -57,6 +57,8 @@ pub enum Fault {
     Hang,
     /// This answer (a test's own synthetic one) instead of the world's.
     Answer(serde_json::Value),
+    /// The world's own answer: a place in the queue, so the fault after it is the next request's.
+    Pass,
 }
 
 #[derive(Default)]
@@ -150,7 +152,7 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         Some(Fault::Api(code)) => (200, String::new(), serde_json::json!({"ok": false, "error": code}).to_string()),
         Some(Fault::Malformed) => (200, String::new(), "{\"ok\": tr".to_string()),
         Some(Fault::Answer(v)) => (200, String::new(), v.to_string()),
-        None => (200, String::new(), shapes::answer(&world, team, &logged).to_string()),
+        None | Some(Fault::Pass) => (200, String::new(), shapes::answer(&world, team, &logged).to_string()),
     };
     let head = format!(
         "HTTP/1.1 {status} FAKE\r\ncontent-type: application/json; charset=utf-8\r\ncontent-length: {}\r\n{extra}connection: close\r\n\r\n",

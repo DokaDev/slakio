@@ -1,14 +1,15 @@
 ---
 source: crates/slakio-tui/tests/style_flows.rs
+assertion_line: 359
 expression: screen_styled(&d)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
     [ B 0..30]
-│▎Home                   @21 ││                                                │
+│▎Home                   @24 ││                                                │
     [ B 0..1] [ B R 1..29] [ B 29..30]
 │ DMs                    ●11 ││                                                │
     [ B 0..1] [ B 25..28] [ B 29..30]
-│ Activity               @33 ││                                                │
+│ Activity               @36 ││                                                │
     [ B 0..1] [ B 25..28] [ B 29..30]
 │ Files                      ││                                                │
     [ B 0..1] [ B 29..30]

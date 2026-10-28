@@ -11,11 +11,13 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 **Pre-alpha, early development. Read-only, no live updates yet.**
 
 slakio signs in to your Slack workspaces with your own session ([Sign in](#sign-in))
-and shows its channels and DMs with their unread marks (muted ones faint and never counted);
-opening a conversation shows its newest messages, older ones as you scroll up, and a message's
-thread when you open it. Messages show Slack's formatting (bold, italic, strike, code and code
+and shows its channels and DMs with their unread marks (muted ones faint: a muted channel
+shows only its mentions of you, a muted DM nothing); opening a conversation shows its newest
+messages, older ones as you scroll up, and a message's thread when you open it (a thread of
+more than 3,000 replies shows its first 3,000, and says so). Messages show Slack's formatting (bold, italic, strike, code and code
 blocks, quotes, links, people and channels by name, emoji); a bot's sections and attachments
-show as text. Channels shared with another organization and people from it are marked `ext`,
+show as text, and a bot's or app's message is marked `app`. Channels shared with another
+organization and people and bots from it are marked `ext`,
 and people in do not disturb `◐` (the status line shows it when it is you). It only
 reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
 updates (open a conversation again to see new messages). What it fetched is kept in a local
@@ -197,8 +199,9 @@ The desktop-app import is adapted from the open-source client
 
 ## Local cache
 
-slakio keeps what it fetched — the workspace's channels, people and sections, and the newest
-messages of the conversations you opened — in one SQLite file in a directory of its own,
+slakio keeps what it fetched — the workspace's channels, people and sections, the newest
+messages of the conversations you opened, and the replies of the threads you opened — in one
+SQLite file in a directory of its own,
 `slakio-store`, in the cache directory (`$SLAKIO_CACHE_DIR`, else `$XDG_CACHE_HOME/slakio`, else
 `~/Library/Caches/slakio` on macOS, `~/.cache/slakio` on Linux, `%LOCALAPPDATA%\slakio\cache` on
 Windows). A start draws from it without waiting for Slack (a cache slower than half a second

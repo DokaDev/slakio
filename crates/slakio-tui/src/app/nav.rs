@@ -40,7 +40,7 @@ impl App {
         }
         let mut u = Unread::default();
         for c in self.model.conversations().iter().filter(|c| v == View::Activity || c.workspace == w.id) {
-            // A muted conversation counts for nothing.
+            // A muted channel counts its mentions only, a muted DM nothing.
             let (unread, mentions) = c.badges();
             match v {
                 View::Home if !c.is_dm() => {

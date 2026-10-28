@@ -139,6 +139,25 @@ fn counts_or_do_not_disturb_that_fail_are_unknown_not_zero() {
     });
 }
 
+/// Counts Slack answers "ok" to but without their lists are unread, not zero.
+#[test]
+fn counts_answered_without_their_lists_are_unknown_not_zero() {
+    rt().block_on(async {
+        for answer in [
+            json!({"ok": true}),
+            json!({"ok": true, "channels": [], "mpims": []}),
+            json!({"ok": true, "channels": {}, "mpims": [], "ims": []}),
+        ] {
+            let mut r = Run::new().await;
+            r.fake.fail_next("client.counts", Fault::Answer(answer.clone()));
+            assert!(r.boot().await.counts_failed, "{answer}");
+        }
+        let mut r = Run::new().await;
+        r.fake.fail_next("client.counts", Fault::Answer(json!({"ok": true, "channels": [], "mpims": [], "ims": []})));
+        assert!(!r.boot().await.counts_failed, "every list there, all read: none unread");
+    });
+}
+
 #[test]
 fn older_pages_follow_one_another_to_the_start() {
     rt().block_on(async {
@@ -207,6 +226,68 @@ fn an_older_page_s_duplicates_deleted_messages_and_emptiness_are_handled() {
     });
 }
 
+/// An older page whose messages are all deleted is not the start: the next older one is read.
+#[test]
+fn an_older_page_of_deleted_messages_only_does_not_end_the_history() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let target = r.target("deploys");
+        let m = |ts: &str, extra: serde_json::Value| {
+            let mut v = json!({"type": "message", "ts": ts, "user": "UDEMOA001", "text": format!("at {ts}")});
+            v.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            v
+        };
+        r.fake.fail_next(
+            "conversations.history",
+            Fault::Answer(json!({"ok": true, "has_more": true, "messages": [
+                m("1700000200.000000", json!({"subtype": "message_deleted"})),
+                m("1700000100.000000", json!({"hidden": true})),
+            ]})),
+        );
+        r.fake.fail_next(
+            "conversations.history",
+            Fault::Answer(json!({"ok": true, "has_more": true, "messages": [
+                m("1700000050.000000", json!({})),
+            ]})),
+        );
+        let p = r.page(&target, Some(Ts(1_700_000_300_000_000))).await;
+        assert_eq!(ts(&p.messages), [Ts(1_700_000_050_000_000)]);
+        assert!(!p.complete, "Slack says there is more");
+        let asked: Vec<String> = r
+            .fake
+            .log()
+            .into_iter()
+            .filter(|l| l.method() == "conversations.history")
+            .filter_map(|l| l.fields().into_iter().find(|(k, _)| *k == "latest").map(|(_, v)| v.to_string()))
+            .collect();
+        assert_eq!(asked, ["1700000300.000000", "1700000100.000000"], "on from the oldest deleted one");
+    });
+}
+
+/// A message Slack lists twice is shown once, the same copy whatever the order: the edited one.
+#[test]
+fn of_a_message_listed_twice_the_edited_copy_is_kept() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let target = r.target("deploys");
+        let plain = json!({"type": "message", "ts": "1700000100.000000", "user": "UDEMOA001", "text": "frist"});
+        let edited = json!({"type": "message", "ts": "1700000100.000000", "user": "UDEMOA001", "text": "first",
+            "edited": {"user": "UDEMOA001", "ts": "1700000110.000000"}});
+        for list in [[plain.clone(), edited.clone()], [edited.clone(), plain.clone()]] {
+            r.fake.fail_next(
+                "conversations.history",
+                Fault::Answer(json!({"ok": true, "has_more": false, "messages": list})),
+            );
+            let p = r.page(&target, Some(Ts(1_700_000_300_000_000))).await;
+            assert_eq!(p.messages.len(), 1);
+            assert_eq!(p.messages[0].text.unsanitized(), "first");
+            assert!(p.messages[0].edited);
+        }
+    });
+}
+
 #[test]
 fn a_thread_is_read_forward_once_and_served_backwards() {
     rt().block_on(async {
@@ -249,9 +330,98 @@ fn a_thread_is_read_forward_once_and_served_backwards() {
         assert_eq!(ts(&seen), ts(&whole));
         assert_eq!(seen[0].ts, first.ts, "the thread starts with its own message");
         assert_eq!(r.calls("conversations.replies"), calls, "served from what was read");
-        // Opening it again reads it again (new replies).
-        r.page(&thread, None).await;
-        assert_eq!(r.calls("conversations.replies"), calls * 2);
+        assert!(!newest.cut, "read to its end");
+        // Opening it again reads what is new only: from the last reply kept on, one request.
+        let again = r.page(&thread, None).await;
+        assert_eq!(r.calls("conversations.replies"), calls + 1);
+        let last = r.fake.log().into_iter().rfind(|l| l.method() == "conversations.replies").unwrap();
+        let oldest = whole.last().unwrap().ts.to_string();
+        assert!(last.fields().iter().any(|(k, v)| *k == "oldest" && *v == oldest), "{}", last.body);
+        assert_eq!(ts(&again.messages), ts(&whole[whole.len() - 28..]), "the same end, nothing lost");
+        // Older pages still come whole from what was kept.
+        let p = r.page(&thread, again.messages.first().map(|m| m.ts)).await;
+        assert_eq!(ts(&p.messages), ts(&whole[whole.len() - 56..whole.len() - 28]));
+        assert_eq!(r.calls("conversations.replies"), calls + 1);
+    });
+}
+
+/// A thread is read with at most 15 requests: past them, or when Slack says there is more but
+/// gives no way on, the thread is cut and says so, and opening it again asks for nothing.
+#[test]
+fn a_thread_read_only_in_part_says_so_and_is_not_read_again() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let parent = r.target("deploys");
+        let thread = |ts| Target::Thread { workspace: parent.workspace().clone(), conversation: parent.conversation().clone(), thread: Ts(ts) };
+        let reply = |n: u64| json!({"type": "message", "ts": format!("1700000{n:03}.000000"), "user": "U1", "text": "r"});
+        for n in 0..16 {
+            r.fake.fail_next("conversations.replies", Fault::Answer(json!({"ok": true, "has_more": true, "messages": [reply(n)], "response_metadata": {"next_cursor": format!("c{n}")}})));
+        }
+        let long = thread(1_700_000_000_000_000);
+        let p = r.page(&long, None).await;
+        assert_eq!(r.calls("conversations.replies"), 15, "no more than 15 requests");
+        assert!(p.cut, "the rest is not read");
+        assert_eq!(p.messages.len(), 15);
+        assert!(r.page(&long, p.messages.first().map(|m| m.ts)).await.cut, "every page of it says so");
+        r.page(&long, None).await;
+        assert_eq!(r.calls("conversations.replies"), 15, "not read again while kept");
+        // More to come, but no cursor (or none that can be read): cut too.
+        let mut r = Run::new().await;
+        r.boot().await;
+        for metadata in [json!(null), json!("not an object"), json!({"next_cursor": ""})] {
+            let mut answer = json!({"ok": true, "has_more": true, "messages": [reply(0)]});
+            if !metadata.is_null() {
+                answer["response_metadata"] = metadata.clone();
+            }
+            r.fake.fail_next("conversations.replies", Fault::Answer(answer));
+            let p = r.page(&thread(1_700_000_000_000_000 + r.id), None).await;
+            assert!(p.cut && p.complete, "{metadata}: one page, its start, but no end");
+        }
+        // Slack's own end is no cut.
+        r.fake.fail_next("conversations.replies", Fault::Answer(json!({"ok": true, "has_more": false, "messages": [reply(0)]})));
+        assert!(!r.page(&thread(1_700_000_999_000_000), None).await.cut);
+    });
+}
+
+/// A request that fails in the middle of reading a thread fails the page, and keeps nothing of
+/// the reading: the next open reads it from its start, and a thread kept before stays as it was.
+#[test]
+fn a_thread_reading_that_fails_midway_keeps_nothing_of_it() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let parent = r.target("long-threads");
+        let conv = parent.conversation().clone();
+        let first = r
+            .world
+            .history(&conv, None, r.world.message_count(&conv))
+            .0
+            .into_iter()
+            .find(|m| m.thread.is_some_and(|t| t.replies > 1000))
+            .unwrap();
+        let thread =
+            Target::Thread { workspace: parent.workspace().clone(), conversation: conv.clone(), thread: first.ts };
+        let (whole, _) = r.world.thread(&conv, first.ts, None, usize::MAX).unwrap();
+        let pages = whole.len().div_ceil(200);
+        // The third request fails.
+        r.fake.fail_next("conversations.replies", Fault::Pass);
+        r.fake.fail_next("conversations.replies", Fault::Pass);
+        r.fake.fail_next("conversations.replies", Fault::Status { status: 500, retry_after: None });
+        let failed = r.ask(Command::History { target: thread.clone(), before: None, limit: 28 }).await;
+        assert!(matches!(failed, Event::Failed { .. }), "{failed:?}");
+        let tried = r.calls("conversations.replies");
+        let newest = r.page(&thread, None).await;
+        assert_eq!(ts(&newest.messages), ts(&whole[whole.len() - 28..]));
+        assert_eq!(r.calls("conversations.replies") - tried, pages, "from its start again");
+        // Kept now: reading what is new fails, and what was kept is served as it was.
+        r.fake.fail_next("conversations.replies", Fault::Status { status: 500, retry_after: None });
+        let failed = r.ask(Command::History { target: thread.clone(), before: None, limit: 28 }).await;
+        assert!(matches!(failed, Event::Failed { .. }), "{failed:?}");
+        let before = r.calls("conversations.replies");
+        let p = r.page(&thread, newest.messages.first().map(|m| m.ts)).await;
+        assert_eq!(ts(&p.messages), ts(&whole[whole.len() - 56..whole.len() - 28]));
+        assert_eq!(r.calls("conversations.replies"), before, "served from what was kept");
     });
 }
 
@@ -288,11 +458,45 @@ fn block_kit_and_bots_are_read_as_text_and_names() {
         r.fake.fail_next("conversations.view", Fault::Answer(answer));
         let p = r.page(&target, None).await;
         assert_eq!(p.messages[0].text.unsanitized(), "*CPU* high on <https://grafana.example|web-1>");
-        assert_eq!(p.messages[0].user.as_str(), "BALERT");
+        assert!(p.messages[0].user.as_str().starts_with("BALERT"), "{}", p.messages[0].user.as_str());
         assert_eq!(p.messages[1].text.unsanitized(), "📎 report.pdf");
-        let bot = p.users.iter().find(|u| u.id.as_str() == "BALERT").expect("the bot, by the name it posts as");
+        let bot = p.users.iter().find(|u| u.id == p.messages[0].user).expect("the bot, by the name it posts as");
         assert!(bot.bot && bot.display_name.unsanitized() == "Grafana");
+        assert_eq!(bot.org, Org::Own);
         assert!(p.complete);
         assert!(!r.fake.log().into_iter().any(|l| l.method() == "users/info" && l.body.contains("BALERT")), "a bot is not looked up");
+    });
+}
+
+/// A bot's messages each keep the name they were posted under (a later name renames none), and a
+/// bot of another organization is of it.
+#[test]
+fn a_bot_s_name_is_each_message_s_and_another_organization_s_bot_is_marked() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let ws = r.boot().await.workspaces[0].id.clone();
+        let target = r.target("alerts");
+        let answer = json!({"ok": true, "history": {"has_more": false, "messages": [
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000300", "bot_id": "BHOOK", "username": "Minsu Kim", "text": "pay this"},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000200", "bot_id": "BHOOK", "username": "Deploys", "text": "shipped"},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000100", "bot_id": "BPART", "username": "Partner bot", "text": "hi",
+             "bot_profile": {"id": "BPART", "team_id": "TPARTNER"}},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000050", "bot_id": "BPART2", "username": "Other bot", "text": "hi",
+             "team": "TPARTNER"},
+        ]}, "users": []});
+        r.fake.fail_next("conversations.view", Fault::Answer(answer));
+        let p = r.page(&target, None).await;
+        let name = |i: usize| {
+            let u = p.users.iter().find(|u| u.id == p.messages[i].user).unwrap();
+            assert!(u.bot);
+            (u.display_name.unsanitized().to_string(), u.org.clone())
+        };
+        assert_eq!(name(3), ("Minsu Kim".to_string(), Org::Own));
+        assert_eq!(name(2), ("Deploys".to_string(), Org::Own), "the older message keeps its own name");
+        assert_ne!(p.messages[2].user, p.messages[3].user);
+        assert!(matches!(name(1).1, Org::External(_)), "another organization's bot");
+        assert!(matches!(name(0).1, Org::External(_)), "by the message's team too");
+        assert!(p.users.iter().all(|u| u.workspace == ws));
+        assert!(p.messages.iter().all(|m| !m.user.as_str().contains(' ')), "no name in an id");
     });
 }

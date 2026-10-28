@@ -148,7 +148,7 @@ fn space_v_folds_the_switcher_to_the_view_shown_and_saves_it() {
     assert_eq!(d.app.view_rows().len(), 1, "a click on the handle folds");
     let folded = in_list(&d, 1);
     assert!(
-        folded.contains("▸ Home") && folded.contains("@21 · A @33"),
+        folded.contains("▸ Home") && folded.contains("@24 · A @36"),
         "the strongest other mark too, with its view's letter: {folded}"
     );
     d.keys("space v space a space v");
@@ -211,7 +211,7 @@ fn the_counts_say_what_the_list_says() {
         .filter(|c| c.workspace.as_str() == "TDEMOA" && c.is_dm() && c.unread > 0 && !c.muted)
         .map(|c| c.unread)
         .sum();
-    // A muted conversation counts for nothing.
+    // A muted channel counts its mentions only, a muted DM nothing.
     let mentions: u32 = convs.iter().map(|c| c.badges().1).sum();
     let b_mentions: u32 = convs.iter().filter(|c| c.workspace.as_str() == "TDEMOB").map(|c| c.badges().1).sum();
     let chip = in_list(&d, 0);

@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/shell_flows.rs
+assertion_line: 28
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│▎Home                   @21 ││                                                │
+│▎Home                   @24 ││                                                │
 │ DMs                    ●11 ││                                                │
-│ Activity               @33 ││                                                │
+│ Activity               @36 ││                                                │
 │ Files                      ││                                                │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│                                                │

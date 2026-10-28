@@ -155,10 +155,15 @@ pub struct Conversation {
 }
 
 impl Conversation {
-    /// Its counts as badges show them: (unread, mentions), none at all when it is muted (a
-    /// muted conversation never badges, nor adds to a section's or a view's count).
+    /// Its counts as badges show them: (unread, mentions). A muted channel shows its mentions of
+    /// the user only, never plain unread messages; a muted DM or group DM shows nothing (Slack
+    /// counts every message of a DM as a mention), nor adds to a section's or a view's count.
     pub fn badges(&self) -> (u32, u32) {
-        if self.muted { (0, 0) } else { (self.unread, self.mentions) }
+        match (self.muted, self.is_dm()) {
+            (false, _) => (self.unread, self.mentions),
+            (true, false) => (0, self.mentions),
+            (true, true) => (0, 0),
+        }
     }
 
     pub fn is_dm(&self) -> bool {

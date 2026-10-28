@@ -199,13 +199,17 @@ fn history(world: &World, request: &Logged) -> Value {
 
 /// A thread, as Slack pages it: forward from its own message, `limit` at a time, the next page
 /// named by `response_metadata.next_cursor` (here the offset, spelled as Slack's opaque ones are).
+/// With `oldest`, the replies from that time on (`inclusive`), its own message still first.
 fn replies(world: &World, request: &Logged) -> Value {
     let (Some(c), Some(ts)) = (channel(request), field(request, "ts").as_deref().and_then(ts_of)) else {
         return json!({"ok": false, "error": "thread_not_found"});
     };
-    let Some((all, _)) = world.thread(&c, ts, None, usize::MAX) else {
+    let Some((mut all, _)) = world.thread(&c, ts, None, usize::MAX) else {
         return json!({"ok": false, "error": "thread_not_found"});
     };
+    if let Some(oldest) = field(request, "oldest").as_deref().and_then(ts_of) {
+        all.retain(|m| m.ts == ts || m.ts >= oldest);
+    }
     let from: usize = field(request, "cursor")
         .and_then(|c| c.strip_prefix("dGhyZWFk:").and_then(|n| n.parse().ok()))
         .unwrap_or(0)

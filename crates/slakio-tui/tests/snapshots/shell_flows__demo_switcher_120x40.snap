@@ -1,10 +1,11 @@
 ---
 source: crates/slakio-tui/tests/shell_flows.rs
+assertion_line: 79
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
 │▎╭ Workspaces ──────────────────╮                                                                                     │
-│ │ ▌A company               @24 │                                                                                     │
+│ │ ▌A company               @27 │                                                                                     │
 │ │ ▌B side                   @9 │                                                                                     │
 │ ╰──── Enter switch · Esc close ╯                                                                                     │
 │ To-dos                   6 ││                                                                                        │
@@ -31,7 +32,7 @@ expression: d.snap()
 │   # feed-build-50          ││                                                                                        │
 │   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││                                                                                        │
-│   # feed-customer-167      ││                                                                                        │
+│   # feed-customer-167   1  ││                                                                                        │
 │   # feed-dashboard-22      ││                                                                                        │
 │   # feed-dashboard-41      ││                                                                                        │
 │   # feed-design-34         ││                                                                                        │

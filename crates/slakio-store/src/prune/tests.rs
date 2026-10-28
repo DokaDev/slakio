@@ -21,7 +21,7 @@ fn messages(n: u64, text_len: usize) -> Vec<Message> {
 }
 
 fn put(store: &mut Store, t: &Target, n: u64, len: usize, seen: u64) {
-    let p = Page { target: t.clone(), messages: messages(n, len), complete: false, users: Vec::new() };
+    let p = Page { target: t.clone(), messages: messages(n, len), complete: false, users: Vec::new(), cut: false };
     store.put_page(&p, None, seen).unwrap();
 }
 

@@ -37,5 +37,5 @@ pub fn other(ws: &str, conv: &str) -> Target {
 /// The world's page of `target` older than `before`.
 pub fn page(world: &World, target: &Target, before: Option<slakio_core::model::Ts>, limit: usize) -> Page {
     let (messages, complete) = world.history(target.conversation(), before, limit);
-    Page { target: target.clone(), messages, complete, users: Vec::new() }
+    Page { target: target.clone(), messages, complete, users: Vec::new(), cut: false }
 }

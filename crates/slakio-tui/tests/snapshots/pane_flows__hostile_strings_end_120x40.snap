@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/pane_flows.rs
+assertion_line: 190
 expression: mask_hangul(&d.screen())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#hostile-strings ─────────────────────────────────────────────────────────────────────╮
-│▎Home                   @21 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│▎Home                   @24 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │ DMs                    ●11 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
-│ Activity               @33 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+│ Activity               @36 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │ Files                      ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 │ To-dos                   6 ││       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
 ├─▾──────────────────────────┤│       xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
@@ -31,7 +32,7 @@ expression: mask_hangul(&d.screen())
 │   # feed-build-50          ││       ����                                                                             │
 │   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││  EB   Eve Bae  22:05                                                                   │
-│   # feed-customer-167      ││       one                                                                              │
+│   # feed-customer-167   1  ││       one                                                                              │
 │   # feed-dashboard-22      ││       two                                                                              │
 │   # feed-dashboard-41      ││       three                                                                            │
 │   # feed-design-34         ││       🙏 1   🎉 1   ✅ 5                                                               │

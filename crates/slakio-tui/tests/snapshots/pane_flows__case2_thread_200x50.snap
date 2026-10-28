@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/pane_flows.rs
+assertion_line: 69
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ─────────────╮╭ ▌#long-threads ──────────────────────────────────────────────────────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────────────────────────────╮
-│▎Home                         @21 ││ ──────────────────────────────────────────── 2026-01-06 ──────────────────────────────────────────── ││  TK   Taylor Kim  03:11                                  │
+│▎Home                         @24 ││ ──────────────────────────────────────────── 2026-01-06 ──────────────────────────────────────────── ││  TK   Taylor Kim  03:11                                  │
 │ DMs                          ●11 ││▎ JL   Jiyoung Lee  07:23                                                                             ││       Staging latency merge timeout                      │
-│ Activity                     @33 ││▎      We waiting waiting now index a the a the release                                               ││                                                          │
+│ Activity                     @36 ││▎      We waiting waiting now index a the a the release                                               ││                                                          │
 │ Files                            ││▎      ⤷ 1,200 replies · last 03:23                                                                   ││  MK   Minsu Kim  03:12                                   │
 │ To-dos                         6 ││                                                                                                      ││       Build rollback done broken merge                   │
 ├─▾────────────────────────────────┤│  DC   Dan Cho  07:30                                                                                 ││                                                          │
@@ -31,7 +32,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50                ││                                                                                                      ││                                                          │
 │   # feed-cache-119               ││  TK   Tom Ko  08:13                                                                                  ││  TK   Tom Ko  03:19                                      │
 │   # feed-customer-161            ││       ＊＊ ＊＊＊＊＊＊                                                                              ││       Draft draft is is customer can retry dashboard     │
-│   # feed-customer-167            ││                                                                                                      ││                                                          │
+│   # feed-customer-167         1  ││                                                                                                      ││                                                          │
 │   # feed-dashboard-22            ││  MK   Minsu Kim  08:21                                                                               ││  NS   Nina Seo  03:20                                    │
 │   # feed-dashboard-41            ││       Review lunch lunch design schema merge design build the looks                                  ││       After ticket customer timeout queue again timeout  │
 │   # feed-design-34               ││                                                                                                      ││       check sprint deploy review maybe is build tracing  │

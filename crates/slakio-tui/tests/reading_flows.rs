@@ -1,5 +1,5 @@
 //! What a real workspace says about its conversations and people, drawn: a muted conversation is
-//! faint and never badged (nor counted by its section or view), the user in do not disturb has
+//! faint, a muted channel badged (and counted) for its mentions only, a muted DM never; the user in do not disturb has
 //! `◐` in the status line, a Slack Connect channel its `ext` and a sender of another organization
 //! `ext` after the name; counts Slack could not tell keep those shown before, and the status line
 //! says so. At 120x40 and 80x24.
@@ -46,9 +46,9 @@ fn mute_do_not_disturb_and_slack_connect_are_drawn_at_120x40_and_80x24() {
         s.pump();
         let screen = s.d.screen();
         let at = format!("{w}x{h}: {screen}");
-        // Muted: no pill, though it mentions the user.
+        // Muted: its mentions of the user only, never its plain unread count.
         let alerts = row_of(&screen, "alerts");
-        assert!(!alerts.contains('4') && !alerts.contains('9'), "{at}");
+        assert!(alerts.contains(" 4 ") && !alerts.contains('9'), "{at}");
         assert!(row_of(&screen, "partner-shared").contains("ext"), "{at}");
         assert!(s.d.status_line().contains('◐'), "the user is in do not disturb: {at}");
         if w >= 100 {
@@ -61,16 +61,23 @@ fn mute_do_not_disturb_and_slack_connect_are_drawn_at_120x40_and_80x24() {
     }
 }
 
+/// A muted channel counts its mentions of the user (Home, Activity), never its plain unread
+/// messages; a muted DM counts for nothing (every message of a DM is a mention in Slack's counts).
 #[test]
-fn a_muted_conversation_adds_to_no_count() {
+fn a_muted_channel_counts_its_mentions_only_and_a_muted_dm_nothing() {
     let mut muted = world();
-    let s = Scripted::booted(true, Some(muted.clone()));
-    let home = s.d.app.view_unread(0, View::Home);
     let ws = muted.workspaces[0].id.clone();
-    muted.conversations.iter_mut().find(|c| c.name == "alerts" && c.workspace == ws).unwrap().muted = false;
-    let s2 = Scripted::booted(true, Some(muted));
-    assert_eq!(s2.d.app.view_unread(0, View::Home).mentions, home.mentions + 4, "only the unmuted one counts");
-    assert_eq!(s.d.app.model.mentions() + 4, s2.d.app.model.mentions(), "nor in Activity");
+    let dm = muted.conversations.iter().position(|c| c.workspace == ws && c.is_dm() && c.unread > 0).unwrap();
+    (muted.conversations[dm].unread, muted.conversations[dm].mentions) = (3, 3);
+    let mut loud = muted.clone();
+    loud.conversations.iter_mut().find(|c| c.name == "alerts" && c.workspace == ws).unwrap().muted = false;
+    muted.conversations[dm].muted = true;
+    let (s, s2) = (Scripted::booted(true, Some(muted)), Scripted::booted(true, Some(loud)));
+    let (home, home2) = (s.d.app.view_unread(0, View::Home), s2.d.app.view_unread(0, View::Home));
+    assert_eq!(home.mentions, home2.mentions, "the muted channel's mentions count");
+    let (dms, dms2) = (s.d.app.view_unread(0, View::Dms), s2.d.app.view_unread(0, View::Dms));
+    assert_eq!(dms.dms + 3, dms2.dms, "the muted DM counts for nothing");
+    assert_eq!(s.d.app.model.mentions() + 3, s2.d.app.model.mentions(), "in Activity: the DM's 3 only");
 }
 
 #[test]
@@ -100,6 +107,11 @@ fn counts_slack_could_not_tell_keep_those_shown_and_say_so() {
     s.pump();
     assert_eq!(s.d.app.view_unread(0, View::Home), before, "the counts shown before stay");
     assert!(s.d.status_line().contains("Unread counts not loaded"), "{}", s.d.status_line());
+    // With two workspaces, it says whose, in that workspace's stripe (found by its id).
+    let notice = s.d.app.status.notice(s.d.now).expect("the notice");
+    assert_eq!(notice.about.as_ref(), Some(&ws));
+    let name = World::demo().snapshot().workspaces[0].name.unsanitized().to_string();
+    assert!(matches!(&notice.msg, slakio_core::i18n::Msg::FailWorkspace { workspace, .. } if *workspace == name));
 }
 
 fn signed() -> Vec<slakio_tui::app::model::SignedIn> {
@@ -113,4 +125,45 @@ fn signed() -> Vec<slakio_tui::app::model::SignedIn> {
             read_only: true,
         })
         .collect()
+}
+
+/// A thread the backend read only in part says so after the last reply read, faint, and the
+/// bots among the senders are marked `app`.
+#[test]
+fn a_thread_read_only_in_part_says_so_and_a_bot_is_marked() {
+    use slakio_core::model::Target;
+    let mut s = Scripted::booted(true, None);
+    s.d.list_cursor_on("long-threads");
+    s.keys("enter");
+    let i = s.b.held.len() - 1;
+    s.b.answer(i);
+    s.pump();
+    s.keys("g g enter");
+    let i =
+        s.b.held
+            .iter()
+            .position(|r| matches!(&r.command, Command::History { target: Target::Thread { .. }, .. }))
+            .expect("the thread asked for");
+    let mut e = s.b.reply(i);
+    let Event::History(page) = &mut e.event else { panic!("{e:?}") };
+    page.cut = true;
+    // Its newest reply is a bot's, posting as a person's name.
+    let last = page.messages.last_mut().unwrap();
+    last.user = slakio_core::model::UserId::new("BHOOK~1");
+    page.users.push(slakio_core::model::User {
+        id: last.user.clone(),
+        workspace: page.target.workspace().clone(),
+        name: "Minsu Kim".into(),
+        display_name: "Minsu Kim".into(),
+        org: slakio_core::model::Org::Own,
+        bot: true,
+        presence: Presence::Unknown,
+    });
+    s.b.push(e);
+    s.pump();
+    let screen = s.d.screen();
+    let lines: Vec<&str> = screen.lines().collect();
+    let notice = lines.iter().position(|l| l.contains("Thread cut short here")).unwrap_or_else(|| panic!("{screen}"));
+    let bot = lines.iter().position(|l| l.contains("Minsu Kim app")).unwrap_or_else(|| panic!("{screen}"));
+    assert!(bot < notice, "the notice after the last reply (the bot's): {screen}");
 }

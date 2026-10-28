@@ -151,45 +151,32 @@ async fn history(
     let limit = limit.clamp(1, PAGE_MAX);
     let channel = target.conversation().as_str().to_string();
     let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
-    let (messages, complete, bots) = match &target {
-        Target::Thread { thread, .. } => {
+    let (messages, complete, bots, cut) = match (&target, before) {
+        (Target::Thread { thread, .. }, _) => {
             ctx.threads.page(client, me.as_ref(), &channel, *thread, before, limit).await?
         }
-        Target::Conversation { .. } => {
+        (Target::Conversation { .. }, None) => {
             let count = limit.to_string();
-            let history: wire::History = match before.map(|ts| ts.to_string()) {
-                None => {
-                    let call = Call::form(
-                        Method::ConversationsView,
-                        &[
-                            ("channel", channel.as_str()),
-                            ("count", count.as_str()),
-                            ("ignore_replies", "true"),
-                            ("no_members", "true"),
-                        ],
-                    );
-                    let view: wire::View = client.call(&call, Priority::User).await?;
-                    ctx.people.learn(view.users.as_deref().unwrap_or_default());
-                    view.history.unwrap_or_default()
-                }
-                Some(latest) => {
-                    let params = [
-                        ("channel", channel.as_str()),
-                        ("latest", latest.as_str()),
-                        ("limit", count.as_str()),
-                        ("ignore_replies", "true"),
-                    ];
-                    client.call(&Call::form(Method::ConversationsHistory, &params), Priority::User).await?
-                }
-            };
-            // Unknown is not complete: only Slack's own "no more" says the start is in this page;
-            // but an older page with nothing in it has nothing older to give either (asking
-            // again would ask for the same).
-            let has_more = history.has_more;
-            let (mut messages, bots) = read(history.messages.unwrap_or_default(), me.as_ref());
-            messages.retain(|m| before.is_none_or(|b| m.ts < b));
-            let complete = has_more == Some(false) || (before.is_some() && messages.is_empty());
-            (messages, complete, bots)
+            let call = Call::form(
+                Method::ConversationsView,
+                &[
+                    ("channel", channel.as_str()),
+                    ("count", count.as_str()),
+                    ("ignore_replies", "true"),
+                    ("no_members", "true"),
+                ],
+            );
+            let view: wire::View = client.call(&call, Priority::User).await?;
+            ctx.people.learn(view.users.as_deref().unwrap_or_default());
+            let history = view.history.unwrap_or_default();
+            // Unknown is not complete: only Slack's own "no more" says the start is in this page.
+            let complete = history.has_more == Some(false);
+            let (messages, bots) = read(history.messages.unwrap_or_default(), me.as_ref());
+            (messages, complete, bots, false)
+        }
+        (Target::Conversation { .. }, Some(before)) => {
+            let (messages, complete, bots) = older(client, me.as_ref(), &channel, before, limit).await?;
+            (messages, complete, bots, false)
         }
     };
     // The authors by name: what the view brought, else looked up (in batches); not the user,
@@ -202,40 +189,117 @@ async fn history(
         .collect();
     let mut users = ctx.people.names(client, &authors, Priority::User).await;
     if let Some(ws) = ctx.people.team() {
-        users.extend(bots.into_iter().map(|(id, name)| bot(&ws, id, name)));
+        users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
     }
-    Ok(Page { target, messages, complete, users })
+    Ok(Page { target, messages, complete, users, cut })
 }
 
-/// The bots that posted in a page, by id: the name each posts as.
-pub(crate) type Bots = HashMap<String, String>;
+/// Pages of deleted messages only read past at most, in one older page.
+pub const SKIPPED_MAX: usize = 4;
 
-/// `raw` as messages, oldest first, each once (a message Slack lists twice is shown once), the
-/// deleted ones left out; and the bots among their authors.
+/// Up to `limit` messages of `channel` older than `before`, oldest first; whether its start is
+/// among them; the bots that posted. A page whose messages are all deleted is passed over (up to
+/// [`SKIPPED_MAX`] of them): the next older one is read, from the oldest of them on.
+async fn older(
+    client: &Client,
+    me: Option<&UserId>,
+    channel: &str,
+    before: Ts,
+    limit: u32,
+) -> Result<(Vec<Message>, bool, Bots), SlackError> {
+    let count = limit.to_string();
+    let mut latest = before;
+    for skipped in 0..=SKIPPED_MAX {
+        let at = latest.to_string();
+        let params =
+            [("channel", channel), ("latest", at.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
+        let history: wire::History =
+            client.call(&Call::form(Method::ConversationsHistory, &params), Priority::User).await?;
+        let has_more = history.has_more;
+        let raw = history.messages.unwrap_or_default();
+        let oldest = raw.iter().filter_map(|m| wire::ts(&m.ts)).map(Ts).filter(|t| *t < latest).min();
+        let (mut messages, bots) = read(raw, me);
+        messages.retain(|m| m.ts < before);
+        match oldest {
+            Some(o) if messages.is_empty() && has_more == Some(true) && skipped < SKIPPED_MAX => latest = o,
+            // Unknown is not complete: only Slack's own "no more" says the start is in this
+            // page; but an older page with nothing in it has nothing older to give either
+            // (asking again would ask for the same).
+            _ => {
+                let complete = has_more == Some(false) || messages.is_empty();
+                return Ok((messages, complete, bots));
+            }
+        }
+    }
+    Ok((Vec::new(), true, Bots::new()))
+}
+
+/// A bot that posted: the name it posted as, and its team when Slack gave one.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Bot {
+    pub name: String,
+    pub team: Option<String>,
+}
+
+/// The bots that posted in a page, by the author id their messages carry: one for each bot and
+/// name it posted as, so a bot that posts under another name later does not rename its earlier
+/// messages.
+pub(crate) type Bots = HashMap<String, Bot>;
+
+/// The author id of the messages bot `id` posted as `name`: the bot's id and a hash of the name
+/// (no character of the name in it).
+fn bot_author(id: &str, name: &str) -> String {
+    // FNV-1a: the same id every run (the cache keeps it).
+    let hash = name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    format!("{id}~{hash:016x}")
+}
+
+/// `raw` as messages, oldest first, each once (of a message Slack lists twice, the copy edited
+/// last), the deleted ones left out; and the bots among their authors.
 pub(crate) fn read(raw: Vec<wire::Message>, me: Option<&UserId>) -> (Vec<Message>, Bots) {
     let mut bots = Bots::new();
-    let mut messages: Vec<Message> = raw
-        .into_iter()
-        .filter_map(|m| {
-            if let (None, Some(id), Some(name)) = (&m.user, &m.bot_id, &m.username) {
-                bots.insert(id.clone(), name.clone());
-            }
-            message(m, me)
-        })
-        .collect();
-    messages.sort_by_key(|m| m.ts);
-    messages.dedup_by_key(|m| m.ts);
-    (messages, bots)
+    let mut messages: Vec<(Message, u64)> =
+        raw.into_iter()
+            .filter_map(|mut m| {
+                if let (None, Some(id), Some(name)) = (&m.user, &m.bot_id, &m.username) {
+                    let author = bot_author(id, name);
+                    let team = m.bot_profile.as_ref().and_then(|b| b.team_id.clone()).or_else(|| m.team.clone());
+                    bots.insert(author.clone(), Bot { name: name.clone(), team });
+                    m.user = Some(author);
+                }
+                // When it was edited last: 0 never, 1 at a time Slack did not give.
+                let edited = m.edited.as_ref().map_or(0, |e| {
+                    e.get("ts").and_then(serde_json::Value::as_str).and_then(wire::ts).unwrap_or(1).max(1)
+                });
+                message(m, me).map(|m| (m, edited))
+            })
+            .collect();
+    messages.sort_by_key(|(m, _)| m.ts);
+    messages.dedup_by(|later, kept| {
+        if later.0.ts != kept.0.ts {
+            return false;
+        }
+        if later.1 > kept.1 {
+            std::mem::swap(later, kept);
+        }
+        true
+    });
+    (messages.into_iter().map(|(m, _)| m).collect(), bots)
 }
 
-/// A bot of workspace `ws` as a person: named as it posts.
-fn bot(ws: &str, id: String, name: String) -> User {
+/// A bot of workspace `ws` as a person: named as it posts; of another organization when its
+/// team is another than `ws`.
+fn bot(ws: &str, id: String, b: Bot) -> User {
+    let org = match b.team {
+        Some(t) if !t.is_empty() && t != ws => Org::External(Remote::new(t)),
+        _ => Org::Own,
+    };
     User {
         id: UserId::new(id),
         workspace: WorkspaceId::new(ws),
-        name: Remote::new(name.clone()),
-        display_name: Remote::new(name),
-        org: Org::Own,
+        name: Remote::new(b.name.clone()),
+        display_name: Remote::new(b.name),
+        org,
         bot: true,
         presence: Presence::Unknown,
     }

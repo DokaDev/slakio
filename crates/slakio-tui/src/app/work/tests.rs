@@ -78,9 +78,21 @@ fn a_stale_or_foreign_page_is_dropped() {
     let mut w = Work::default();
     w.open(conversation(&m, "backend"));
     let g = w.take_requests().remove(0).id;
-    let other = Page { target: conversation(&m, "incidents"), messages: Vec::new(), complete: true, users: Vec::new() };
+    let other = Page {
+        target: conversation(&m, "incidents"),
+        messages: Vec::new(),
+        complete: true,
+        users: Vec::new(),
+        cut: false,
+    };
     assert!(!w.on_page(g, &other, &m), "another target");
-    let same = Page { target: conversation(&m, "backend"), messages: Vec::new(), complete: true, users: Vec::new() };
+    let same = Page {
+        target: conversation(&m, "backend"),
+        messages: Vec::new(),
+        complete: true,
+        users: Vec::new(),
+        cut: false,
+    };
     assert!(!w.on_page(Generation(g.0 + 7), &same, &m), "another generation");
     assert!(w.on_page(g, &same, &m));
     assert!(!w.on_page(g, &same, &m), "answered already");
@@ -208,7 +220,7 @@ fn a_page_for_a_closed_pane_is_dropped_and_reopening_loads_afresh() {
     w.open(backend.clone());
     let g = w.take_requests().remove(0).id;
     w.close();
-    let page = Page { target: backend.clone(), messages: Vec::new(), complete: true, users: Vec::new() };
+    let page = Page { target: backend.clone(), messages: Vec::new(), complete: true, users: Vec::new(), cut: false };
     assert!(!w.on_page(g, &page, &m), "nobody waits for it");
     w.open(backend);
     let asked = w.take_requests();

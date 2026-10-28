@@ -1,12 +1,12 @@
 ---
 source: crates/slakio-tui/tests/markup_flows.rs
-assertion_line: 104
+assertion_line: 110
 expression: s.d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
-│▎Home                   @21 ││                                                │
+│▎Home                   @24 ││                                                │
 │ DMs                    ●11 ││                                                │
-│ Activity               @33 ││ ───────────────── 2026-01-05 ───────────────── │
+│ Activity               @36 ││ ───────────────── 2026-01-05 ───────────────── │
 │ Files                      ││ KN  Kate Nam  09:00                            │
 │ To-dos                   6 ││     Deploy of api is cancelled done: run make  │
 ├─▾──────────────────────────┤│     ship & ask @Minsu Kim or @Me in #alerts    │

@@ -1,12 +1,12 @@
 ---
 source: crates/slakio-tui/tests/markup_flows.rs
-assertion_line: 104
+assertion_line: 110
 expression: s.d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────────────────────────────────────────────╮
-│▎Home                   @21 ││                                                                                        │
+│▎Home                   @24 ││                                                                                        │
 │ DMs                    ●11 ││                                                                                        │
-│ Activity               @33 ││                                                                                        │
+│ Activity               @36 ││                                                                                        │
 │ Files                      ││                                                                                        │
 │ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
@@ -32,7 +32,7 @@ expression: s.d.snap()
 │   # feed-build-50          ││  KN   Kate Nam  09:10                                                                  │
 │   # feed-cache-119         ││       see the runbook or https://status.example.com @here 🎉                           │
 │   # feed-customer-161      ││                                                                                        │
-│   # feed-customer-167      ││  KN   Kate Nam  09:20                                                                  │
+│   # feed-customer-167   1  ││  KN   Kate Nam  09:20                                                                  │
 │   # feed-dashboard-22      ││       fn main() { println!("a very long line of code that never wraps in a narrow pan… │
 │   # feed-dashboard-41      ││           *not bold*                                                                   │
 │   # feed-design-34         ││                                                                                        │

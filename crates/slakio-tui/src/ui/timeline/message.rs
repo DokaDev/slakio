@@ -109,6 +109,12 @@ pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected:
         out.extend(comfortable(app, pane, tl, i, w, selected));
     }
     out.extend(footer(app, pane, tl, i, w));
+    // A thread read only in part says so after the last reply read.
+    if tl.cut && i + 1 == tl.items.len() {
+        let notice = app.i18n.label(Label::PaneThreadCut).to_string();
+        out.push((Line::raw(""), Kind::Gap));
+        out.push((Line::from(Span::styled(clip(&notice, w), app.theme.faint())), Kind::Gap));
+    }
     out
 }
 
@@ -175,7 +181,7 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     };
     let author_style = if m.own { t.own_author() } else { t.author() };
     let time_text = time::hm(m.ts);
-    let tag = other_org(app, pane, m);
+    let tag = tags(app, pane, m);
     let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2 + width(&tag)).max(1));
     let mut header = picture(0);
     header.push(Span::styled(name, author_style));
@@ -223,7 +229,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             spans.extend([chip, Span::raw(" ")]);
             room -= chip_column;
         }
-        let tag = other_org(app, pane, m);
+        let tag = tags(app, pane, m);
         spans.extend([
             Span::styled(clip(m.author.as_str(), room.saturating_sub(width(&tag))), author_style),
             Span::styled(tag, t.faint()),
@@ -241,9 +247,16 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
                 spans.extend([chip, Span::raw(" ")]);
                 name_w -= chip_w;
             }
-            let name = clip(m.author.as_str(), name_w - 1);
-            let pad = " ".repeat(name_w - width(&name));
-            spans.push(Span::styled(format!("{name}{pad}"), author_style));
+            // The tags after the name, the name cut to leave them room (a bot's mark always shows).
+            let tag = tags(app, pane, m);
+            let tag = if width(&tag) + 2 <= name_w { tag } else { String::new() };
+            let name = clip(m.author.as_str(), (name_w - 1).saturating_sub(width(&tag)).max(1));
+            let pad = " ".repeat(name_w.saturating_sub(width(&name) + width(&tag)));
+            if tag.is_empty() {
+                spans.push(Span::styled(format!("{name}{pad}"), author_style));
+            } else {
+                spans.extend([Span::styled(name, author_style), Span::styled(tag, t.faint()), Span::raw(pad)]);
+            }
         } else {
             spans.push(Span::raw(" ".repeat(indent_w)));
         }
@@ -258,11 +271,19 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
     out
 }
 
-/// ` ext` after the name of a sender of another organization (a Slack Connect peer); empty for
-/// one of the workspace's own.
-fn other_org(app: &App, pane: &Pane, m: &Shown) -> String {
-    let external = app.model.user(pane.target.workspace(), &m.user).is_some_and(|u| matches!(u.org, Org::External(_)));
-    if external { format!(" {}", app.i18n.label(Label::ListExternal)) } else { String::new() }
+/// What follows the sender's name: ` app` for a bot or an app (GUI Slack's APP badge: its name
+/// is whatever it chose to post as), ` ext` for a sender of another organization (a Slack Connect
+/// peer); empty for a person of the workspace's own.
+fn tags(app: &App, pane: &Pane, m: &Shown) -> String {
+    let user = app.model.user(pane.target.workspace(), &m.user);
+    let mut out = String::new();
+    if user.is_some_and(|u| u.bot) {
+        out.push_str(&format!(" {}", app.i18n.label(Label::MessageApp)));
+    }
+    if user.is_some_and(|u| matches!(u.org, Org::External(_))) {
+        out.push_str(&format!(" {}", app.i18n.label(Label::ListExternal)));
+    }
+    out
 }
 
 /// The text's column in the current density, for the rows under it.

@@ -275,7 +275,7 @@ fn signing_out_of_one_workspace_removes_its_part_only() {
     let c = world.snapshot().conversations.iter().find(|c| c.workspace.as_str() == a).unwrap();
     let t = slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() };
     let (messages, _) = world.history(&c.id, None, 5);
-    let page = slakio_core::backend::Page { target: t.clone(), messages, complete: false, users: vec![] };
+    let page = slakio_core::backend::Page { target: t.clone(), messages, complete: false, users: vec![], cut: false };
     store.put_page(&page, None, 1).unwrap();
     let mut reader = Store::open(&named).unwrap().store;
     assert!(reader.forget(a).is_err(), "a reader removes nothing");

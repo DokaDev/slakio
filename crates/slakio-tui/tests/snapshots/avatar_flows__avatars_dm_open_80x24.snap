@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/avatar_flows.rs
+assertion_line: 234
 expression: mask_hangul(&narrow.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────╮
-│ Home                   @21 ││    still pager review done lunch someone       │
+│ Home                   @24 ││    still pager review done lunch someone       │
 │▎DMs                    ●11 ││    ⤷ 12 replies · last 04:02                   │
-│ Activity               @33 ││                                                │
+│ Activity               @36 ││                                                │
 │ Files                      ││ M  Me · 04:08                                  │
 │ To-dos                   6 ││    Rolling back                                │
 ├─▾──────────────────────────┤│    🎉 3                                        │

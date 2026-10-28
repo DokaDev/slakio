@@ -27,6 +27,8 @@ pub struct Timeline {
     /// The messages are the local cache's, from an earlier run: the page awaited replaces them,
     /// and a retry asks for the newest page again (not an older one).
     pub cached: bool,
+    /// A thread read only in part: its newest replies are not among those shown.
+    pub cut: bool,
 }
 
 impl Timeline {
@@ -47,7 +49,9 @@ impl Timeline {
         // The backend's page replaces what the cache had.
         if std::mem::take(&mut self.cached) {
             self.items.clear();
+            self.cut = false;
         }
+        self.cut |= page.cut;
         let first = self.items.first().map(|m| m.ts);
         let older: Vec<Shown> = shown.into_iter().filter(|m| first.is_none_or(|f| m.ts < f)).collect();
         let n = older.len();

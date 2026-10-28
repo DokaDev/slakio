@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/pane_flows.rs
+assertion_line: 69
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#long-threads ────────────────────────────────────╮╭ ▌⤷ Thread · #long-threads ───────╮
-│▎Home                   @21 ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
+│▎Home                   @24 ││ ─────────────────── 2026-01-06 ─────────────────── ││     Staging fine invoice release │
 │ DMs                    ●11 ││▎JL  Jiyoung Lee  07:23                             ││     merge                        │
-│ Activity               @33 ││▎    We waiting waiting now index a the a the       ││                                  │
+│ Activity               @36 ││▎    We waiting waiting now index a the a the       ││                                  │
 │ Files                      ││▎    release                                        ││ JH  Jiwon Han  03:18             │
 │ To-dos                   6 ││▎    ⤷ 1,200 replies · last 03:23                   ││     Budget should timeout        │
 ├─▾──────────────────────────┤│                                                    ││     timeout after tomorrow       │
@@ -31,7 +32,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50          ││     Tracing on we pager please looks budget        ││                                  │
 │   # feed-cache-119         ││     waiting merge budget queue still branch        ││ IM  Ivy Moon  03:22              │
 │   # feed-customer-161      ││     metrics customer invoice                       ││     Draft broken can looks       │
-│   # feed-customer-167      ││                                                    ││     staging done tracing now     │
+│   # feed-customer-167   1  ││                                                    ││     staging done tracing now     │
 │   # feed-dashboard-22      ││ TK  Tom Ko  08:13                                  ││     lunch meeting invoice        │
 │   # feed-dashboard-41      ││     ＊＊ ＊＊＊＊＊＊                              ││     migration done customer      │
 │   # feed-design-34         ││                                                    ││     please                       │

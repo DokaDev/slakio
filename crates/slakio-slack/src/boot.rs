@@ -6,8 +6,8 @@
 //!
 //! Counts are Slack's: a channel is unread when Slack says it has unreads and its mentions are
 //! Slack's mention count; a DM's (and a group DM's) count is Slack's too, every message there
-//! being for the user. A conversation the user muted keeps its counts here: the UI never badges
-//! it. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
+//! being for the user. A conversation the user muted keeps its counts here: the UI shows a muted
+//! channel's mentions only, a muted DM's nothing. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
 //! within the organization is not), and a DM with a person of another team.
 
 use crate::client::Client;
@@ -41,8 +41,12 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     client.set_team(&team.id);
     people.set_team(&team.id);
     *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
-    let counts: Option<wire::Counts> =
-        client.call(&Call::form(Method::ClientCounts, &[]), Priority::Background).await.ok();
+    // An answer without one of its lists cannot be read: unknown, not zero.
+    let counts: Option<wire::Counts> = client
+        .call::<wire::Counts>(&Call::form(Method::ClientCounts, &[]), Priority::Background)
+        .await
+        .ok()
+        .filter(|c| c.channels.is_some() && c.mpims.is_some() && c.ims.is_some());
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
     let mut known = people.names(client, &peers, Priority::Background).await;

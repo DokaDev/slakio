@@ -159,6 +159,7 @@ fn a_thread_is_kept_apart_from_its_conversation() {
         messages: conv.messages[..5].iter().map(|m| Message { text: Remote::new("reply"), ..m.clone() }).collect(),
         complete: true,
         users: Vec::new(),
+        cut: false,
     };
     store.put_page(&replies, None, 2).unwrap();
     let back = store.newest_page(&th, 28).unwrap().unwrap();

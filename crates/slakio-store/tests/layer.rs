@@ -107,7 +107,7 @@ fn target(world: &World, name: &str) -> Target {
 
 fn page(world: &World, t: &Target, before: Option<Ts>) -> Page {
     let (messages, complete) = world.history(t.conversation(), before, 28);
-    Page { target: t.clone(), messages, complete, users: Vec::new() }
+    Page { target: t.clone(), messages, complete, users: Vec::new(), cut: false }
 }
 
 fn history(t: &Target, before: Option<Ts>) -> Command {
@@ -449,7 +449,8 @@ async fn a_thread_s_newest_page_is_kept_and_given_first_on_a_later_open() {
     let conv = target(&w, "general");
     let parent = page(&w, &conv, None).messages[0].clone();
     let thread = Target::Thread { workspace: ws.clone(), conversation: conv.conversation().clone(), thread: parent.ts };
-    let replies = Page { target: thread.clone(), messages: vec![parent.clone()], complete: true, users: Vec::new() };
+    let replies =
+        Page { target: thread.clone(), messages: vec![parent.clone()], complete: true, users: Vec::new(), cut: false };
     let mut r = run(&dir, &ws, Caps::default(), false).await;
     r.ask(1, history(&thread, None));
     let req = r.backend_next().await;
@@ -464,4 +465,27 @@ async fn a_thread_s_newest_page_is_kept_and_given_first_on_a_later_open() {
     r.backend_next().await;
     let Event::CachedHistory(p) = r.ui_next().await.event else { panic!("cached") };
     assert_eq!((p.target, p.messages), (thread, replies.messages), "the thread, not its conversation");
+}
+
+#[tokio::test]
+async fn a_thread_read_only_in_part_is_not_kept() {
+    let (dir, w) = (scratch("thread-cut"), world());
+    first_run(&dir, &w).await;
+    let ws = snapshot(&w).workspaces[0].id.clone();
+    let conv = target(&w, "general");
+    let parent = page(&w, &conv, None).messages[0].clone();
+    let thread = Target::Thread { workspace: ws.clone(), conversation: conv.conversation().clone(), thread: parent.ts };
+    let cut = Page { target: thread.clone(), messages: vec![parent], complete: true, users: Vec::new(), cut: true };
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, history(&thread, None));
+    let req = r.backend_next().await;
+    r.answer(req.id, Event::History(Box::new(cut))).await;
+    assert!(matches!(r.ui_next().await.event, Event::History(_)), "passed on as it is");
+    r.settled().await;
+    r.no_faults();
+    drop(r);
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(2, history(&thread, None));
+    r.backend_next().await;
+    assert!(r.ui.rx.try_recv().is_err(), "no word on what is newer: nothing of it kept");
 }

@@ -67,10 +67,15 @@ impl Status {
     /// Show `msg` from `now` on when nothing shows, else as soon as what shows (and what was
     /// queued before it) is done: it is seen at least once.
     pub fn queue(&mut self, msg: impl Into<Msg>, level: Level, now: Instant) {
+        self.queue_about(msg, level, None, now);
+    }
+
+    /// [`Status::queue`] for a notice about workspace `about`.
+    pub fn queue_about(&mut self, msg: impl Into<Msg>, level: Level, about: Option<WorkspaceId>, now: Instant) {
         if self.notice(now).is_none() && self.waiting.is_empty() {
-            self.put(msg.into(), level, None, now, true);
+            self.put(msg.into(), level, about, now, true);
         } else {
-            self.waiting.push_back((msg.into(), level, None));
+            self.waiting.push_back((msg.into(), level, about));
         }
     }
 

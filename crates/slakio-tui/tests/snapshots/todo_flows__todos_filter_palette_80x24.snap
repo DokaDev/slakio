@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/todo_flows.rs
+assertion_line: 241
 expression: "{ let mut small = Demo::new(80, 24); small.keys(\"space o f\"); small.snap() }"
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ Home                   @21 ││                                                │
+│ Home                   @24 ││                                                │
 │ DMs                    ●11 ││                                                │
-│ Activity               @33 ││                                                │
+│ Activity               @36 ││                                                │
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │▎To-dos  │ : filter                                                 │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │

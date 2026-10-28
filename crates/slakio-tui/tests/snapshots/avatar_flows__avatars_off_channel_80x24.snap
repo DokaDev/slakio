@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/avatar_flows.rs
+assertion_line: 131
 expression: mask_hangul(&small.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────╮
-│▎Home                   @21 ││                                                │
+│▎Home                   @24 ││                                                │
 │ DMs                    ●11 ││ Tom Ko · 06:41                                 │
-│ Activity               @33 ││   On waiting migration someone index can       │
+│ Activity               @36 ││   On waiting migration someone index can       │
 │ Files                      ││   staging should                               │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│ Kate Nam · 06:51                               │

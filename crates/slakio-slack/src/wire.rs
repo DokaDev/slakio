@@ -257,6 +257,17 @@ pub struct Message {
     /// A bot's message: the bot's id and the name it posts as.
     pub bot_id: Option<String>,
     pub username: Option<String>,
+    /// The team of the one who posted (in a channel shared with another organization, maybe
+    /// another than the workspace's).
+    pub team: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub bot_profile: Option<BotProfile>,
+}
+
+/// The bot that posted a message: its team.
+#[derive(Debug, Default, Deserialize)]
+pub struct BotProfile {
+    pub team_id: Option<String>,
 }
 
 /// A file shared with a message: the client reads its name only.

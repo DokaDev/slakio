@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/avatar_flows.rs
+assertion_line: 230
 expression: mask_hangul(&small.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────╮
-│ Home                   @21 ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
+│ Home                   @24 ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
 │▎DMs                    ●11 ││ MK Minsu Kim     Waiting on deploy alert staging lunch       00:44 │
-│ Activity               @33 ││                                                                    │
+│ Activity               @36 ││                                                                    │
 │ Files                      ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
 │ To-dos                   6 ││                  tomorrow sprint review on tracing                 │
 ├─▾──────────────────────────┤│                  production                                        │

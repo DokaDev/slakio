@@ -175,9 +175,18 @@ impl App {
         }
         if !cached {
             self.boots[b].failed = None;
-            // Unknown is not zero: the counts kept are shown, and the status line says so.
+            // Unknown is not zero: the counts kept are shown, and the status line says so (with
+            // several workspaces, whose; its stripe found by id, two may have one name).
             if snapshot.counts_failed {
-                self.status.queue(Msg::Label(Label::FailCounts), Level::Warning, now);
+                let whose = self.boots[b].workspace.clone().filter(|_| self.boots.len() > 1);
+                match whose.and_then(|ws| self.model.workspace(&ws).cloned()) {
+                    Some(w) => {
+                        let why = self.i18n.label(Label::FailCounts).to_string();
+                        let msg = Msg::FailWorkspace { workspace: w.name.line().into_string(), why };
+                        self.status.queue_about(msg, Level::Warning, Some(w.id.clone()), now);
+                    }
+                    None => self.status.queue(Msg::Label(Label::FailCounts), Level::Warning, now),
+                }
             }
         }
         let h = self.list_height();

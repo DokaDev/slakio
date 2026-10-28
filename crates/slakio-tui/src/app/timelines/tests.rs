@@ -7,7 +7,7 @@ fn target(ws: &str) -> Target {
 }
 
 fn page(ws: &str, complete: bool) -> Page {
-    Page { target: target(ws), messages: Vec::new(), complete, users: Vec::new() }
+    Page { target: target(ws), messages: Vec::new(), complete, users: Vec::new(), cut: false }
 }
 
 #[test]
@@ -29,4 +29,18 @@ fn a_timeline_is_kept_per_workspace_and_answers_only_its_request() {
     assert!(store.awaiting(&target("T2"), Generation(2)).is_some());
     store.retain(|t| *t == target("T2"));
     assert!(store.get(&target("T1")).is_none() && store.get(&target("T2")).is_some());
+}
+
+#[test]
+fn a_thread_read_only_in_part_stays_marked_and_the_cache_s_mark_goes_with_its_messages() {
+    let mut tl = Timeline::default();
+    tl.add_cached((50..60).map(msg).collect());
+    tl.cut = true;
+    let fresh = page("T", false);
+    tl.add_page(&fresh, (50..60).map(msg).collect());
+    assert!(!tl.cut, "the backend's page replaces the cache's, its mark too");
+    let cut = Page { cut: true, ..page("T", false) };
+    tl.add_page(&cut, (40..50).map(msg).collect());
+    tl.add_page(&page("T", true), (30..40).map(msg).collect());
+    assert!(tl.cut, "an older page does not unsay it");
 }

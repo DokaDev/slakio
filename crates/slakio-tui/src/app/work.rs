@@ -65,7 +65,8 @@ pub struct Work {
 /// The draft of a target that has none yet.
 static NO_DRAFT: Composer = Composer::EMPTY;
 /// The timeline of a target that has none yet.
-static EMPTY: Timeline = Timeline { items: Vec::new(), complete: false, pending: None, failed: None, cached: false };
+static EMPTY: Timeline =
+    Timeline { items: Vec::new(), complete: false, pending: None, failed: None, cached: false, cut: false };
 
 /// `m` as drawn in a pane of `model`.
 fn shown(model: &Model, target: &Target, m: &Message) -> Shown {

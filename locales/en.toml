@@ -69,6 +69,7 @@
 "list.later_version" = "{view} comes in a later version"
 "list.empty" = "Nothing here"
 "list.external" = "ext"
+"message.app" = "app"
 "list.failed" = "Could not load workspaces"
 "list.failed_one" = "Could not load"
 "list.unavailable" = "Not available"
@@ -79,6 +80,7 @@
 "pane.no_messages_read_only" = "No messages yet"
 "pane.thread" = "Thread"
 "pane.failed" = "Could not load messages"
+"pane.thread_cut" = "Thread cut short here: newer replies were not read"
 # A DM's title: its peer's presence.
 "presence.active" = "active"
 "presence.away" = "away"

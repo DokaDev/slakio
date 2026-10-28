@@ -1,11 +1,12 @@
 ---
 source: crates/slakio-tui/tests/workspaces_flows.rs
+assertion_line: 261
 expression: t.d.snap()
 ---
-╭ ▌B side ▾ · A @24 ─────────╮╭────────────────────────────────────────────────╮
+╭ ▌B side ▾ · A @27 ─────────╮╭────────────────────────────────────────────────╮
 │▎Home                       ││                                                │
 │ DMs                        ││                                                │
-│ Activity               @24 ││                                                │
+│ Activity               @27 ││                                                │
 │ Files                      ││                                                │
 │ To-dos                     ││                                                │
 ├─▾──────────────────────────┤│                                                │

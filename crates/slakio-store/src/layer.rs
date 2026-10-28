@@ -116,7 +116,8 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                             cache.prune();
                         }
                     }
-                    (Some(Asked::Page { before }), Event::History(p)) => {
+                    // A thread read only in part says nothing of what is newer: not kept.
+                    (Some(Asked::Page { before }), Event::History(p)) if !p.cut => {
                         cache.put_page((**p).clone(), before);
                         pages += 1;
                         if pages % PRUNE_EVERY == 0 {

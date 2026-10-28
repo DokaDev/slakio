@@ -91,6 +91,9 @@ pub struct Page {
     /// People the messages name whom the backend learned of with this page (their names, for
     /// authors not in the snapshot); none when it has nothing new.
     pub users: Vec<User>,
+    /// A thread read only in part (longer than is read at once, or Slack gave no way on): its
+    /// newest replies are not among those read, and the page is no word on what is newer.
+    pub cut: bool,
 }
 
 /// Everything the UI lists right after start: the answer to [`Command::Boot`].

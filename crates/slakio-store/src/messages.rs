@@ -141,7 +141,7 @@ impl Store {
             .collect::<Result<Vec<_>, _>>()?;
         tx.commit()?;
         users.retain(|u| messages.iter().any(|m| m.user == u.id));
-        Ok(Some(Page { target: target.clone(), messages, complete: false, users }))
+        Ok(Some(Page { target: target.clone(), messages, complete: false, users, cut: false }))
     }
 }
 

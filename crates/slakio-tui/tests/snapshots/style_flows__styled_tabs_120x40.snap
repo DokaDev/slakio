@@ -1,14 +1,15 @@
 ---
 source: crates/slakio-tui/tests/style_flows.rs
+assertion_line: 360
 expression: screen_styled(&tabs(&t))
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #incidents @3 ×  2 #backend ×  3 #general ×
     [bdr 0..1] [mut 1..2] [ws 2..3] [mut 3..17] [mut B 17..18] [err B 18..21] [mut 21..22] [bdr 22..30] [mut 30..43] [err B 43..46] [mut 46..47] [dim 47..48] [mut 48..49] [acc/cl B 49..52] [/cl B 52..61] [mut/cl 61..62] [/cl B 62..63] [mut 63..75] [dim 75..76] [mut 76..77]
-│▎Home                   @21 │╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
+│▎Home                   @24 │╭ ▌#backend ─────────────────────────────────────────────────────────────────────────────╮
     [bdr 0..1] [acc B 1..2] [ B 2..25] [err B 25..28] [ B 28..29] [bdr 29..30] [acc 30..32] [ws 32..33] [ B 33..42] [acc 42..120]
 │ DMs                    ●11 ││       Rolling back                                                                     │
     [bdr 0..1] [err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
-│ Activity               @33 ││                                                                                        │
+│ Activity               @36 ││                                                                                        │
     [bdr 0..1] [err B 25..28] [bdr 29..30] [acc 30..31] [acc 119..120]
 │ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
     [bdr 0..1] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..50] [dim 52..57] [acc 119..120]
@@ -60,8 +61,8 @@ expression: screen_styled(&tabs(&t))
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
 │   # feed-customer-161      ││  ＊   ＊＊＊  06:59                                                                    │
     [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..30] [acc 30..31] [av/av B 32..34] [av/av B 35..36] [ B 38..39] [ B 40..41] [ B 42..43] [dim 46..51] [acc 119..120]
-│   # feed-customer-167      ││       Confirmed                                                                        │
-    [bdr 0..1] [dim 4..5] [dim 6..23] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
+│   # feed-customer-167   1  ││       Confirmed                                                                        │
+    [bdr 0..1] [dim 4..5] [dim 6..23] [on/err B 25..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
 │   # feed-dashboard-22      ││                                                                                        │
     [bdr 0..1] [mut 4..5] [bdr 29..30] [acc 30..31] [acc 119..120]
 │   # feed-dashboard-41      ││  KN   Kate Nam  07:05                                                                  │
