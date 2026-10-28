@@ -295,6 +295,34 @@ fn a_retry_asks_again_for_the_workspace_shown_only() {
 }
 
 #[test]
+fn a_retry_asks_again_for_a_workspace_shown_from_the_cache_while_slack_has_not_answered() {
+    rt().block_on(async {
+        // B answers each boot from the cache at once, and Slack never does.
+        let boots = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (b, mut end) = BackendHandle::pair(READ_ONLY, 8);
+        let counted = std::sync::Arc::clone(&boots);
+        tokio::spawn(async move {
+            while let Some(r) = end.rx.recv().await {
+                if r.command == Command::Boot {
+                    counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let cached = World::demo().snapshot().only(&ids().1);
+                    let _ =
+                        end.tx.send(Envelope { generation: r.id, event: Event::CachedBoot(Box::new(cached)) }).await;
+                }
+            }
+        });
+        let mut t = Two::new(120, 40, world(true), b);
+        t.settle().await;
+        t.keys("space W j enter").await;
+        assert!(t.d.app.showing_cached(), "B is shown from the cache");
+        assert_eq!(boots.load(std::sync::atomic::Ordering::SeqCst), 1);
+        t.keys("r").await;
+        assert_eq!(boots.load(std::sync::atomic::Ordering::SeqCst), 2, "r asks B again");
+        assert!(!t.d.status_line().contains("Nothing to retry"), "{}", t.d.status_line());
+    });
+}
+
+#[test]
 fn read_only_is_per_workspace_and_a_change_goes_only_where_it_can_be_made() {
     rt().block_on(async {
         let mut t = Two::new(120, 40, world(true), world(false));

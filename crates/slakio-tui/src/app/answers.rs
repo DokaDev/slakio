@@ -115,11 +115,12 @@ impl App {
     }
 
     /// `r` (`:retry`): ask again for what could not be loaded for a reason that may pass — the
-    /// workspace shown (also one still loading: its backend may hang or be gone), else the
-    /// active pane's messages. Only when asked: nothing retries on its own.
+    /// workspace shown (also one still loading, or shown from the cache while Slack has not
+    /// answered: its backend may hang or be gone), else the active pane's messages. Only when
+    /// asked: nothing retries on its own.
     pub(super) fn retry(&mut self, now: Instant) {
         let here = self.boot_here().map(|b| (b.workspace.clone(), b.failed.clone()));
-        let loading = matches!(&here, Some((Some(ws), None)) if !self.model.is_loaded_in(ws));
+        let loading = matches!(&here, Some((Some(ws), None)) if !self.model.is_fresh(ws));
         match here {
             Some((ws, Some(kind))) if kind.retryable() => self.boot_again(ws),
             // Asking again cannot help: say why once more.
