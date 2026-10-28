@@ -10,6 +10,10 @@ cookie, and reading its per-workspace tokens follow these implementations.
 gammons/slk — https://github.com/gammons/slk
 `internal/slackdesktop/` (config-directory matrix, cookie database read,
 keychain-account ordering, Local Storage token layout, workspace list).
+Also, ported into `crates/slakio-slack/src/live*`: `internal/slack/client.go`
+and `connection.go` (the live updates socket's address and parameters, its
+header set, the reconnect pause and silence limit) and `internal/slack/events.go`
+(which events and message subtypes are read, and their fields).
 
 MIT License
 

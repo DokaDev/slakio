@@ -10,7 +10,7 @@ unless it says so.
 |---|---|---|
 | `slakio-core` | UI-free and network-free core: the domain model, the backend protocol (commands and events tagged with a generation), the terminal-escape sanitiser, paths, atomic file writes, the config file, the secret store interface, faults, i18n | nothing of slakio |
 | `slakio-world` | a seeded, deterministic fake world (two workspaces, ~300 channels, DMs, a Slack Connect channel, a 10k-message channel, a 1,200-reply thread, hostile strings) for the demo mode and the tests | `slakio-core` |
-| `slakio-slack` | the Slack transport and backend, read-only by construction: the method allowlist, requests in the official web client's format, tolerant decoding, errors as data, the process-wide request cap, in-flight limit and kill switch (see [the Slack transport](#the-slack-transport)) | `slakio-core` |
+| `slakio-slack` | the Slack transport and backend, read-only by construction, with each workspace's live updates (a socket that only receives): the method allowlist, requests in the official web client's format, tolerant decoding, errors as data, the process-wide request cap, in-flight limit and kill switch (see [the Slack transport](#the-slack-transport)) | `slakio-core` |
 | `slakio-auth` | signing in: a browser request pasted as cURL parsed for the workspace's address, the session token and the cookies; the OS keychain behind the secret store (macOS); `workspaces.toml`, the signed-in workspace without any secret (see [Signing in](#signing-in)) | `slakio-core` |
 | `slakio-store` | the local cache: the last boot snapshot and the newest messages of the conversations opened, in one SQLite file (bundled SQLite), private to the user, one writer at a time, pruned to caps, set up again when unreadable; the cache in front of a backend (see [The local cache](#the-local-cache)) | `slakio-core` |
 | `slakio-fake` | an in-process fake Slack server for the tests, seeded by `slakio-world`; it logs every request as received | `slakio-core`, `slakio-world` (dev-dependency only) |
@@ -117,6 +117,14 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   workspace's answer replaces its part of the model only, and each has its own failure ("Could
   not load", and the status line names whose start failed) and its own `read_only`. A backend
   that boots every workspace at once (the demo) answers `Command::Boot` without a workspace.
+- **Live updates.** What a backend pushes (`Event::Live`) goes to every timeline that shows where
+  it belongs (`app/work/live.rs`): a message posted into its conversation or thread (only among
+  what is loaded, never into a span not read), a new copy over the one loaded, a deletion out, a
+  reply onto its thread's count; a pane where the user chose a message keeps its view, one
+  following the newest keeps following. Counts follow (`Model::bump`: not for the user's own
+  messages, nor a reply not shown in the conversation; `Model::mark` for one read elsewhere).
+  Whether a workspace's updates arrive is said briefly in the status line each time it changes
+  (`app/answers/live.rs`; what was said of it before is dropped, `Status::restate_about`).
 - What only the binary can do is an `Effect` the loop carries out: copying is OSC 52, so no
   clipboard library or helper process is involved; saving an answer the app asked for (the
   icons question) goes into the config file, keeping its comments. `slakio --demo` uses `DemoBackend`
@@ -188,7 +196,8 @@ every rail sits in the transport, below the backend, so no caller can go around 
    above stay shared by all of them). A request given up while it waits frees its place.
 5. **Hosts.** TLS (rustls with the OS's certificate verifier, HTTP/2 when offered) to the
    signed-in workspace's own host (`<name>.slack.com`) and the edge cache's
-   (`edgeapi.slack.com`), nothing else: the host is checked where the socket opens, so no file,
+   (`edgeapi.slack.com`), and for the live updates the realtime host (`wss-primary.slack.com`,
+   HTTP/1.1 only), nothing else: the host is checked where the socket opens, so no file,
    image or other host is ever reached. The tests reach a loopback address over plain HTTP.
 6. **Format.** Requests look like the official web client's (the browser's header set in its
    order, no `Referer`, the token in the form body and never in a header, the client's `_x_*`
@@ -199,6 +208,24 @@ every rail sits in the transport, below the backend, so no caller can go around 
    `FailKind` (`Auth`, `RateLimited { retry_after }`, `Network`, `Offline`, `Busy`, `CapReached`,
    `Api { code }`); the error log gets the method, the code or the status, never a body, a token
    or a message.
+
+**Live updates** (`live.rs`, `slakio_slack::serve_live`, what the binary runs): once a workspace
+has booted, one WebSocket to the realtime host, opened as the web client opens it (the token in
+its address, the browser's smaller header set for a socket, the `d` cookie). It only receives:
+the client writes nothing on it but a pong for each ping and a close (frames read and written by
+hand, `live/socket.rs`: masked, no extension, a message at most 4 MiB, anything a server must not
+send fails it). Messages posted, changed and deleted and conversations read elsewhere
+(`*_marked`) are pushed to the UI as `Event::Live` (generation `Generation::PUSHED`, no request
+asked for it), a new author named by one lookup a socket; everything else on the socket is left
+unread. A socket that drops, closes or is silent for 60 seconds opens again after a pause doubling
+from 1 to 30 seconds, each a random half to all of it, reset once one stayed open 30 seconds; each
+opening goes past the kill switch and counts against the request cap (`Governor::dial`), and
+switching the network off ends the socket for good. The socket replays nothing it missed, so when
+one opens again the UI is told to catch up (`Connection::Connected { catch_up: true }`) and asks
+for the newest page of each conversation open again (`Command::Catchup`, at most 8, one page each,
+`conversations.history` in the background share of the budget, never an open), each page the
+truth for the span it covers, the whole timeline replaced when it does not reach back to what was
+loaded (no gap is hidden). Each workspace's socket is its own; one that fails holds none back.
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
 is refused before any request, and a newer page of the same conversation supersedes one in

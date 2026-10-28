@@ -8,7 +8,7 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 
 ## Status
 
-**Pre-alpha, early development. Read-only, no live updates yet.**
+**Pre-alpha, early development. Read-only.**
 
 slakio signs in to your Slack workspaces with your own session ([Sign in](#sign-in))
 and shows its channels and DMs with their unread marks (muted ones faint: a muted channel
@@ -19,8 +19,12 @@ blocks, quotes, links, people and channels by name, emoji); a bot's sections and
 show as text, and a bot's or app's message is marked `app`. Channels shared with another
 organization and people and bots from it are marked `ext`,
 and people in do not disturb `◐` (the status line shows it when it is you). It only
-reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
-updates (open a conversation again to see new messages). What it fetched is kept in a local
+reads: it sends no message, reacts to nothing and marks nothing as read. Messages posted,
+edited and deleted show as they happen in the conversations and threads open, and the unread
+counts follow (live updates, over one connection per workspace that only receives; the status
+line says when it drops and comes back, and the conversations open are read again then);
+reactions show when a conversation is opened again, and who is typing or online is not shown.
+What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
 ([Install](#install)); the latest release, 0.0.9, reads real history (one page of older messages per `gg` or scroll, paced to
@@ -310,8 +314,9 @@ the answer in the config file; `:icons on|off` changes it later. `rail_expand`, 
 left rail (later the top bar, now the view switcher), is ignored (the status line says it can be removed).
 
 `network = "off"` (or `SLAKIO_NETWORK=off` in the environment, or `slakio --offline`) is a kill
-switch for the Slack connection: with any of them set, slakio sends nothing at all. Every
-request also goes through a request cap and an allowlist of read-only methods.
+switch for the Slack connection: with any of them set, slakio sends nothing at all and opens no
+live updates connection. Every request also goes through a request cap and an allowlist of
+read-only methods; each opening of the live updates connection counts against the cap.
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.
