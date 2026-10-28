@@ -6,7 +6,9 @@
 //! through a [`BackendHandle`] and hands the events back whenever they arrive (an answer may come
 //! late, or never). Only one wiring file of the UI names a concrete backend.
 
-use crate::model::{Conversation, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace, WorkspaceId};
+use crate::model::{
+    Conversation, ConversationId, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace, WorkspaceId,
+};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
@@ -16,6 +18,9 @@ use tokio::sync::mpsc;
 pub struct Generation(pub u64);
 
 impl Generation {
+    /// What an event no request asked for carries ([`Event::Live`]): no request has it.
+    pub const PUSHED: Generation = Generation(0);
+
     pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
@@ -52,6 +57,10 @@ pub enum Command {
     /// Change saved item `item` (Slack's `saved.update` / `saved.delete`). Answered with
     /// [`Event::Saved`], every saved item after the change.
     Save { item: SavedId, change: SavedChange },
+    /// The newest `limit` messages of the conversation `target` again, after live updates were
+    /// lost a while (they replay nothing): answered with [`Event::History`], read in the
+    /// background. Unlike an open, it never waits for or supersedes one.
+    Catchup { target: Target, limit: u32 },
 }
 
 impl Command {
@@ -59,7 +68,7 @@ impl Command {
     /// command is named here, so a new one is classified when it is added.
     pub fn changes(&self) -> bool {
         match self {
-            Command::Boot | Command::History { .. } => false,
+            Command::Boot | Command::History { .. } | Command::Catchup { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -157,6 +166,44 @@ pub enum Event {
         kind: FailKind,
         detail: String,
     },
+    /// Something that happened in a workspace, as it happened (no request asked for it; its
+    /// envelope carries [`Generation::PUSHED`]).
+    Live(Box<Live>),
+}
+
+/// What a backend's live updates tell of a workspace.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Live {
+    /// A message posted in `conversation` — a reply under message `thread`, also shown in the
+    /// conversation when `broadcast` — or, when `changed`, a new copy of one (edited, or its
+    /// replies changed): it replaces the copy loaded and is never added. `mention`: it mentions
+    /// the user. `users`: its author when the UI may not know them.
+    Message {
+        workspace: WorkspaceId,
+        conversation: ConversationId,
+        thread: Option<Ts>,
+        broadcast: bool,
+        changed: bool,
+        mention: bool,
+        message: Message,
+        users: Vec<User>,
+    },
+    /// The message at `ts` was deleted (a reply under `thread`, when Slack said).
+    Deleted { workspace: WorkspaceId, conversation: ConversationId, thread: Option<Ts>, ts: Ts },
+    /// The conversation was read elsewhere (another client): its counts now.
+    Marked { workspace: WorkspaceId, conversation: ConversationId, unread: u32, mentions: u32 },
+    /// The live updates of `workspace` started, or stopped.
+    Connection { workspace: WorkspaceId, state: Connection },
+}
+
+/// Whether a workspace's live updates arrive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Connection {
+    /// They arrive; `catch_up`: they were lost a while, and what was missed meanwhile should be
+    /// read again ([`Command::Catchup`]).
+    Connected { catch_up: bool },
+    /// They stopped; the backend connects again by itself.
+    Lost,
 }
 
 impl FailKind {

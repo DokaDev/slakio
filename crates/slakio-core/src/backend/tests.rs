@@ -10,7 +10,8 @@ fn every_command() -> Vec<Command> {
     let target = Target::Conversation { workspace: ws, conversation: ConversationId::new("C1") };
     vec![
         Command::Boot,
-        Command::History { target, before: None, limit: 28 },
+        Command::History { target: target.clone(), before: None, limit: 28 },
+        Command::Catchup { target, limit: 28 },
         Command::Save { item: SavedId::new("S1"), change: SavedChange::Complete },
     ]
 }
