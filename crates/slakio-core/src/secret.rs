@@ -60,6 +60,8 @@ pub trait SecretStore: Send + Sync {
     /// Remove the entry. `Ok(true)` when an entry was removed; deleting a missing entry is not
     /// an error (`Ok(false)`).
     fn delete(&self, account: &str) -> Result<bool, Unavailable>;
+    /// Every account the store holds an entry for (slakio's entries only).
+    fn accounts(&self) -> Result<Vec<String>, Unavailable>;
 }
 
 /// What signs the client in to one workspace, as the web client holds it: the session token

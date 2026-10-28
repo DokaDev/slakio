@@ -48,4 +48,9 @@ impl SecretStore for MemoryStore {
     fn delete(&self, account: &str) -> Result<bool, Unavailable> {
         Ok(self.check()?.remove(account).is_some())
     }
+    fn accounts(&self) -> Result<Vec<String>, Unavailable> {
+        let mut all: Vec<String> = self.check()?.keys().cloned().collect();
+        all.sort();
+        Ok(all)
+    }
 }

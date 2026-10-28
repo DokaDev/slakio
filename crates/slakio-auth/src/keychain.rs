@@ -60,6 +60,19 @@ mod imp {
             Err(e) => Err(why(&e)),
         }
     }
+
+    /// The accounts of slakio's entries: a search by service that reads no secret.
+    pub(super) fn accounts() -> Result<Vec<String>, Unavailable> {
+        let store = apple_native_keyring_store::keychain::Store::new().map_err(|e| why(&e))?;
+        let spec = std::collections::HashMap::from([("service", SERVICE)]);
+        let found = store.search(&spec).map_err(|e| why(&e))?;
+        Ok(found
+            .iter()
+            .filter_map(keyring_core::Entry::get_specifiers)
+            .filter(|(s, _)| s == SERVICE)
+            .map(|(_, a)| a)
+            .collect())
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -78,6 +91,9 @@ mod imp {
     pub(super) fn delete(_: &str) -> Result<bool, Unavailable> {
         Err(unavailable(NONE))
     }
+    pub(super) fn accounts() -> Result<Vec<String>, Unavailable> {
+        Err(unavailable(NONE))
+    }
 }
 
 impl SecretStore for Keychain {
@@ -89,5 +105,8 @@ impl SecretStore for Keychain {
     }
     fn delete(&self, account: &str) -> Result<bool, Unavailable> {
         imp::delete(account)
+    }
+    fn accounts(&self) -> Result<Vec<String>, Unavailable> {
+        imp::accounts()
     }
 }

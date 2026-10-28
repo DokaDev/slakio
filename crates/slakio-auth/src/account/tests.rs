@@ -113,3 +113,53 @@ fn a_workspace_is_named_by_its_team_name_or_host() {
     assert_eq!(named(&all, "Acme"), vec![&a, &b], "two of that name: both, to be told apart");
     assert!(named(&all, "nothing").is_empty());
 }
+
+#[test]
+fn an_unreadable_file_is_moved_aside_and_signing_out_of_all_still_finds_its_workspaces() {
+    let (store, path) = (MemoryStore::new(), scratch("aside"));
+    let creds = Credentials::new(TOKEN, COOKIE);
+    let other = Account { team: "T1OTHER".into(), ..account() };
+    keep(&store, &path, &account(), &creds).unwrap();
+    keep(&store, &path, &other, &creds).unwrap();
+    // Damaged: the second workspace lost its host, so nothing of the file can be read.
+    let text =
+        std::fs::read_to_string(&path).unwrap().replace("host = \"example.slack.com\"\nuser = \"U0TEST\"\n\n", "");
+    std::fs::write(&path, &text).unwrap();
+    assert!(load(&path).is_err());
+    let third = Account { team: "T2THIRD".into(), ..account() };
+    keep(&store, &path, &third, &creds).unwrap();
+    assert_eq!(load(&path).unwrap(), vec![third.clone()]);
+    let kept = std::fs::read_to_string(aside(&path)).unwrap();
+    assert!(kept.contains("T0TEST") && kept.contains("T1OTHER"), "not written over: {kept}");
+    // An entry no file names (left by an earlier failure) goes too.
+    store.set("T3ORPHAN", "v1\na\nb\n").unwrap();
+    let gone: Vec<String> = forget(&store, &path).unwrap().into_iter().map(|a| a.team).collect();
+    assert_eq!(gone, ["T2THIRD", "T0TEST", "T1OTHER", "T3ORPHAN"]);
+    assert_eq!(store.accounts().unwrap(), Vec::<String>::new(), "no secret is left");
+    assert!(!path.exists() && !aside(&path).exists());
+    // Unreadable and not moved aside yet: its team ids are found all the same.
+    keep(&store, &path, &account(), &creds).unwrap();
+    std::fs::write(&path, "[[workspace]]\nteam = \"T0TEST\"\n").unwrap();
+    assert_eq!(forget(&store, &path).unwrap().len(), 1);
+    assert_eq!(store.get("T0TEST"), Ok(None));
+}
+
+#[test]
+fn signing_in_or_out_waits_for_another_that_changes_the_file() {
+    let (store, path) = (std::sync::Arc::new(MemoryStore::new()), scratch("lock"));
+    keep(&*store, &path, &account(), &Credentials::new(TOKEN, COOKIE)).unwrap();
+    let other = Account { team: "T1OTHER".into(), ..account() };
+    let held = std::fs::OpenOptions::new().write(true).open(path.with_extension("lock")).unwrap();
+    held.lock().unwrap();
+    let (s, p, o) = (std::sync::Arc::clone(&store), path.clone(), other.clone());
+    let signing_in = std::thread::spawn(move || keep(&*s, &p, &o, &Credentials::new(TOKEN, COOKIE)));
+    let (s, p) = (std::sync::Arc::clone(&store), path.clone());
+    let signing_out = std::thread::spawn(move || forget_one(&*s, &p, "T0TEST"));
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert!(!signing_in.is_finished() && !signing_out.is_finished(), "both wait for the lock");
+    assert_eq!(load(&path).unwrap(), vec![account()], "nothing changed meanwhile");
+    drop(held);
+    signing_in.join().unwrap().unwrap();
+    signing_out.join().unwrap().unwrap();
+    assert_eq!(load(&path).unwrap(), vec![other], "neither change is lost");
+}

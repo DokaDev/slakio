@@ -3,6 +3,11 @@
 //! the team id, as one entry per workspace. Signing in to a workspace adds it, or updates it when
 //! it is already signed in; the others stay. Signing out removes one workspace, or all.
 //!
+//! Every change of the file holds `workspaces.lock` beside it, so two slakios signing in or out
+//! at once never lose each other's line. A file that exists but cannot be read is never written
+//! over: it is moved aside to `workspaces.toml.unreadable`, and signing out of all still finds
+//! the team ids in it (and every entry the secret store holds).
+//!
 //! ```toml
 //! [[workspace]]
 //! team = "T0123"
@@ -95,15 +100,68 @@ pub fn decode(secret: &str) -> Option<Credentials> {
     Some(if ds.is_empty() { c } else { c.with_ds(ds) })
 }
 
+/// The lock held while the file at `path` is read, changed and written (released on drop).
+fn locked(path: &Path) -> Result<std::fs::File, Fault> {
+    let lock = path.with_extension("lock");
+    if let Some(dir) = lock.parent().filter(|d| !d.as_os_str().is_empty()) {
+        std::fs::create_dir_all(dir).map_err(|e| Fault::io_at(&e, dir))?;
+    }
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&lock)
+        .map_err(|e| Fault::io_at(&e, &lock))?;
+    file.lock().map_err(|e| Fault::io_at(&e, &lock))?;
+    Ok(file)
+}
+
+/// Where a file at `path` that cannot be read is moved to.
+pub fn aside(path: &Path) -> std::path::PathBuf {
+    path.with_extension("toml.unreadable")
+}
+
+/// Move the unreadable file at `path` aside (added to what was moved aside before), so that
+/// writing a new one loses no team id.
+fn move_aside(path: &Path) -> Result<(), Fault> {
+    let text = std::fs::read(path).map_err(|e| Fault::io_at(&e, path))?;
+    let to = aside(path);
+    let mut kept = std::fs::read(&to).unwrap_or_default();
+    kept.extend_from_slice(&text);
+    kept.push(b'\n');
+    slakio_core::fsutil::atomic_write(&to, &kept).map_err(|e| Fault::io_at(&e, &to))?;
+    std::fs::remove_file(path).map_err(|e| Fault::io_at(&e, path))
+}
+
+/// The team ids a file names line by line (`team = "T…"`), however damaged the rest of it is.
+fn salvaged(path: &Path) -> Vec<String> {
+    let text = std::fs::read(path).unwrap_or_default();
+    String::from_utf8_lossy(&text)
+        .lines()
+        .filter_map(|l| {
+            let value = l.trim().strip_prefix("team")?.trim_start().strip_prefix('=')?.trim();
+            let team = value.strip_prefix('"')?.strip_suffix('"')?;
+            valid_team(team).then(|| team.to_string())
+        })
+        .collect()
+}
+
 /// Keep `account` signed in with `credentials`: the secret first, then the file, which names it
 /// in its place (or last, when it is new) beside the workspaces signed in to already; their
-/// secrets stay. A store that fails keeps nothing new. A file that cannot be read is replaced by
-/// one naming this workspace alone (it named nothing that could be read).
+/// secrets stay. A store that fails keeps nothing new. A file that cannot be read is moved aside
+/// first ([`aside`]); when that fails too, nothing is kept.
 pub fn keep(store: &dyn SecretStore, path: &Path, account: &Account, credentials: &Credentials) -> Result<(), Fault> {
     if !valid_team(&account.team) {
         return Err(Fault::other("not a team id"));
     }
-    let mut accounts = load(path).unwrap_or_default();
+    let _lock = locked(path)?;
+    let mut accounts = match load(path) {
+        Ok(a) => a,
+        Err(_) => {
+            move_aside(path)?;
+            Vec::new()
+        }
+    };
     store.set(&account.team, &encode(credentials)).map_err(|Unavailable(f)| f)?;
     match accounts.iter_mut().find(|a| a.team == account.team) {
         Some(a) => a.clone_from(account),
@@ -131,6 +189,7 @@ pub fn named<'a>(accounts: &'a [Account], query: &str) -> Vec<&'a Account> {
 /// Sign out of workspace `team` alone: its secret is removed, then its line of the file (the
 /// file goes with the last one). The workspace signed out of; `None` when it was not signed in.
 pub fn forget_one(store: &dyn SecretStore, path: &Path, team: &str) -> Result<Option<Account>, Fault> {
+    let _lock = locked(path)?;
     let mut accounts = load(path)?;
     let Some(at) = accounts.iter().position(|a| a.team == team) else { return Ok(None) };
     store.delete(team).map_err(|Unavailable(f)| f)?;
@@ -157,16 +216,31 @@ pub fn credentials(store: &dyn SecretStore, account: &Account) -> Result<Option<
     }
 }
 
-/// Sign out of every workspace in `path`: their secrets are removed, then the file. The
-/// workspaces signed out of.
+/// Sign out of every workspace: every secret-store entry found is removed — those `path` names,
+/// those a file that cannot be read (or one moved aside) names, and every other the store holds
+/// — then the files. The workspaces signed out of; one known by its team id alone is named by
+/// it. When an entry cannot be removed (or the store cannot list them), the files stay.
 pub fn forget(store: &dyn SecretStore, path: &Path) -> Result<Vec<Account>, Fault> {
-    let accounts = load(path)?;
+    let _lock = locked(path)?;
+    let mut accounts = load(path).unwrap_or_default();
+    let listed = store.accounts().map_err(|Unavailable(f)| f);
+    let mut teams = salvaged(path);
+    teams.extend(salvaged(&aside(path)));
+    teams.extend(listed.clone().unwrap_or_default().into_iter().filter(|t| valid_team(t)));
+    for team in teams {
+        if !accounts.iter().any(|a| a.team == team) {
+            accounts.push(Account { name: team.clone(), team, host: String::new(), user: String::new() });
+        }
+    }
     for a in &accounts {
         store.delete(&a.team).map_err(|Unavailable(f)| f)?;
     }
-    match std::fs::remove_file(path) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(Fault::io_at(&e, path)),
-        _ => {}
+    listed?;
+    for file in [path.to_path_buf(), aside(path)] {
+        match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(Fault::io_at(&e, &file)),
+            _ => {}
+        }
     }
     Ok(accounts)
 }
