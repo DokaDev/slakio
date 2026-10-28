@@ -112,6 +112,38 @@ fn counts_slack_could_not_tell_keep_those_shown_and_say_so() {
     assert_eq!(notice.about.as_ref(), Some(&ws));
     let name = World::demo().snapshot().workspaces[0].name.unsanitized().to_string();
     assert!(matches!(&notice.msg, slakio_core::i18n::Msg::FailWorkspace { workspace, .. } if *workspace == name));
+    // At 80 columns it fits whole: the short words, the name kept.
+    s.d.app.resize(80, 24);
+    let line = s.d.status_line();
+    assert!(line.contains(&format!("{name}: Unread counts not loaded")), "{line}");
+    assert!(!line.contains("may be old") && !line.contains('…'), "{line}");
+}
+
+/// A first start with no counts kept and Slack's counts failing: the words say they are not
+/// loaded (nothing "shown may be old"), and the views show `?`, faint, not a look of all read;
+/// it stays after the notice is gone.
+#[test]
+fn counts_unknown_on_a_first_start_show_as_unknown() {
+    let mut snap = World::demo().snapshot().clone();
+    snap.counts_failed = true;
+    for c in &mut snap.conversations {
+        (c.unread, c.mentions) = (0, 0);
+    }
+    let mut s = Scripted::booted(true, Some(snap));
+    let line = s.d.status_line();
+    assert!(line.contains("Unread counts not loaded") && !line.contains("may be old"), "{line}");
+    s.d.now += std::time::Duration::from_secs(30);
+    s.d.app.on_tick(s.d.now);
+    let screen = s.d.screen();
+    let home = screen.lines().find(|l| l.contains("Home")).unwrap_or_else(|| panic!("{screen}"));
+    assert!(home.split("││").next().unwrap().trim_end().ends_with('?'), "{screen}");
+    let (y, line) = screen.lines().enumerate().find(|(_, l)| l.contains("Home")).unwrap();
+    let x = line
+        .chars()
+        .take_while(|c| *c != '?')
+        .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(0))
+        .sum::<usize>();
+    assert_eq!(s.d.buffer()[(x as u16, y as u16)].style().fg, s.d.app.theme.faint().fg);
 }
 
 fn signed() -> Vec<slakio_tui::app::model::SignedIn> {

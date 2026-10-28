@@ -177,16 +177,31 @@ impl App {
         if !cached {
             self.boots[b].failed = None;
             // Unknown is not zero: the counts kept are shown, and the status line says so (with
-            // several workspaces, whose; its stripe found by id, two may have one name).
+            // several workspaces, whose, short; its stripe found by id, two may have one name).
+            // With none kept, the views say the counts are unknown until a later start reads them.
+            let ids: Vec<WorkspaceId> = snapshot.workspaces.iter().map(|w| w.id.clone()).collect();
+            let mut kept = false;
+            for ws in ids {
+                let none = (self.model.conversations().iter())
+                    .filter(|c| c.workspace == ws)
+                    .all(|c| c.unread == 0 && c.mentions == 0);
+                kept |= snapshot.counts_failed && !none;
+                if snapshot.counts_failed && none {
+                    self.model.counts_unknown.insert(ws);
+                } else {
+                    self.model.counts_unknown.remove(&ws);
+                }
+            }
             if snapshot.counts_failed {
                 let whose = self.boots[b].workspace.clone().filter(|_| self.boots.len() > 1);
+                let label = if kept && whose.is_none() { Label::FailCounts } else { Label::FailCountsNone };
                 match whose.and_then(|ws| self.model.workspace(&ws).cloned()) {
                     Some(w) => {
-                        let why = self.i18n.label(Label::FailCounts).to_string();
+                        let why = self.i18n.label(label).to_string();
                         let msg = Msg::FailWorkspace { workspace: w.name.line().into_string(), why };
                         self.status.queue_about(msg, Level::Warning, Some(w.id.clone()), now);
                     }
-                    None => self.status.queue(Msg::Label(Label::FailCounts), Level::Warning, now),
+                    None => self.status.queue(Msg::Label(label), Level::Warning, now),
                 }
             }
         }

@@ -87,6 +87,9 @@ pub struct Model {
     cached: HashSet<WorkspaceId>,
     /// The workspaces whose saved items the backend cannot tell (unknown is not empty).
     saved_unknown: HashSet<WorkspaceId>,
+    /// The workspaces whose unread counts Slack could not tell, with none kept from before:
+    /// their views show `?`, not a look of all read.
+    pub counts_unknown: HashSet<WorkspaceId>,
 }
 
 impl Model {
@@ -94,7 +97,14 @@ impl Model {
     pub fn new(snapshot: Snapshot) -> Self {
         let ids: HashSet<WorkspaceId> = snapshot.workspaces.iter().map(|w| w.id.clone()).collect();
         let saved_unknown = if snapshot.saved.is_none() { ids.clone() } else { HashSet::new() };
-        let mut m = Self { snapshot, users: HashMap::new(), fresh: ids, cached: HashSet::new(), saved_unknown };
+        let mut m = Self {
+            snapshot,
+            users: HashMap::new(),
+            fresh: ids,
+            cached: HashSet::new(),
+            saved_unknown,
+            counts_unknown: HashSet::new(),
+        };
         m.index_users();
         m
     }

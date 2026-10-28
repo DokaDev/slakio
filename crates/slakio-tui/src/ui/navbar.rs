@@ -58,6 +58,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
         let buf = f.buffer_mut();
         for p in &row.pieces {
             let style = match p.part {
+                // Counts Slack could not tell: unknown, faint.
+                Part::Badge if p.text == "?" => t.faint(),
                 Part::Badge => count_style(t, own),
                 // A hidden view's mark on the folded row, styled as its own row would be.
                 Part::Mark => hidden.map_or_else(|| t.bold(), |(_, u)| count_style(t, u)),

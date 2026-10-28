@@ -84,6 +84,13 @@ impl App {
         Some(navbar::chip(title, &chip))
     }
 
+    /// `?` for a view whose counts Slack could not tell in the workspace shown (none kept).
+    fn counts_unknown(&self, v: View) -> Option<String> {
+        let ws = self.shell.current_id(&self.model)?;
+        let counted = matches!(v, View::Home | View::Dms | View::Activity);
+        (counted && self.model.counts_unknown.contains(&ws)).then(|| "?".to_string())
+    }
+
     /// How many rows the views take at the top of the list panel: one each, or one folded.
     pub fn nav_rows(&self) -> u16 {
         if self.shell.nav_folded { 1 } else { View::ALL.len() as u16 }
@@ -104,7 +111,7 @@ impl App {
             .map(|v| Item {
                 glyph: icons.then(|| v.glyph()),
                 label: self.i18n.label(v.label()).to_string(),
-                badge: self.view_unread(self.workspace(), *v).badge(),
+                badge: self.view_unread(self.workspace(), *v).badge().or_else(|| self.counts_unknown(*v)),
             })
             .collect();
         let shown = View::ALL.iter().position(|v| *v == self.shell.view).unwrap_or(0);
