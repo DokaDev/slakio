@@ -8,11 +8,15 @@ An unofficial terminal client for Slack, written in Rust with [Ratatui](https://
 
 ## Status
 
-**Pre-alpha, early development. Read-only, one workspace, no live updates yet.**
+**Pre-alpha, early development. Read-only, no live updates yet.**
 
-slakio signs in to **one** Slack workspace with your own browser session ([Sign in](#sign-in))
-and shows its channels and DMs with their unread marks; opening a conversation shows its newest
-messages (older ones and threads load as you scroll up or open them, still rough). It only
+slakio signs in to your Slack workspaces with your own session ([Sign in](#sign-in))
+and shows its channels and DMs with their unread marks (muted ones faint and never counted);
+opening a conversation shows its newest messages, older ones as you scroll up, and a message's
+thread when you open it. Messages show Slack's formatting (bold, italic, strike, code and code
+blocks, quotes, links, people and channels by name, emoji); a bot's sections and attachments
+show as text. Channels shared with another organization and people from it are marked `ext`,
+and people in do not disturb `◐` (the status line shows it when it is you). It only
 reads: it sends no message, reacts to nothing and marks nothing as read. There are no realtime
 updates (open a conversation again to see new messages). What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
@@ -208,7 +212,8 @@ the other workspaces' parts are left as they are.
 - It keeps at most 200 messages a conversation, 500 MB in all, and drops a conversation not
   opened for 30 days (a conversation open on screen is never dropped); `cache_messages`,
   `cache_max_mb` and `cache_days` change the limits, and `cache = "off"` keeps nothing between
-  runs ([Configuration](#configuration)). Threads are not cached yet.
+  runs ([Configuration](#configuration)). The threads you opened are kept the same way, each
+  with the same limits.
 - Its directory is readable by you only (`0700`, the files `0600`); only that directory is
   changed or excluded, never the cache directory you named, and a symbolic link in its place or
   in place of one of its files is refused. On macOS it is excluded from Time Machine backups

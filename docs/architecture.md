@@ -135,7 +135,10 @@ widget only through `line()` / `block()`, the sanitiser, which removes escape se
 (7-bit and 8-bit), control, bidi and invisible characters, private-use code points, mark
 floods and overlong text. `Remote::unsanitized` (comparisons and lookups) and `Safe::trusted`
 are kept out of the drawing code by a test. Message texts are sanitised once, when their page
-arrives; the composer sanitises what is typed or pasted into it.
+arrives, and then read as Slack's markup (`mrkdwn.rs`: marks, code, quotes, people, channels,
+links, emoji; only `&amp;`, `&lt;` and `&gt;` are decoded, so nothing the sanitiser removed
+comes back); people and channels are named from the read model when drawn
+(`ui/timeline/body.rs`). The composer sanitises what is typed or pasted into it.
 
 ## Robustness
 
@@ -204,7 +207,21 @@ one cancels it (before it is sent, or by dropping its answer), and the cancelled
 `Busy`. People are named by id lookups, never a directory listing: a view brings some of its
 authors along, the rest (and the DMs' people at the start) are asked of the edge cache's
 `users/info` in batches of 80, each id once a session (kept in memory); until then an id shows.
-A read-only backend offers no composer: nothing is ever shown as sent. The binary runs one for
+A start reads, besides `client.userBoot`, the unread counts (`client.counts`; when they
+fail the snapshot says so, `Snapshot::counts_failed`, and the UI and the cache keep the counts
+they had instead of zeros), the DMs' people by name and whether they are in do not disturb
+(`dnd.teamInfo`, in batches of 80; the user's own from the start bundle); the conversations
+muted come from the user's notification preferences in the start bundle. A muted conversation
+keeps its counts in the model but never badges (`Conversation::badges`). Older pages of a
+conversation come from `conversations.history` (`latest`, exclusive): a message listed twice
+is shown once, a deleted one (`message_deleted`, `hidden`) not at all, and an older page with
+nothing older in it ends the paging. Slack pages a thread forward only (`conversations.replies`
+by cursor), so its newest page reads it from its start (200 a request, 15 requests at most) and
+keeps it for the session (64 threads); its older pages come from what was kept. A message whose
+blocks are more than rich text (a bot's sections, headers, context) or whose text is empty is
+written out as Slack markup from its blocks; attachments and file names follow the text
+(`blocks.rs`); a bot is named as it posts. A read-only backend offers no composer: nothing is
+ever shown as sent. The binary runs one for
 each signed-in workspace, behind one handle (`slakio_tui::many`, below); the tests run it
 against `slakio-fake` (one fake per workspace, `FakeSlack::start_team`). The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
 
@@ -212,8 +229,9 @@ against `slakio-fake` (one fake per workspace, `FakeSlack::start_team`). The HTT
 
 `slakio-store` keeps, in `<cache>/slakio-store/cache.sqlite3`, the last boot snapshot (replaced whole by each
 boot; a workspace it no longer lists leaves the cache with it) and the newest messages of each
-conversation opened (each page the backend answers is the truth for the span of time it covers:
-what the cache held there and the page lacks is gone). Remote text is kept as it came and read
+conversation and thread opened (each page the backend answers is the truth for the span of time
+it covers: what the cache held there and the page lacks is gone; a thread is a place of its own,
+`<conversation>:<thread>`, capped and aged as a conversation is). Remote text is kept as it came and read
 back as `Remote`, so it still reaches the screen only through the sanitiser. No secret is kept.
 
 - **Schema.** `schema_version` holds the number of migrations applied (`schema.rs`, appended to
