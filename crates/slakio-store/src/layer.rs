@@ -9,6 +9,8 @@
 //!   log says so. The backend's `Booted` is kept and handed to the UI.
 //! - The newest page of a conversation or a thread of this workspace likewise
 //!   (`CachedHistory`); every page the backend answers for one is kept.
+//! - A conversation read again after live updates were lost (`Catchup`): its answer is kept like a
+//!   newest page, and nothing of the cache's comes first.
 //! - Everything else goes through untouched, both ways: the UI's request still gets exactly one
 //!   answer of the backend's (a cached one is extra and ends nothing).
 //!
@@ -153,6 +155,13 @@ async fn ask(request: &Request, front: &Front, asked: &mut HashMap<Generation, A
             let read = front.cache.newest(target.clone(), *limit);
             let page = within(front.waits.page, read, "a newest page", &front.on_slow).await?;
             Some(Envelope { generation: id, event: Event::CachedHistory(Box::new(page)) })
+        }
+        // Read again after live updates were lost: kept like any newest page, with nothing of the
+        // cache's given first (the UI shows the messages already).
+        Command::Catchup { target, .. } if *target.workspace() == front.workspace => {
+            front.cache.protect(target.clone());
+            asked.insert(id, Asked::Page { before: None });
+            None
         }
         _ => None,
     }
