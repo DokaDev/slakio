@@ -106,6 +106,17 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   changes on screen until the answer, every saved item after the change, replaces them. The
   snapshot, and every answer about saved items, says when it was taken (the backend's clock):
   reminders due before then are overdue.
+- **Several workspaces.** The read model is keyed by id: people by the workspace that lists them
+  and their id (a Slack Connect peer two workspaces list is two entries), the workspace shown by
+  its id, and the list cursor found again by its row's id after the rows change. Each signed-in
+  workspace has a backend of its own; `many::serve` puts one handle in front of them and hands a
+  request to the workspace it is about (`Request.workspace`, a history request's target), so one
+  that fails, hangs or is gone fails on its own and holds none of the others back; a request for
+  no workspace, or one not signed in to, fails (`Auth`) without going anywhere. The app boots
+  each workspace on its own (`App::connect_workspaces`): it lists them before they answer, a
+  workspace's answer replaces its part of the model only, and each has its own failure ("Could
+  not load", and the status line names whose start failed) and its own `read_only`. A backend
+  that boots every workspace at once (the demo) answers `Command::Boot` without a workspace.
 - What only the binary can do is an `Effect` the loop carries out: copying is OSC 52, so no
   clipboard library or helper process is involved; saving an answer the app asked for (the
   icons question) goes into the config file, keeping its comments. `slakio --demo` uses `DemoBackend`
@@ -168,7 +179,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
    `Retry-After` (30 seconds when Slack does not say); a paused method fails with
    `RateLimited` without being sent, and the other methods go on.
 4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
-   `Busy`.
+   `Busy`. Every workspace's client has a lane of its own: it holds at most 6 of the 8 and 48 of
+   the waiting places, so one busy workspace never leaves another without a slot (the caps and
+   budgets above stay shared by all of them).
 5. **Hosts.** TLS (rustls with the OS's certificate verifier, HTTP/2 when offered) to the
    signed-in workspace's own host (`<name>.slack.com`) and the edge cache's
    (`edgeapi.slack.com`), nothing else: the host is checked where the socket opens, so no file,
@@ -190,9 +203,9 @@ one cancels it (before it is sent, or by dropping its answer), and the cancelled
 `Busy`. People are named by id lookups, never a directory listing: a view brings some of its
 authors along, the rest (and the DMs' people at the start) are asked of the edge cache's
 `users/info` in batches of 80, each id once a session (kept in memory); until then an id shows.
-A read-only backend offers no composer: nothing is ever shown as sent. The binary runs it for
-the signed-in workspace; the tests run it against
-`slakio-fake`. The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
+A read-only backend offers no composer: nothing is ever shown as sent. The binary runs one for
+each signed-in workspace, behind one handle (`slakio_tui::many`, below); the tests run it
+against `slakio-fake` (one fake per workspace, `FakeSlack::start_team`). The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
 
 ## The local cache
 
@@ -211,15 +224,21 @@ back as `Remote`, so it still reaches the screen only through the sanitiser. No 
   opened without following a symbolic link and made private through the open file; the cache
   directory named (`SLAKIO_CACHE_DIR`) is never changed. The journal must be WAL, or the cache
   is not used.
-- **Whose.** The cache keeps the signed-in workspace and user (`Store::claim`); another sign-in
-  finds it emptied, and a second process of another sign-in does not use it.
+- **Per workspace.** One cache holds a part per signed-in workspace: its last boot snapshot (the
+  lists in order within it, its own time and saved-items marker) and its conversations' pages. A
+  workspace's boot answer replaces its own part only; signing out of one removes that part
+  (`Store::forget`).
+- **Whose.** Each part keeps whose it is (`Store::claim`, meta `owner:<team>` = the user):
+  another sign-in to that workspace finds that part emptied (in one transaction, the other parts
+  untouched), and a second process of another sign-in does not use it.
 - **Caps.** At most 200 messages a conversation, 500 MB, 30 days since a conversation was last
   opened (config keys `cache_messages`, `cache_max_mb`, `cache_days`); every conversation asked
-  for during the run is exempt, so nothing shown in a pane is pruned. Pruned after the first boot
+  for during the run, by any workspace, is exempt, so nothing shown in a pane is pruned. Pruned after the first boot
   and every 32 pages, in one transaction; the freed pages go back to the file system 256 at a
   time, the jobs asked for meanwhile first.
-- **In front of a backend** (`layer.rs`): a task between the UI's handle and the backend's. A
-  boot, and the newest page of a conversation of the signed-in workspace, are answered from the
+- **In front of a backend** (`layer.rs`): a task between the UI's handle and one workspace's
+  backend (every workspace's front shares the one cache). A boot, and the newest page of a
+  conversation of that workspace, are answered from the
   cache first — `Event::CachedBoot` / `Event::CachedHistory`, queued for the UI before the
   request is handed on, so a start draws without waiting for Slack; the cache is waited for
   500 ms at most for a boot (`BOOT_WAIT`) and 100 ms for a page (`READ_WAIT`), so a busy or slow
@@ -236,8 +255,9 @@ back as `Remote`, so it still reaches the screen only through the sanitiser. No 
   addexclusion`, remembered in the cache); a failure is said once. Debug builds run only a
   stand-in named by `SLAKIO_TEST_TMUTIL` (the tests'), never `tmutil` itself.
 
-The binary opens it for the signed-in workspace (`src/store.rs`; never for the demo), and
-`slakio logout` removes it.
+The binary opens it once for the process, when the first workspace's backend starts
+(`src/store.rs`; never for the demo), and puts it in front of every signed-in workspace's
+backend; `slakio logout` removes it (or one workspace's part).
 
 ## Signing in
 
@@ -249,9 +269,11 @@ PowerShell copies), without running anything; its errors are fixed words that ne
 paste. The binary then asks Slack with one `client.userBoot`, through the transport and its
 rails, and only an accepted sign-in is kept: the credentials as one entry of the OS keychain
 (service `slakio`, the team id as the account), the workspace's id, name and host in
-`workspaces.toml`. Signing in to another workspace removes the previous one's keychain entry,
-so `slakio logout`, which removes every workspace the file names and then the file, leaves
-nothing behind. The paste and the credentials are wiped from memory when dropped (`zeroize`);
+`workspaces.toml`. Signing in to another workspace adds it (the desktop picker marks several
+with `Space`); the ones signed in to before keep their entries. `slakio logout <workspace>`
+removes that workspace's keychain entry, its line of the file and its part of the cache;
+`slakio logout --all` (or with one workspace, `slakio logout`) removes every workspace the file
+names and then the file, so nothing is left behind. The paste and the credentials are wiped from memory when dropped (`zeroize`);
 the parser reads the paste in one pass and gives up on more than a few candidate values. With `SLAKIO_SECRET_STORE=memory` (every test)
 the keychain is never touched. A debug build may sign in to a fake Slack on the loopback address
 (`SLAKIO_TEST_SLACK_ADDR`); a release build never reads that variable.

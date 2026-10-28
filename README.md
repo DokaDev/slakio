@@ -36,7 +36,8 @@ images, and settings. This README only lists what works; it will grow with each 
   a crash. Not signed in, it says how to sign in; signed in, it shows the workspace's
   channels and DMs (unread and mention marks from Slack) and, for a conversation you open, its
   newest 28 messages, read-only. `slakio login` signs in (from the Slack desktop app on macOS,
-  or `slakio login --paste` to paste a browser request), `slakio logout` signs out,
+  or `slakio login --paste` to paste a browser request; several workspaces can be signed in at
+  once), `slakio logout [<workspace> | --all]` signs out,
   `slakio --offline` sends nothing. A start shows the last session's channels and the
   conversations opened from the local cache right away (`cached` in the status line until
   Slack has answered), without waiting for Slack.
@@ -150,7 +151,8 @@ read-only requests to your workspace.
 ### From the Slack desktop app (macOS)
 
 If you use the Slack desktop app, run `slakio login`: it lists the workspaces the app is signed
-in to, you pick one, and macOS asks whether `security` (the system tool slakio reads the key
+in to, you pick one (or mark several with `Space`, then `Enter` signs in to each of them in
+turn), and macOS asks whether `security` (the system tool slakio reads the key
 with) may use the **"Slack Safe Storage"** key — choose **Allow**, not **Always Allow** (that
 would let any program on the Mac read the key without asking). slakio reads the app's files (its cookie database and its stored session
 tokens) and changes nothing; it never contacts Slack except the one request that checks the
@@ -174,9 +176,14 @@ if Slack no longer accepts it.
 Either way, slakio checks the session token and the `d` cookie (and `d-s`) with one request to
 Slack, shows the workspace's name and stores them in the **macOS Keychain** (the first time, and
 after an update, macOS asks whether slakio may use the entry). `workspaces.toml` next to the
-config file names the workspace and holds no secret. `slakio logout` removes both. If Slack
-signs the session out, slakio says "run slakio login" and you sign in again. This release
-signs in to **one** workspace even when the app has several; signing in to another replaces it.
+config file names the workspaces and holds no secret. Signing in to another workspace adds it:
+the ones signed in to before stay, and the workspace switcher (`Space W`, or the workspace's
+name at the top of the list) moves between them, each with its own unread marks. Each starts on
+its own: one that Slack refuses or that does not answer shows "Could not load" in its own list
+and leaves the others working. `slakio logout <workspace>` (its name, host or team id) signs out
+of one and removes its credentials and its part of the local cache, keeping the others;
+`slakio logout --all` signs out of every one (with one workspace, `slakio logout` alone does).
+If Slack signs the session out, slakio says "run slakio login" and you sign in again.
 
 The desktop-app import is adapted from the open-source client
 [gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.
@@ -191,8 +198,9 @@ Windows). A start draws from it without waiting for Slack (a cache slower than h
 for the workspace, or a tenth of a second for a conversation's messages, is not waited for, and
 the error log says so), then replaces what it showed with Slack's answer; with the network
 off it shows the cache alone. No token, cookie or other secret is ever in it: the credentials
-stay in the keychain. It is the signed-in user's only: signing in as someone else starts it
-again from nothing.
+stay in the keychain. Each workspace has its own part of it, the signed-in user's only:
+signing in to a workspace as someone else starts that workspace's part again from nothing, and
+the other workspaces' parts are left as they are.
 
 - It keeps at most 200 messages a conversation, 500 MB in all, and drops a conversation not
   opened for 30 days (a conversation open on screen is never dropped); `cache_messages`,
@@ -206,9 +214,10 @@ again from nothing.
 - A second slakio while one runs reads the cache but does not write it, and says so. A cache that
   cannot be read (damaged, or written by a newer slakio) is started again from nothing, with one
   line in the status line (shown after any other notice, so each is seen). `slakio logout`
-  removes it, also when the keychain could not be changed, and says so; a slakio still running
-  keeps showing the workspace until it is quit (logout says so when one runs). Deleting the
-  directory is always safe.
+  (of the last workspace, or `--all`) removes it, also when the keychain could not be changed,
+  and says so; a slakio still running keeps showing the workspace until it is quit (logout says
+  so when one runs). Signing out of one of several removes that workspace's part only, and not
+  while a slakio runs (quit it first). Deleting the directory is always safe.
 
 ## Install
 
