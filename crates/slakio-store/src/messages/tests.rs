@@ -1,5 +1,6 @@
 use super::*;
 use crate::testutil::{other, page, target, writer};
+use slakio_core::model::WorkspaceId;
 use slakio_world::World;
 
 fn texts(p: &Page) -> Vec<String> {
@@ -117,4 +118,21 @@ fn a_read_only_cache_keeps_no_page() {
     let t = target(&world, "general");
     reader.put_page(&page(&world, &t, None, 3), None, 1).unwrap();
     assert_eq!(reader.newest_page(&t, 3).unwrap(), None);
+}
+
+#[test]
+fn a_page_never_writes_the_people_of_another_workspace() {
+    let world = World::new(9);
+    let mut store = writer("msg-other-ws");
+    let t = target(&world, "general");
+    let mut p = page(&world, &t, None, 5);
+    let mut stranger = world.snapshot().users[0].clone();
+    stranger.workspace = WorkspaceId::new("T0OTHER");
+    p.users = vec![world.snapshot().users[0].clone(), stranger];
+    store.put_page(&p, None, 1).unwrap();
+    let count = |ws: &str| -> i64 {
+        store.conn.query_row("SELECT COUNT(*) FROM users WHERE workspace = ?1", [ws], |r| r.get(0)).unwrap()
+    };
+    assert_eq!(count(t.workspace().as_str()), 1, "the target's workspace's person is kept");
+    assert_eq!(count("T0OTHER"), 0, "another workspace's part is not written");
 }

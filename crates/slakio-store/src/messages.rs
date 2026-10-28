@@ -101,7 +101,8 @@ impl Store {
                 ],
             )?;
         }
-        for u in &page.users {
+        // Only the target's workspace's people: a page never writes another workspace's part.
+        for u in page.users.iter().filter(|u| u.workspace.as_str() == ws) {
             put_user(&tx, u, None)?;
         }
         tx.execute(
