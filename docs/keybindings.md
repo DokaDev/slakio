@@ -155,8 +155,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Down` | Next message (extends a VISUAL range) | `pane.next` |
 | `k` | Previous message (extends a VISUAL range) | `pane.prev` |
 | `Up` | Previous message (extends a VISUAL range) | `pane.prev` |
-| `g g` | Oldest message | `pane.first` |
-| `Home` | Oldest message | `pane.first` |
+| `g g` | Oldest message loaded; each press loads one more page | `pane.first` |
+| `Home` | Oldest message loaded; each press loads one more page | `pane.first` |
 | `G` | Newest message | `pane.last` |
 | `End` | Newest message | `pane.last` |
 | `Ctrl+D` | Half a page of messages down | `pane.half_down` |

@@ -152,7 +152,7 @@
 "action.todo.sort" = "Order To-dos"
 "action.pane.next" = "Next message (extends a VISUAL range)"
 "action.pane.prev" = "Previous message (extends a VISUAL range)"
-"action.pane.first" = "Oldest message"
+"action.pane.first" = "Oldest message loaded; each press loads one more page"
 "action.pane.last" = "Newest message"
 "action.pane.open_thread" = "Open the thread (with none selected: write)"
 "action.pane.visual" = "Select a range of messages (VISUAL)"

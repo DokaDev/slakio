@@ -131,7 +131,7 @@
 "action.todo.sort" = "할 일 정렬"
 "action.pane.next" = "다음 메시지 (VISUAL 범위 넓히기)"
 "action.pane.prev" = "이전 메시지 (VISUAL 범위 넓히기)"
-"action.pane.first" = "가장 오래된 메시지"
+"action.pane.first" = "불러온 가장 오래된 메시지 (누를 때마다 한 페이지 더)"
 "action.pane.last" = "가장 최근 메시지"
 "action.pane.open_thread" = "스레드 열기 (선택이 없으면 쓰기)"
 "action.pane.visual" = "메시지 범위 고르기 (VISUAL)"
