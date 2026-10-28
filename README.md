@@ -89,8 +89,10 @@ images, and settings. This README only lists what works; it will grow with each 
     row between blocks and after reactions, reactions as emoji chips (Slack's shortcodes such as
     `:+1:` drawn as emoji, skin tones too; a workspace's own emoji stay `:name:`); `:density`
     switches to compact columns and saves it; date separators, the edited marker, "N replies"
-    rows; older messages load as you go up; `j` / `k` select messages, `g g` /
-    `G` jump to the oldest / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
+    rows; older messages load a page at a time as you go up, paced so reading back never
+    runs into Slack's limits (a page on its way, one that failed with `r` to retry, and the
+    start of a conversation each show a row); `j` / `k` select messages, `g g` / `G` jump to
+    the oldest loaded (asking for one more page) / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
     wheel too), `Enter` opens the selected message's thread in a panel on the right (another
     thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
     the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between the
