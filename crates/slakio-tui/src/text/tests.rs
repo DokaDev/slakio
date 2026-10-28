@@ -83,6 +83,26 @@ fn wrap_styled_keeps_each_run_s_style_across_lines() {
     );
 }
 
+/// A combining mark in a run of its own joins the grapheme before it (another run's): each line
+/// still finds its styles at once, not by searching the rest of the text.
+#[test]
+fn wrap_styled_is_linear_when_graphemes_span_runs() {
+    use ratatui::style::{Modifier, Style};
+    let code = Style::new().add_modifier(Modifier::BOLD);
+    let mut runs = Vec::new();
+    for _ in 0..100_000 {
+        runs.push(("c".to_string(), code));
+        runs.push(("\u{0301}".to_string(), Style::new()));
+    }
+    let started = std::time::Instant::now();
+    let (lines, more) = wrap_styled(&runs, 100, 40, Style::new());
+    let took = started.elapsed();
+    assert!(more);
+    assert_eq!(lines.len(), 40);
+    assert!(lines.iter().flatten().all(|s| s.style == code), "each ć in the style of its c");
+    assert!(took < std::time::Duration::from_secs(2), "{took:?}");
+}
+
 proptest::proptest! {
     /// Styled or not, the lines hold the same text.
     #[test]

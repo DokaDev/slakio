@@ -109,8 +109,10 @@ pub fn wrap(s: &str, w: usize, max_lines: usize) -> (Vec<String>, bool) {
 }
 
 /// [`wrap`] for text in styled runs: the same lines, each as spans in the styles of the runs
-/// its text came from (`fallback` where a grapheme cannot be found again, such as a combining
-/// mark that joined the run before it).
+/// its text came from. A grapheme takes the style of the run its first character is in (a
+/// combining mark in a run of its own joins the grapheme before it); `fallback` where a line's
+/// grapheme is not the text's next one. Linear in the text: each line is found where the one
+/// before ended, only blanks and breaks left out between them.
 pub fn wrap_styled(
     runs: &[(String, Style)],
     w: usize,
@@ -119,21 +121,37 @@ pub fn wrap_styled(
 ) -> (Vec<Vec<Span<'static>>>, bool) {
     let plain: String = runs.iter().map(|(s, _)| s.as_str()).collect();
     let (lines, more) = wrap(&plain, w, max_lines);
-    let cells: Vec<(&str, Style)> = runs.iter().flat_map(|(s, st)| s.graphemes(true).map(move |g| (g, *st))).collect();
-    let mut k = 0;
+    // Where each run starts in `plain`, and its style.
+    let mut starts: Vec<(usize, Style)> = Vec::with_capacity(runs.len());
+    let mut at = 0;
+    for (s, st) in runs {
+        if !s.is_empty() {
+            starts.push((at, *st));
+        }
+        at += s.len();
+    }
+    let style_at = |byte: usize| match starts.partition_point(|(b, _)| *b <= byte) {
+        0 => fallback,
+        n => starts[n - 1].1,
+    };
+    let mut cursor = 0;
     let out = lines
         .iter()
         .map(|line| {
             let mut spans: Vec<Span<'static>> = Vec::new();
             for g in line.graphemes(true) {
-                // The line's graphemes come in the text's order; only blanks and breaks are left
-                // out between them.
-                let style = match cells[k.min(cells.len())..].iter().position(|(cg, _)| *cg == g) {
-                    Some(at) => {
-                        k += at + 1;
-                        cells[k - 1].1
-                    }
-                    None => fallback,
+                // Pass over the blanks and breaks the wrap left out.
+                while !plain[cursor..].starts_with(g)
+                    && let Some(c) = plain[cursor..].chars().next().filter(|c| c.is_whitespace())
+                {
+                    cursor += c.len_utf8();
+                }
+                let style = if plain[cursor..].starts_with(g) {
+                    let style = style_at(cursor);
+                    cursor += g.len();
+                    style
+                } else {
+                    fallback
                 };
                 match spans.last_mut() {
                     Some(last) if last.style == style => last.content.to_mut().push_str(g),
