@@ -4,6 +4,7 @@
 //! a saved item — and the status line says why; nothing waits for an answer that never comes.
 
 use super::model::{Model, SignedIn};
+use super::status::Level;
 use super::{App, Effect};
 use slakio_core::backend::{Capabilities, Command, Envelope, Event, FailKind, Generation, Request, Snapshot};
 use slakio_core::fault::Fault;
@@ -196,14 +197,18 @@ impl App {
         if waited {
             // With several workspaces, the words say whose start failed.
             let name = whose.filter(|_| self.boots.len() > 1).and_then(|ws| self.model.workspace(&ws).cloned());
+            // A notice about a workspace names it by id, so its stripe is its own whatever its name.
+            let about = |w: &slakio_core::model::Workspace| Some(w.id.clone());
             match name {
                 // A refused sign-in has words of its own, short enough to keep the name.
                 Some(w) if kind == FailKind::Auth => {
-                    self.warn(Msg::FailWorkspaceAuth { workspace: w.name.line().into_string() }, now);
+                    let msg = Msg::FailWorkspaceAuth { workspace: w.name.line().into_string() };
+                    self.status.show_about(msg, Level::Warning, about(&w), now);
                 }
                 Some(w) => {
                     let why = self.i18n.label(failure(&kind)).to_string();
-                    self.warn(Msg::FailWorkspace { workspace: w.name.line().into_string(), why }, now);
+                    let msg = Msg::FailWorkspace { workspace: w.name.line().into_string(), why };
+                    self.status.show_about(msg, Level::Warning, about(&w), now);
                 }
                 None => self.warn(Msg::Label(failure(&kind)), now),
             }

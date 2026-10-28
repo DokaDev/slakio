@@ -6,6 +6,7 @@
 //! that one, so each is seen at least once whatever comes at the same time.
 
 use slakio_core::i18n::Msg;
+use slakio_core::model::WorkspaceId;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
@@ -25,6 +26,8 @@ pub struct Notice {
     pub msg: Msg,
     pub level: Level,
     pub until: Instant,
+    /// The workspace it is about (its stripe shows beside it), when it is about one.
+    pub about: Option<WorkspaceId>,
 }
 
 /// The message slot.
@@ -34,7 +37,7 @@ pub struct Status {
     /// The notice showing was queued: taken from the slot early, it is queued again.
     queued: bool,
     /// Notices that must be seen, waiting for the slot, in order.
-    waiting: VecDeque<(Msg, Level)>,
+    waiting: VecDeque<(Msg, Level, Option<WorkspaceId>)>,
 }
 
 impl Status {
@@ -45,30 +48,35 @@ impl Status {
 
     /// Show `msg` from `now` on, unless a stronger notice is still showing.
     pub fn show(&mut self, msg: impl Into<Msg>, level: Level, now: Instant) {
+        self.show_about(msg, level, None, now);
+    }
+
+    /// [`Status::show`] for a notice about workspace `about`.
+    pub fn show_about(&mut self, msg: impl Into<Msg>, level: Level, about: Option<WorkspaceId>, now: Instant) {
         if self.notice(now).is_some_and(|n| n.level > level) {
             return;
         }
         if self.queued
             && let Some(n) = self.notice.take().filter(|n| n.until > now)
         {
-            self.waiting.push_front((n.msg, n.level));
+            self.waiting.push_front((n.msg, n.level, n.about));
         }
-        self.put(msg.into(), level, now, false);
+        self.put(msg.into(), level, about, now, false);
     }
 
     /// Show `msg` from `now` on when nothing shows, else as soon as what shows (and what was
     /// queued before it) is done: it is seen at least once.
     pub fn queue(&mut self, msg: impl Into<Msg>, level: Level, now: Instant) {
         if self.notice(now).is_none() && self.waiting.is_empty() {
-            self.put(msg.into(), level, now, true);
+            self.put(msg.into(), level, None, now, true);
         } else {
-            self.waiting.push_back((msg.into(), level));
+            self.waiting.push_back((msg.into(), level, None));
         }
     }
 
-    fn put(&mut self, msg: Msg, level: Level, now: Instant, queued: bool) {
+    fn put(&mut self, msg: Msg, level: Level, about: Option<WorkspaceId>, now: Instant, queued: bool) {
         let until = now + if level == Level::Warning { WARNING_FOR } else { INFO_FOR };
-        self.notice = Some(Notice { msg, level, until });
+        self.notice = Some(Notice { msg, level, until, about });
         self.queued = queued;
     }
 
@@ -82,8 +90,8 @@ impl Status {
     pub fn expire(&mut self, now: Instant) -> bool {
         if self.notice.as_ref().is_some_and(|n| n.until <= now) {
             self.notice = None;
-            if let Some((msg, level)) = self.waiting.pop_front() {
-                self.put(msg, level, now, true);
+            if let Some((msg, level, about)) = self.waiting.pop_front() {
+                self.put(msg, level, about, now, true);
             }
             return true;
         }

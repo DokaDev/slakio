@@ -215,12 +215,13 @@ fn a_workspace_slack_refuses_says_why_and_what_to_do_after_its_notice_is_gone() 
 
 /// At every width, in either language, the notice about a refused workspace begins with its own
 /// stripe and name (cut, never left out), so it never reads as the shown workspace's, and keeps
-/// `slakio login` whole.
+/// `slakio login` whole. Its stripe is found by its id, not its name: B named as A still wears
+/// its own.
 #[test]
 fn a_refused_workspace_s_notice_names_it_in_its_own_color_at_every_width() {
     rt().block_on(async {
         for lang in [Lang::En, Lang::Ko] {
-            for name in ["B side", "Acme Engineering EU"] {
+            for name in ["B side", "Acme Engineering EU", "A company"] {
                 for (w, h) in [(120, 40), (100, 30), (80, 24)] {
                     let mut t = Two::named(w, h, world(true), failing(FailKind::Auth), lang, ["A company", name]);
                     t.settle().await;

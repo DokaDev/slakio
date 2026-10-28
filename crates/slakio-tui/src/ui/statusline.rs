@@ -190,8 +190,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     };
     let msg_max = notice.map_or(NOTICE_MAX, |n| notice_max(app, &n.msg));
     // A notice about a workspace wears that workspace's stripe, not the one of the workspace shown.
-    let notice_stripe = notice.and_then(|n| named(&n.msg)).and_then(|name| {
-        let w = app.model.workspaces().iter().find(|w| w.name.line().into_string() == name)?;
+    // Found by its id: two workspaces may have one name.
+    let notice_stripe = notice.filter(|n| named(&n.msg).is_some()).and_then(|n| {
+        let w = app.model.workspace(n.about.as_ref()?)?;
         Some(Span::styled("▌", t.workspace(w.color)))
     });
     let stripe_w = usize::from(notice_stripe.is_some());
