@@ -288,9 +288,14 @@ pub fn in_use(parent: &Path) -> bool {
 fn own_dir(parent: &Path) -> Result<PathBuf, Fault> {
     std::fs::create_dir_all(parent).map_err(|e| io_fault(&e, parent))?;
     let dir = std::path::absolute(parent.join(DIR)).map_err(|e| io_fault(&e, parent))?;
-    let mut make = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut make, 0o700);
+    let make = {
+        let mut make = std::fs::DirBuilder::new();
+        std::os::unix::fs::DirBuilderExt::mode(&mut make, 0o700);
+        make
+    };
+    #[cfg(not(unix))]
+    let make = std::fs::DirBuilder::new();
     match make.create(&dir) {
         Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(io_fault(&e, &dir)),
         _ => {}
