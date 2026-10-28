@@ -275,3 +275,31 @@ fn each_workspaces_list_comes_back_from_the_cache_with_the_network_off() {
     run.quit();
     assert_eq!((m.methods(0).len(), m.methods(1).len()), asked, "the network off: nothing asked of either");
 }
+
+#[test]
+fn signing_in_from_the_app_adds_the_workspace_and_keeps_the_one_signed_in_to() {
+    let m = Machine::new("app-login", &[0]);
+    let (creds, addrs) = m.env();
+    let env = [("SLAKIO_TEST_CREDENTIALS", creds.as_str()), ("SLAKIO_TEST_SLACK_ADDR", addrs.as_str())];
+    let config = m.dir.join("config-1.toml");
+    std::fs::copy(m.dir.join("config.toml"), &config).unwrap();
+    let Some(mut run) = Run::spawn_with(&m.dir, &config, &m.dir.join("typescript-1"), &env, (120, 40), "login") else {
+        return;
+    };
+    run.wait_for("the paste screen", |t| t.contains("Waiting for the paste"));
+    let paste = format!(
+        "curl 'https://{}/api/client.counts' -H 'cookie: b=1; d={COOKIE}' --data-raw 'token={TOKEN}'",
+        HOSTS[1]
+    );
+    run.type_bytes(format!("\x1b[200~{paste}\x1b[201~").as_bytes());
+    run.wait_for("signed in to B", |t| t.contains(&format!("Signed in to {}", m.name(1))));
+    // Both are listed and booted: A, signed in to before, first.
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    wait_until("B booted", || m.methods(1).iter().filter(|x| *x == "client.userBoot").count() >= 2);
+    run.type_bytes(b" Wj\r");
+    run.wait_for("B's channels", |t| t.contains(&m.channel(1)));
+    run.quit();
+    let file = m.file();
+    assert!(file.contains(HOSTS[0]) && file.contains(HOSTS[1]), "{file}");
+    assert!(!file.contains(TOKEN) && !file.contains(COOKIE));
+}

@@ -61,7 +61,19 @@ impl Run {
     /// Start the binary with config file `config` in a pseudo terminal of `size` (columns,
     /// rows), recording what it draws in `out`; `None` when `script` cannot start.
     pub fn spawn(dir: &Path, config: &Path, out: &Path, env: &[(&str, &str)], size: (u16, u16)) -> Option<Self> {
-        let child = start(dir, config, out, env, size)?;
+        Self::spawn_with(dir, config, out, env, size, "")
+    }
+
+    /// [`Run::spawn`] with `command` (`login`) before the options.
+    pub fn spawn_with(
+        dir: &Path,
+        config: &Path,
+        out: &Path,
+        env: &[(&str, &str)],
+        size: (u16, u16),
+        command: &str,
+    ) -> Option<Self> {
+        let child = start(dir, config, out, env, size, command)?;
         Some(Run { child, dir: dir.to_path_buf(), config: config.to_path_buf(), out: out.to_path_buf(), size })
     }
 
@@ -163,9 +175,16 @@ fn screen(t: &str, rows: usize, cols: usize) -> String {
 }
 
 /// Start the binary in a pseudo terminal of `size`, recording what it draws in `out`.
-fn start(dir: &Path, config: &Path, out: &Path, env: &[(&str, &str)], size: (u16, u16)) -> Option<Child> {
+fn start(
+    dir: &Path,
+    config: &Path,
+    out: &Path,
+    env: &[(&str, &str)],
+    size: (u16, u16),
+    command: &str,
+) -> Option<Child> {
     let line = format!(
-        "stty rows {} cols {}; exec '{}' --config '{}'",
+        "stty rows {} cols {}; exec '{}' {command} --config '{}'",
         size.1,
         size.0,
         env!("CARGO_BIN_EXE_slakio"),
