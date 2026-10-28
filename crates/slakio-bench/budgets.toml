@@ -7,7 +7,10 @@
 # The release binary (lto, one codegen unit, stripped). A developer machine (aarch64 macOS)
 # measures about 1 MiB with the empty frame of step zero; the budget leaves room for what comes
 # before the first release, and is lowered or raised only with a measurement and a reason.
-binary_mib_max = 8.0
+# Raised from 8.0: CI's x86_64 Linux build measured 8 371 472 bytes (7.98 MiB) with the bundled
+# SQLite cache and several workspaces, then 8 401 520 bytes (8.01 MiB) with the fixes that keep
+# each workspace's slot, waiting places, keychain entries and cache part its own.
+binary_mib_max = 8.5
 
 [idle]
 # The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
