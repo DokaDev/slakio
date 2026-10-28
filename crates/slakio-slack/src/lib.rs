@@ -32,6 +32,8 @@
 //! wiring; the authentication crate never depends on it (the binary hands it the credentials).
 
 pub mod adapter;
+pub mod blocks;
+pub(crate) mod boot;
 pub mod client;
 pub mod error;
 pub mod governor;
@@ -41,6 +43,7 @@ pub mod method;
 pub(crate) mod people;
 pub mod request;
 pub mod response;
+pub(crate) mod threads;
 pub mod wire;
 
 pub use adapter::serve;

@@ -17,6 +17,12 @@ fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Optio
     })
 }
 
+/// A value that cannot be read is `None`, not a failure of the whole answer.
+fn loose<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Option<T>, D::Error> {
+    let value = Option::<serde_json::Value>::deserialize(d)?;
+    Ok(value.and_then(|v| serde_json::from_value(v).ok()))
+}
+
 /// `client.userBoot`.
 #[derive(Debug, Default, Deserialize)]
 pub struct UserBoot {
@@ -27,6 +33,83 @@ pub struct UserBoot {
     pub channels: Option<Vec<Channel>>,
     #[serde(default, deserialize_with = "lenient")]
     pub ims: Option<Vec<Im>>,
+    #[serde(default, deserialize_with = "loose")]
+    pub prefs: Option<Prefs>,
+    /// The user's own do-not-disturb times.
+    #[serde(default, deserialize_with = "loose")]
+    pub dnd: Option<Dnd>,
+}
+
+/// The user's preferences, of which the client reads the conversations muted.
+#[derive(Debug, Default, Deserialize)]
+pub struct Prefs {
+    /// Notification preferences as JSON in a string: `{"channels": {"C1": {"muted": true}}}`.
+    pub all_notifications_prefs: Option<String>,
+    /// The older spelling: ids, comma-separated.
+    pub muted_channels: Option<String>,
+}
+
+impl Prefs {
+    /// The ids of the conversations muted, by either spelling; unreadable parts are left out.
+    pub fn muted(&self) -> std::collections::HashSet<String> {
+        let mut out: std::collections::HashSet<String> = self
+            .muted_channels
+            .as_deref()
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string)
+            .collect();
+        let all: Option<serde_json::Value> =
+            self.all_notifications_prefs.as_deref().and_then(|s| serde_json::from_str(s).ok());
+        if let Some(channels) = all.as_ref().and_then(|v| v.get("channels")).and_then(serde_json::Value::as_object) {
+            for (id, prefs) in channels {
+                match prefs.get("muted").and_then(serde_json::Value::as_bool) {
+                    Some(true) => {
+                        out.insert(id.clone());
+                    }
+                    // The newer spelling says it is not muted: it is not.
+                    Some(false) => {
+                        out.remove(id);
+                    }
+                    None => {}
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Someone's do-not-disturb times (seconds since the Unix epoch).
+#[derive(Debug, Default, Deserialize)]
+pub struct Dnd {
+    pub dnd_enabled: Option<bool>,
+    pub next_dnd_start_ts: Option<u64>,
+    pub next_dnd_end_ts: Option<u64>,
+    pub snooze_enabled: Option<bool>,
+    pub snooze_endtime: Option<u64>,
+}
+
+impl Dnd {
+    /// In do not disturb at `now` (seconds); `None` when Slack said too little to tell.
+    pub fn active(&self, now: u64) -> Option<bool> {
+        if self.snooze_enabled == Some(true) && self.snooze_endtime.is_some_and(|end| now < end) {
+            return Some(true);
+        }
+        match (self.dnd_enabled?, self.next_dnd_start_ts, self.next_dnd_end_ts) {
+            (false, _, _) => Some(false),
+            (true, Some(start), Some(end)) => Some(start <= now && now < end),
+            (true, _, _) => None,
+        }
+    }
+}
+
+/// `dnd.teamInfo`: people's do-not-disturb times by id.
+#[derive(Debug, Default, Deserialize)]
+pub struct DndTeam {
+    #[serde(default, deserialize_with = "loose")]
+    pub users: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,6 +132,8 @@ pub struct Channel {
     pub is_mpim: Option<bool>,
     pub is_ext_shared: Option<bool>,
     pub is_archived: Option<bool>,
+    /// Shared with another workspace of the same organization (not Slack Connect).
+    pub is_org_shared: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +216,21 @@ pub struct History {
     #[serde(default, deserialize_with = "lenient")]
     pub messages: Option<Vec<Message>>,
     pub has_more: Option<bool>,
+    #[serde(default, deserialize_with = "loose")]
+    pub response_metadata: Option<Metadata>,
+}
+
+/// Where the next page starts (`conversations.replies` pages forward by cursor).
+#[derive(Debug, Default, Deserialize)]
+pub struct Metadata {
+    pub next_cursor: Option<String>,
+}
+
+impl History {
+    /// The cursor of the next page, when Slack gave one (an empty one is none).
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.response_metadata.as_ref()?.next_cursor.as_deref().filter(|c| !c.is_empty())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,6 +244,26 @@ pub struct Message {
     pub reactions: Option<Vec<Reaction>>,
     /// Present (whatever it holds) when the message was edited.
     pub edited: Option<serde_json::Value>,
+    /// `message_deleted`, `tombstone`, `bot_message`, `channel_join`, …
+    pub subtype: Option<String>,
+    /// Slack keeps it from the message list (a deleted message's leftover).
+    pub hidden: Option<bool>,
+    /// Block Kit: what bots post, and the rich text people write.
+    pub blocks: Option<serde_json::Value>,
+    /// Legacy attachments (bots, unfurls).
+    pub attachments: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "lenient")]
+    pub files: Option<Vec<File>>,
+    /// A bot's message: the bot's id and the name it posts as.
+    pub bot_id: Option<String>,
+    pub username: Option<String>,
+}
+
+/// A file shared with a message: the client reads its name only.
+#[derive(Debug, Deserialize)]
+pub struct File {
+    pub name: Option<String>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

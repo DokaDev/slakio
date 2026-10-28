@@ -170,7 +170,11 @@ fn the_backend_boots_from_the_start_bundle_and_reads_a_conversation() {
         assert!(handle.capabilities.read_only && !handle.capabilities.demo);
         ask(&handle, 1, Command::Boot);
         let Event::Booted(snapshot) = next(&mut handle).await.event else { panic!("booted") };
-        assert_eq!(fake.methods(), ["client.userBoot", "client.counts", "users/info"], "the DMs' people by name");
+        assert_eq!(
+            fake.methods(),
+            ["client.userBoot", "client.counts", "users/info", "dnd.teamInfo"],
+            "the DMs' people by name, and whether they are in do not disturb"
+        );
         assert_eq!(snapshot.workspaces[0].id, ws.id);
         assert_eq!(snapshot.saved, None, "saved items are unknown, not none");
         let expected = world

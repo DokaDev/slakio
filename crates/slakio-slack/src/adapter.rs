@@ -9,25 +9,27 @@
 //! first, and at most one is under way: a newer open cancels the older one — before it is
 //! sent, or by dropping its answer — and the older one is answered `Failed(Busy)`, so a pane
 //! that still shows it can be retried instead of waiting.
+//!
+//! A thread is read from its start by `conversations.replies` (Slack pages it forward only) and
+//! kept for the session ([`crate::threads`]): its newest page is the end of what was read, its
+//! older pages come from what is kept, without a request.
 
+use crate::boot::{Me, boot};
 use crate::client::Client;
 use crate::error::SlackError;
 use crate::governor::Priority;
 use crate::method::Method;
 use crate::people::People;
 use crate::request::Call;
+use crate::threads::Threads;
 use crate::wire;
 use slakio_core::backend::{
-    BackendEnd, BackendHandle, Capabilities, Command, Envelope, Event, Generation, Page, Request, Snapshot,
-    refuse_change,
+    BackendEnd, BackendHandle, Capabilities, Command, Envelope, Event, Generation, Page, Request, refuse_change,
 };
-use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, Message, Org, Presence, Reaction, Section, SectionId, SectionKind,
-    Target, ThreadSummary, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
-};
+use slakio_core::model::{Message, Org, Presence, Reaction, Target, ThreadSummary, Ts, User, UserId, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, PoisonError};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{AbortHandle, JoinSet};
 
@@ -51,14 +53,19 @@ pub fn serve(client: Client) -> BackendHandle {
     handle
 }
 
-/// The user's own id once the workspace has booted (whose reactions are "mine").
-type Me = Arc<Mutex<Option<UserId>>>;
+/// What the backend learns in a session: the user's own id once booted (whose reactions are
+/// "mine"), the people named so far, the threads read.
+#[derive(Default)]
+struct Session {
+    me: Me,
+    people: People,
+    threads: Threads,
+}
 
 pub use crate::people::LOOKUP_BATCH;
 
 async fn run(client: Arc<Client>, mut end: BackendEnd) {
-    let me: Me = Arc::default();
-    let people: Arc<People> = Arc::default();
+    let session: Arc<Session> = Arc::default();
     let mut tasks = JoinSet::new();
     let mut in_flight: HashMap<Target, AbortHandle> = HashMap::new();
     // The open under way, to cancel when a newer one comes.
@@ -71,11 +78,11 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
             }
             continue;
         }
-        let (client, tx, me, people) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&me), Arc::clone(&people));
+        let (client, tx, ctx) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&session));
         let Request { id, command, .. } = request;
         match command {
             Command::Boot => {
-                tasks.spawn(async move { answer(&tx, id, boot(&client, &me, &people).await).await });
+                tasks.spawn(async move { answer(&tx, id, boot(&client, &ctx.me, &ctx.people).await).await });
             }
             Command::History { target, before, limit } => {
                 if let Some(older) = in_flight.remove(&target) {
@@ -96,7 +103,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd) {
                         if opening {
                             tokio::time::sleep(OPEN_DEBOUNCE).await;
                         }
-                        history(&client, &me, &people, target, before, limit).await
+                        history(&client, &ctx, target, before, limit).await
                     };
                     let page = match cancelled {
                         Some(cancelled) => tokio::select! {
@@ -132,173 +139,114 @@ async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Even
     let _ = tx.send(envelope).await;
 }
 
-/// The workspace from `client.userBoot` (it cannot do without), its unread marks from
-/// `client.counts` (it can).
-async fn boot(client: &Client, me: &Me, people: &People) -> Result<Event, SlackError> {
-    let boot: wire::UserBoot = client.call(&crate::login::user_boot(), Priority::User).await?;
-    let (Some(team), Some(self_)) = (boot.team, boot.me) else {
-        return Err(SlackError::Network { detail: "the start answer has no team or user".to_string() });
-    };
-    client.set_team(&team.id);
-    people.set_team(&team.id);
-    *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
-    let counts: Option<wire::Counts> =
-        client.call(&Call::form(Method::ClientCounts, &[]), Priority::Background).await.ok();
-    // The DMs' people, by name (in batches); those not found show their id.
-    let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
-    let known = people.names(client, &peers, Priority::Background).await;
-    Ok(Event::Booted(Box::new(snapshot(&team, &self_, boot.channels, boot.ims, counts, known))))
-}
-
-fn snapshot(
-    team: &wire::Team,
-    me: &wire::Me,
-    channels: Option<Vec<wire::Channel>>,
-    ims: Option<Vec<wire::Im>>,
-    counts: Option<wire::Counts>,
-    known: Vec<User>,
-) -> Snapshot {
-    let ws = WorkspaceId::new(&team.id);
-    let mut unread: HashMap<String, (u32, u32)> = HashMap::new();
-    if let Some(c) = counts {
-        for n in [c.channels, c.mpims, c.ims].into_iter().flatten().flatten() {
-            let mentions = n.mention_count.unwrap_or(0);
-            let unreads = if n.has_unreads == Some(true) { mentions.max(1) } else { 0 };
-            unread.insert(n.id, (unreads, mentions.min(unreads)));
-        }
-    }
-    let section = |id: &str, name: &str, kind| Section {
-        id: SectionId::new(format!("{}:{id}", team.id)),
-        workspace: ws.clone(),
-        name: Remote::new(name),
-        kind,
-    };
-    let sections = vec![
-        section("channels", "Channels", SectionKind::Channels),
-        section("dms", "Direct messages", SectionKind::DirectMessages),
-    ];
-    let conversation = |id: String, name: String, kind: ConversationKind, external: bool, section: &Section| {
-        let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
-        Conversation {
-            id: ConversationId::new(id),
-            workspace: ws.clone(),
-            kind,
-            name: Remote::new(name),
-            section: section.id.clone(),
-            external,
-            muted: false,
-            unread,
-            mentions,
-        }
-    };
-    let mut conversations: Vec<Conversation> = channels
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|c| c.is_archived != Some(true) && c.is_mpim != Some(true))
-        .map(|c| {
-            let name = c.name.unwrap_or_else(|| c.id.clone());
-            let kind = ConversationKind::Channel { private: c.is_private == Some(true) };
-            conversation(c.id, name, kind, c.is_ext_shared == Some(true), &sections[0])
-        })
-        .collect();
-    conversations.extend(ims.unwrap_or_default().into_iter().filter_map(|im| {
-        let user = im.user?;
-        let peer = known.iter().find(|u| u.id.as_str() == user);
-        let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
-        let external = peer.is_some_and(|u| matches!(u.org, Org::External(_)));
-        Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external, &sections[1]))
-    }));
-    let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
-    Snapshot {
-        workspaces: vec![Workspace {
-            id: ws.clone(),
-            name: Remote::new(team.name.clone().unwrap_or_else(|| team.id.clone())),
-            color: WorkspaceColor(0),
-            me: UserId::new(&me.id),
-        }],
-        users: std::iter::once(User {
-            id: UserId::new(&me.id),
-            workspace: ws,
-            name: Remote::new(me_name.clone()),
-            display_name: Remote::new(me_name),
-            org: Org::Own,
-            bot: false,
-            presence: Presence::Unknown,
-        })
-        .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
-        .collect(),
-        sections,
-        conversations,
-        // Saved items are not read in this version: unknown, not none.
-        saved: None,
-        taken: Ts(now_micros()),
-    }
-}
-
 /// A page of `target`: the newest through `conversations.view`, older ones through
-/// `conversations.history`, a thread through `conversations.replies`.
+/// `conversations.history`, a thread's from what [`Threads`] read of it (`conversations.replies`).
 async fn history(
     client: &Client,
-    me: &Me,
-    people: &People,
+    ctx: &Session,
     target: Target,
     before: Option<Ts>,
     limit: u32,
 ) -> Result<Page, SlackError> {
-    let limit = limit.clamp(1, PAGE_MAX).to_string();
+    let limit = limit.clamp(1, PAGE_MAX);
     let channel = target.conversation().as_str().to_string();
-    let latest = before.map(|ts| ts.to_string());
-    let history: wire::History = match (&target, &latest) {
-        (Target::Thread { thread, .. }, _) => {
-            let ts = thread.to_string();
-            let mut params = vec![("channel", channel.as_str()), ("ts", ts.as_str()), ("limit", limit.as_str())];
-            if let Some(l) = &latest {
-                params.push(("latest", l));
-            }
-            client.call(&Call::form(Method::ConversationsReplies, &params), Priority::User).await?
+    let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    let (messages, complete, bots) = match &target {
+        Target::Thread { thread, .. } => {
+            ctx.threads.page(client, me.as_ref(), &channel, *thread, before, limit).await?
         }
-        (Target::Conversation { .. }, None) => {
-            let call = Call::form(
-                Method::ConversationsView,
-                &[
-                    ("channel", channel.as_str()),
-                    ("count", limit.as_str()),
-                    ("ignore_replies", "true"),
-                    ("no_members", "true"),
-                ],
-            );
-            let view: wire::View = client.call(&call, Priority::User).await?;
-            people.learn(view.users.as_deref().unwrap_or_default());
-            view.history.unwrap_or_default()
-        }
-        (Target::Conversation { .. }, Some(l)) => {
-            let params = [
-                ("channel", channel.as_str()),
-                ("latest", l.as_str()),
-                ("limit", limit.as_str()),
-                ("ignore_replies", "true"),
-            ];
-            client.call(&Call::form(Method::ConversationsHistory, &params), Priority::User).await?
+        Target::Conversation { .. } => {
+            let count = limit.to_string();
+            let history: wire::History = match before.map(|ts| ts.to_string()) {
+                None => {
+                    let call = Call::form(
+                        Method::ConversationsView,
+                        &[
+                            ("channel", channel.as_str()),
+                            ("count", count.as_str()),
+                            ("ignore_replies", "true"),
+                            ("no_members", "true"),
+                        ],
+                    );
+                    let view: wire::View = client.call(&call, Priority::User).await?;
+                    ctx.people.learn(view.users.as_deref().unwrap_or_default());
+                    view.history.unwrap_or_default()
+                }
+                Some(latest) => {
+                    let params = [
+                        ("channel", channel.as_str()),
+                        ("latest", latest.as_str()),
+                        ("limit", count.as_str()),
+                        ("ignore_replies", "true"),
+                    ];
+                    client.call(&Call::form(Method::ConversationsHistory, &params), Priority::User).await?
+                }
+            };
+            // Unknown is not complete: only Slack's own "no more" says the start is in this page;
+            // but an older page with nothing in it has nothing older to give either (asking
+            // again would ask for the same).
+            let has_more = history.has_more;
+            let (mut messages, bots) = read(history.messages.unwrap_or_default(), me.as_ref());
+            messages.retain(|m| before.is_none_or(|b| m.ts < b));
+            let complete = has_more == Some(false) || (before.is_some() && messages.is_empty());
+            (messages, complete, bots)
         }
     };
-    let me = me.lock().unwrap_or_else(PoisonError::into_inner).clone();
-    let mut messages: Vec<Message> =
-        history.messages.unwrap_or_default().into_iter().filter_map(|m| message(m, me.as_ref())).collect();
-    messages.sort_by_key(|m| m.ts);
-    // Unknown is not complete: only Slack's own "no more" says the start is in this page.
-    let complete = history.has_more == Some(false);
-    // The authors by name: what the view brought, else looked up (in batches); not the user.
+    // The authors by name: what the view brought, else looked up (in batches); not the user,
+    // nor a bot (named by the name it posts as).
     let authors: Vec<String> = messages
         .iter()
         .map(|m| m.user.as_str())
-        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != *u))
+        .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != *u) && !bots.contains_key(*u))
         .map(str::to_string)
         .collect();
-    let users = people.names(client, &authors, Priority::User).await;
+    let mut users = ctx.people.names(client, &authors, Priority::User).await;
+    if let Some(ws) = ctx.people.team() {
+        users.extend(bots.into_iter().map(|(id, name)| bot(&ws, id, name)));
+    }
     Ok(Page { target, messages, complete, users })
 }
 
+/// The bots that posted in a page, by id: the name each posts as.
+pub(crate) type Bots = HashMap<String, String>;
+
+/// `raw` as messages, oldest first, each once (a message Slack lists twice is shown once), the
+/// deleted ones left out; and the bots among their authors.
+pub(crate) fn read(raw: Vec<wire::Message>, me: Option<&UserId>) -> (Vec<Message>, Bots) {
+    let mut bots = Bots::new();
+    let mut messages: Vec<Message> = raw
+        .into_iter()
+        .filter_map(|m| {
+            if let (None, Some(id), Some(name)) = (&m.user, &m.bot_id, &m.username) {
+                bots.insert(id.clone(), name.clone());
+            }
+            message(m, me)
+        })
+        .collect();
+    messages.sort_by_key(|m| m.ts);
+    messages.dedup_by_key(|m| m.ts);
+    (messages, bots)
+}
+
+/// A bot of workspace `ws` as a person: named as it posts.
+fn bot(ws: &str, id: String, name: String) -> User {
+    User {
+        id: UserId::new(id),
+        workspace: WorkspaceId::new(ws),
+        name: Remote::new(name.clone()),
+        display_name: Remote::new(name),
+        org: Org::Own,
+        bot: true,
+        presence: Presence::Unknown,
+    }
+}
+
 fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
+    // A deleted message's leftover: gone. (A deleted thread's own message stays as Slack's
+    // `tombstone`, its replies still under it.)
+    if m.hidden == Some(true) || m.subtype.as_deref() == Some("message_deleted") {
+        return None;
+    }
     let ts = Ts(wire::ts(&m.ts)?);
     let thread = match (m.reply_count, m.latest_reply.as_deref().and_then(wire::ts)) {
         (Some(replies), Some(last)) if replies > 0 => Some(ThreadSummary { replies, last_reply: Ts(last) }),
@@ -315,18 +263,16 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
             Reaction { name: Remote::new(r.name), count, mine }
         })
         .collect();
+    let files: Vec<String> =
+        m.files.unwrap_or_default().into_iter().filter_map(|f| f.name.or(f.title)).filter(|n| !n.is_empty()).collect();
+    let text =
+        crate::blocks::text(m.text.as_deref().unwrap_or_default(), m.blocks.as_ref(), m.attachments.as_ref(), &files);
     Some(Message {
         ts,
-        user: UserId::new(m.user.unwrap_or_default()),
-        text: Remote::new(m.text.unwrap_or_default()),
+        user: UserId::new(m.user.or(m.bot_id).unwrap_or_default()),
+        text: Remote::new(text),
         thread,
         reactions,
         edited: m.edited.is_some(),
     })
-}
-
-fn now_micros() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| u64::try_from(d.as_micros()).unwrap_or(u64::MAX))
 }

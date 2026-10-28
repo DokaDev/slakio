@@ -31,7 +31,7 @@ impl People {
         *self.team.lock().unwrap_or_else(PoisonError::into_inner) = Some(team.to_string());
     }
 
-    fn team(&self) -> Option<String> {
+    pub(crate) fn team(&self) -> Option<String> {
         self.team.lock().unwrap_or_else(PoisonError::into_inner).clone()
     }
 
