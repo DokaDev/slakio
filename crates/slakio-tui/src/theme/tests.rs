@@ -381,3 +381,27 @@ fn reaction_chips_stand_off_the_background_and_their_text_reads() {
         assert_eq!((t.reaction_mine().fg, t.reaction_mine().bg), (Some(t.bg), Some(t.accent)), "{n}");
     }
 }
+
+/// In every theme, NO_COLOR too, markup reads apart: a link is underlined (a person named is
+/// bold, never underlined); code is in another color than a mention of the user (or keeps its
+/// backticks where nothing tints it); code's tint is not the background.
+#[test]
+fn links_code_and_mentions_read_apart_in_every_theme() {
+    let mut all: Vec<Theme> = BUILTINS.iter().map(|t| (*t).clone()).collect();
+    all.extend([Theme::no_color(), resolve("terminal", false, Background::Light)]);
+    for t in &all {
+        let (link, code, me, other) = (t.markup_link(), t.code(), t.mention(true), t.mention(false));
+        assert!(link.add_modifier.contains(Modifier::UNDERLINED), "{}: links underlined", t.name);
+        assert!(!other.add_modifier.contains(Modifier::UNDERLINED), "{}", t.name);
+        assert_ne!(link.add_modifier, other.add_modifier, "{}: a link is not a person", t.name);
+        if t.code_marks() {
+            assert!(t.kind != Kind::Truecolor, "{}", t.name);
+        } else {
+            assert_ne!(t.code_bg(), t.bg, "{}: code is tinted", t.name);
+            assert_eq!(code.bg, Some(t.code_bg()), "{}", t.name);
+        }
+        if t.kind != Kind::NoColor {
+            assert_ne!((code.fg, code.bg), (me.fg, me.bg), "{}: code is not a mention of the user", t.name);
+        }
+    }
+}

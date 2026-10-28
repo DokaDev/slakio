@@ -352,9 +352,33 @@ impl Theme {
         }
     }
 
-    /// Code in a message (inline, or a code block's lines): the warm color; plain without color.
+    /// Code in a message (inline, or a code block's lines): body text on a tint of the raised
+    /// surface (never the warm color of a mention of the user); in the 16-color theme, green on
+    /// no background; plain without color. Where there is no tint, inline code keeps its
+    /// backticks ([`Self::code_marks`]).
     pub fn code(&self) -> Style {
-        if self.plain() { Style::new() } else { self.warm() }
+        match self.kind {
+            Kind::Truecolor => self.text().bg(self.code_bg()),
+            Kind::Ansi => Style::new().fg(Color::Green),
+            Kind::NoColor => Style::new(),
+        }
+    }
+
+    /// The background of code: the status line's surface, or the raised one where the surface is
+    /// the background itself.
+    pub fn code_bg(&self) -> Color {
+        if self.surface == self.bg { self.raised() } else { self.surface }
+    }
+
+    /// Inline code is drawn with its backticks: no background tells it apart.
+    pub fn code_marks(&self) -> bool {
+        self.kind != Kind::Truecolor
+    }
+
+    /// A link in a message: underlined (with or without color), in the accent; apart from a
+    /// person or channel named, which is bold.
+    pub fn markup_link(&self) -> Style {
+        self.link().add_modifier(Modifier::UNDERLINED)
     }
 
     /// A reaction chip: a pill on the raised background (the cursor line's color on a dark

@@ -98,15 +98,40 @@ fn people_channels_broadcasts_groups_and_links() {
 /// known shows the id, not a name the sender wrote.
 #[test]
 fn labels_cannot_pass_for_another_address_or_person() {
-    assert_eq!(flat(&parse("<https://evil.example/x|https://bank.example>")), "https://bank.example (evil.example)");
-    assert_eq!(flat(&parse("<https://evil.example|bank.example/login>")), "bank.example/login (evil.example)");
-    assert_eq!(flat(&parse("<http://evil.example|WWW.Bank.Example>")), "WWW.Bank.Example (evil.example)");
+    assert_eq!(flat(&parse("<https://evil.example/x|https://bank.example>")), "https://bank.example → evil.example");
+    assert_eq!(flat(&parse("<https://evil.example|bank.example/login>")), "bank.example/login → evil.example");
+    assert_eq!(flat(&parse("<http://evil.example|WWW.Bank.Example>")), "WWW.Bank.Example → evil.example");
     // A label of the same host, or one that is no address, is shown as written.
     assert_eq!(flat(&parse("<https://bank.example/a|https://bank.example>")), "https://bank.example");
     assert_eq!(flat(&parse("<https://Bank.example:8443/a|bank.example>")), "bank.example");
     assert_eq!(flat(&parse("<https://grafana.example|web-1>")), "web-1");
     assert_eq!(flat(&parse("<https://grafana.example|see v1.2 notes>")), "see v1.2 notes");
     assert_eq!(flat(&parse("<mailto:ops-desk|ops-desk>")), "ops-desk", "a mail link is no web address");
+    // Fail closed: once the label reads as an address, the target shows unless it is provably
+    // the same web host.
+    for (link, shown) in [
+        ("<https://bank.example@evil.test/|https://bank.example>", "https://bank.example → evil.test"),
+        ("<http://203.0.113.5/login|https://bank.example>", "https://bank.example → 203.0.113.5"),
+        ("<https://b\u{430}nk.example/|bank.example>", "bank.example → b\\u{430}nk.example"),
+        ("<https://evil.example./|evil.example>", "evil.example → evil.example."),
+        ("<https://evil.xn--p1ai/|bank.example>", "bank.example → evil.xn--p1ai"),
+        ("<https://evil.example:8443/|bank.example>", "bank.example → evil.example:8443"),
+        ("<slack://channel?id=C1|https://bank.example>", "https://bank.example → slack://channel"),
+        ("<mailto:x@evil.test|support@bank.test>", "support@bank.test → x@evil.test"),
+        ("<https://evil.example/|bank.example.>", "bank.example. → evil.example"),
+        ("<https://evil.example/|https://b\u{e4}nk.example>", "https://b\u{e4}nk.example → evil.example"),
+        ("<https://evil.example/|10.0.0.1>", "10.0.0.1 → evil.example"),
+        // A forged annotation inside the label is no way out of it.
+        (
+            "<https://evil.example/|https://bank.example (bank.example)>",
+            "https://bank.example (bank.example) → evil.example",
+        ),
+    ] {
+        assert_eq!(flat(&parse(link)), shown, "{link}");
+    }
+    // A link that runs code goes nowhere: its label alone, and it says it goes nowhere.
+    assert_eq!(flat(&parse("<javascript:alert(1)|https://bank.example>")), "https://bank.example");
+    assert!(runs_code(" JavaScript:x") && runs_code("data:text/html,x") && !runs_code("https://a.example"));
     // People: by the read model's name, else by id; the sender's label never names them.
     assert_eq!(flat(&parse("<@UUNKNOWN|CEO>")), "@UUNKNOWN");
     let name = |p: &Piece| matches!(p, Piece::User { .. }).then(|| "Minsu".to_string());

@@ -1,6 +1,6 @@
 ---
 source: crates/slakio-tui/tests/markup_flows.rs
-assertion_line: 110
+assertion_line: 112
 expression: s.d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────────────────────────────────────────────╮
@@ -26,7 +26,7 @@ expression: s.d.snap()
 │   # announcements          ││                                                                                        │
 │   # design-review          ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
 │   # feed-alert-134         ││  KN   Kate Nam  09:00                                                                  │
-│   # feed-alert-8           ││       Deploy of api is cancelled done: run make ship & ask @Minsu Kim or @Me in        │
+│   # feed-alert-8           ││       Deploy of api is cancelled done: run `make ship` & ask @Minsu Kim or @Me in      │
 │   # feed-budget-162        ││       #alerts                                                                          │
 │   # feed-budget-33         ││                                                                                        │
 │   # feed-build-50          ││  KN   Kate Nam  09:10                                                                  │

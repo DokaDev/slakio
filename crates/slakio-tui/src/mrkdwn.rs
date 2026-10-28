@@ -270,7 +270,7 @@ pub fn decode(s: &str) -> String {
 /// What a piece says as plain text, its people and channels named by `name`. A person not
 /// known there shows the id (a label is the sender's word, and could name anyone); a channel
 /// not known, the label Slack wrote, else the id. A link shows its label, and where it goes
-/// too when the label reads as another address.
+/// too when the label reads as an address that is not provably the link's own ([`real_target`]).
 pub fn plain(piece: &Piece, name: &dyn Fn(&Piece) -> Option<String>) -> String {
     match piece {
         Piece::Text(t, _) | Piece::Code(t) => t.clone(),
@@ -280,27 +280,115 @@ pub fn plain(piece: &Piece, name: &dyn Fn(&Piece) -> Option<String>) -> String {
         }
         Piece::Broadcast(w) => format!("@{w}"),
         Piece::Group(label) => label.clone().unwrap_or_else(|| "@group".to_string()),
-        Piece::Link { url, label: Some(label), .. } => match (host(label), host(url)) {
-            (Some(said), Some(real)) if said != real => format!("{label} ({real})"),
-            _ => label.clone(),
+        Piece::Link { url, label: Some(label), .. } => match real_target(url, label) {
+            Some(real) => format!("{label} → {real}"),
+            None => label.clone(),
         },
         Piece::Link { url, label: None, .. } => shown_url(url).to_string(),
     }
 }
 
-/// The host `s` names when it reads as a web address (`https://a.example/x`, `a.example/x`),
-/// in lower case, without its port.
-fn host(s: &str) -> Option<String> {
+/// A link that runs something instead of going somewhere (`javascript:` and the like): never
+/// drawn as a link, nor said to go anywhere.
+pub fn runs_code(url: &str) -> bool {
+    let s = url.trim_start().to_ascii_lowercase();
+    ["javascript:", "vbscript:", "data:"].iter().any(|p| s.starts_with(p))
+}
+
+/// Where a link labelled `label` really goes, to show beside the label: once the label reads as
+/// an address, the link's target unless it is provably the same web host. It fails closed: a
+/// target that cannot be read as a plain web host (userinfo, a host that is not ASCII, a
+/// trailing dot, another scheme) is shown as it is. `None` for a label that names no address,
+/// and for a link that runs code ([`runs_code`]).
+pub fn real_target(url: &str, label: &str) -> Option<String> {
+    if runs_code(url) || !looks_like_address(label) {
+        return None;
+    }
+    if let (Some(said), Some(real)) = (web_host(label, false), web_host(url, true))
+        && said == real
+    {
+        return None;
+    }
+    Some(target_of(url))
+}
+
+/// The host of `s` read strictly as a web address (`https://a.example/x`; with `scheme` false
+/// also `a.example/x`): lower case, its port left out; `None` for anything else: userinfo, a
+/// character that is not ASCII, an empty label (a trailing dot), no dot at all.
+fn web_host(s: &str, scheme: bool) -> Option<String> {
     let lower = s.trim().to_ascii_lowercase();
-    let rest = lower.strip_prefix("https://").or_else(|| lower.strip_prefix("http://")).unwrap_or(&lower);
+    let rest = lower.strip_prefix("https://").or_else(|| lower.strip_prefix("http://"));
+    let rest = if scheme { rest? } else { rest.unwrap_or(&lower) };
     let host = rest.split(['/', '?', '#']).next()?;
-    let host =
-        host.rsplit_once(':').map_or(host, |(h, port)| if port.bytes().all(|b| b.is_ascii_digit()) { h } else { host });
-    let tld = host.rsplit_once('.')?.1;
+    let host = match host.rsplit_once(':') {
+        Some((h, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => h,
+        _ => host,
+    };
     let shaped =
         host.split('.').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'));
-    (shaped && tld.len() >= 2 && tld.bytes().all(|b| b.is_ascii_alphabetic())).then(|| host.to_string())
+    (shaped && host.contains('.')).then(|| host.to_string())
 }
+
+/// `label` reads as an address: a scheme (`https://`, `mailto:`), or a word that is a host name,
+/// an IP address or a mail address, whatever its letters (IDN, punycode, a trailing dot).
+fn looks_like_address(label: &str) -> bool {
+    let lower = label.to_lowercase();
+    if lower.contains("://") || lower.contains("mailto:") || lower.contains("www.") {
+        return true;
+    }
+    lower.split_whitespace().any(|word| {
+        let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        let word = word.rsplit_once('@').map_or(word, |(_, h)| h);
+        let host = word.split(['/', '?', '#', ':']).next().unwrap_or_default().trim_end_matches('.');
+        let parts: Vec<&str> = host.split('.').collect();
+        let last = parts.last().copied().unwrap_or_default();
+        let ip = parts.len() == 4 && parts.iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+        ip || (parts.len() >= 2
+            && parts.iter().all(|p| !p.is_empty())
+            && last.chars().count() >= 2
+            && last.chars().any(char::is_alphabetic))
+    })
+}
+
+/// A link's target as shown beside its label: the host of a web address (its port too), the
+/// address of a `mailto:`, else the scheme and what follows up to its path; a character that is
+/// not ASCII written as its code point (a look-alike letter cannot pass for another), at most
+/// [`TARGET_MAX`] characters.
+fn target_of(url: &str) -> String {
+    let url = url.trim();
+    let lower = url.to_ascii_lowercase();
+    let shown = if let Some(rest) = lower.strip_prefix("mailto:").map(|_| &url[7..]) {
+        rest.split('?').next().unwrap_or_default().to_string()
+    } else if let Some((scheme, rest)) = url.split_once("://") {
+        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+        if ["http", "https"].contains(&scheme.to_ascii_lowercase().as_str()) {
+            host.to_ascii_lowercase()
+        } else {
+            format!("{scheme}://{host}")
+        }
+    } else {
+        url.split(['/', '?', '#']).next().unwrap_or_default().to_string()
+    };
+    let mut out = String::new();
+    for c in shown.chars() {
+        if c.is_ascii() && !c.is_ascii_control() {
+            out.push(c);
+        } else {
+            out.push_str(&format!("\\u{{{:x}}}", u32::from(c)));
+        }
+    }
+    if out.is_empty() {
+        out.push('?');
+    }
+    match out.char_indices().nth(TARGET_MAX) {
+        Some((i, _)) => format!("{}…", &out[..i]),
+        None => out,
+    }
+}
+
+/// The most characters of a link's target shown beside its label.
+pub const TARGET_MAX: usize = 60;
 
 /// A link's address as shown when it has no label: a `mailto:` without its scheme.
 /// (Never starting with a combining mark, which would join the character before it.)

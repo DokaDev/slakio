@@ -287,6 +287,9 @@ impl Model {
     pub fn named(&self, ws: &WorkspaceId, piece: &crate::mrkdwn::Piece) -> Option<String> {
         use crate::mrkdwn::Piece;
         match piece {
+            // A bot's author id of one name it posted as (`<bot>~<hash>`) is no person to
+            // mention: a sender could make it name anyone.
+            Piece::User { id, .. } if id.contains('~') => None,
             Piece::User { id, .. } => {
                 self.user(ws, &UserId::new(id.as_str())).map(|u| u.display_name.line().into_string())
             }

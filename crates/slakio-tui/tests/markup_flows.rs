@@ -103,6 +103,8 @@ fn markup_is_drawn_in_its_styles_at_120x40_and_80x24() {
         let t = &s.d.app.theme;
         assert_eq!(style_of(&s, "make").fg, t.code().fg, "{at}");
         assert_eq!(style_of(&s, "the runbook").fg, t.link().fg, "{at}");
+        assert!(style_of(&s, "the runbook").add_modifier.contains(Modifier::UNDERLINED), "{at}");
+        assert!(screen.contains("`make"), "the 16-color theme keeps the backticks: {at}");
         let me_name =
             s.d.app.model.user(&s.d.app.model.workspaces()[0].id, &slakio_core::model::UserId::new(&me)).unwrap();
         let me_name = format!("@{}", me_name.display_name.line().as_str());
@@ -120,4 +122,67 @@ fn hostile_text_inside_markup_is_drawn_harmless() {
         .collect();
     let s = shown(&texts, 120, 40);
     assert_harmless(&s.d.screen());
+}
+
+/// Code, links and mentions read apart in tokyo-night and under NO_COLOR: a link underlined,
+/// code tinted (its backticks kept without color), never in the user's mention style.
+#[test]
+fn code_links_and_mentions_read_apart_with_and_without_color() {
+    use slakio_tui::theme::{Background, Theme};
+    let probe = Scripted::booted(true, None);
+    let (me, other, channel) = ids(&probe);
+    let me_name = probe.d.app.model.user(&probe.d.app.model.workspaces()[0].id, &slakio_core::model::UserId::new(&me));
+    let me_name = format!("@{}", me_name.unwrap().display_name.line().as_str());
+    for theme in [Theme::no_color(), slakio_tui::theme::resolve("tokyo-night", true, Background::Dark)] {
+        let mut s = shown(&texts(&me, &other, &channel), 120, 40);
+        s.d.app.theme = theme.clone();
+        let screen = s.d.screen();
+        let at = format!("{}: {screen}", theme.name);
+        let (code, link, mine) = (style_of(&s, "make"), style_of(&s, "the runbook"), style_of(&s, &me_name));
+        assert!(link.add_modifier.contains(Modifier::UNDERLINED), "{at}");
+        assert_ne!((code.fg, code.bg, code.add_modifier), (mine.fg, mine.bg, mine.add_modifier), "{at}");
+        if theme.code_marks() {
+            assert!(screen.contains("`make ship`"), "{at}");
+        } else {
+            assert_eq!(code.bg, Some(theme.code_bg()), "{at}");
+            assert!(!screen.contains("`make"), "{at}");
+        }
+    }
+}
+
+/// A link whose label names another address shows the real host after it, faint and not
+/// underlined (no markup gives that style); a forged annotation in the label stays in the link;
+/// a `javascript:` link is plain text; a bot's per-name id is no mention, and an app named is
+/// marked.
+#[test]
+fn a_link_s_real_host_is_a_span_of_its_own_and_ids_cannot_pass_for_people() {
+    let texts = vec![
+        "<https://evil.example/login|https://bank.example (bank.example)> and <javascript:alert(1)|click here>"
+            .to_string(),
+        "<@BHOOK~3f00000000000000> wrote, then <@UAPP1> did".to_string(),
+    ];
+    let mut s = shown(&texts, 120, 40);
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let app = slakio_core::model::User {
+        id: slakio_core::model::UserId::new("UAPP1"),
+        workspace: ws.clone(),
+        name: Remote::new("Deploy Bot".to_string()),
+        display_name: Remote::new("Deploy Bot".to_string()),
+        org: slakio_core::model::Org::Own,
+        bot: true,
+        presence: slakio_core::model::Presence::Unknown,
+    };
+    s.d.app.model.add_users(&ws, &[app]);
+    let screen = s.d.screen();
+    let t = &s.d.app.theme;
+    let real = style_of(&s, "→ evil.example");
+    assert_eq!(real.fg, t.faint().fg, "{screen}");
+    assert!(!real.add_modifier.contains(Modifier::UNDERLINED), "{screen}");
+    assert!(style_of(&s, "(bank.example)").add_modifier.contains(Modifier::UNDERLINED), "the label's own text");
+    let click = style_of(&s, "click here");
+    assert!(!click.add_modifier.contains(Modifier::UNDERLINED) && click.fg == t.text().fg, "{screen}");
+    assert!(screen.contains("@BHOOK~3f00000000000000"), "an id, not a name: {screen}");
+    let mark = style_of(&s, "@Deploy Bot app");
+    assert!(mark.add_modifier.contains(Modifier::BOLD), "{screen}");
+    assert_eq!(style_of(&s, " app did").fg, t.faint().fg, "the app's mark is faint, apart: {screen}");
 }

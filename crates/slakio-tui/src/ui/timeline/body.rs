@@ -2,11 +2,15 @@
 //! spans at a width. Text wraps at blanks; a quoted line wraps under a bar; a code block's line is
 //! never wrapped, it is cut with `…`. People and channels are named from the read model when it
 //! knows them (their names may come after the message), else by the label Slack wrote, else by
-//! their id. The user named, and everyone (`@here`), stand out as GUI Slack marks a mention.
+//! their id. The user named, and everyone (`@here`), stand out as GUI Slack marks a mention; an
+//! app named is marked. Links are underlined; where a link's label reads as another address
+//! than its own, the real target follows it in a faint span of its own (`→ host`), a style no
+//! sender's markup gives. A link that runs code is plain text. Inline code is tinted, or keeps
+//! its backticks where nothing can tint it.
 
 use crate::app::App;
 use crate::app::pane::Shown;
-use crate::mrkdwn::{Block, Marks, Piece, plain};
+use crate::mrkdwn::{Block, Marks, Piece, plain, real_target, runs_code};
 use crate::text::{clip, wrap_styled};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
@@ -28,7 +32,7 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Ve
         match block {
             Block::Code(line) => out.push(vec![Span::styled(clip(line, w), t.code())]),
             Block::Line { quote, pieces } => {
-                let runs: Vec<(String, Style)> = pieces.iter().map(|p| run(app, ws, p)).collect();
+                let runs: Vec<(String, Style)> = pieces.iter().flat_map(|p| runs(app, ws, p)).collect();
                 let inner = if *quote { w.saturating_sub(2) } else { w };
                 let (lines, more) = wrap_styled(&runs, inner, room, t.text());
                 for mut line in lines {
@@ -49,22 +53,36 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Ve
     (out, false)
 }
 
-/// Piece `p` as text and its style.
-fn run(app: &App, ws: &WorkspaceId, p: &Piece) -> (String, Style) {
+/// Piece `p` as text in its styles: most pieces one run; a link whose label hides where it
+/// goes, and an app named, a faint run after it.
+fn runs(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
     let t = &app.theme;
     let text = plain(p, &|p| app.model.named(ws, p));
-    let style = match p {
-        Piece::Text(_, marks) => marked(t.text(), *marks),
-        Piece::Code(_) => t.code(),
+    match p {
+        Piece::Text(_, marks) => vec![(text, marked(t.text(), *marks))],
+        Piece::Code(code) if t.code_marks() => vec![(format!("`{code}`"), t.code())],
+        Piece::Code(_) => vec![(text, t.code())],
         Piece::User { id, marks, .. } => {
-            marked(t.mention(app.model.me(ws).is_some_and(|me| me.as_str() == id)), *marks)
+            let me = app.model.me(ws).is_some_and(|me| me.as_str() == id);
+            let mut out = vec![(text, marked(t.mention(me), *marks))];
+            let user = app.model.named(ws, p).and_then(|_| app.model.user(ws, &slakio_core::model::UserId::new(id)));
+            if user.is_some_and(|u| u.bot) {
+                out.push((format!(" {}", app.i18n.label(slakio_core::i18n::Label::MessageApp)), t.faint()));
+            }
+            out
         }
-        Piece::Channel { marks, .. } => marked(t.mention(false), *marks),
-        Piece::Broadcast(_) => t.mention(true),
-        Piece::Group(_) => t.mention(false),
-        Piece::Link { marks, .. } => marked(t.link(), *marks),
-    };
-    (text, style)
+        Piece::Channel { marks, .. } => vec![(text, marked(t.mention(false), *marks))],
+        Piece::Broadcast(_) => vec![(text, t.mention(true))],
+        Piece::Group(_) => vec![(text, t.mention(false))],
+        Piece::Link { url, marks, .. } if runs_code(url) => vec![(text, marked(t.text(), *marks))],
+        Piece::Link { url, label, marks } => {
+            let real = label.as_deref().and_then(|l| real_target(url, l));
+            let shown = label.clone().filter(|_| real.is_some()).unwrap_or(text);
+            let mut out = vec![(shown, marked(t.markup_link(), *marks))];
+            out.extend(real.map(|r| (format!(" → {r}"), t.faint())));
+            out
+        }
+    }
 }
 
 /// `base` with `marks`.
