@@ -179,9 +179,10 @@ every rail sits in the transport, below the backend, so no caller can go around 
    `Retry-After` (30 seconds when Slack does not say); a paused method fails with
    `RateLimited` without being sent, and the other methods go on.
 4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
-   `Busy`. Every workspace's client has a lane of its own: it holds at most 6 of the 8 and 48 of
-   the waiting places, so one busy workspace never leaves another without a slot (the caps and
-   budgets above stay shared by all of them).
+   `Busy`. Every workspace's client has a lane of its own: one of the 8 is kept for it (for as
+   many lanes as there are slots), and it holds at most 6 of the 8 and 48 of the waiting places,
+   so busy workspaces, however many, never leave another without a slot (the caps and budgets
+   above stay shared by all of them). A request given up while it waits frees its place.
 5. **Hosts.** TLS (rustls with the OS's certificate verifier, HTTP/2 when offered) to the
    signed-in workspace's own host (`<name>.slack.com`) and the edge cache's
    (`edgeapi.slack.com`), nothing else: the host is checked where the socket opens, so no file,
@@ -272,8 +273,12 @@ rails, and only an accepted sign-in is kept: the credentials as one entry of the
 `workspaces.toml`. Signing in to another workspace adds it (the desktop picker marks several
 with `Space`); the ones signed in to before keep their entries. `slakio logout <workspace>`
 removes that workspace's keychain entry, its line of the file and its part of the cache;
-`slakio logout --all` (or with one workspace, `slakio logout`) removes every workspace the file
-names and then the file, so nothing is left behind. The paste and the credentials are wiped from memory when dropped (`zeroize`);
+`slakio logout --all` (or with one workspace, `slakio logout`) removes every keychain entry it
+finds — those the file names, the team ids of a file that cannot be read, and every other entry
+of the `slakio` service — and then the file, so nothing is left behind. A `workspaces.toml` that
+cannot be read is never written over: signing in moves it aside to `workspaces.toml.unreadable`
+first. Changes of the file hold `workspaces.lock` beside it, and `slakio logout <workspace>`
+holds the cache as its writer from before the credentials go until the part is removed. The paste and the credentials are wiped from memory when dropped (`zeroize`);
 the parser reads the paste in one pass and gives up on more than a few candidate values. With `SLAKIO_SECRET_STORE=memory` (every test)
 the keychain is never touched. A debug build may sign in to a fake Slack on the loopback address
 (`SLAKIO_TEST_SLACK_ADDR`); a release build never reads that variable.
