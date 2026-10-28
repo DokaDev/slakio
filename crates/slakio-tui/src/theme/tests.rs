@@ -75,14 +75,35 @@ fn every_truecolor_theme_keeps_text_readable() {
     }
 }
 
-/// Workspace colors are the same in every theme (a workspace keeps its color): marks (3:1) on
-/// the background of every dark theme, and apart from each other.
+/// Workspace colors are the same in every dark theme, and the same hues deepened in every light
+/// one (a workspace keeps its color): marks (3:1) on every surface of the theme they are drawn
+/// in, and apart from each other.
 #[test]
-fn workspace_colors_read_on_every_dark_theme() {
-    for t in truecolor().filter(|t| dark(t)) {
-        assert_eq!(t.workspaces, &WORKSPACE_COLORS, "{}", t.name);
+fn workspace_colors_read_on_every_theme() {
+    for t in truecolor() {
+        let want: &[Color] = if dark(t) { &WORKSPACE_COLORS } else { &WORKSPACE_COLORS_LIGHT };
+        assert_eq!(t.workspaces, want, "{}", t.name);
         for c in t.workspaces {
-            assert!(contrast(*c, t.bg) >= 3.0, "{}: {c:?} {:.2}", t.name, contrast(*c, t.bg));
+            for bg in [t.bg, t.surface, t.surface_alt] {
+                assert!(contrast(*c, bg) >= 3.0, "{}: {c:?} on {bg:?} {:.2}", t.name, contrast(*c, bg));
+            }
+        }
+    }
+}
+
+/// The first workspace (the one nearly everyone has) does not wear a red: not an error's, not
+/// the mention pills', not one that reads as either.
+#[test]
+fn the_first_workspace_color_is_not_a_red() {
+    for t in BUILTINS {
+        let first = t.workspaces[0];
+        assert_ne!(first, t.error, "{}: the first workspace color is the error color", t.name);
+        assert_ne!(first, Color::Red, "{}", t.name);
+        if matches!(first, Color::Rgb(..)) {
+            let ((h, _), (e, _)) = (hue(first), hue(t.error));
+            let apart = (h - e).abs().min(360.0 - (h - e).abs());
+            assert!((40.0..=320.0).contains(&h), "{}: the first workspace color {first:?} is a red ({h:.0})", t.name);
+            assert!(apart >= 60.0, "{}: the first workspace color is near the error's hue", t.name);
         }
     }
 }

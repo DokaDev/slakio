@@ -3,21 +3,39 @@
 use super::{Background, Dim, Kind, Theme, rgb};
 use ratatui::style::Color;
 
-/// Workspace colors of the truecolor themes: twelve that read on a dark background and stay
-/// apart from each other.
+/// Workspace colors of the dark truecolor themes: twelve that read on a dark background and stay
+/// apart from each other. Workspaces take them in sign-in order, so the first is a blue, never a
+/// red (red is an error's and the mention pills'); the red comes last.
 pub const WORKSPACE_COLORS: [Color; 12] = [
-    rgb(0xE06C75),
-    rgb(0xE5935A),
-    rgb(0xE6C35C),
-    rgb(0x8FC77A),
-    rgb(0x4FB3A9),
-    rgb(0x5CC6D9),
     rgb(0x5B8DEF),
-    rgb(0x8C8CF0),
+    rgb(0x4FB3A9),
+    rgb(0xE6C35C),
     rgb(0xC792EA),
+    rgb(0xE5935A),
+    rgb(0x8FC77A),
+    rgb(0x5CC6D9),
     rgb(0xF08CC0),
+    rgb(0x8C8CF0),
     rgb(0xB8906A),
     rgb(0x9AA3B5),
+    rgb(0xE06C75),
+];
+
+/// The same twelve hues, in the same order, deep enough for a light background (3:1 on each
+/// light theme's surfaces): a workspace keeps its hue across themes.
+pub const WORKSPACE_COLORS_LIGHT: [Color; 12] = [
+    rgb(0x2F5FC4),
+    rgb(0x0E7C72),
+    rgb(0x8A6A00),
+    rgb(0x8A4FC2),
+    rgb(0xB35A12),
+    rgb(0x3F7F2A),
+    rgb(0x0B7A94),
+    rgb(0xB83E86),
+    rgb(0x5555C8),
+    rgb(0x8A5F3A),
+    rgb(0x5F6878),
+    rgb(0xB8323C),
 ];
 
 /// Workspace colors of the ANSI theme.
@@ -173,7 +191,7 @@ pub const TOKYO_NIGHT_DAY: Theme = Theme {
     mode_visual: rgb(0xB1055A),
     mode_command: rgb(0x884A0A),
     mode_fg: rgb(0xE1E2E7),
-    workspaces: &WORKSPACE_COLORS,
+    workspaces: &WORKSPACE_COLORS_LIGHT,
     avatars: &AVATARS_DEEP,
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 79 },
@@ -203,7 +221,7 @@ pub const LIGHT: Theme = Theme {
     mode_visual: rgb(0x8250DF),
     mode_command: rgb(0xBC4C00),
     mode_fg: rgb(0xFFFFFF),
-    workspaces: &WORKSPACE_COLORS,
+    workspaces: &WORKSPACE_COLORS_LIGHT,
     avatars: &AVATARS_DEEP,
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 55 },
@@ -296,7 +314,7 @@ pub const CATPPUCCIN_LATTE: Theme = Theme {
     mode_visual: rgb(0xEA76CB),
     mode_command: rgb(0xFE640B),
     mode_fg: rgb(0x11111B),
-    workspaces: &WORKSPACE_COLORS,
+    workspaces: &WORKSPACE_COLORS_LIGHT,
     avatars: &AVATARS_DEEP,
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 78 },
@@ -359,7 +377,7 @@ pub const GRUVBOX_LIGHT: Theme = Theme {
     mode_visual: rgb(0x8F3F71),
     mode_command: rgb(0xAF3A03),
     mode_fg: rgb(0xFBF1C7),
-    workspaces: &WORKSPACE_COLORS,
+    workspaces: &WORKSPACE_COLORS_LIGHT,
     avatars: &AVATARS_DEEP,
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x606060), keep: 60 },
