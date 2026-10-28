@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&d.screen())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
-│▎Home                   @24 ││ ───────────────── 2026-01-05 ───────────────── │
+│▎Home                   @21 ││ ───────────────── 2026-01-05 ───────────────── │
 │ DMs                    ●11 ││ KN  Kate Nam  10:21                            │
-│ Activity               @37 ││     Staging customer again cache maybe waiting │
+│ Activity               @33 ││     Staging customer again cache maybe waiting │
 │ Files                      ││     timeout draft after                        │
 │ To-dos                   6 ││     ⤷ 9 replies · last 10:30                   │
 ├─▾──────────────────────────┤│                                                │

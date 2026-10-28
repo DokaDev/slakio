@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&small.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────╮
-│ Home                   @24 ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
+│ Home                   @21 ││ ─────────────────────────── 2026-01-09 ─────────────────────────── │
 │▎DMs                    ●11 ││ MK Minsu Kim     Waiting on deploy alert staging lunch       00:44 │
-│ Activity               @37 ││                                                                    │
+│ Activity               @33 ││                                                                    │
 │ Files                      ││ MK Minsu Kim     We retry looks again budget queue now       01:36 │
 │ To-dos                   6 ││                  tomorrow sprint review on tracing                 │
 ├─▾──────────────────────────┤│                  production                                        │
@@ -16,7 +16,7 @@ expression: mask_hangul(&small.snap())
 │ AM● Alex Morgan            ││                  still pager review done lunch someone             │
 │ ＊○ ＊＊＊                 ││                  ⤷ 12 replies · last 04:02                         │
 │ H ● Hana                4  ││                                                                    │
-│ SR● Sam Rivera          1  ││ M  Me            Rolling back                                04:08 │
+│ SR● Sam Rivera             ││ M  Me            Rolling back                                04:08 │
 │ ＊○ ＊＊＊                 ││                  🎉 3                                              │
 │ TK◐ Taylor Kim             ││                                                                    │
 │ CP● Chris Park             ││ MK Minsu Kim     Done schema for please today deploy looks   05:26 │

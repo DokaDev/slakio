@@ -1,0 +1,45 @@
+---
+source: crates/slakio-tui/tests/reading_flows.rs
+assertion_line: 57
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#partner-shared ──────────────────────────────────────────────────────────────────────╮
+│▎Home                   @21 ││       Someone cache roadmap customer maybe meeting we still queue staging on someone   │
+│ DMs                    ●11 ││       we production should                                                             │
+│ Activity               @33 ││                                                                                        │
+│ Files                      ││  JP   Jiho Park  08:32                                                                 │
+│ To-dos                   6 ││       SELECT count(*) FROM jobs WHERE state = 'stuck';                                 │
+├─▾──────────────────────────┤│       👀 4   🔥 4   🎉 1                                                               │
+│ ▾ Favorites                ││                                                                                        │
+│   # backend                ││  JP   Jiho Park  09:26                                                                 │
+│   # incidents           3  ││       Production queue customer merge tomorrow a metrics                               │
+│                            ││                                                                                        │
+│ ▾ Ops                      ││  JP   Jiho Park  09:42                                                                 │
+│   # deploys                ││       Check design design broken again index queue production looks broken after       │
+│   # alerts                 ││       tracing schema again the                                                         │
+│▎  # partner-shared ext     ││                                                                                        │
+│   # hostile-strings        ││  RD   Rae Diaz ext  10:28                                                              │
+│   # big-history            ││       Starting deploy                                                                  │
+│   # long-threads           ││       🎉 2   👀 1                                                                      │
+│                            ││                                                                                        │
+│ ▾ Channels                 ││  ＊   ＊＊＊  10:47                                                                    │
+│   # announcements          ││       Thanks!                                                                          │
+│   # design-review          ││                                                                                        │
+│   # feed-alert-134         ││  JL   Jiyoung Lee  11:51                                                               │
+│   # feed-alert-8           ││       Tracing maybe is dashboard fine check dashboard customer pager looks metrics     │
+│   # feed-budget-162        ││       customer (edited)                                                                │
+│   # feed-budget-33         ││                                                                                        │
+│   # feed-build-50          ││  QF   Quinn Ford ext  12:08                                                            │
+│   # feed-cache-119         ││       A is on staging again roadmap now broken someone index cache cache tracing       │
+│   # feed-customer-161      ││                                                                                        │
+│   # feed-customer-167      ││  JL   Jiyoung Lee  12:54                                                               │
+│   # feed-dashboard-22      ││       On the the a done build merge alert latency                                      │
+│   # feed-dashboard-41      ││                                                                                        │
+│   # feed-design-34         ││  JP   Jiho Park  13:06                                                                 │
+│   # feed-design-83         ││       Timeout today please budget merge invoice staging rollback tracing roadmap       │
+│   # feed-draft-142         ││       production budget someone dashboard can for                                      │
+│   # feed-draft-58          ││       👍 5                                                                             │
+│   # feed-draft-84          │├─ Message #partner-shared ──────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Read only: nothing can be sent                                                       │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #partner-shared    │ k messages · Esc list · Ctrl+R views · ? help │ ◐ do not disturb │ read only

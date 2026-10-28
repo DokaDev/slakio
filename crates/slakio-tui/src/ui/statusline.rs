@@ -26,6 +26,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::model::Presence;
 use std::time::Instant;
 
 /// Where the keyboard is, for the hint line (`None` under a popup with keys of its own).
@@ -213,6 +214,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         })
     });
 
+    let own_dnd = app.shell.current(&app.model).and_then(|ws| {
+        let me = app.model.user(&ws.id, app.model.me(&ws.id)?)?;
+        (me.presence == Presence::Dnd).then(|| {
+            if w >= DND_WORDS_FROM { format!("◐ {}", app.i18n.label(Label::PresenceDnd)) } else { "◐".to_string() }
+        })
+    });
+
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {
         let mut out = badge.clone();
         if let Some(s) = &stripe {
@@ -243,6 +251,14 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
                 out.push(sep());
             }
             out.extend(part);
+        }
+        // The user in do not disturb, in the workspace shown: its mark, and its words when the
+        // line is wide.
+        if let Some(dnd) = &own_dnd {
+            if !out.is_empty() {
+                out.push(sep());
+            }
+            out.push(Span::styled(dnd.clone(), t.presence(Presence::Dnd)));
         }
         if let Some(d) = &demo {
             if !out.is_empty() {
@@ -405,6 +421,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     f.render_widget(Paragraph::new(Line::from(line)), area);
     draw_right(f, area, right_spans);
 }
+
+/// The width from which the user's do-not-disturb mark has its words beside it.
+const DND_WORDS_FROM: usize = 100;
 
 /// The most cells the hints make room for a notice.
 const NOTICE_MAX: usize = 48;

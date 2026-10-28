@@ -523,7 +523,8 @@ fn red_means_a_mention_and_the_dm_counts_add_up() {
         let cells: Vec<&ratatui::buffer::Cell> = (list.x..list.right()).map(|x| &buf[(x, y)]).collect();
         let text: String = cells.iter().map(|c| c.symbol()).collect();
         let red = cells.iter().any(|cell| cell.bg == t.error);
-        assert_eq!(red, c.mentions > 0, "{text}: red only with a mention");
+        // A muted one is never badged, its mentions or not.
+        assert_eq!(red, c.badges().1 > 0, "{text}: red only with a mention");
         if c.unread > 0 && !c.muted {
             assert!(text.trim_end().ends_with(&format!(" {}", c.unread)), "{text}: its unread count");
             sum += c.unread;

@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #backend ×  2 #incidents ×
-│▎Home                   @24 │╭ ▌#incidents ───────────────────────────────────────────────────────────────────────────╮
+│▎Home                   @21 │╭ ▌#incidents ───────────────────────────────────────────────────────────────────────────╮
 │ DMs                    ●11 ││       Timeout we release is                                                            │
-│ Activity               @37 ││                                                                                        │
+│ Activity               @33 ││                                                                                        │
 │ Files                      ││  AM   Alex Morgan  23:03                                                               │
 │ To-dos                   6 ││       Check staging design                                                             │
 ├─▾──────────────────────────┤│                                                                                        │
@@ -31,7 +31,7 @@ expression: d.snap()
 │   # feed-build-50          ││       waiting the budget                                                               │
 │   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││  DY   Dana Yoon  02:38                                                                 │
-│   # feed-customer-167   1  ││       Tomorrow ticket should merge waiting                                             │
+│   # feed-customer-167      ││       Tomorrow ticket should merge waiting                                             │
 │   # feed-dashboard-22      ││                                                                                        │
 │   # feed-dashboard-41      ││  MK   Minsu Kim  02:52                                                                 │
 │   # feed-design-34         ││       After check fine check branch metrics latency check                              │

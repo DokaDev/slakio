@@ -1,0 +1,29 @@
+---
+source: crates/slakio-tui/tests/reading_flows.rs
+assertion_line: 57
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#partner-shared ──────────────────────────────╮
+│▎Home                   @21 ││ JL  Jiyoung Lee  11:51                         │
+│ DMs                    ●11 ││     Tracing maybe is dashboard fine check      │
+│ Activity               @33 ││     dashboard customer pager looks metrics     │
+│ Files                      ││     customer (edited)                          │
+│ To-dos                   6 ││                                                │
+├─▾──────────────────────────┤│ QF  Quinn Ford ext  12:08                      │
+│ ▾ Favorites                ││     A is on staging again roadmap now broken   │
+│   # backend                ││     someone index cache cache tracing          │
+│   # incidents           3  ││                                                │
+│                            ││ JL  Jiyoung Lee  12:54                         │
+│ ▾ Ops                      ││     On the the a done build merge alert        │
+│   # deploys                ││     latency                                    │
+│   # alerts                 ││                                                │
+│▎  # partner-shared ext     ││ JP  Jiho Park  13:06                           │
+│   # hostile-strings        ││     Timeout today please budget merge invoice  │
+│   # big-history            ││     staging rollback tracing roadmap           │
+│   # long-threads           ││     production budget someone dashboard can    │
+│                            ││     for                                        │
+│ ▾ Channels                 ││     👍 5                                       │
+│   # announcements          │├─ Message #partner-shared ──────────────────────┤
+│   # design-review          ││ › Read only: nothing can be sent               │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #partner-shared     │ k messages · ? help │ ◐ │ read only

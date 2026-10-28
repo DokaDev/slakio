@@ -358,6 +358,8 @@
 "fail.offline" = "오프라인: Slack에 요청하지 않습니다"
 "fail.busy" = "처리 중: 보내지 않았습니다"
 "fail.api" = "Slack이 요청을 거절했습니다"
+# The unread counts of a workspace could not be read at its start.
+"fail.counts" = "안 읽은 수를 불러오지 못함: 보이는 수는 예전 것일 수 있음"
 "fail.workspace" = "{workspace}: {why}"
 "fail.workspace_auth" = "{workspace}: 로그아웃됨, slakio login으로 로그인"
 "retry.hint" = "{keys} 다시 시도"

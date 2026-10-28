@@ -40,20 +40,22 @@ impl App {
         }
         let mut u = Unread::default();
         for c in self.model.conversations().iter().filter(|c| v == View::Activity || c.workspace == w.id) {
+            // A muted conversation counts for nothing.
+            let (unread, mentions) = c.badges();
             match v {
                 View::Home if !c.is_dm() => {
-                    u.mentions += c.mentions;
-                    u.any |= c.unread > 0 && !c.muted;
+                    u.mentions += mentions;
+                    u.any |= unread > 0;
                 }
                 // A DM's unread messages, all of them (a DM is for the user anyway): `●n`.
                 View::Dms if c.is_dm() => {
-                    if c.unread > 0 && !c.muted {
+                    if unread > 0 {
                         u.any = true;
-                        u.dms += c.unread;
+                        u.dms += unread;
                     }
-                    u.dm_mention |= c.mentions > 0;
+                    u.dm_mention |= mentions > 0;
                 }
-                View::Activity => u.mentions += c.mentions,
+                View::Activity => u.mentions += mentions,
                 _ => {}
             }
         }

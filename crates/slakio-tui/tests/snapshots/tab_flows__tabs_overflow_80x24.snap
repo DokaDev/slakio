@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮‹ 4 #rand… ×  5 #depl… ×  6 #long… ×  7 #big-… ×
-│▎Home                   @24 │╭ ▌#big-history ─────────────────────────────────╮
+│▎Home                   @21 │╭ ▌#big-history ─────────────────────────────────╮
 │ DMs                    ●11 ││ LK  Leo Kang  11:14                            │
-│ Activity               @37 ││     Deploy customer sprint staging can         │
+│ Activity               @33 ││     Deploy customer sprint staging can         │
 │ Files                      ││                                                │
 │ To-dos                   6 ││ MB  Max Baek  11:30                            │
 ├─▾──────────────────────────┤│     PR is up                                   │

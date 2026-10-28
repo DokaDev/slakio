@@ -147,8 +147,8 @@ impl App {
         let id = envelope.generation;
         let boot = self.boots.iter().position(|b| b.id == id);
         match envelope.event {
-            Event::Booted(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, false)),
-            Event::CachedBoot(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, true)),
+            Event::Booted(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, false, now)),
+            Event::CachedBoot(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, true, now)),
             Event::CachedHistory(page) => {
                 self.model.add_users(page.target.workspace(), &page.users);
                 self.work.on_cached_page(id, &page, &self.model)
@@ -165,7 +165,7 @@ impl App {
 
     /// The answer of boot `b` (the cache's, when `cached`: drawn only while the backend's own
     /// has not come). The list's cursor stays on the row it was on.
-    fn on_boot(&mut self, b: usize, snapshot: &Snapshot, cached: bool) -> bool {
+    fn on_boot(&mut self, b: usize, snapshot: &Snapshot, cached: bool, now: Instant) -> bool {
         let anchor = self.shell.anchor(&self.model);
         match self.boots[b].workspace.clone() {
             None if !cached => self.model = Model::new(snapshot.clone()),
@@ -175,6 +175,10 @@ impl App {
         }
         if !cached {
             self.boots[b].failed = None;
+            // Unknown is not zero: the counts kept are shown, and the status line says so.
+            if snapshot.counts_failed {
+                self.status.queue(Msg::Label(Label::FailCounts), Level::Warning, now);
+            }
         }
         let h = self.list_height();
         self.shell.clamp(&self.model, h);

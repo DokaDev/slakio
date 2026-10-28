@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/shell_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ─────────────╮╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│▎Home                         @24 ││                                                                                                                                                                  │
+│▎Home                         @21 ││                                                                                                                                                                  │
 │ DMs                          ●11 ││                                                                                                                                                                  │
-│ Activity                     @37 ││                                                                                                                                                                  │
+│ Activity                     @33 ││                                                                                                                                                                  │
 │ Files                            ││                                                                                                                                                                  │
 │ To-dos                         6 ││                                                                                                                                                                  │
 ├─▾────────────────────────────────┤│                                                                                                                                                                  │
@@ -31,7 +31,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50                ││                                                              Ctrl+O   Back to the last one                                                                       │
 │   # feed-cache-119               ││                                                              ?        Keyboard help                                                                              │
 │   # feed-customer-161            ││                                                              Ctrl+Q   Quit                                                                                       │
-│   # feed-customer-167         1  ││                                                                                                                                                                  │
+│   # feed-customer-167            ││                                                                                                                                                                  │
 │   # feed-dashboard-22            ││                                                                                                                                                                  │
 │   # feed-dashboard-41            ││                                                                                                                                                                  │
 │   # feed-design-34               ││                                                                                                                                                                  │

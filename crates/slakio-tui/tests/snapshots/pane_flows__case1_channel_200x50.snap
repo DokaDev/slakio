@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/pane_flows.rs
 expression: mask_hangul(&s)
 ---
 ╭ ▌A company ▾ · B @9 ─────────────╮╭ ▌#backend ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│▎Home                         @24 ││                                                                                                                                                                  │
+│▎Home                         @21 ││                                                                                                                                                                  │
 │ DMs                          ●11 ││  ＊   ＊＊＊  05:31                                                                                                                                              │
-│ Activity                     @37 ││       PR is up                                                                                                                                                   │
+│ Activity                     @33 ││       PR is up                                                                                                                                                   │
 │ Files                            ││                                                                                                                                                                  │
 │ To-dos                         6 ││  MK   Minsu Kim  05:43                                                                                                                                           │
 ├─▾────────────────────────────────┤│       For staging latency tomorrow index after staging                                                                                                           │
@@ -31,7 +31,7 @@ expression: mask_hangul(&s)
 │   # feed-build-50                ││  KN   Kate Nam  06:26                                                                                                                                            │
 │   # feed-cache-119               ││       Check a customer should maybe                                                                                                                              │
 │   # feed-customer-161            ││                                                                                                                                                                  │
-│   # feed-customer-167         1  ││  MJ   Mia Jang  06:35                                                                                                                                            │
+│   # feed-customer-167            ││  MJ   Mia Jang  06:35                                                                                                                                            │
 │   # feed-dashboard-22            ││       Budget metrics merge design rollback alert alert should draft after alert on staging tomorrow                                                              │
 │   # feed-dashboard-41            ││                                                                                                                                                                  │
 │   # feed-design-34               ││  TK   Tom Ko  06:41                                                                                                                                              │

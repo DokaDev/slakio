@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/avatar_flows.rs
 expression: mask_hangul(&narrow.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────╮
-│ Home                   @24 ││    still pager review done lunch someone       │
+│ Home                   @21 ││    still pager review done lunch someone       │
 │▎DMs                    ●11 ││    ⤷ 12 replies · last 04:02                   │
-│ Activity               @37 ││                                                │
+│ Activity               @33 ││                                                │
 │ Files                      ││ M  Me · 04:08                                  │
 │ To-dos                   6 ││    Rolling back                                │
 ├─▾──────────────────────────┤│    🎉 3                                        │
@@ -16,7 +16,7 @@ expression: mask_hangul(&narrow.snap())
 │ AM● Alex Morgan            ││                                                │
 │ ＊○ ＊＊＊                 ││ MK Minsu Kim · 06:17                           │
 │ H ● Hana                4  ││    For looks maybe rollback                    │
-│ SR● Sam Rivera          1  ││                                                │
+│ SR● Sam Rivera             ││                                                │
 │ ＊○ ＊＊＊                 ││ M  Me · 07:27                                  │
 │ TK◐ Taylor Kim             ││    Metrics staging dashboard index design      │
 │ CP● Chris Park             ││    today lunch review review migration again   │

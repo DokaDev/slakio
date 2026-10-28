@@ -25,7 +25,7 @@
 //! With `avatars = "off"` a DM starts with the presence mark alone (`● Minsu Kim`, `@` while
 //! unknown) and a group DM with `@`.
 //!
-//! Unread conversations are bold, muted ones faint; nothing else marks them.
+//! Unread conversations are bold, muted ones faint and never badged; nothing else marks them.
 
 use super::{avatar_chip, count_pill, frame, highlight, presence_mark};
 use crate::app::model::Row;
@@ -206,11 +206,13 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             };
             // A DM: its unread messages (unless muted), red only when one mentions the user. A
             // channel: its mentions, red. Red is for mentions only (ui-ux-spec).
+            // A muted conversation never badges: faint, and no count.
+            let (unread_n, mentions) = c.badges();
             let count = match (c.is_dm(), unread) {
-                (true, true) => c.unread,
-                _ => c.mentions,
+                (true, true) => unread_n,
+                _ => mentions,
             };
-            let style = if c.mentions > 0 { t.badge() } else { t.pill() };
+            let style = if mentions > 0 { t.badge() } else { t.pill() };
             let pill = if count > 0 { right(f, area, &count_pill(count), style) } else { 0 };
             // DMs has no sections: its rows start where a section's name would.
             let x = if app.shell.view == View::Home { 3 } else { 1 };

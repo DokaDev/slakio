@@ -379,6 +379,8 @@
 "fail.offline" = "Offline: Slack is not being asked"
 "fail.busy" = "Busy: nothing was sent"
 "fail.api" = "Slack refused the request"
+# The unread counts of a workspace could not be read at its start.
+"fail.counts" = "Unread counts not loaded: those shown may be old"
 # A failure of one workspace's start: its name, then why (one of the fail.* words).
 "fail.workspace" = "{workspace}: {why}"
 # A workspace whose sign-in Slack refused at its start: short, so its name fits beside it.

@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/tab_flows.rs
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮ 1 #backend ×  2 #incidents ×
-│▎Home                   @24 │╭ ▌#incidents ───────────────────────────────────╮
+│▎Home                   @21 │╭ ▌#incidents ───────────────────────────────────╮
 │ DMs                    ●11 ││ RC  Robin Choi  01:49                          │
-│ Activity               @37 ││     Thanks!                                    │
+│ Activity               @33 ││     Thanks!                                    │
 │ Files                      ││                                                │
 │ To-dos                   6 ││ MJ  Mia Jang  02:18                            │
 ├─▾──────────────────────────┤│     Still budget build latency rollback        │

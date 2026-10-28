@@ -3,9 +3,9 @@ source: crates/slakio-tui/tests/todo_flows.rs
 expression: "{ let mut small = Demo::new(80, 24); small.keys(\"space o f\"); small.snap() }"
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ Home                   @24 ││                                                │
+│ Home                   @21 ││                                                │
 │ DMs                    ●11 ││                                                │
-│ Activity               @37 ││                                                │
+│ Activity               @33 ││                                                │
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │▎To-dos  │ : filter                                                 │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
