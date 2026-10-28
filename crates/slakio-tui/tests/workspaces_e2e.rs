@@ -303,3 +303,20 @@ fn signing_in_from_the_app_adds_the_workspace_and_keeps_the_one_signed_in_to() {
     assert!(file.contains(HOSTS[0]) && file.contains(HOSTS[1]), "{file}");
     assert!(!file.contains(TOKEN) && !file.contains(COOKIE));
 }
+
+#[test]
+fn signing_out_of_one_workspace_while_a_slakio_runs_changes_nothing_and_says_to_quit_it() {
+    let m = Machine::new("logout-running", &[0, 1]);
+    let Some(run) = m.start(1, (100, 30), &[]) else { return };
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    let file = m.file();
+    let out = m.cli(&["logout", "b-team"], "");
+    assert!(!out.status.success());
+    assert!(text(&out).contains("A slakio is still running"), "{}", text(&out));
+    assert_eq!(m.file(), file, "still signed in to both: nothing is left half done");
+    run.quit();
+    // Quit: now it goes.
+    let out = m.cli(&["logout", "b-team"], "");
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!m.file().contains(HOSTS[1]));
+}

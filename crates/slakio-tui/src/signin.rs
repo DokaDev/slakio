@@ -93,7 +93,8 @@ pub(crate) fn sign_out(
 }
 
 /// Sign out of `a` alone (others stay signed in): its credentials and line first, then its part
-/// of the cache — not while a slakio runs and writes it (that one is to be quit first).
+/// of the cache. Not while a slakio runs and writes the cache: nothing is changed then, and the
+/// user is told to quit it first.
 fn sign_out_one(
     store: &dyn SecretStore,
     path: Option<&std::path::Path>,
@@ -103,6 +104,12 @@ fn sign_out_one(
 ) -> ExitCode {
     let errors = || ErrorLog::new(paths.errors_log());
     let Some(path) = path else { return ExitCode::FAILURE };
+    // A slakio that runs writes the cache: nothing is signed out until it is quit, so its part
+    // of the cache is never left behind without a workspace that names it.
+    if crate::store::in_use(paths) {
+        eprintln!("{}", i18n.label(Label::LogoutStillRunning));
+        return ExitCode::FAILURE;
+    }
     if let Err(fault) = account::forget_one(store, path, &a.team) {
         errors().record("logout", &fault);
         eprintln!("{}", i18n.label(Label::LogoutFailed));
