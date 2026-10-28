@@ -265,3 +265,21 @@ fn the_journal_is_wal_and_a_file_system_without_it_is_not_used() {
     let mode: String = memory.pragma_update_and_check(None, "journal_mode", "WAL", |r| r.get(0)).unwrap();
     assert!(wal(&mode).is_err(), "{mode}: refused");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_claim_that_could_not_empty_the_cache_leaves_it_the_sign_in_it_was() {
+    use std::os::unix::fs::PermissionsExt;
+    let named = scratch("claim-failed").join("cache");
+    let mut store = Store::open(&named).unwrap().store;
+    assert!(store.claim("T1 UA").unwrap());
+    let dir = store.dir().to_path_buf();
+    // Its files cannot be removed: the rebuild for another sign-in fails.
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let failed = store.claim("T1 UB");
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(failed.is_err());
+    // Set up again later (found damaged): still the first sign-in's, never the one that failed.
+    store.rebuild().unwrap();
+    assert_eq!(store.meta(OWNER).unwrap().as_deref(), Some("T1 UA"));
+}

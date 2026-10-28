@@ -133,8 +133,10 @@ impl Store {
         if self.read_only() {
             return Ok(false);
         }
-        self.owner = Some(owner.to_owned());
+        // Only once emptied is it `owner`'s: a rebuild that failed leaves it the one it was.
         self.rebuild()?;
+        self.set_meta(OWNER, owner)?;
+        self.owner = Some(owner.to_owned());
         Ok(true)
     }
 
@@ -268,8 +270,8 @@ fn side_path(path: &Path, side: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Remove the cache in `dir` (the database, its journal files and the lock): `slakio logout`,
-/// and a cache set up again. What is not there is not an error.
+/// Remove the database and its journal files in `dir` (the lock stays: [`remove`] takes it):
+/// `slakio logout`, and a cache set up again. What is not there is not an error.
 pub fn remove_files(dir: &Path) -> Result<(), Fault> {
     let db = dir.join(FILE);
     for p in [db.clone(), side_path(&db, SIDE[0]), side_path(&db, SIDE[1])] {
