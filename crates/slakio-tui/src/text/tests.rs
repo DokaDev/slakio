@@ -120,3 +120,21 @@ proptest::proptest! {
         proptest::prop_assert_eq!(got, want);
     }
 }
+
+#[test]
+fn an_arrow_wraps_with_what_it_points_to() {
+    let s = "sign in at docs.example.com → evil.example before noon";
+    let (lines, _) = wrap(s, 30, 9);
+    let trimmed: Vec<&str> = lines.iter().map(|l| l.trim_end()).collect();
+    assert_eq!(trimmed, ["sign in at docs.example.com", "→ evil.example before noon"]);
+    assert!(lines.iter().all(|l| !l.trim_end().ends_with('→')), "{lines:?}");
+    // In styled runs too: the arrow and its host keep their faint run on the next line.
+    let faint = Style::new().add_modifier(ratatui::style::Modifier::DIM);
+    let runs = [("sign in at docs.example.com".to_string(), Style::new()), (" → evil.example".to_string(), faint)];
+    let (lines, _) = wrap_styled(&runs, 30, 9, Style::new());
+    assert_eq!(lines[1].iter().map(|s| s.content.as_ref()).collect::<String>(), "→ evil.example");
+    assert!(lines[1].iter().all(|s| s.style == faint));
+    // Nothing else is joined: an arrow alone, or before more blanks, wraps as before.
+    let (lines, _) = wrap("a →  b", 3, 9);
+    assert_eq!(lines.iter().map(|l| l.trim()).collect::<Vec<_>>(), ["a →", "b"]);
+}

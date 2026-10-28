@@ -165,13 +165,18 @@ pub fn wrap_styled(
 }
 
 /// `s` as runs of non-blanks and runs of blanks (a word keeps the punctuation written against
-/// it).
+/// it). An arrow and the word after one blank are one word (`→ host`): an arrow never ends a
+/// line apart from what it points to.
 fn words(s: &str) -> impl Iterator<Item = &str> {
     let mut rest = s;
     std::iter::from_fn(move || {
         let first = rest.chars().next()?;
         let blank = first.is_whitespace();
-        let end = rest.find(|c: char| c.is_whitespace() != blank).unwrap_or(rest.len());
+        let run_end = |r: &str, blank: bool| r.find(|c: char| c.is_whitespace() != blank).unwrap_or(r.len());
+        let mut end = run_end(rest, blank);
+        if &rest[..end] == "→" && rest[end..].starts_with(' ') && !rest[end + 1..].starts_with(char::is_whitespace) {
+            end += 1 + run_end(&rest[end + 1..], false);
+        }
         let (run, tail) = rest.split_at(end);
         rest = tail;
         Some(run)
