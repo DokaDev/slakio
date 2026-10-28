@@ -1,7 +1,7 @@
 //! The signed-in workspaces. `workspaces.toml` in the config directory names each one (team id,
 //! name, host, the user's id) and holds no secret; the credentials are in the secret store under
-//! the team id, as one entry. This version signs in to one workspace: signing in again replaces
-//! it.
+//! the team id, as one entry per workspace. Signing in to a workspace adds it, or updates it when
+//! it is already signed in; the others stay. Signing out removes one workspace, or all.
 //!
 //! ```toml
 //! [[workspace]]
@@ -95,20 +95,55 @@ pub fn decode(secret: &str) -> Option<Credentials> {
     Some(if ds.is_empty() { c } else { c.with_ds(ds) })
 }
 
-/// Keep `account` signed in with `credentials`: the secret first, then the file (which then
-/// names this workspace only). The secrets of the workspaces the file named before go, so no
-/// entry is left behind that `slakio logout` would not know of. A store that fails keeps
-/// nothing new.
+/// Keep `account` signed in with `credentials`: the secret first, then the file, which names it
+/// in its place (or last, when it is new) beside the workspaces signed in to already; their
+/// secrets stay. A store that fails keeps nothing new. A file that cannot be read is replaced by
+/// one naming this workspace alone (it named nothing that could be read).
 pub fn keep(store: &dyn SecretStore, path: &Path, account: &Account, credentials: &Credentials) -> Result<(), Fault> {
     if !valid_team(&account.team) {
         return Err(Fault::other("not a team id"));
     }
-    // A file that cannot be read names nothing it could leave behind; it is replaced.
-    for old in load(path).unwrap_or_default().iter().filter(|a| a.team != account.team) {
-        store.delete(&old.team).map_err(|Unavailable(f)| f)?;
-    }
+    let mut accounts = load(path).unwrap_or_default();
     store.set(&account.team, &encode(credentials)).map_err(|Unavailable(f)| f)?;
-    save(path, std::slice::from_ref(account))
+    match accounts.iter_mut().find(|a| a.team == account.team) {
+        Some(a) => a.clone_from(account),
+        None => accounts.push(account.clone()),
+    }
+    save(path, &accounts)
+}
+
+/// Which of `accounts` `query` names: its team id, or its name or host (letters case-blind), or
+/// the first part of its host (`example` for `example.slack.com`).
+pub fn named<'a>(accounts: &'a [Account], query: &str) -> Vec<&'a Account> {
+    let q = query.trim();
+    let by = |f: &dyn Fn(&Account) -> bool| accounts.iter().filter(|a| f(a)).collect::<Vec<_>>();
+    let exact = by(&|a| a.team == q);
+    if !exact.is_empty() {
+        return exact;
+    }
+    by(&|a| {
+        a.name.eq_ignore_ascii_case(q)
+            || a.host.eq_ignore_ascii_case(q)
+            || a.host.split('.').next().is_some_and(|h| h.eq_ignore_ascii_case(q))
+    })
+}
+
+/// Sign out of workspace `team` alone: its secret is removed, then its line of the file (the
+/// file goes with the last one). The workspace signed out of; `None` when it was not signed in.
+pub fn forget_one(store: &dyn SecretStore, path: &Path, team: &str) -> Result<Option<Account>, Fault> {
+    let mut accounts = load(path)?;
+    let Some(at) = accounts.iter().position(|a| a.team == team) else { return Ok(None) };
+    store.delete(team).map_err(|Unavailable(f)| f)?;
+    let gone = accounts.remove(at);
+    if accounts.is_empty() {
+        match std::fs::remove_file(path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(Fault::io_at(&e, path)),
+            _ => {}
+        }
+    } else {
+        save(path, &accounts)?;
+    }
+    Ok(Some(gone))
 }
 
 /// The credentials of `account`: `Ok(None)` when the store has none; a damaged entry is a
