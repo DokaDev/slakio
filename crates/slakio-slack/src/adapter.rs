@@ -148,7 +148,12 @@ async fn history(
     before: Option<Ts>,
     limit: u32,
 ) -> Result<Page, SlackError> {
-    let limit = limit.clamp(1, PAGE_MAX);
+    // An older page is reading back, which nobody waits for the way they wait for what they
+    // opened: it takes the background share of the request budget (the user's stays free). A
+    // thread's older page comes from what was kept, so it may be larger (no request).
+    let priority = if before.is_some() { Priority::Background } else { Priority::User };
+    let kept_thread = before.is_some() && matches!(target, Target::Thread { .. });
+    let limit = limit.clamp(1, if kept_thread { crate::threads::BATCH } else { PAGE_MAX });
     let channel = target.conversation().as_str().to_string();
     let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
     let (messages, complete, bots, cut) = match (&target, before) {
@@ -175,7 +180,7 @@ async fn history(
             (messages, complete, bots, false)
         }
         (Target::Conversation { .. }, Some(before)) => {
-            let (messages, complete, bots) = older(client, me.as_ref(), &channel, before, limit).await?;
+            let (messages, complete, bots) = older(client, me.as_ref(), &channel, before, limit, priority).await?;
             (messages, complete, bots, false)
         }
     };
@@ -187,7 +192,7 @@ async fn history(
         .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != *u) && !bots.contains_key(*u))
         .map(str::to_string)
         .collect();
-    let mut users = ctx.people.names(client, &authors, Priority::User).await;
+    let mut users = ctx.people.names(client, &authors, priority).await;
     if let Some(ws) = ctx.people.team() {
         users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
     }
@@ -206,6 +211,7 @@ async fn older(
     channel: &str,
     before: Ts,
     limit: u32,
+    priority: Priority,
 ) -> Result<(Vec<Message>, bool, Bots), SlackError> {
     let count = limit.to_string();
     let mut latest = before;
@@ -213,8 +219,7 @@ async fn older(
         let at = latest.to_string();
         let params =
             [("channel", channel), ("latest", at.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
-        let history: wire::History =
-            client.call(&Call::form(Method::ConversationsHistory, &params), Priority::User).await?;
+        let history: wire::History = client.call(&Call::form(Method::ConversationsHistory, &params), priority).await?;
         let has_more = history.has_more;
         let raw = history.messages.unwrap_or_default();
         let oldest = raw.iter().filter_map(|m| wire::ts(&m.ts)).map(Ts).filter(|t| *t < latest).min();

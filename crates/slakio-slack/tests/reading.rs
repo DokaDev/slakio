@@ -29,8 +29,12 @@ struct Run {
 
 impl Run {
     async fn new() -> Self {
+        Self::with(Limits::default()).await
+    }
+
+    async fn with(limits: Limits) -> Self {
         let fake = FakeSlack::start(World::demo()).await.unwrap();
-        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let governor = Governor::new(limits, Box::new(FakeClock::default()), true);
         let client =
             Client::new(Credentials::new(TOKEN, "cookie-TEST"), Endpoints::local(fake.addr()).unwrap(), governor);
         Self { fake, handle: slakio_slack::serve(client), world: World::demo(), id: 0 }
@@ -184,6 +188,30 @@ fn older_pages_follow_one_another_to_the_start() {
         assert_eq!(r.calls("conversations.history"), pages);
         let older = r.fake.log().into_iter().rfind(|l| l.method() == "conversations.history").unwrap();
         assert!(older.fields().iter().any(|(k, _)| *k == "latest"));
+    });
+}
+
+/// Reading back is background work: it never takes the share of the request budget kept for
+/// what the user opens.
+#[test]
+fn older_pages_take_the_background_share_of_the_budget() {
+    rt().block_on(async {
+        // Room for the start and the newest page, none for background work.
+        let limits = Limits { per_minute: 40, background_per_minute: 0, ..Limits::default() };
+        let mut r = Run::with(limits).await;
+        let target = r.target("deploys");
+        let newest = r.page(&target, None).await;
+        let before = newest.messages.first().map(|m| m.ts);
+        r.id += 1;
+        let command = Command::History { target: target.clone(), before, limit: 28 };
+        r.handle.send(Request { id: Generation(r.id), workspace: None, command }).unwrap();
+        let e = tokio::time::timeout(Duration::from_secs(20), r.handle.rx.recv()).await.unwrap().unwrap();
+        assert!(
+            matches!(e.event, Event::Failed { kind: slakio_core::backend::FailKind::CapReached, .. }),
+            "{:?}",
+            e.event
+        );
+        assert_eq!(r.calls("conversations.history"), 0, "nothing was sent for it");
     });
 }
 
