@@ -77,7 +77,7 @@ impl Theme {
 }
 
 /// The relative luminance of an RGB color (`None` for a terminal color).
-fn luminance(c: Color) -> Option<f64> {
+pub(super) fn luminance(c: Color) -> Option<f64> {
     let Color::Rgb(r, g, b) = c else { return None };
     let lin = |v: u8| {
         let v = f64::from(v) / 255.0;

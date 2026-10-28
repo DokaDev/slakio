@@ -6,7 +6,7 @@
 //! app named is marked. Links are underlined; where a link's label reads as another address
 //! than its own, the real target follows it in a faint span of its own (`→ host`), a style no
 //! sender's markup gives. A link that runs code is plain text. Inline code is tinted, or keeps
-//! its backticks where nothing can tint it.
+//! its backticks where nothing can tint it; a code block's lines are tinted, or marked by a bar.
 
 use crate::app::App;
 use crate::app::pane::Shown;
@@ -19,6 +19,9 @@ use slakio_core::model::WorkspaceId;
 /// The bar before a quoted line, and the blank after it.
 const QUOTE: &str = "▎ ";
 
+/// The bar before a code block's line where nothing tints it (no color), and the blank after it.
+const CODE: &str = "│ ";
+
 /// The rows of `m`'s text in a pane of workspace `ws`, `w` cells wide, at most `max` of them;
 /// whether text was left out.
 pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Vec<Vec<Span<'static>>>, bool) {
@@ -30,6 +33,10 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Ve
             return (out, true);
         }
         match block {
+            // Without color nothing tints a code block: a bar marks its lines.
+            Block::Code(line) if t.kind == crate::theme::Kind::NoColor => {
+                out.push(vec![Span::styled(CODE, t.faint()), Span::styled(clip(line, w.saturating_sub(2)), t.code())]);
+            }
             Block::Code(line) => out.push(vec![Span::styled(clip(line, w), t.code())]),
             Block::Line { quote, pieces } => {
                 let runs: Vec<(String, Style)> = pieces.iter().flat_map(|p| runs(app, ws, p)).collect();

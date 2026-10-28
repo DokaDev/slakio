@@ -125,7 +125,8 @@ fn hostile_text_inside_markup_is_drawn_harmless() {
 }
 
 /// Code, links and mentions read apart in tokyo-night and under NO_COLOR: a link underlined,
-/// code tinted (its backticks kept without color), never in the user's mention style.
+/// code tinted (without color, inline code keeps its backticks and a code block's lines a bar),
+/// never in the user's mention style.
 #[test]
 fn code_links_and_mentions_read_apart_with_and_without_color() {
     use slakio_tui::theme::{Background, Theme};
@@ -146,6 +147,14 @@ fn code_links_and_mentions_read_apart_with_and_without_color() {
         } else {
             assert_eq!(code.bg, Some(theme.code_bg()), "{at}");
             assert!(!screen.contains("`make"), "{at}");
+        }
+        // A code block's lines: tinted, or, where nothing tints them, after a bar.
+        let block = screen.lines().find(|l| l.contains("fn main")).unwrap_or_else(|| panic!("{at}"));
+        if theme.kind == slakio_tui::theme::Kind::NoColor {
+            assert!(block.contains("│ fn main"), "{at}");
+        } else {
+            assert!(!block.contains("│ fn main"), "{at}");
+            assert_eq!(style_of(&s, "fn main").bg, Some(theme.code_bg()), "{at}");
         }
     }
 }

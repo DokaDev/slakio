@@ -352,8 +352,8 @@ impl Theme {
         }
     }
 
-    /// Code in a message (inline, or a code block's lines): body text on a tint of the raised
-    /// surface (never the warm color of a mention of the user); in the 16-color theme, green on
+    /// Code in a message (inline, or a code block's lines): body text on a tint
+    /// ([`Self::code_bg`]; never the warm color of a mention of the user); in the 16-color theme, green on
     /// no background; plain without color. Where there is no tint, inline code keeps its
     /// backticks ([`Self::code_marks`]).
     pub fn code(&self) -> Style {
@@ -362,12 +362,6 @@ impl Theme {
             Kind::Ansi => Style::new().fg(Color::Green),
             Kind::NoColor => Style::new(),
         }
-    }
-
-    /// The background of code: the status line's surface, or the raised one where the surface is
-    /// the background itself.
-    pub fn code_bg(&self) -> Color {
-        if self.surface == self.bg { self.raised() } else { self.surface }
     }
 
     /// Inline code is drawn with its backticks: no background tells it apart.
@@ -504,13 +498,18 @@ impl Theme {
             _ => Some(self.selection),
         };
         if let Some(bg) = bg {
+            // Code keeps a tint of its own, apart from the bar.
+            let code = (self.kind == Kind::Truecolor).then(|| (self.code_bg(), self.code_on(bg)));
             for x in row.left()..row.right() {
                 let cell = &mut buf[(x, row.y)];
                 // A pill and an avatar chip keep their background.
                 if (cell.bg == self.error && self.error != Color::Reset) || self.chip_bg(cell.bg) {
                     continue;
                 }
-                cell.bg = bg;
+                cell.bg = match code {
+                    Some((on_bg, on_bar)) if cell.bg == on_bg => on_bar,
+                    _ => bg,
+                };
                 if cell.fg == bg || cell.fg == self.fg_dim || cell.fg == self.fg_muted || cell.fg == self.border {
                     cell.fg = self.fg;
                 }
@@ -559,6 +558,7 @@ impl Theme {
 }
 
 mod bars;
+mod code;
 mod workspace;
 
 #[cfg(test)]

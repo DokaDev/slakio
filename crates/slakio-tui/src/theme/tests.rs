@@ -405,3 +405,33 @@ fn links_code_and_mentions_read_apart_in_every_theme() {
         }
     }
 }
+
+/// Code's tint is seen in every truecolor theme: 1.3:1 at least from the background and the
+/// selection bar (a selected row keeps a tint of its own), 1.2:1 from the other bars, with body
+/// text 4.5:1 on it.
+#[test]
+fn code_is_tinted_apart_from_its_row_also_when_selected() {
+    for t in truecolor() {
+        let n = t.name;
+        for (what, row) in
+            [("bg", t.bg), ("selection", t.selection), ("cursor line", t.cursor_line), ("range", t.range)]
+        {
+            let c = t.code_on(row);
+            // The unfocused and VISUAL bars of a light theme sit close to the background: a
+            // little less room there with text kept readable.
+            let least = if matches!(what, "bg" | "selection") { 1.3 } else { 1.2 };
+            assert!(contrast(c, row) >= least, "{n}: code on the {what} {:.2}", contrast(c, row));
+            assert!(contrast(t.fg, c) >= 4.5, "{n}: text on code on the {what} {:.2}", contrast(t.fg, c));
+        }
+        assert_eq!(t.code().bg, Some(t.code_bg()), "{n}");
+        for (how, bar) in [(Selection::Focused, t.selection), (Selection::Unfocused, t.cursor_line)] {
+            let row = ratatui::layout::Rect::new(0, 0, 4, 1);
+            let mut buf = Buffer::empty(row);
+            buf[(1, 0)].set_style(t.code());
+            buf[(2, 0)].set_style(t.text().bg(t.bg));
+            t.paint_selection(&mut buf, row, how);
+            assert_eq!(buf[(2, 0)].bg, bar, "{n}: the bar");
+            assert_eq!(buf[(1, 0)].bg, t.code_on(bar), "{n}: code keeps a tint of its own on the bar");
+        }
+    }
+}
