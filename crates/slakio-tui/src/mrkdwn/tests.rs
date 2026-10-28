@@ -64,6 +64,9 @@ fn code_is_shown_as_written() {
 #[test]
 fn quotes_are_lines_that_start_with_a_quote_mark() {
     assert_eq!(flat(&parse("&gt; said\nnot &gt; quoted\n>also")), "> said\nnot > quoted\n> also");
+    // A face or a comparison at the start of a line is not a quote.
+    assert_eq!(flat(&parse("&gt;_&lt; oops\n&gt;=5 left\n&gt;.&lt;")), ">_< oops\n>=5 left\n>.<");
+    assert_eq!(flat(&parse("&gt;\n&gt; *bold*")), "> \n> bold");
 }
 
 #[test]
@@ -89,6 +92,25 @@ fn people_channels_broadcasts_groups_and_links() {
     assert_eq!(one("*<https://x.example>*"), [Piece::Link { url: "https://x.example".into(), label: None, marks: B }]);
     assert_eq!(one("a <> b < c"), [t("a <> b < c", N)]);
     assert_eq!(flat(&parse("1 &lt; 2 &amp;&amp; 3 &gt; 2")), "1 < 2 && 3 > 2");
+}
+
+/// A label that reads as another address shows where the link goes; a person whose id is not
+/// known shows the id, not a name the sender wrote.
+#[test]
+fn labels_cannot_pass_for_another_address_or_person() {
+    assert_eq!(flat(&parse("<https://evil.example/x|https://bank.example>")), "https://bank.example (evil.example)");
+    assert_eq!(flat(&parse("<https://evil.example|bank.example/login>")), "bank.example/login (evil.example)");
+    assert_eq!(flat(&parse("<http://evil.example|WWW.Bank.Example>")), "WWW.Bank.Example (evil.example)");
+    // A label of the same host, or one that is no address, is shown as written.
+    assert_eq!(flat(&parse("<https://bank.example/a|https://bank.example>")), "https://bank.example");
+    assert_eq!(flat(&parse("<https://Bank.example:8443/a|bank.example>")), "bank.example");
+    assert_eq!(flat(&parse("<https://grafana.example|web-1>")), "web-1");
+    assert_eq!(flat(&parse("<https://grafana.example|see v1.2 notes>")), "see v1.2 notes");
+    assert_eq!(flat(&parse("<mailto:ops-desk|ops-desk>")), "ops-desk", "a mail link is no web address");
+    // People: by the read model's name, else by id; the sender's label never names them.
+    assert_eq!(flat(&parse("<@UUNKNOWN|CEO>")), "@UUNKNOWN");
+    let name = |p: &Piece| matches!(p, Piece::User { .. }).then(|| "Minsu".to_string());
+    assert_eq!(first_line(&parse("<@U1|CEO>"), &name).as_deref(), Some("@Minsu"));
 }
 
 #[test]
@@ -126,6 +148,23 @@ fn hostile_texts_stay_sanitised() {
     }
 }
 
+/// A closing mark looked for past [`REACH`] bytes: the look-ahead ends inside a character of
+/// several bytes (Hangul, CJK, emoji) at every offset, behind every mark and every pass-over.
+#[test]
+fn a_look_ahead_ending_inside_a_character_does_not_crash() {
+    for mark in ["*", "_", "~"] {
+        for over in ["<", "`"] {
+            for wide in ["\u{AC00}", "\u{6F22}", "\u{1F600}", "\u{0301}"] {
+                for pad in 0..4 {
+                    let text = format!("{mark}{over}{}{}", "a".repeat(REACH - 3 + pad), wide.repeat(400));
+                    let blocks = parse(&text);
+                    assert!(flat(&blocks).contains(wide), "{mark}{over} +{pad} {wide:?}");
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn a_long_hostile_line_is_read_quickly() {
     let line = "*a _b ~c `d <e ".repeat(3_000);
@@ -141,6 +180,14 @@ proptest! {
     /// sanitiser removes.
     #[test]
     fn any_text_reads_to_safe_text(raw in "\\PC{0,200}|[*_~`<>&|@#!:a-z \\n]{0,200}") {
+        let safe = Remote::new(raw).block();
+        let out = flat(&parse(safe.as_str()));
+        prop_assert_eq!(self::safe(&out), Ok(()));
+    }
+
+    /// Longer than the look-ahead, in characters of several bytes: reading never panics.
+    #[test]
+    fn long_wide_text_reads_to_safe_text(raw in "[*_~`<> a\u{AC00}\u{6F22}\u{1F600}\u{0301}]{900,1400}") {
         let safe = Remote::new(raw).block();
         let out = flat(&parse(safe.as_str()));
         prop_assert_eq!(self::safe(&out), Ok(()));

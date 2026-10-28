@@ -102,7 +102,7 @@ fn lines(s: &str, out: &mut Vec<Block>, skip_empty: bool) {
         return;
     }
     for line in s.split('\n') {
-        let quoted = line.strip_prefix("&gt;").or_else(|| line.strip_prefix('>'));
+        let quoted = line.strip_prefix("&gt;").or_else(|| line.strip_prefix('>')).filter(|b| quotes(b));
         let (quote, body) = match quoted {
             Some(b) => (true, b.strip_prefix(' ').unwrap_or(b)),
             None => (false, line),
@@ -113,12 +113,19 @@ fn lines(s: &str, out: &mut Vec<Block>, skip_empty: bool) {
     }
 }
 
+/// A line's `>` starts a quote when what follows it, `rest`, is nothing, a blank, a letter, a
+/// mark or a `<…>`: not punctuation that makes a face or a comparison of it (`>_<`, `>=5`).
+fn quotes(rest: &str) -> bool {
+    rest.chars().next().is_none_or(|c| !c.is_ascii_punctuation() || matches!(c, '*' | '~' | '`' | '<'))
+}
+
 /// The pieces of `s` (part of one line) under `marks` onto `out`.
 fn inline(s: &str, marks: Marks, out: &mut Vec<Piece>) {
     let mut text = String::new();
     let flush = |text: &mut String, out: &mut Vec<Piece>| {
         if !text.is_empty() {
-            out.push(Piece::Text(emoji::replace(&decode(text)), marks));
+            let t = unjoined(emoji::replace(&decode(text)), out);
+            out.push(Piece::Text(t, marks));
             text.clear();
         }
     };
@@ -128,7 +135,7 @@ fn inline(s: &str, marks: Marks, out: &mut Vec<Piece>) {
             '`' => {
                 if let Some(end) = s[i + 1..].find('`').filter(|e| *e > 0) {
                     flush(&mut text, out);
-                    out.push(Piece::Code(decode(&s[i + 1..i + 1 + end])));
+                    out.push(Piece::Code(unjoined(decode(&s[i + 1..i + 1 + end]), out)));
                     i += end + 2;
                     continue;
                 }
@@ -139,6 +146,15 @@ fn inline(s: &str, marks: Marks, out: &mut Vec<Piece>) {
                     && let Some(p) = entity(&s[i + 1..i + 1 + end], marks)
                 {
                     flush(&mut text, out);
+                    let p = match p {
+                        Piece::Link { url, label, marks } => {
+                            let label = label.map(|l| unjoined(l, out)).filter(|l| !l.is_empty());
+                            Piece::Link { url, label, marks }
+                        }
+                        Piece::Group(label) => Piece::Group(label.map(|l| unjoined(l, out))),
+                        Piece::Text(t, m) => Piece::Text(unjoined(t, out), m),
+                        other => other,
+                    };
                     out.push(p);
                     i += end + 2;
                     continue;
@@ -163,6 +179,18 @@ fn inline(s: &str, marks: Marks, out: &mut Vec<Piece>) {
     flush(&mut text, out);
 }
 
+/// `t` without the combining marks it starts with when pieces `before` it are on its line: with
+/// the delimiter between them gone they would join the marks of the character before, past what
+/// the sanitiser keeps on one character.
+fn unjoined(t: String, before: &[Piece]) -> String {
+    use unicode_segmentation::UnicodeSegmentation;
+    if before.is_empty() {
+        return t;
+    }
+    let joined = format!("a{t}").graphemes(true).next().map_or(1, str::len) - 1;
+    if joined == 0 { t } else { t[joined..].to_string() }
+}
+
 /// The delimiter at `i` of `s` may open a mark: after the start, a blank or punctuation, before
 /// a non-blank.
 fn opens(s: &str, i: usize) -> bool {
@@ -175,7 +203,11 @@ fn opens(s: &str, i: usize) -> bool {
 /// blank or punctuation, with something between; code and `<…>` in between are passed over.
 /// Looked for within [`REACH`] bytes.
 fn closing(s: &str, i: usize, c: char) -> Option<usize> {
-    let end = s.len().min(i + 1 + REACH);
+    // Never inside a character: a slice ends on a character's boundary.
+    let mut end = s.len().min(i + 1 + REACH);
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
     let mut j = i + 1;
     while j < end {
         let ch = s[j..].chars().next()?;
@@ -235,26 +267,46 @@ pub fn decode(s: &str) -> String {
     s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 }
 
-/// What a piece says as plain text, its people and channels named by `name` (`None`: the label
-/// Slack wrote, else the id).
+/// What a piece says as plain text, its people and channels named by `name`. A person not
+/// known there shows the id (a label is the sender's word, and could name anyone); a channel
+/// not known, the label Slack wrote, else the id. A link shows its label, and where it goes
+/// too when the label reads as another address.
 pub fn plain(piece: &Piece, name: &dyn Fn(&Piece) -> Option<String>) -> String {
     match piece {
         Piece::Text(t, _) | Piece::Code(t) => t.clone(),
-        Piece::User { id, label, .. } => {
-            format!("@{}", name(piece).or_else(|| label.clone()).unwrap_or_else(|| id.clone()))
-        }
+        Piece::User { id, .. } => format!("@{}", name(piece).unwrap_or_else(|| id.clone())),
         Piece::Channel { id, label, .. } => {
             format!("#{}", name(piece).or_else(|| label.clone()).unwrap_or_else(|| id.clone()))
         }
         Piece::Broadcast(w) => format!("@{w}"),
         Piece::Group(label) => label.clone().unwrap_or_else(|| "@group".to_string()),
-        Piece::Link { url, label, .. } => label.clone().unwrap_or_else(|| shown_url(url).to_string()),
+        Piece::Link { url, label: Some(label), .. } => match (host(label), host(url)) {
+            (Some(said), Some(real)) if said != real => format!("{label} ({real})"),
+            _ => label.clone(),
+        },
+        Piece::Link { url, label: None, .. } => shown_url(url).to_string(),
     }
 }
 
+/// The host `s` names when it reads as a web address (`https://a.example/x`, `a.example/x`),
+/// in lower case, without its port.
+fn host(s: &str) -> Option<String> {
+    let lower = s.trim().to_ascii_lowercase();
+    let rest = lower.strip_prefix("https://").or_else(|| lower.strip_prefix("http://")).unwrap_or(&lower);
+    let host = rest.split(['/', '?', '#']).next()?;
+    let host =
+        host.rsplit_once(':').map_or(host, |(h, port)| if port.bytes().all(|b| b.is_ascii_digit()) { h } else { host });
+    let tld = host.rsplit_once('.')?.1;
+    let shaped =
+        host.split('.').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'));
+    (shaped && tld.len() >= 2 && tld.bytes().all(|b| b.is_ascii_alphabetic())).then(|| host.to_string())
+}
+
 /// A link's address as shown when it has no label: a `mailto:` without its scheme.
+/// (Never starting with a combining mark, which would join the character before it.)
 pub fn shown_url(url: &str) -> &str {
-    url.strip_prefix("mailto:").unwrap_or(url)
+    let url = url.strip_prefix("mailto:").unwrap_or(url);
+    url.trim_start_matches(|c: char| unicode_width::UnicodeWidthChar::width(c) == Some(0))
 }
 
 /// The first line of `blocks` with text, as plain text (a tab title, a saved item's row).
