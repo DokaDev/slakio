@@ -15,7 +15,7 @@
 
 use super::pane::Shown;
 use slakio_core::backend::{FailKind, Generation, Page};
-use slakio_core::model::{Target, Ts};
+use slakio_core::model::{Target, ThreadSummary, Ts};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -45,6 +45,8 @@ pub struct Timeline {
     pub retry_at: Option<Instant>,
     /// An older page arrived: the history was read back from its newest page.
     pub paged: bool,
+    /// The newest page asked for again after live updates were lost; its request id.
+    pub catchup: Option<Generation>,
 }
 
 impl Timeline {
@@ -105,6 +107,91 @@ impl Timeline {
         self.failed.is_some() && self.retry_at.is_some()
     }
 
+    /// A message that arrived live (already sanitised), put in its place by its timestamp or
+    /// over the copy there. A new one goes in only among what is loaded — newer than the oldest
+    /// loaded message, or anywhere once the oldest one is — so none lands in a span not read;
+    /// nor while nothing is loaded (the page awaited brings it). `changed`: a new copy, which
+    /// only replaces (keeping the thread's count of replies when the copy has none). `true`
+    /// when the timeline changed.
+    pub fn put_live(&mut self, mut shown: Shown, changed: bool) -> bool {
+        match self.items.binary_search_by_key(&shown.ts, |m| m.ts) {
+            Ok(i) => {
+                if shown.thread.is_none() {
+                    shown.thread = self.items[i].thread;
+                }
+                self.items[i] = shown;
+                true
+            }
+            Err(i) if !changed && (i > 0 || self.complete) && (!self.items.is_empty() || self.pending.is_none()) => {
+                self.items.insert(i, shown);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// The message at `ts` was deleted. `true` when it was loaded.
+    pub fn remove(&mut self, ts: Ts) -> bool {
+        let Some(i) = self.position(ts) else { return false };
+        self.items.remove(i);
+        true
+    }
+
+    /// Reply `reply` came under the message at `parent`: one more on its count of replies (once:
+    /// a reply not newer than the last one counted is not counted again). `true` when changed.
+    pub fn add_reply(&mut self, parent: Ts, reply: Ts) -> bool {
+        let Some(i) = self.position(parent) else { return false };
+        let m = &mut self.items[i];
+        match &mut m.thread {
+            Some(t) if reply <= t.last_reply => false,
+            Some(t) => {
+                (t.replies, t.last_reply) = (t.replies.saturating_add(1), reply);
+                true
+            }
+            None => {
+                m.thread = Some(ThreadSummary { replies: 1, last_reply: reply });
+                true
+            }
+        }
+    }
+
+    /// A reply under the message at `parent` was deleted: one fewer on its count.
+    pub fn drop_reply(&mut self, parent: Ts) -> bool {
+        let Some(i) = self.position(parent) else { return false };
+        let m = &mut self.items[i];
+        let Some(t) = &mut m.thread else { return false };
+        t.replies = t.replies.saturating_sub(1);
+        if t.replies == 0 {
+            m.thread = None;
+        }
+        true
+    }
+
+    /// The newest page read again after live updates were lost (already sanitised), in place of
+    /// what was loaded over the span it covers: what it lacks there was deleted meanwhile. When it
+    /// does not reach back to the newest message loaded, what came between is unknown: the page
+    /// replaces everything (reading back pages the rest again), so no gap is ever hidden.
+    pub fn catch_up(&mut self, page: &Page, shown: Vec<Shown>) {
+        self.catchup = None;
+        let Some(oldest) = shown.first().map(|m| m.ts) else {
+            if page.complete {
+                self.items.clear();
+                self.complete = true;
+            }
+            return;
+        };
+        if page.complete {
+            // The whole conversation: nothing older is left.
+            (self.items, self.complete) = (shown, true);
+        } else if self.items.last().is_some_and(|m| m.ts >= oldest) {
+            self.items.retain(|m| m.ts < oldest);
+            self.items.extend(shown);
+        } else {
+            self.items = shown;
+            (self.complete, self.paged) = (false, false);
+        }
+    }
+
     /// The index of the message at `ts`, when loaded.
     pub fn position(&self, ts: Ts) -> Option<usize> {
         self.items.binary_search_by_key(&ts, |m| m.ts).ok()
@@ -129,6 +216,10 @@ impl TimelineStore {
         self.timelines.get(target)
     }
 
+    pub fn get_mut(&mut self, target: &Target) -> Option<&mut Timeline> {
+        self.timelines.get_mut(target)
+    }
+
     /// The timeline of `target`, empty if it had none.
     pub fn entry(&mut self, target: &Target) -> &mut Timeline {
         self.timelines.entry(target.clone()).or_default()
@@ -139,10 +230,20 @@ impl TimelineStore {
         self.timelines.get_mut(target).filter(|t| t.pending == Some(id))
     }
 
+    /// The timeline whose catch-up is the answer `id` about `target`.
+    pub fn caught_up(&mut self, target: &Target, id: Generation) -> Option<&mut Timeline> {
+        self.timelines.get_mut(target).filter(|t| t.catchup == Some(id))
+    }
+
     /// The page asked for as request `id` failed at `now`: its timeline stops waiting; when
     /// Slack asked to slow down, it asks again by itself once Slack's pause passed. The target,
     /// when one waited for it.
     pub fn fail(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<Target> {
+        // A catch-up that failed leaves what was loaded as it was.
+        if let Some((target, tl)) = self.timelines.iter_mut().find(|(_, t)| t.catchup == Some(id)) {
+            tl.catchup = None;
+            return Some(target.clone());
+        }
         let (target, tl) = self.timelines.iter_mut().find(|(_, t)| t.pending == Some(id))?;
         tl.pending = None;
         tl.retry_at = match &kind {

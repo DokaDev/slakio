@@ -92,6 +92,9 @@ pub struct Model {
     pub counts_unknown: HashSet<WorkspaceId>,
     /// Each bot's author ids of the names it posted as, oldest first ([`BOT_NAMES`] at most).
     bot_names: HashMap<(WorkspaceId, String), std::collections::VecDeque<UserId>>,
+    /// Each workspace's live updates as last heard of: whether they arrive now, and whether they
+    /// ever did this run.
+    pub live: HashMap<WorkspaceId, (bool, bool)>,
 }
 
 /// The names of one bot kept as people at most.
@@ -110,6 +113,7 @@ impl Model {
             saved_unknown,
             counts_unknown: HashSet::new(),
             bot_names: HashMap::new(),
+            live: HashMap::new(),
         };
         m.index_users();
         m
@@ -263,6 +267,29 @@ impl Model {
     pub fn target(&self, target: &Target) -> Option<&Conversation> {
         let (workspace, conversation) = (target.workspace(), target.conversation());
         self.snapshot.conversations.iter().find(|c| &c.workspace == workspace && &c.id == conversation)
+    }
+
+    /// A message by someone else came live into conversation `id` of `ws`: one more unread (and
+    /// one more mention when it mentions the user, or every message of a DM does). Muting
+    /// changes what badges show, not the counts ([`Conversation::badges`]). `true` when listed.
+    pub fn bump(&mut self, ws: &WorkspaceId, id: &ConversationId, mention: bool) -> bool {
+        let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
+            return false;
+        };
+        c.unread = c.unread.saturating_add(1);
+        if mention || c.is_dm() {
+            c.mentions = c.mentions.saturating_add(1);
+        }
+        true
+    }
+
+    /// Conversation `id` of `ws` was read elsewhere: its counts are Slack's now.
+    pub fn mark(&mut self, ws: &WorkspaceId, id: &ConversationId, unread: u32, mentions: u32) -> bool {
+        let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
+            return false;
+        };
+        (c.unread, c.mentions) = (unread.max(mentions), mentions);
+        true
     }
 
     /// The id of `row` (of the rows of this model), which outlives the row's index.

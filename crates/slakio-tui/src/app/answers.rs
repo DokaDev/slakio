@@ -172,6 +172,7 @@ impl App {
             }
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
+            Event::Live(live) => self.on_live(*live, now),
         }
     }
 
@@ -258,6 +259,8 @@ impl App {
         waited
     }
 }
+
+mod live;
 
 /// The status line's words for a failure of `kind`.
 pub(super) fn failure(kind: &FailKind) -> Label {

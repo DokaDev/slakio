@@ -330,8 +330,10 @@ impl Wiring {
         connected.await.ok().flatten().ok_or(Label::SigninStoreRead)
     }
 
+    /// A workspace's backend, with its live updates.
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
-        slakio_slack::serve(slakio_slack::Client::new(credentials, endpoints, Arc::clone(&self.governor)))
+        let client = slakio_slack::Client::new(credentials, endpoints, Arc::clone(&self.governor));
+        slakio_slack::serve_live(client, slakio_slack::Realtime::default())
     }
 
     /// One backend per workspace of `kept`, each with the cache in front of it (what to tell

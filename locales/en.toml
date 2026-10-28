@@ -389,6 +389,11 @@
 # The unread counts of a workspace could not be read at its start.
 "fail.counts" = "Unread counts not loaded: those shown may be old"
 "fail.counts_none" = "Unread counts not loaded"
+# A workspace's live updates (new, edited and deleted messages as they happen), when that changes.
+"live.on" = "Live updates on"
+"live.back" = "Live updates back"
+"live.lost" = "Live updates lost: reconnecting"
+"live.waiting" = "Live updates not connected: trying again"
 # A failure of one workspace's start: its name, then why (one of the fail.* words).
 "fail.workspace" = "{workspace}: {why}"
 # A workspace whose sign-in Slack refused at its start: short, so its name fits beside it.

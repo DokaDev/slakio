@@ -79,6 +79,27 @@ impl Status {
         }
     }
 
+    /// Say `msg` in place of what `stale` says is no longer true: those notices waiting are
+    /// forgotten, and the one showing too, so `msg` shows at once in its place. Otherwise a
+    /// warning shows as [`Status::show_about`] says and anything else is queued.
+    pub fn restate_about(
+        &mut self,
+        msg: impl Into<Msg>,
+        level: Level,
+        about: Option<WorkspaceId>,
+        now: Instant,
+        stale: impl Fn(&Msg) -> bool,
+    ) {
+        self.waiting.retain(|(m, _, _)| !stale(m));
+        if self.notice(now).is_some_and(|n| stale(&n.msg)) {
+            self.notice = None;
+        }
+        match level {
+            Level::Warning => self.show_about(msg, level, about, now),
+            Level::Info => self.queue_about(msg, level, about, now),
+        }
+    }
+
     fn put(&mut self, msg: Msg, level: Level, about: Option<WorkspaceId>, now: Instant, queued: bool) {
         let until = now + if level == Level::Warning { WARNING_FOR } else { INFO_FOR };
         self.notice = Some(Notice { msg, level, until, about });

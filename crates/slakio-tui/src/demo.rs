@@ -3,7 +3,7 @@
 //! binary's wiring is the one place that names it.
 
 use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Page, Request};
-use slakio_core::model::Target;
+use slakio_core::model::{Target, Ts};
 use slakio_world::World;
 use std::collections::VecDeque;
 
@@ -30,16 +30,8 @@ impl Backend for DemoBackend {
                 Some(ws) => self.world.snapshot().only(ws),
                 None => self.world.snapshot().clone(),
             })),
-            Command::History { target, before, limit } => {
-                let limit = limit as usize;
-                let (messages, complete) = match &target {
-                    Target::Conversation { conversation, .. } => self.world.history(conversation, before, limit),
-                    Target::Thread { conversation, thread, .. } => {
-                        self.world.thread(conversation, *thread, before, limit).unwrap_or((Vec::new(), true))
-                    }
-                };
-                Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: false }))
-            }
+            Command::History { target, before, limit } => self.page(target, before, limit),
+            Command::Catchup { target, limit } => self.page(target, None, limit),
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
@@ -51,5 +43,19 @@ impl Backend for DemoBackend {
 
     fn poll(&mut self) -> Option<Envelope> {
         self.ready.pop_front()
+    }
+}
+
+impl DemoBackend {
+    /// Up to `limit` messages of `target` older than `before` (the newest when `None`).
+    fn page(&self, target: Target, before: Option<Ts>, limit: u32) -> Event {
+        let limit = limit as usize;
+        let (messages, complete) = match &target {
+            Target::Conversation { conversation, .. } => self.world.history(conversation, before, limit),
+            Target::Thread { conversation, thread, .. } => {
+                self.world.thread(conversation, *thread, before, limit).unwrap_or((Vec::new(), true))
+            }
+        };
+        Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: false }))
     }
 }

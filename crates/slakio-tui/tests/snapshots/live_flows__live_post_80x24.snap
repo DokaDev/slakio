@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/live_flows.rs
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#general ─────────────────────────────────────╮
+│▎Home                   @24 ││ RC  Robin Choi  00:30                          │
+│ DMs                    ●11 ││     Review pager after customer pager latency  │
+│ Activity               @36 ││     waiting today branch should migration now  │
+│ Files                      ││     the                                        │
+│ To-dos                   6 ││                                                │
+├─▾──────────────────────────┤│ AM  Alex Morgan  01:28                         │
+│   # feed-production-44     ││     Fine branch draft rollback please invoice  │
+│   # feed-queue-224         ││     timeout again latency broken alert maybe   │
+│   # feed-retry-63          ││     dashboard                                  │
+│   # feed-review-152        ││                                                │
+│   # feed-sprint-90         ││ LK  Leo Kang  02:54                            │
+│   # feed-sprint-94         ││     Draft roadmap timeout                      │
+│   # feed-staging-91        ││                                                │
+│   # feed-ticket-104        ││ NH  Noah Han  03:36                            │
+│   # feed-ticket-158        ││     Still we pager is on after staging queue   │
+│   # feed-ticket-201        ││     the today rollback draft                   │
+│   # feed-ticket-215        ││                                                │
+│   # feed-ticket-35         ││ MK  Minsu Kim  03:36                           │
+│   # feed-timeout-21        ││     deploy is green                            │
+│   ▪ frontend               │├─ Message #general ─────────────────────────────┤
+│▎  # general                ││ › Read only: nothing can be sent               │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #general │ Live updates on           │ ? help │ read only

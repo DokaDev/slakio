@@ -367,6 +367,11 @@
 # The unread counts of a workspace could not be read at its start.
 "fail.counts" = "안 읽은 수를 불러오지 못함: 보이는 수는 예전 것일 수 있음"
 "fail.counts_none" = "안 읽은 수를 불러오지 못함"
+# A workspace's live updates (new, edited and deleted messages as they happen), when that changes.
+"live.on" = "실시간 업데이트 켜짐"
+"live.back" = "실시간 업데이트 다시 켜짐"
+"live.lost" = "실시간 연결 끊김: 다시 연결하는 중"
+"live.waiting" = "실시간 연결 안 됨: 다시 시도하는 중"
 "fail.workspace" = "{workspace}: {why}"
 "fail.workspace_auth" = "{workspace}: 로그아웃됨, slakio login으로 로그인"
 "retry.hint" = "{keys} 다시 시도"

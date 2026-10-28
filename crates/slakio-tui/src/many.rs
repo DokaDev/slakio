@@ -18,7 +18,7 @@ pub const BOUND: usize = 64;
 /// The workspace `request` is about, if it names one.
 pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
     match &request.command {
-        Command::History { target, .. } => Some(target.workspace()),
+        Command::History { target, .. } | Command::Catchup { target, .. } => Some(target.workspace()),
         Command::Boot | Command::Save { .. } => request.workspace.as_ref(),
     }
 }

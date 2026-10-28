@@ -46,6 +46,8 @@ proptest.workspace = true
 insta.workspace = true
 # The binary signing in against the tests' fake Slack.
 slakio-fake.workspace = true
+# The synthetic live updates the fake pushes.
+serde_json.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net"] }
 
 [lints]

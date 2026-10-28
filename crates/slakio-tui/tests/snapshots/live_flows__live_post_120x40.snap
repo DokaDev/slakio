@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/live_flows.rs
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#general ─────────────────────────────────────────────────────────────────────────────╮
+│▎Home                   @24 ││  IM   Ivy Moon  20:08                                                                  │
+│ DMs                    ●11 ││       Review migration for branch is roadmap dashboard is can review someone still     │
+│ Activity               @36 ││       again retry                                                                      │
+│ Files                      ││                                                                                        │
+│ To-dos                   6 ││  MK   Minsu Kim  20:47                                                                 │
+├─▾──────────────────────────┤│       Release release customer meeting release on migration timeout schema pager       │
+│   # feed-draft-142         ││       tracing customer sprint done for                                                 │
+│   # feed-draft-58          ││       👀 4   👍 5                                                                      │
+│   # feed-draft-84          ││                                                                                        │
+│   # feed-index-199      2  ││  MJ   Mia Jang  22:02                                                                  │
+│   # feed-index-39          ││       SELECT count(*) FROM jobs WHERE state = 'stuck';                                 │
+│   # feed-index-5        1  ││                                                                                        │
+│   # feed-invoice-16        ││  AS   Ava Shin  23:08                                                                  │
+│   # feed-invoice-168       ││       Confirmed                                                                        │
+│   # feed-latency-144       ││                                                                                        │
+│   # feed-meeting-82        ││  AS   Ava Shin  23:54                                                                  │
+│   # feed-merge-192         ││       Broken cache queue migration latency                                             │
+│   # feed-merge-54          ││                                                                                        │
+│   # feed-metrics-125       ││ ───────────────────────────────────── 2026-01-13 ───────────────────────────────────── │
+│   # feed-metrics-13        ││  RC   Robin Choi  00:30                                                                │
+│   # feed-metrics-18        ││       Review pager after customer pager latency waiting today branch should migration  │
+│   # feed-production-111    ││       now the                                                                          │
+│   # feed-production-44     ││                                                                                        │
+│   # feed-queue-224         ││  AM   Alex Morgan  01:28                                                               │
+│   # feed-retry-63          ││       Fine branch draft rollback please invoice timeout again latency broken alert     │
+│   # feed-review-152        ││       maybe dashboard                                                                  │
+│   # feed-sprint-90         ││                                                                                        │
+│   # feed-sprint-94         ││  LK   Leo Kang  02:54                                                                  │
+│   # feed-staging-91        ││       Draft roadmap timeout                                                            │
+│   # feed-ticket-104        ││                                                                                        │
+│   # feed-ticket-158        ││  NH   Noah Han  03:36                                                                  │
+│   # feed-ticket-201        ││       Still we pager is on after staging queue the today rollback draft                │
+│   # feed-ticket-215        ││                                                                                        │
+│   # feed-ticket-35         ││  MK   Minsu Kim  03:36                                                                 │
+│   # feed-timeout-21        ││       deploy is green                                                                  │
+│   ▪ frontend               │├─ Message #general ─────────────────────────────────────────────────────────────────────┤
+│▎  # general                ││ › Read only: nothing can be sent                                                       │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #general │ Live updates on            │ k messages · Esc list · Ctrl+R views · ? help │ read only
