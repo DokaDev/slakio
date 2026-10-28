@@ -345,3 +345,49 @@ fn shipped_korean_catalog_translates_every_entry() {
     let stale: Vec<_> = SAME_IN_KO.iter().filter(|k| !same.contains(k)).collect();
     assert!(stale.is_empty(), "SAME_IN_KO lists keys that are translated or gone: {stale:?}");
 }
+
+/// Korean particles, which are written right after the word they follow, a Latin one too
+/// (`slakio login` and then the particle, no space). Escaped: Hangul is only in `ko.toml`.
+const KO_PARTICLES: &[&str] = &[
+    "\u{C73C}\u{B85C}",
+    "\u{B85C}",
+    "\u{C744}",
+    "\u{B97C}",
+    "\u{C774}",
+    "\u{AC00}",
+    "\u{C740}",
+    "\u{B294}",
+    "\u{C5D0}",
+    "\u{C5D0}\u{C11C}",
+    "\u{C758}",
+    "\u{C640}",
+    "\u{ACFC}",
+    "\u{B3C4}",
+    "\u{B9CC}",
+];
+
+fn hangul(c: char) -> bool {
+    ('\u{AC00}'..='\u{D7A3}').contains(&c)
+}
+
+#[test]
+fn shipped_korean_catalog_writes_a_particle_right_after_a_latin_word() {
+    let ko = locale("ko", Policy::Required, include_str!("../../../locales/ko.toml"));
+    let mut stray = vec![];
+    for (key, text) in ko.entries.iter().chain(ko.one.iter()) {
+        let chars: Vec<char> = text.chars().collect();
+        for i in 1..chars.len().saturating_sub(1) {
+            if chars[i] != ' ' || !(chars[i - 1].is_ascii_alphanumeric() || "/)`'\"".contains(chars[i - 1])) {
+                continue;
+            }
+            let rest: String = chars[i + 1..].iter().collect();
+            let particle = KO_PARTICLES
+                .iter()
+                .find(|p| rest.starts_with(**p) && !rest[p.len()..].chars().next().is_some_and(hangul));
+            if particle.is_some() {
+                stray.push(format!("{key}: {text}"));
+            }
+        }
+    }
+    assert!(stray.is_empty(), "a space before a particle: {stray:#?}");
+}
