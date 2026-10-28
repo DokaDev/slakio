@@ -198,6 +198,7 @@ fn workspace_colors_stay_apart_from_the_accent() {
             let c = t.workspace(WorkspaceColor(slot)).fg.unwrap();
             let d = workspace::distance(c, t.accent).unwrap();
             assert!(d >= workspace::APART, "{}: workspace {slot} {c:?} is {d:.3} from the accent", t.name);
+            assert!(!workspace::same_hue(c, t.accent), "{}: workspace {slot} {c:?} has the accent's hue", t.name);
         }
         // The colors left all differ, and enough are left.
         let shown: Vec<Color> = t.workspace_colors().collect();
@@ -208,6 +209,19 @@ fn workspace_colors_stay_apart_from_the_accent() {
     assert_eq!(first_two(&DARK), [rgb(0x5B8DEF), rgb(0xC792EA)]);
     assert_eq!(first_two(&LIGHT), [rgb(0x2F5FC4), rgb(0x8A4FC2)]);
     assert_eq!(first_two(&DRACULA), [rgb(0x5B8DEF), rgb(0x4FB3A9)]);
+    // A light theme and its dark twin give the first two workspaces the same hues (the accent
+    // of one may be near a color only in lightness: its hue still rules it out).
+    for (day, night) in [
+        (&CATPPUCCIN_LATTE, &CATPPUCCIN_MOCHA),
+        (&TOKYO_NIGHT_DAY, &TOKYO_NIGHT_NIGHT),
+        (&GRUVBOX_LIGHT, &GRUVBOX_DARK),
+        (&LIGHT, &DARK),
+    ] {
+        // The palettes hold the same hues in the same slots.
+        let slots =
+            |t: &Theme| [0, 1].map(|s| t.workspaces.iter().position(|c| Some(*c) == t.workspace(WorkspaceColor(s)).fg));
+        assert_eq!(slots(day), slots(night), "{} and {}", day.name, night.name);
+    }
     // The 16 colors are the terminal's own: none is left out.
     assert_eq!(TERMINAL.workspace_colors().count(), TERMINAL.workspaces.len());
 }

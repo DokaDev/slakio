@@ -1,4 +1,6 @@
-//! The colors of workspaces: the theme's palette, less the colors that read as its accent.
+//! The colors of workspaces: the theme's palette, less the colors that read as its accent —
+//! near it in Oklab, or of its hue (both clearly colored), however much lighter or darker: a
+//! light theme and its dark twin then give their workspaces the same hues.
 
 use super::Theme;
 use ratatui::style::{Color, Style};
@@ -7,6 +9,13 @@ use slakio_core::model::WorkspaceColor;
 /// How far (in Oklab) a workspace's color stays from the theme's accent, so its stripe never
 /// reads as part of a focus frame beside it.
 pub(super) const APART: f64 = 0.1;
+
+/// How far apart in hue (degrees, Oklch) a workspace's color stays from the accent when both
+/// are clearly colored (chroma above [`COLORED`]).
+pub(super) const HUE_APART: f64 = 20.0;
+
+/// The chroma (Oklch) above which a color has a hue that reads as one.
+pub(super) const COLORED: f64 = 0.06;
 
 impl Theme {
     /// The style of workspace color `c`.
@@ -20,7 +29,7 @@ impl Theme {
     /// The colors workspaces take, by slot (wrapping around): the palette in its order, without
     /// those near the accent, so the next one takes their place.
     pub(super) fn workspace_colors(&self) -> impl Iterator<Item = Color> + '_ {
-        let apart = |c: &&Color| distance(**c, self.accent).is_none_or(|d| d >= APART);
+        let apart = |c: &&Color| distance(**c, self.accent).is_none_or(|d| d >= APART) && !same_hue(**c, self.accent);
         self.workspaces.iter().filter(apart).copied()
     }
 }
@@ -29,6 +38,18 @@ impl Theme {
 pub(super) fn distance(a: Color, b: Color) -> Option<f64> {
     let (a, b) = (oklab(a)?, oklab(b)?);
     Some(((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2) + (a.2 - b.2).powi(2)).sqrt())
+}
+
+/// `a` and `b` are both clearly colored and within [`HUE_APART`] of each other's hue (`false`
+/// for a terminal color).
+pub(super) fn same_hue(a: Color, b: Color) -> bool {
+    let (Some(a), Some(b)) = (oklab(a), oklab(b)) else { return false };
+    let chroma = |c: (f64, f64, f64)| c.1.hypot(c.2);
+    if chroma(a) <= COLORED || chroma(b) <= COLORED {
+        return false;
+    }
+    let d = (a.2.atan2(a.1) - b.2.atan2(b.1)).to_degrees().rem_euclid(360.0);
+    d.min(360.0 - d) < HUE_APART
 }
 
 /// `c` in Oklab, `None` for a terminal color.
