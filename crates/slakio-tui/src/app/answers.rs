@@ -87,6 +87,11 @@ impl App {
         self.boot_here()?.failed.as_ref()
     }
 
+    /// The workspace shown boots on its own (not with every workspace at once).
+    pub fn boots_alone(&self) -> bool {
+        self.boot_here().is_some_and(|b| b.workspace.is_some())
+    }
+
     /// Why the last request for workspace `ws` failed, if it did.
     pub fn boot_failed_in(&self, ws: &WorkspaceId) -> Option<&FailKind> {
         let own = self.boots.iter().find(|b| b.workspace.as_ref() == Some(ws));
@@ -162,14 +167,24 @@ impl App {
     /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
+        let mut whose = None;
         let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
             b.failed = Some(kind.clone());
+            whose = b.workspace.clone();
             true
         } else {
             self.work.on_failed(id, kind.clone()) || self.on_save_failed(id)
         };
         if waited {
-            self.warn(Msg::Label(failure(&kind)), now);
+            // With several workspaces, the words say whose start failed.
+            let name = whose.filter(|_| self.boots.len() > 1).and_then(|ws| self.model.workspace(&ws).cloned());
+            match name {
+                Some(w) => {
+                    let why = self.i18n.label(failure(&kind)).to_string();
+                    self.warn(Msg::FailWorkspace { workspace: w.name.line().into_string(), why }, now);
+                }
+                None => self.warn(Msg::Label(failure(&kind)), now),
+            }
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
             self.effects.push(Effect::Record { context: "backend", fault });
         }

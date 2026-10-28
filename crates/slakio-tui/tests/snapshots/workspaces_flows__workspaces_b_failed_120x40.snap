@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/workspaces_flows.rs
+expression: t.d.snap()
+---
+╭ ▌B side ▾ · A @28 ─────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│▎Home                       ││                                                                                        │
+│ DMs                        ││                                                                                        │
+│ Activity               @28 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ To-dos                     ││                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
+│ Could not load             ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                         No conversation open                                           │
+│                            ││                         Pick one in the list and press Enter.                          │
+│                            ││                                                                                        │
+│                            ││                         Enter    Open                                                  │
+│                            ││                         Space h  Home                                                  │
+│                            ││                         Space d  DMs                                                   │
+│                            ││                         Ctrl+O   Back to the last one                                  │
+│                            ││                         ?        Keyboard help                                         │
+│                            ││                         Ctrl+Q   Quit                                                  │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+│                            ││                                                                                        │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌B side › Home │ B side: Signed out: run slakio login to sign in again       │ ? help · Space more │ read only

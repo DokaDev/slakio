@@ -70,6 +70,7 @@
 "list.empty" = "Nothing here"
 "list.external" = "ext"
 "list.failed" = "Could not load workspaces"
+"list.failed_one" = "Could not load"
 "list.unavailable" = "Not available"
 
 # The work area.
@@ -375,6 +376,8 @@
 "fail.offline" = "Offline: Slack is not being asked"
 "fail.busy" = "Busy: nothing was sent"
 "fail.api" = "Slack refused the request"
+# A failure of one workspace's start: its name, then why (one of the fail.* words).
+"fail.workspace" = "{workspace}: {why}"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"
 "hint.todo_save" = "to Saved"

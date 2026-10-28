@@ -25,7 +25,11 @@ impl Backend for DemoBackend {
 
     fn send(&mut self, request: Request) {
         let event = match request.command {
-            Command::Boot => Event::Booted(Box::new(self.world.snapshot().clone())),
+            // One workspace's boot answers its part only.
+            Command::Boot => Event::Booted(Box::new(match &request.workspace {
+                Some(ws) => self.world.snapshot().only(ws),
+                None => self.world.snapshot().clone(),
+            })),
             Command::History { target, before, limit } => {
                 let limit = limit as usize;
                 let (messages, complete) = match &target {

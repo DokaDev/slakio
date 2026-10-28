@@ -57,6 +57,7 @@
 "list.empty" = "비어 있습니다"
 "list.external" = "외부"
 "list.failed" = "워크스페이스를 불러오지 못했습니다"
+"list.failed_one" = "불러오지 못했습니다"
 "list.unavailable" = "쓸 수 없음"
 
 "pane.loading" = "메시지를 불러오는 중…"
@@ -354,6 +355,7 @@
 "fail.offline" = "오프라인: Slack에 요청하지 않습니다"
 "fail.busy" = "처리 중: 보내지 않았습니다"
 "fail.api" = "Slack이 요청을 거절했습니다"
+"fail.workspace" = "{workspace}: {why}"
 "retry.hint" = "{keys} 다시 시도"
 "hint.todo_done" = "완료"
 "hint.todo_save" = "저장됨으로"

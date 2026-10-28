@@ -65,7 +65,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             let known = ws.as_ref().is_some_and(|w| app.model.saved_known(w));
             (app.shell.view == View::Todos && !known).then(|| faint(Label::ListUnavailable))
         }
-        Some(kind) => Some(super::failed_text(app, Label::ListFailed, kind)),
+        Some(kind) => {
+            let what = if app.boots_alone() { Label::ListFailedOne } else { Label::ListFailed };
+            Some(super::failed_text(app, what, kind))
+        }
         None => Some(faint(Label::ListLoading)),
     };
     if let Some(text) = unknown {

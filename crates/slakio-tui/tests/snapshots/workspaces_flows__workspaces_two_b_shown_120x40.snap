@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/workspaces_flows.rs
+expression: t.d.snap()
+---
+╭ ▌B side ▾ · A @28 ─────────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│▎Home                    @8 ││                                                                                        │
+│ DMs                     ●1 ││                                                                                        │
+│ Activity               @37 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ To-dos                   2 ││                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
+│ ▾ Side projects            ││                                                                                        │
+│   # side-project           ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Channels                 ││                                                                                        │
+│   # feed-build-40       3  ││                                                                                        │
+│   # feed-index-17          ││                                                                                        │
+│   # feed-index-25          ││                                                                                        │
+│   # feed-index-27          ││                                                                                        │
+│   # feed-migration-32      ││                         No conversation open                                           │
+│   ▪ feed-production-28     ││                         Pick one in the list and press Enter.                          │
+│   # feed-production-29  1  ││                                                                                        │
+│   # feed-rollback-35       ││                         Enter    Open                                                  │
+│   # feed-staging-20     1  ││                         Space h  Home                                                  │
+│   # feed-staging-31        ││                         Space d  DMs                                                   │
+│   # feed-ticket-24         ││                         Ctrl+O   Back to the last one                                  │
+│   # general                ││                         ?        Keyboard help                                         │
+│   # help-cache-15          ││                         Ctrl+Q   Quit                                                  │
+│   # help-customer-54       ││                                                                                        │
+│   ▪ help-design-26         ││                                                                                        │
+│   # help-merge-38          ││                                                                                        │
+│   ▪ help-migration-48      ││                                                                                        │
+│   # help-pager-2        3  ││                                                                                        │
+│   # help-pager-42          ││                                                                                        │
+│   # help-production-18     ││                                                                                        │
+│   # help-review-19         ││                                                                                        │
+│   # ideas                  ││                                                                                        │
+│   # ops-alert-53           ││                                                                                        │
+│   # ops-build-13           ││                                                                                        │
+│   # ops-customer-4         ││                                                                                        │
+│   # ops-dashboard-43       ││                                                                                        │
+│   # ops-deploy-36          ││                                                                                        │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌B side › Home │ Enter open · l peek · t new tab · Tab next pane · [/] views · ? help · Space more │ read only

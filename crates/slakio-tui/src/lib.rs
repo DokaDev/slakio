@@ -7,7 +7,8 @@
 //! * [`screen`] — the geometry of the main screen, shared by drawing and the mouse.
 //! * [`ui`] — drawing a frame.
 //! * [`demo`] — the demo backend over the invented world (`slakio --demo`); [`exchange`] —
-//!   requests and answers between the app and a backend.
+//!   requests and answers between the app and a backend; [`many`] — one backend of several
+//!   workspaces, each with its own.
 //! * [`theme`] — color and style tokens; [`avatar`] — a person's initials chip.
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
@@ -25,6 +26,7 @@ pub mod exchange;
 pub mod input;
 pub mod keymap;
 pub mod kitty;
+pub mod many;
 pub mod navbar;
 pub mod screen;
 pub mod tabbar;
