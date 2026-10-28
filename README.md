@@ -37,7 +37,7 @@ images, and settings. This README only lists what works; it will grow with each 
   or `slakio login --paste` to paste a browser request), `slakio logout` signs out,
   `slakio --offline` sends nothing. A start shows the last session's channels and the
   conversations opened from the local cache right away (`cached` in the status line until
-  Slack has answered), with no request made first.
+  Slack has answered), without waiting for Slack.
 - `slakio --demo` shows an invented world (two workspaces, sidebar sections, about 300
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
@@ -182,23 +182,29 @@ The desktop-app import is adapted from the open-source client
 ## Local cache
 
 slakio keeps what it fetched — the workspace's channels, people and sections, and the newest
-messages of the conversations you opened — in one SQLite file in the cache directory
-(`$XDG_CACHE_HOME/slakio`, else `~/Library/Caches/slakio` on macOS, `~/.cache/slakio` on Linux,
-`%LOCALAPPDATA%\slakio\cache` on Windows). A start draws from it before sending anything, then
-asks Slack and replaces what it showed; with the network off it shows the cache alone. No token,
-cookie or other secret is ever in it: the credentials stay in the keychain.
+messages of the conversations you opened — in one SQLite file in a directory of its own,
+`slakio-store`, in the cache directory (`$SLAKIO_CACHE_DIR`, else `$XDG_CACHE_HOME/slakio`, else
+`~/Library/Caches/slakio` on macOS, `~/.cache/slakio` on Linux, `%LOCALAPPDATA%\slakio\cache` on
+Windows). A start draws from it without waiting for Slack (a cache slower than a tenth of a
+second is not waited for), then replaces what it showed with Slack's answer; with the network
+off it shows the cache alone. No token, cookie or other secret is ever in it: the credentials
+stay in the keychain. It is the signed-in user's only: signing in as someone else starts it
+again from nothing.
 
 - It keeps at most 200 messages a conversation, 500 MB in all, and drops a conversation not
   opened for 30 days (a conversation open on screen is never dropped); `cache_messages`,
   `cache_max_mb` and `cache_days` change the limits, and `cache = "off"` keeps nothing between
   runs ([Configuration](#configuration)). Threads are not cached yet.
-- The directory is readable by you only (`0700`, the files `0600`). On macOS it is excluded from
-  Time Machine backups (`tmutil addexclusion`, which marks the directory itself); if that fails,
-  slakio says so once and tries again on the next start.
+- Its directory is readable by you only (`0700`, the files `0600`); only that directory is
+  changed or excluded, never the cache directory you named, and a symbolic link in its place or
+  in place of one of its files is refused. On macOS it is excluded from Time Machine backups
+  (`tmutil addexclusion`, which marks the directory itself); if that fails, slakio says so once
+  and tries again on the next start.
 - A second slakio while one runs reads the cache but does not write it, and says so. A cache that
   cannot be read (damaged, or written by a newer slakio) is started again from nothing, with one
-  line in the status line. `slakio logout` removes it, and deleting the directory is always
-  safe.
+  line in the status line (shown after any other notice, so each is seen). `slakio logout`
+  removes it, also when the keychain could not be changed; quit a running slakio first (logout
+  says so when one runs). Deleting the directory is always safe.
 
 ## Install
 

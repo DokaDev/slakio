@@ -196,7 +196,7 @@ the signed-in workspace; the tests run it against
 
 ## The local cache
 
-`slakio-store` keeps, in `<cache>/cache.sqlite3`, the last boot snapshot (replaced whole by each
+`slakio-store` keeps, in `<cache>/slakio-store/cache.sqlite3`, the last boot snapshot (replaced whole by each
 boot; a workspace it no longer lists leaves the cache with it) and the newest messages of each
 conversation opened (each page the backend answers is the truth for the span of time it covers:
 what the cache held there and the page lacks is gone). Remote text is kept as it came and read
@@ -206,16 +206,24 @@ back as `Remote`, so it still reaches the screen only through the sanitiser. No 
   only); each one runs in a transaction. A cache of a newer version, or one that is not a
   database, is set up again from nothing (it only holds what can be fetched again).
 - **One writer.** The writer holds an OS lock on `cache.lock` (`File::try_lock`); a second
-  process opens the database read-only and never writes it. The directory is `0700`, the files
-  `0600` (Unix).
+  process opens the database read-only and never writes it; a read is one transaction. The
+  store's own directory (`slakio-store`, which it makes) is `0700`, the files `0600` (Unix),
+  opened without following a symbolic link and made private through the open file; the cache
+  directory named (`SLAKIO_CACHE_DIR`) is never changed. The journal must be WAL, or the cache
+  is not used.
+- **Whose.** The cache keeps the signed-in workspace and user (`Store::claim`); another sign-in
+  finds it emptied, and a second process of another sign-in does not use it.
 - **Caps.** At most 200 messages a conversation, 500 MB, 30 days since a conversation was last
   opened (config keys `cache_messages`, `cache_max_mb`, `cache_days`); every conversation asked
   for during the run is exempt, so nothing shown in a pane is pruned. Pruned after the first boot
-  and every 32 pages.
+  and every 32 pages, in one transaction; the freed pages go back to the file system 256 at a
+  time, the jobs asked for meanwhile first.
 - **In front of a backend** (`layer.rs`): a task between the UI's handle and the backend's. A
   boot, and the newest page of a conversation of the signed-in workspace, are answered from the
-  cache first — `Event::CachedBoot` / `Event::CachedHistory`, read before the request is handed
-  on, so a start draws with no request made — then by the backend, whose answer replaces it in
+  cache first — `Event::CachedBoot` / `Event::CachedHistory`, queued for the UI before the
+  request is handed on, so a start draws without waiting for Slack; the cache is waited for
+  100 ms at most (`READ_WAIT`), so a busy or slow cache never holds a request back — then by the
+  backend, whose answer replaces it in
   the UI and is kept. A cached answer ends nothing: the request still gets exactly one answer of
   the backend's. The UI marks what came from the cache (`cached` in the status line) until then,
   keeps it when the refresh fails (the status line says why), and asks for the newest page again
@@ -223,7 +231,7 @@ back as `Remote`, so it still reaches the screen only through the sanitiser. No 
 - **Its own thread.** The store runs on a thread of its own (`cache.rs`); jobs run in order,
   writes are not waited for, a failed job goes to the error log and a database found damaged is
   set up again.
-- **Backups.** On macOS the cache directory is excluded from Time Machine once (`tmutil
+- **Backups.** On macOS the store's own directory (an absolute path) is excluded from Time Machine once (`tmutil
   addexclusion`, remembered in the cache); a failure is said once. Debug builds run only a
   stand-in named by `SLAKIO_TEST_TMUTIL` (the tests'), never `tmutil` itself.
 
