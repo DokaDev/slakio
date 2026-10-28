@@ -268,11 +268,12 @@ struct Kept {
 }
 
 /// Signing in from the app ended: the workspaces it signed in to (their names), every
-/// signed-in workspace now (those signed in to before too), and why one asked for did not sign
-/// in, if one did not.
+/// signed-in workspace now (those signed in to before too) connected, as [`Wiring::connect`]
+/// gives them with what to tell about the cache, and why one asked for did not sign in, if one
+/// did not.
 struct Done {
     names: Vec<String>,
-    kept: Vec<Kept>,
+    connected: (BackendHandle, Vec<SignedInTo>, Vec<Msg>),
     failed: Option<Label>,
 }
 
@@ -295,7 +296,10 @@ impl Wiring {
             let Some(endpoints) = self.endpoints(&account.host) else { continue };
             match account::credentials(&*self.store, &account) {
                 Ok(Some(credentials)) => kept.push(Kept { account, credentials, endpoints }),
-                Ok(None) => {}
+                Ok(None) => self.record(&slakio_core::fault::Fault::other(format!(
+                    "workspace {}: no credentials in the keychain; left out (slakio login signs in again)",
+                    account.team
+                ))),
                 Err(f) => {
                     self.record(&f);
                     fault = Some(f);
@@ -308,13 +312,17 @@ impl Wiring {
         }
     }
 
-    /// [`Wiring::signed_in`], off the loop's thread (the keychain may ask).
-    async fn all_kept(&self) -> Result<Vec<Kept>, Label> {
+    /// [`Wiring::signed_in`], then [`Wiring::connect`], off the loop's thread (the keychain may
+    /// ask; claiming each workspace's part of the cache may wait).
+    async fn connect_all(&self) -> Result<(BackendHandle, Vec<SignedInTo>, Vec<Msg>), Label> {
         let w = self.clone();
-        match tokio::task::spawn_blocking(move || w.signed_in()).await {
-            Ok(Ok(kept)) if !kept.is_empty() => Ok(kept),
-            _ => Err(Label::SigninStoreRead),
-        }
+        let connected = tokio::task::spawn_blocking(move || {
+            let kept = w.signed_in().ok().filter(|k| !k.is_empty())?;
+            let mut notices = Vec::new();
+            let (handle, signed) = w.connect(kept, &mut notices);
+            Some((handle, signed, notices))
+        });
+        connected.await.ok().flatten().ok_or(Label::SigninStoreRead)
     }
 
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
@@ -342,8 +350,8 @@ impl Wiring {
     /// workspace.
     async fn sign_in_app(self, text: Pasted) -> Result<Done, Label> {
         let one = self.clone().sign_in(text).await?;
-        let kept = self.all_kept().await?;
-        Ok(Done { names: vec![words::shown(&one.account.name)], kept, failed: None })
+        let connected = self.connect_all().await?;
+        Ok(Done { names: vec![words::shown(&one.account.name)], connected, failed: None })
     }
 
     /// Sign in with each of the picked desktop workspaces `teams`, one after the other; one that
@@ -362,8 +370,8 @@ impl Wiring {
         if names.is_empty() {
             return Err(failed.unwrap_or(Label::SigninDesktopFailed));
         }
-        let kept = self.all_kept().await?;
-        Ok(Done { names, kept, failed })
+        let connected = self.connect_all().await?;
+        Ok(Done { names, connected, failed })
     }
 
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
@@ -453,11 +461,10 @@ fn check_label(e: &SlackError) -> Label {
 
 /// Signing in from the app ended: with a sign-in the app connects to every signed-in
 /// workspace (the ones signed in to before too, each booted again), else says why not.
-fn signed_in(done: Result<Done, Label>, app: &mut App, backend: &mut Option<BackendHandle>, wiring: &Wiring) {
+fn signed_in(done: Result<Done, Label>, app: &mut App, backend: &mut Option<BackendHandle>) {
     match done {
         Ok(d) => {
-            let mut notices = Vec::new();
-            let (handle, signed) = wiring.connect(d.kept, &mut notices);
+            let (handle, signed, mut notices) = d.connected;
             app.signed_in(handle.capabilities, &signed, &d.names, Instant::now());
             *backend = Some(handle);
             if let Some(why) = d.failed {
@@ -562,7 +569,7 @@ async fn run(
             envelope = exchange::next(backend.as_mut()) => app.on_backend(envelope, Instant::now()),
             done = async { signing_in.as_mut().expect("guarded").await }, if signing_in.is_some() => {
                 signing_in = None;
-                signed_in(done.unwrap_or(Err(Label::SigninFailed)), &mut app, &mut backend, wiring);
+                signed_in(done.unwrap_or(Err(Label::SigninFailed)), &mut app, &mut backend);
                 true
             }
             // Asked to end from outside: the loop ends and the terminal is restored on the way

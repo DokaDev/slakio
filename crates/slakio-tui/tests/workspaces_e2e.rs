@@ -352,3 +352,49 @@ fn signing_out_of_one_workspace_holds_the_cache_from_before_its_credentials_go()
     assert!(text(&out).contains("its part of the local cache is deleted"), "{}", text(&out));
     assert!(!m.file().contains(HOSTS[1]) && m.file().contains(HOSTS[0]), "{}", m.file());
 }
+
+#[test]
+fn a_workspace_whose_credentials_are_gone_is_left_out_and_the_error_log_says_so() {
+    let m = Machine::new("no-secret", &[0, 1]);
+    let s = m.world.snapshot();
+    let only_a = format!("{}|{TOKEN}|{COOKIE}", s.workspaces[0].id);
+    let Some(run) = m.start(1, (100, 30), &[("SLAKIO_TEST_CREDENTIALS", &only_a)]) else { return };
+    run.wait_for("A's channels", |t| t.contains(&m.channel(0)));
+    run.quit();
+    let log = std::fs::read_to_string(m.dir.join("state").join("slakio").join("errors.log")).unwrap_or_default();
+    let b = s.workspaces[1].id.as_str();
+    assert!(log.lines().any(|l| l.contains(b) && l.contains("no credentials")), "{log}");
+    assert!(m.methods(1).is_empty(), "B is not asked");
+}
+
+#[test]
+fn signing_in_from_the_app_never_holds_up_the_screen_while_the_cache_is_slow() {
+    let m = Machine::new("app-login-slow", &[0]);
+    let (creds, addrs) = m.env();
+    let env = [
+        ("SLAKIO_TEST_CREDENTIALS", creds.as_str()),
+        ("SLAKIO_TEST_SLACK_ADDR", addrs.as_str()),
+        ("SLAKIO_TEST_CLAIM_DELAY_MS", "2000"),
+    ];
+    let config = m.dir.join("config-1.toml");
+    std::fs::copy(m.dir.join("config.toml"), &config).unwrap();
+    let Some(mut run) = Run::spawn_with(&m.dir, &config, &m.dir.join("typescript-1"), &env, (120, 40), "login") else {
+        return;
+    };
+    run.wait_for("the paste screen", |t| t.contains("Waiting for the paste"));
+    let paste = format!(
+        "curl 'https://{}/api/client.counts' -H 'cookie: b=1; d={COOKIE}' --data-raw 'token={TOKEN}'",
+        HOSTS[1]
+    );
+    run.type_bytes(format!("\x1b[200~{paste}\x1b[201~").as_bytes());
+    // Slack accepted it; each workspace's part of the cache is now claimed, slowly.
+    wait_until("B checked", || m.methods(1).iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(300));
+    let asked = Instant::now();
+    run.type_bytes(b"?");
+    run.wait_for("the help", |t| t.contains("Keys —"));
+    assert!(asked.elapsed() < Duration::from_millis(1500), "the screen answered after {:?}", asked.elapsed());
+    run.type_bytes(b"\x1b");
+    run.wait_for("signed in to B", |t| t.contains(&format!("Signed in to {}", m.name(1))));
+    run.quit();
+}

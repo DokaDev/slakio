@@ -27,6 +27,10 @@ const TEST_TMUTIL: &str = "SLAKIO_TEST_TMUTIL";
 /// answer, so the tests' warm starts draw from the cache on a slow machine too.
 const TEST_CACHE_WAIT: &str = "SLAKIO_TEST_CACHE_WAIT_MS";
 
+/// `SLAKIO_TEST_CLAIM_DELAY_MS`, debug builds only: claiming a workspace's part of the cache
+/// takes this long first, as with a slow disk, for the test that it never holds up the screen.
+const TEST_CLAIM_DELAY: &str = "SLAKIO_TEST_CLAIM_DELAY_MS";
+
 /// The one-time notice of a failed exclusion from backups.
 const BACKUP_NOTICE: &str = "cache_backup_failed";
 
@@ -94,6 +98,9 @@ impl Local {
         notices: &mut Vec<Msg>,
     ) -> BackendHandle {
         let Some(cache) = self.cache(notices) else { return backend };
+        if let Some(ms) = cfg!(debug_assertions).then(|| std::env::var(TEST_CLAIM_DELAY).ok()?.parse().ok()).flatten() {
+            std::thread::sleep(Duration::from_millis(ms));
+        }
         // Another sign-in's part: emptied by the writer, not used by a reader.
         match cache.claim(team, user, CLAIM_WAIT) {
             Some(Ok(true)) => {
