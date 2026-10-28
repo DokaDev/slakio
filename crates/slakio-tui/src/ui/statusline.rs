@@ -25,7 +25,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use slakio_core::i18n::Label;
+use slakio_core::i18n::{Label, Msg};
 use std::time::Instant;
 
 /// Where the keyboard is, for the hint line (`None` under a popup with keys of its own).
@@ -132,6 +132,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         }
         _ => {}
     }
+    // A workspace that could not be loaded has no views to go to.
+    let ws_failed =
+        app.boot_failed().is_some() && !app.shell.current_id(&app.model).is_some_and(|w| app.model.is_loaded_in(&w));
+    if ws_failed {
+        resolved.retain(|(_, l)| *l != Label::HintNav);
+    }
     // What could not be loaded here, for a reason that may pass: asking again comes first.
     if !resolved.is_empty()
         && app.failed_here().is_some_and(slakio_core::backend::FailKind::retryable)
@@ -171,15 +177,18 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         };
         if view_hidden { format!("{view} › {place}") } else { place }
     });
-    // The notice, or the first keys of a sequence until its popup shows.
+    // The notice, or the first keys of a sequence until its popup shows; with the room it takes
+    // at most.
+    let notice = app.keys.pending().is_empty().then(|| app.status.notice(now)).flatten();
     let msg: Option<(String, Style)> = if !app.keys.pending().is_empty() {
         (!app.which_key_visible(now)).then(|| (format!("{} …", keys::label(app.keys.pending())), t.bold()))
     } else {
-        app.status.notice(now).map(|n| {
+        notice.map(|n| {
             let style = if n.level == Level::Warning { t.warning() } else { t.text() };
             (app.i18n.msg(&n.msg).to_string(), style)
         })
     };
+    let msg_max = notice.map_or(NOTICE_MAX, |n| notice_max(app, &n.msg));
     let demo = app.backend.and_then(|c| {
         let mark = if c.demo {
             Label::StatusDemo
@@ -243,7 +252,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     };
     let need = |ws_name: &Option<String>, place_text: &Option<String>, hints: &[(String, String)]| {
         // A notice is worth more than the hints: they make room for it.
-        let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + width(m).min(48));
+        let msg_w = msg.as_ref().map_or(0, |(m, _)| 3 + width(m).min(msg_max));
         spans_width(&left(ws_name, place_text)) + msg_w + spans_width(&right(hints))
     };
     // Shorten until it fits, in this order: the hints of least worth (a peek, the command line,
@@ -380,12 +389,50 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     if let Some((m, style)) = msg {
         let room = w.saturating_sub(spans_width(&line) + spans_width(&right_spans) + 3);
         if room > 0 {
+            let m = notice.map_or_else(|| clip(&m, room), |n| fit_notice(app, &n.msg, room));
             line.push(sep());
-            line.push(Span::styled(clip(&m, room), style));
+            line.push(Span::styled(m, style));
         }
     }
     f.render_widget(Paragraph::new(Line::from(line)), area);
     draw_right(f, area, right_spans);
+}
+
+/// The most cells the hints make room for a notice.
+const NOTICE_MAX: usize = 48;
+
+/// The most of a workspace's name a notice about it keeps when the line is short.
+const NOTICE_NAME: usize = 16;
+
+/// The room the hints make for notice `msg`: [`NOTICE_MAX`], or more for one about a workspace,
+/// so its whole reason fits beside its name cut to [`NOTICE_NAME`] cells.
+fn notice_max(app: &App, msg: &Msg) -> usize {
+    match msg {
+        Msg::FailWorkspace { workspace, why } => {
+            let short = clip(workspace, NOTICE_NAME);
+            let w = width(&app.i18n.msg(&Msg::FailWorkspace { workspace: short, why: why.clone() }));
+            NOTICE_MAX.max(w)
+        }
+        _ => NOTICE_MAX,
+    }
+}
+
+/// Notice `msg` in `room` cells. One about a workspace gives up its name (cut with `…`, then
+/// left out) before its reason, which says what to do.
+fn fit_notice(app: &App, msg: &Msg, room: usize) -> String {
+    let whole = app.i18n.msg(msg).to_string();
+    let Msg::FailWorkspace { workspace, why } = msg else { return clip(&whole, room) };
+    if width(&whole) <= room {
+        return whole;
+    }
+    let around = width(&whole).saturating_sub(width(workspace));
+    let name_room = room.saturating_sub(around);
+    // A name cut under a few cells says nothing: the reason alone.
+    if name_room < 4.min(width(workspace)) || name_room == 0 {
+        return clip(why, room);
+    }
+    let short = clip(workspace, name_room);
+    app.i18n.msg(&Msg::FailWorkspace { workspace: short, why: why.clone() }).to_string()
 }
 
 /// `spans` at the right end of `area`, when they fit.

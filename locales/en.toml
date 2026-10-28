@@ -330,6 +330,8 @@
 "ctx.signin" = "Sign-in: Slack desktop app workspaces"
 "switcher.title" = "Workspaces"
 "switcher.keys" = "Enter switch · Esc close"
+"switcher.signed_out" = "signed out"
+"switcher.failed" = "not loaded"
 "config.retired" = "{key} is no longer used (the rail became the view switcher); it can be removed from the config file"
 "action.density" = "Comfortable or compact messages"
 "action.retry" = "Retry what could not be loaded"

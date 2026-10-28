@@ -10,8 +10,8 @@ expression: t.d.snap()
 │ To-dos                     ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
 │ Could not load             ││                                                                                        │
-│                            ││                                                                                        │
-│                            ││                                                                                        │
+│ Signed out: run slakio     ││                                                                                        │
+│ login to sign in again     ││                                                                                        │
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 │                            ││                                                                                        │
@@ -41,4 +41,4 @@ expression: t.d.snap()
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌B side › Home │ B side: Signed out: run slakio login to sign in again       │ ? help · Space more │ read only
+ NORMAL  ▌B side › Home │ B side: Signed out: run slakio login to sign in again    │ Tab next pane · ? help │ read only

@@ -67,16 +67,21 @@ struct Two {
 
 impl Two {
     fn new(w: u16, h: u16, a: BackendHandle, b: BackendHandle) -> Self {
+        Self::named(w, h, a, b, Lang::En, ["A company", "B side"])
+    }
+
+    /// [`Two::new`] in `lang`, the workspaces named `names`.
+    fn named(w: u16, h: u16, a: BackendHandle, b: BackendHandle, lang: Lang, names: [&str; 2]) -> Self {
         let (ia, ib) = ids();
         let read_only = (a.capabilities.read_only, b.capabilities.read_only);
         let handle = many::serve(vec![(ia.clone(), a), (ib.clone(), b)]);
         let mut d = Demo::new(w, h);
-        let mut app = App::new(Lang::En, Theme::terminal());
+        let mut app = App::new(lang, Theme::terminal());
         app.settings = Settings::default();
         app.resize(w, h);
         let signed = [
-            SignedIn { id: ia, name: "A company".into(), read_only: read_only.0 },
-            SignedIn { id: ib, name: "B side".into(), read_only: read_only.1 },
+            SignedIn { id: ia, name: names[0].into(), read_only: read_only.0 },
+            SignedIn { id: ib, name: names[1].into(), read_only: read_only.1 },
         ];
         app.connect_workspaces(handle.capabilities, &signed);
         d.app = app;
@@ -163,6 +168,49 @@ fn a_workspace_that_fails_leaves_the_other_listed_with_its_own_row_and_words() {
         t.keys("space W k enter").await;
         assert!(!t.d.screen().contains("Could not load"));
         assert!(!t.names(0).is_empty());
+    });
+}
+
+#[test]
+fn a_workspace_slack_refuses_says_why_and_what_to_do_after_its_notice_is_gone() {
+    rt().block_on(async {
+        for (lang, w, h) in
+            [(Lang::En, 120, 40), (Lang::En, 100, 30), (Lang::En, 80, 24), (Lang::Ko, 120, 40), (Lang::Ko, 80, 24)]
+        {
+            let names = ["A company", "Acme Engineering EU"];
+            let mut t = Two::named(w, h, world(true), failing(FailKind::Auth), lang, names);
+            t.settle().await;
+            // The notice keeps its reason whole: the name gives way.
+            let status = t.d.status_line();
+            let why = t.d.app.i18n.label(slakio_core::i18n::Label::FailAuth).to_string();
+            assert!(status.contains(&why), "{lang:?} {w}x{h}: the whole reason: {status}");
+            assert!(status.contains("slakio login"), "{status}");
+            t.keys("space W").await;
+            // The switcher marks it, where its count would be.
+            let mark = t.d.app.i18n.label(slakio_core::i18n::Label::SwitcherSignedOut).to_string();
+            let row = t.d.screen().lines().find(|l| l.contains("Acme")).unwrap().to_string();
+            assert!(row.contains(&mark), "{lang:?} {w}x{h}: {row}");
+            t.keys("j enter").await;
+            // Long after the notice: the list still says why, and what to do.
+            t.d.now = Instant::now() + Duration::from_secs(7);
+            let shown = t.d.screen();
+            let status = t.d.status_line();
+            assert!(!status.contains(&why), "the notice is gone: {status}");
+            let list: String =
+                shown.lines().map(|l| l.chars().take(30).collect::<String>()).collect::<Vec<_>>().join("\n");
+            assert!(list.contains("slakio"), "{lang:?} {w}x{h}: {shown}");
+            assert!(list.contains("login"), "{lang:?} {w}x{h}: {shown}");
+            // Asking again cannot help, and its views hold nothing: neither is offered.
+            let (retry, views) = (
+                t.d.app.i18n.label(slakio_core::i18n::Label::HintRetry).to_string(),
+                t.d.app.i18n.label(slakio_core::i18n::Label::HintNav).to_string(),
+            );
+            assert!(!status.contains(&format!("r {retry}")) && !status.contains(&format!("[/] {views}")), "{status}");
+            if (lang, w) == (Lang::En, 120) {
+                assert!(shown.contains("│ Could not load "), "{shown}");
+                assert!(shown.contains("│ Signed out: run slakio "), "{shown}");
+            }
+        }
     });
 }
 

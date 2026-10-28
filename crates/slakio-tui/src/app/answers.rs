@@ -92,6 +92,16 @@ impl App {
         self.boot_here().is_some_and(|b| b.workspace.is_some())
     }
 
+    /// Why nothing of the workspace shown could be loaded, in words, when asking again cannot
+    /// help and it is one of several (with one, the sign-in screen says it): its list says why,
+    /// and what to do, for as long as it shows, once the notice is gone.
+    pub fn failed_why(&self) -> Option<Label> {
+        let ws = self.shell.current_id(&self.model)?;
+        let kind = self.boot_failed()?;
+        let shown = self.model.is_loaded_in(&ws);
+        (self.boots.len() > 1 && self.boots_alone() && !shown && !kind.retryable()).then(|| failure(kind))
+    }
+
     /// Why the last request for workspace `ws` failed, if it did.
     pub fn boot_failed_in(&self, ws: &WorkspaceId) -> Option<&FailKind> {
         let own = self.boots.iter().find(|b| b.workspace.as_ref() == Some(ws));

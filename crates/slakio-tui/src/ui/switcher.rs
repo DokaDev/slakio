@@ -1,6 +1,6 @@
 //! The workspace switcher: a small popup under the list panel's workspace chip, one row per
-//! workspace — its color band, its name and what it holds unread (`@3`, `●`) — the cursor on
-//! the one to switch to.
+//! workspace — its color band, its name and what it holds unread (`@3`, `●`), or that it could
+//! not be loaded (`signed out`) — the cursor on the one to switch to.
 //!
 //! ```text
 //! ╭ Workspaces ──────────────────╮
@@ -16,6 +16,7 @@ use crate::text::{clip, width};
 use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::Rect;
+use slakio_core::backend::FailKind;
 use slakio_core::i18n::Label;
 
 pub(super) fn draw(f: &mut Frame, app: &App) {
@@ -36,7 +37,13 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
             any: app.model.workspace_unread(&w.id),
             ..Unread::default()
         };
-        let mark = unread.badge();
+        // A workspace that could not be loaded says so, quietly, where its count would be.
+        let failed = app.boot_failed_in(&w.id).filter(|_| !app.model.is_loaded_in(&w.id));
+        let failed = failed.map(|k| {
+            let l = if *k == FailKind::Auth { Label::SwitcherSignedOut } else { Label::SwitcherFailed };
+            app.i18n.label(l).to_string()
+        });
+        let mark = failed.clone().or_else(|| unread.badge());
         let mark_w = mark.as_deref().map_or(0, width);
         let buf = f.buffer_mut();
         buf.set_string(row.x + 1, y, "▌", t.workspace(w.color));
@@ -45,7 +52,8 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         buf.set_string(row.x + 2, y, clip(w.name.line().as_str(), room), name_style);
         if let Some(m) = &mark {
             let x = row.right().saturating_sub(mark_w as u16 + 1);
-            buf.set_string(x, y, m, t.marker(m.starts_with('@')));
+            let style = if failed.is_some() { t.muted() } else { t.marker(m.starts_with('@')) };
+            buf.set_string(x, y, m, style);
         }
         if i == cursor {
             let bar = Rect { x: row.x + 2, width: row.width.saturating_sub(2), ..row };

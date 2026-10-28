@@ -309,6 +309,8 @@
 "ctx.signin" = "로그인: Slack 데스크톱 앱 워크스페이스"
 "switcher.title" = "워크스페이스"
 "switcher.keys" = "Enter 전환 · Esc 닫기"
+"switcher.signed_out" = "로그아웃됨"
+"switcher.failed" = "못 불러옴"
 "config.retired" = "{key} 설정은 더 이상 쓰지 않습니다(레일이 보기 전환으로 바뀜). 설정 파일에서 지워도 됩니다"
 "action.density" = "메시지 넉넉하게 또는 촘촘하게"
 "action.retry" = "불러오지 못한 것 다시 시도"

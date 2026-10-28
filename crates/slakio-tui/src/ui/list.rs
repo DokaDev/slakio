@@ -67,7 +67,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         }
         Some(kind) => {
             let what = if app.boots_alone() { Label::ListFailedOne } else { Label::ListFailed };
-            Some(super::failed_text(app, what, kind))
+            Some(match app.failed_why() {
+                // It cannot be asked again: why, and what to do, under it (in body text, apart
+                // from the faint "Loading…").
+                Some(why) => {
+                    let mut text = ratatui::text::Text::styled(app.i18n.label(what).to_string(), t.text());
+                    let lines = crate::text::wrap(&app.i18n.label(why), usize::from(pad(inner).width), 4).0;
+                    text.lines.extend(lines.into_iter().map(|l| Line::styled(l, t.muted())));
+                    text
+                }
+                None => super::failed_text(app, what, kind),
+            })
         }
         None => Some(faint(Label::ListLoading)),
     };
