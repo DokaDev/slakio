@@ -131,12 +131,12 @@ impl App {
             Event::Booted(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, false)),
             Event::CachedBoot(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, true)),
             Event::CachedHistory(page) => {
-                self.model.add_users(&page.users);
+                self.model.add_users(page.target.workspace(), &page.users);
                 self.work.on_cached_page(id, &page, &self.model)
             }
             Event::History(page) => {
                 // Its authors' names first: a page's messages are drawn with them as it arrives.
-                self.model.add_users(&page.users);
+                self.model.add_users(page.target.workspace(), &page.users);
                 self.work.on_page(id, &page, &self.model)
             }
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),

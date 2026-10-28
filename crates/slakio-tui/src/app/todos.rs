@@ -83,9 +83,9 @@ pub struct TodoView {
     pub status: StatusFilter,
     pub due: DueFilter,
     pub sort: Sort,
-    /// The last change asked for (older answers are dropped) and what it was; its notice counts
-    /// from the answer.
-    asked: Option<(Generation, SavedChange)>,
+    /// The last change asked for (older answers are dropped), what it was and of which
+    /// workspace; its notice counts from the answer.
+    asked: Option<(Generation, SavedChange, WorkspaceId)>,
     /// The item `d` asked about (and its workspace), while the question is open.
     clearing: Option<(SavedId, WorkspaceId)>,
 }
@@ -207,8 +207,8 @@ impl App {
     }
 
     fn ask_saved(&mut self, (item, workspace): (SavedId, WorkspaceId), change: SavedChange) {
-        let g = self.work.requests.ask(Some(workspace), Command::Save { item, change });
-        self.shell.todo.asked = Some((g, change));
+        let g = self.work.requests.ask(Some(workspace.clone()), Command::Save { item, change });
+        self.shell.todo.asked = Some((g, change, workspace));
     }
 
     /// The answer to the clear question: `yes` clears the item asked about.
@@ -221,9 +221,8 @@ impl App {
     /// The backend's saved items after the change asked last, by its clock `taken`, arrived at
     /// `now`; an older answer is dropped.
     pub(super) fn on_saved(&mut self, generation: Generation, items: Vec<SavedItem>, taken: Ts, now: Instant) -> bool {
-        let Some((_, change)) = self.shell.todo.asked.filter(|(g, _)| *g == generation) else { return false };
-        self.shell.todo.asked = None;
-        self.model.set_saved(items, taken);
+        let Some((_, change, ws)) = self.shell.todo.asked.take_if(|(g, ..)| *g == generation) else { return false };
+        self.model.set_saved_in(&ws, items, taken);
         self.shell.clamp(&self.model, self.list_height());
         let done = match change {
             SavedChange::Complete => Label::StatusTodoCompleted,
@@ -238,7 +237,7 @@ impl App {
 
     /// The change asked last as request `id` failed: nothing changed, and nothing waits for it.
     pub(super) fn on_save_failed(&mut self, id: Generation) -> bool {
-        self.shell.todo.asked.take_if(|(g, _)| *g == id).is_some()
+        self.shell.todo.asked.take_if(|(g, ..)| *g == id).is_some()
     }
 
     /// `Enter` (`focus`) or `l` on an item: its message in the work area, selected — in its

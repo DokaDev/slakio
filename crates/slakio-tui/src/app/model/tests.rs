@@ -99,12 +99,13 @@ fn a_person_listed_by_two_workspaces_is_kept_as_each_one_sees_them() {
         presence: slakio_core::model::Presence::Unknown,
     };
     let mut m = Model::default();
-    m.add_users(&[peer(&a, Org::Own), peer(&b, Org::External(Remote::new("A corp")))]);
+    m.add_users(&a, &[peer(&a, Org::Own)]);
+    m.add_users(&b, &[peer(&b, Org::External(Remote::new("A corp")))]);
     let id = UserId::new("U-peer");
     assert_eq!(m.user(&a, &id).map(|u| &u.org), Some(&Org::Own));
     assert_eq!(m.user(&b, &id).map(|u| &u.org), Some(&Org::External(Remote::new("A corp"))), "not overwritten by A's");
     // Learned again from a page of B: B's entry changes, A's does not.
-    m.add_users(&[User { presence: slakio_core::model::Presence::Away, ..peer(&b, Org::Own) }]);
+    m.add_users(&b, &[User { presence: slakio_core::model::Presence::Away, ..peer(&b, Org::Own) }]);
     assert_eq!(m.user(&a, &id).map(|u| u.presence), Some(slakio_core::model::Presence::Unknown));
     assert_eq!(m.user(&b, &id).map(|u| u.presence), Some(slakio_core::model::Presence::Away));
     // A workspace that does not list them yet shows their name all the same.
@@ -264,4 +265,29 @@ mod properties {
             }
         }
     }
+}
+
+#[test]
+fn an_answer_of_one_workspace_never_changes_another_workspaces_people_or_saved_items() {
+    let mut m = model();
+    let (a, b) = (ws(&m, 0), ws(&m, 1));
+    let all: Vec<SavedItem> = m.snapshot.saved.clone().unwrap();
+    let of =
+        |items: &[SavedItem], w: &WorkspaceId| items.iter().filter(|i| &i.workspace == w).cloned().collect::<Vec<_>>();
+    assert!(!of(&all, &a).is_empty() && !of(&all, &b).is_empty(), "both workspaces have saved items");
+    // A's answer: one of A's items gone, and an item tagged with B's workspace in it.
+    let mut answer = of(&all, &a)[1..].to_vec();
+    let mut stray = of(&all, &b)[0].clone();
+    stray.state = SavedState::Completed;
+    answer.push(stray);
+    m.set_saved_in(&a, answer, m.taken());
+    let now = m.snapshot.saved.clone().unwrap();
+    assert_eq!(of(&now, &a), of(&all, &a)[1..].to_vec(), "A's items as its answer says");
+    assert_eq!(of(&now, &b), of(&all, &b), "B's items are not touched");
+    // A page of A that names a person of B: B's view of them is not changed.
+    let id = m.snapshot.users.iter().find(|u| u.workspace == b).unwrap().id.clone();
+    let before = m.user(&b, &id).cloned();
+    let changed = User { display_name: Remote::new("Changed"), ..before.clone().unwrap() };
+    m.add_users(&a, &[changed]);
+    assert_eq!(m.user(&b, &id).cloned(), before);
 }

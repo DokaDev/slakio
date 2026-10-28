@@ -246,10 +246,10 @@ impl Model {
         })
     }
 
-    /// People the backend learned of after the start (a page's authors): each is added, or
-    /// replaces what was known of them in the workspace that lists them.
-    pub fn add_users(&mut self, users: &[User]) {
-        for u in users {
+    /// People the backend learned of after the start (a page's authors, of workspace `ws`): each
+    /// is added, or replaces what was known of them in `ws`; one of another workspace is left out.
+    pub fn add_users(&mut self, ws: &WorkspaceId, users: &[User]) {
+        for u in users.iter().filter(|u| &u.workspace == ws) {
             match self.users.get(&(u.workspace.clone(), u.id.clone())) {
                 Some(&i) => self.snapshot.users[i] = u.clone(),
                 None => {
@@ -297,10 +297,14 @@ impl Model {
         !self.saved_unknown.contains(ws)
     }
 
-    /// Every saved item after a change the backend made, and its clock then.
-    pub fn set_saved(&mut self, items: Vec<SavedItem>, taken: slakio_core::model::Ts) {
-        self.saved_unknown.retain(|ws| !items.iter().any(|i| &i.workspace == ws));
-        self.snapshot.saved = Some(items);
+    /// Workspace `ws`'s saved items after a change its backend made, and its clock then: the
+    /// other workspaces' items stay, and an item of another workspace is left out.
+    pub fn set_saved_in(&mut self, ws: &WorkspaceId, items: Vec<SavedItem>, taken: slakio_core::model::Ts) {
+        let mut all = self.snapshot.saved.take().unwrap_or_default();
+        all.retain(|i| &i.workspace != ws);
+        all.extend(items.into_iter().filter(|i| &i.workspace == ws));
+        self.saved_unknown.remove(ws);
+        self.snapshot.saved = Some(all);
         self.snapshot.taken = taken;
     }
 
