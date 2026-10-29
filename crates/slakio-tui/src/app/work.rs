@@ -79,6 +79,9 @@ static EMPTY: Timeline = Timeline {
     retry_at: None,
     paged: false,
     catchup: None,
+    live_after: None,
+    recatch: None,
+    catchup_fails: 0,
 };
 
 /// `m` as drawn in a pane of `model`.
@@ -432,8 +435,7 @@ impl Work {
     /// request or for a target no pane shows is dropped. Every pane on the target keeps its
     /// selection on its messages (it names them by timestamp).
     pub fn on_page(&mut self, generation: Generation, page: &Page, model: &Model) -> bool {
-        if let Some(tl) = self.timelines.caught_up(&page.target, generation) {
-            tl.catch_up(page, page.messages.iter().map(|m| shown(model, &page.target, m)).collect());
+        if self.on_caught_up(generation, page, model) {
             return true;
         }
         let Some(tl) = self.timelines.awaiting(&page.target, generation) else { return false };

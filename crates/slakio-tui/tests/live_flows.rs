@@ -9,7 +9,6 @@
 #[path = "support/demo.rs"]
 mod demo;
 #[path = "support/scripted.rs"]
-#[expect(dead_code, reason = "the shared harness has more than these tests use")]
 mod scripted;
 
 use scripted::Scripted;
@@ -277,4 +276,103 @@ fn with_several_workspaces_the_notice_names_whose() {
     push(&mut s, Live::Connection { workspace: b.id.clone(), state: Connection::Connected { catch_up: false } });
     let name = b.name.unsanitized().to_string();
     assert!(s.d.status_line().contains(&format!("{name}: Live updates on")), "{}", s.d.status_line());
+}
+
+#[test]
+fn what_comes_live_while_a_catch_up_is_on_its_way_stays_and_a_chosen_view_stays_put() {
+    let (mut s, at) = opened("general", 120, 40);
+    s.keys("k k k");
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    let chosen = pane.messages()[pane.selected().expect("a selection")].ts;
+    s.d.screen();
+    let top = s.d.pane(PaneKind::Conversation).unwrap().drawn_rows();
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: true } });
+    // The socket is back, the page is on its way, and a message comes live meanwhile.
+    let live_ts = 1_900_000_000_000_000;
+    push(&mut s, at.post(live_ts, &at.other, "posted after the socket came back"));
+    let i = s.b.held.iter().position(|r| matches!(r.command, Command::Catchup { .. })).unwrap();
+    s.b.answer(i);
+    s.pump();
+    assert_eq!(newest(&s), Ts(live_ts), "kept after the page, which was read before it came");
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    assert_eq!(pane.messages()[pane.selected().unwrap()].ts, chosen);
+    s.d.screen();
+    assert_eq!(s.d.pane(PaneKind::Conversation).unwrap().drawn_rows(), top, "nothing moved on screen");
+}
+
+#[test]
+fn a_failed_catch_up_is_asked_for_again_by_itself() {
+    let (mut s, at) = opened("general", 120, 40);
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: true } });
+    let catchups = |s: &Scripted| s.b.held.iter().filter(|r| matches!(r.command, Command::Catchup { .. })).count();
+    let i = s.b.held.iter().position(|r| matches!(r.command, Command::Catchup { .. })).unwrap();
+    s.b.fail(i, slakio_core::backend::FailKind::Network);
+    s.pump();
+    assert_eq!(catchups(&s), 0);
+    s.d.now += Duration::from_secs(29);
+    s.d.app.on_tick(s.d.now);
+    s.pump();
+    assert_eq!(catchups(&s), 0, "not before its pause");
+    s.d.now += Duration::from_secs(2);
+    s.d.app.on_tick(s.d.now);
+    s.pump();
+    assert_eq!(catchups(&s), 1, "asked again: no gap stays hidden");
+}
+
+#[test]
+fn unknown_counts_stay_unknown_and_a_deletion_said_twice_counts_once() {
+    let (mut s, at) = opened("general", 120, 40);
+    let count = |s: &Scripted| {
+        let c = s.d.app.model.conversations().iter().find(|c| c.id == at.conversation).unwrap();
+        (c.unread, c.mentions)
+    };
+    s.d.app.model.counts_unknown.insert(at.ws.clone());
+    let before = count(&s);
+    let ts = newest(&s).0 + 1;
+    push(&mut s, at.post(ts, &at.other, "x"));
+    assert_eq!(count(&s), before, "one more on an unknown count is still unknown");
+    s.d.app.model.counts_unknown.clear();
+    // A reply: counted once, taken off once however often its deletion is said.
+    s.keys("k");
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    let parent = pane.messages()[pane.selected().unwrap()].ts;
+    let replies = |s: &Scripted| {
+        let pane = s.d.pane(PaneKind::Conversation).unwrap();
+        pane.messages().iter().find(|m| m.ts == parent).unwrap().thread.map_or(0, |t| t.replies)
+    };
+    let thread = Target::Thread { workspace: at.ws.clone(), conversation: at.conversation.clone(), thread: parent };
+    s.keys("enter");
+    let i =
+        s.b.held
+            .iter()
+            .position(|r| matches!(&r.command, Command::History { target, .. } if *target == thread))
+            .unwrap();
+    s.b.answer(i);
+    s.pump();
+    let before = replies(&s);
+    let ts = 1_900_000_000_000_000;
+    push(&mut s, at.live(Some(parent), false, false, message(ts, &at.other, "on it")));
+    assert_eq!(replies(&s), before + 1);
+    let deleted = || Live::Deleted {
+        workspace: at.ws.clone(),
+        conversation: at.conversation.clone(),
+        thread: Some(parent),
+        ts: Ts(ts),
+    };
+    push(&mut s, deleted());
+    push(&mut s, deleted());
+    assert_eq!(replies(&s), before, "taken off once");
+    // A reply never loaded: nothing to take off.
+    push(
+        &mut s,
+        Live::Deleted {
+            workspace: at.ws.clone(),
+            conversation: at.conversation.clone(),
+            thread: Some(parent),
+            ts: Ts(7),
+        },
+    );
+    assert_eq!(replies(&s), before);
 }

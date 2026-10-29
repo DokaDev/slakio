@@ -273,6 +273,10 @@ impl Model {
     /// one more mention when it mentions the user, or every message of a DM does). Muting
     /// changes what badges show, not the counts ([`Conversation::badges`]). `true` when listed.
     pub fn bump(&mut self, ws: &WorkspaceId, id: &ConversationId, mention: bool) -> bool {
+        // Counts Slack did not give stay unknown: one more on an unknown count is still unknown.
+        if self.counts_unknown.contains(ws) {
+            return false;
+        }
         let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
             return false;
         };

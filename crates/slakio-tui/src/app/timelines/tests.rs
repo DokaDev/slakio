@@ -128,3 +128,84 @@ fn a_failed_catch_up_leaves_what_was_loaded() {
     let tl = store.get(&target("T")).unwrap();
     assert!(tl.catchup.is_none() && tl.failed.is_none() && tl.items.len() == 10);
 }
+
+#[test]
+fn catching_up_keeps_what_came_live_meanwhile_and_judges_the_gap_by_what_was_loaded_when_asked() {
+    // Loaded 50..60, asked; meanwhile 90 and 91 came live (newer than the page Slack served).
+    let asked = || {
+        let mut tl = Timeline::default();
+        tl.add_page(&page("T", false), (50..60).map(msg).collect());
+        tl.ask_catch_up(Generation(9));
+        assert!(tl.put_live(msg(90), false) && tl.put_live(msg(91), false));
+        tl
+    };
+    // The page overlaps what was loaded: the live ones stay after it.
+    let mut tl = asked();
+    tl.catch_up(&page("T", false), vec![55, 56, 58, 59, 60, 61].into_iter().map(msg).collect());
+    assert_eq!(ts(&tl), [50, 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 90, 91]);
+    // The page does not reach back to 59 (more were missed than it holds): a gap, though 90 is
+    // newer than its oldest. Never hidden: the page replaces what was loaded, the live ones stay.
+    let mut tl = asked();
+    tl.catch_up(&page("T", false), vec![70, 71].into_iter().map(msg).collect());
+    assert_eq!(ts(&tl), [70, 71, 90, 91]);
+    assert!(!tl.complete && !tl.paged);
+    // The whole conversation: the live ones stay too.
+    let mut tl = asked();
+    tl.catch_up(&page("T", true), vec![52, 70].into_iter().map(msg).collect());
+    assert_eq!(ts(&tl), [52, 70, 90, 91]);
+    // One loaded before the ask and newer than the page was deleted meanwhile: it goes.
+    let mut tl = Timeline::default();
+    tl.add_page(&page("T", false), (50..60).map(msg).collect());
+    tl.ask_catch_up(Generation(9));
+    tl.catch_up(&page("T", false), (50..59).map(msg).collect());
+    assert_eq!(ts(&tl), (50..59).collect::<Vec<_>>());
+}
+
+#[test]
+fn the_page_that_replaces_the_cache_keeps_what_came_live_on_top_of_it() {
+    let mut tl = Timeline::default();
+    tl.add_cached((50..60).map(msg).collect());
+    assert!(tl.put_live(msg(80), false));
+    tl.add_page(&page("T", false), (52..62).map(msg).collect());
+    assert_eq!(ts(&tl), [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 80]);
+    assert!(!tl.cached);
+    // Without a live one, the page alone (a cached message newer than it was deleted).
+    let mut tl = Timeline::default();
+    tl.add_cached((50..60).map(msg).collect());
+    tl.add_page(&page("T", false), (40..50).map(msg).collect());
+    assert_eq!(ts(&tl), (40..50).collect::<Vec<_>>());
+}
+
+#[test]
+fn a_failed_catch_up_is_asked_for_again_by_itself_after_a_pause_that_doubles() {
+    let mut store = TimelineStore::default();
+    let now = Instant::now();
+    let tl = store.entry(&target("T"));
+    tl.add_page(&page("T", false), (50..60).map(msg).collect());
+    tl.ask_catch_up(Generation(4));
+    store.fail(Generation(4), FailKind::Network, now);
+    assert_eq!(store.get(&target("T")).unwrap().recatch, Some(now + RETRY_PAUSE));
+    let tl = store.entry(&target("T"));
+    tl.ask_catch_up(Generation(5));
+    assert!(tl.recatch.is_none());
+    // What it must reach back to is still what was loaded before the first ask.
+    assert!(tl.put_live(msg(90), false));
+    tl.ask_catch_up(Generation(5));
+    store.fail(Generation(5), FailKind::RateLimited { retry_after: None }, now);
+    assert_eq!(store.get(&target("T")).unwrap().recatch, Some(now + 2 * RETRY_PAUSE));
+    for _ in 0..10 {
+        let tl = store.entry(&target("T"));
+        tl.ask_catch_up(Generation(6));
+        store.fail(Generation(6), FailKind::Network, now);
+    }
+    assert_eq!(store.get(&target("T")).unwrap().recatch, Some(now + RECATCH_MAX), "at most this long");
+    let tl = store.entry(&target("T"));
+    tl.ask_catch_up(Generation(7));
+    tl.catch_up(&page("T", false), (58..62).map(msg).collect());
+    assert_eq!(ts(tl).last(), Some(&90), "judged from 59, the live one kept");
+    assert_eq!((tl.recatch, tl.catchup_fails), (None, 0));
+    // The sign-in failing is not asked again by itself.
+    tl.ask_catch_up(Generation(8));
+    store.fail(Generation(8), FailKind::Auth, now);
+    assert_eq!(store.get(&target("T")).unwrap().recatch, None);
+}

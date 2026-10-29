@@ -23,6 +23,10 @@ use std::time::{Duration, Instant};
 /// when Slack did not say.
 pub const RETRY_PAUSE: Duration = Duration::from_secs(30);
 
+/// The longest pause before a failed catch-up is asked for again by itself (the pause doubles
+/// from [`RETRY_PAUSE`] each time it fails again).
+pub const RECATCH_MAX: Duration = Duration::from_secs(15 * 60);
+
 #[derive(Clone, Debug, Default)]
 pub struct Timeline {
     /// Oldest first.
@@ -47,6 +51,14 @@ pub struct Timeline {
     pub paged: bool,
     /// The newest page asked for again after live updates were lost; its request id.
     pub catchup: Option<Generation>,
+    /// The newest message a page loaded (the cache's, or when a catch-up was asked): those newer
+    /// came live after it, and the page that replaces what was loaded keeps them.
+    pub live_after: Option<Ts>,
+    /// A catch-up failed: when it is asked for again by itself (what it was to read is missing
+    /// until then).
+    pub recatch: Option<Instant>,
+    /// Catch-ups that failed in a row.
+    pub catchup_fails: u32,
 }
 
 impl Timeline {
@@ -54,6 +66,7 @@ impl Timeline {
     /// shown until it comes. Only into an empty timeline; it still waits.
     pub fn add_cached(&mut self, shown: Vec<Shown>) {
         if self.items.is_empty() {
+            self.live_after = shown.last().map(|m| m.ts);
             self.items = shown;
             self.cached = true;
         }
@@ -64,9 +77,13 @@ impl Timeline {
     pub fn add_page(&mut self, page: &Page, shown: Vec<Shown>) -> usize {
         self.pending = None;
         self.complete = page.complete;
-        // The backend's page replaces what the cache had.
+        // The backend's page replaces what the cache had, but not what came live on top of it
+        // and is newer than the page.
+        let mut live = Vec::new();
         if std::mem::take(&mut self.cached) {
-            self.items.clear();
+            let (after, newest) = (self.live_after.take(), shown.last().map(|m| m.ts));
+            live = std::mem::take(&mut self.items);
+            live.retain(|m| after.is_some_and(|a| m.ts > a) && newest.is_none_or(|n| m.ts > n));
             self.cut = false;
         }
         self.cut |= page.cut;
@@ -75,6 +92,7 @@ impl Timeline {
         let older: Vec<Shown> = shown.into_iter().filter(|m| first.is_none_or(|f| m.ts < f)).collect();
         let n = older.len();
         self.items.splice(0..0, older);
+        self.items.extend(live);
         n
     }
 
@@ -155,7 +173,7 @@ impl Timeline {
         }
     }
 
-    /// A reply under the message at `parent` was deleted: one fewer on its count.
+    /// A reply under the message at `parent` was deleted (and was loaded): one fewer on its count.
     pub fn drop_reply(&mut self, parent: Ts) -> bool {
         let Some(i) = self.position(parent) else { return false };
         let m = &mut self.items[i];
@@ -167,29 +185,46 @@ impl Timeline {
         true
     }
 
+    /// The newest page is asked for again (request `id`) after live updates were lost: what is
+    /// loaded now (the newest message from before) is what the page must reach back to.
+    pub fn ask_catch_up(&mut self, id: Generation) {
+        self.catchup = Some(id);
+        self.recatch = None;
+        if self.live_after.is_none() {
+            self.live_after = self.items.last().map(|m| m.ts);
+        }
+    }
+
     /// The newest page read again after live updates were lost (already sanitised), in place of
     /// what was loaded over the span it covers: what it lacks there was deleted meanwhile. When it
-    /// does not reach back to the newest message loaded, what came between is unknown: the page
-    /// replaces everything (reading back pages the rest again), so no gap is ever hidden.
+    /// does not reach back to the newest message loaded when it was asked for, what came between
+    /// is unknown: the page replaces everything (reading back pages the rest again), so no gap is
+    /// ever hidden. What came live meanwhile and is newer than the page stays after it.
     pub fn catch_up(&mut self, page: &Page, shown: Vec<Shown>) {
         self.catchup = None;
+        (self.recatch, self.catchup_fails) = (None, 0);
+        let from = self.live_after.take().or_else(|| self.items.last().map(|m| m.ts));
+        let newest = shown.last().map(|m| m.ts);
+        let live = |m: &Shown| from.is_none_or(|f| m.ts > f) && newest.is_none_or(|n| m.ts > n);
         let Some(oldest) = shown.first().map(|m| m.ts) else {
             if page.complete {
-                self.items.clear();
+                self.items.retain(live);
                 self.complete = true;
             }
             return;
         };
+        let tail: Vec<Shown> = self.items.iter().filter(|m| live(m)).cloned().collect();
         if page.complete {
             // The whole conversation: nothing older is left.
             (self.items, self.complete) = (shown, true);
-        } else if self.items.last().is_some_and(|m| m.ts >= oldest) {
+        } else if from.is_some_and(|f| f >= oldest) {
             self.items.retain(|m| m.ts < oldest);
             self.items.extend(shown);
         } else {
             self.items = shown;
             (self.complete, self.paged) = (false, false);
         }
+        self.items.extend(tail);
     }
 
     /// The index of the message at `ts`, when loaded.
@@ -239,9 +274,17 @@ impl TimelineStore {
     /// Slack asked to slow down, it asks again by itself once Slack's pause passed. The target,
     /// when one waited for it.
     pub fn fail(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<Target> {
-        // A catch-up that failed leaves what was loaded as it was.
+        // A catch-up that failed leaves what was loaded as it was, and is asked for again by
+        // itself after a pause that doubles each time (unless the sign-in failed).
         if let Some((target, tl)) = self.timelines.iter_mut().find(|(_, t)| t.catchup == Some(id)) {
             tl.catchup = None;
+            tl.catchup_fails = tl.catchup_fails.saturating_add(1);
+            let pause = RETRY_PAUSE.saturating_mul(1 << (tl.catchup_fails - 1).min(6)).min(RECATCH_MAX);
+            tl.recatch = match kind {
+                FailKind::Auth | FailKind::ReadOnly => None,
+                FailKind::RateLimited { retry_after: Some(after) } => Some(now + pause.max(after)),
+                _ => Some(now + pause),
+            };
             return Some(target.clone());
         }
         let (target, tl) = self.timelines.iter_mut().find(|(_, t)| t.pending == Some(id))?;

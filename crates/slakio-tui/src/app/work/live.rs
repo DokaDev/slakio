@@ -2,12 +2,13 @@
 //! shows where it belongs — the conversation, the thread it is a reply of — and the count of
 //! replies under a thread's own message follows. Panes name their selection and anchor by
 //! timestamp, and one where the user chose a message keeps its view, so nothing moves under the
-//! user; a pane following the newest message keeps following it. After live updates were lost a while, the open conversations are read again,
-//! one newest page each ([`Work::catch_up`]).
+//! user; a pane following the newest message keeps following it. After live updates were lost a
+//! while, the open conversations are read again, one newest page each ([`Work::catch_up`]); one
+//! that fails is asked for again by itself later.
 
 use super::{Work, shown};
 use crate::app::model::Model;
-use slakio_core::backend::Command;
+use slakio_core::backend::{Command, Generation, Page};
 use slakio_core::model::{ConversationId, Message, Target, Ts, WorkspaceId};
 
 /// The most conversations of a workspace read again after live updates were lost.
@@ -61,11 +62,7 @@ impl Work {
                 .into_iter()
                 .flatten()
                 .collect();
-        for pane in self.panes.values().filter(|p| into.contains(&p.target) && p.selected.is_some()) {
-            if pane.bottom.get().is_none() {
-                pane.bottom.set(self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts));
-            }
-        }
+        self.pin(&into);
         if at.thread.is_none() || at.broadcast {
             let target = at.conversation();
             if let Some(tl) = self.timelines.get_mut(&target) {
@@ -85,17 +82,52 @@ impl Work {
         drawn
     }
 
+    /// The panes on `targets` where the user chose a message keep their view while what they
+    /// show changes: their bottom is pinned to the newest message shown.
+    fn pin(&self, targets: &[Target]) {
+        for pane in self.panes.values().filter(|p| targets.contains(&p.target) && p.selected.is_some()) {
+            if pane.bottom.get().is_none() {
+                pane.bottom.set(self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts));
+            }
+        }
+    }
+
     /// The message at `ts` was deleted at `at` (a reply, when `at.thread` says so). `true` when a
-    /// pane's messages changed.
+    /// pane's messages changed. A reply comes off its thread's count only when it was loaded and
+    /// taken away now: a deletion said twice, or one of a reply never shown, counts nothing.
     pub fn on_live_deleted(&mut self, at: Place<'_>, ts: Ts) -> bool {
-        let mut drawn = false;
+        let mut removed = false;
         for (_, tl) in self.timelines.iter_mut().filter(|(t, _)| at.holds(t)) {
-            drawn |= tl.remove(ts);
-            if let Some(parent) = at.thread {
+            removed |= tl.remove(ts);
+        }
+        let mut drawn = removed;
+        if let Some(parent) = at.thread.filter(|_| removed) {
+            for (_, tl) in self.timelines.iter_mut().filter(|(t, _)| at.holds(t)) {
                 drawn |= tl.drop_reply(parent);
             }
         }
         drawn
+    }
+
+    /// The newest page of a catch-up arrived as the answer `generation`: `false` when it is not
+    /// one. Panes where the user chose a message keep their view.
+    pub(super) fn on_caught_up(&mut self, generation: Generation, page: &Page, model: &Model) -> bool {
+        if self.timelines.caught_up(&page.target, generation).is_none() {
+            return false;
+        }
+        self.pin(std::slice::from_ref(&page.target));
+        let shown = page.messages.iter().map(|m| shown(model, &page.target, m)).collect();
+        if let Some(tl) = self.timelines.caught_up(&page.target, generation) {
+            tl.catch_up(page, shown);
+        }
+        true
+    }
+
+    /// Ask for `target`'s newest page again, as a catch-up.
+    pub(super) fn ask_catch_up(&mut self, target: &Target) {
+        let command = Command::Catchup { target: target.clone(), limit: CATCHUP_PAGE };
+        let id = self.requests.ask(Some(target.workspace().clone()), command);
+        self.timelines.entry(target).ask_catch_up(id);
     }
 
     /// Live updates of `ws` came back after they were lost: read its open conversations again
@@ -117,9 +149,7 @@ impl Work {
             .collect();
         targets.sort_by_key(|t| (Some(t) != active.as_ref(), t.conversation().clone()));
         for target in targets.into_iter().take(CATCHUP_MAX) {
-            let command = Command::Catchup { target: target.clone(), limit: CATCHUP_PAGE };
-            let id = self.requests.ask(Some(ws.clone()), command);
-            self.timelines.entry(&target).catchup = Some(id);
+            self.ask_catch_up(&target);
         }
     }
 }

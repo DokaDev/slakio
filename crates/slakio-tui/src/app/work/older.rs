@@ -3,8 +3,9 @@
 //! gesture wants one more page at most ([`super::Work::fill`] queues it), and the pages queued
 //! go out one at a time, at least [`OLDER_GAP`] apart, whatever the gestures (holding `k`,
 //! pressing `gg` again and again). A page Slack asked to slow down for is asked for again by
-//! itself once Slack's pause passed. A thread's older pages are not paced: the backend serves
-//! them from what it read when the thread opened, without a request.
+//! itself once Slack's pause passed, and so is a catch-up that failed, once its pause passed. A
+//! thread's older pages are not paced: the backend serves them from what it read when the thread
+//! opened, without a request.
 
 use super::Work;
 use crate::app::pane::PAGE;
@@ -57,7 +58,8 @@ impl Work {
         let queued = self.timelines.iter().any(|(_, tl)| tl.queued);
         let next = self.older_at.map(|at| at + OLDER_GAP).filter(|_| queued);
         let retry = self.timelines.iter().filter_map(|(_, tl)| tl.retry_at.filter(|_| tl.failed.is_some())).min();
-        next.into_iter().chain(retry).min()
+        let recatch = self.timelines.iter().filter_map(|(_, tl)| tl.recatch).min();
+        next.into_iter().chain(retry).chain(recatch).min()
     }
 
     /// At `now`: the failed pages whose pause passed are asked for again, and one queued older
@@ -74,6 +76,15 @@ impl Work {
         }
         if changed {
             self.fill();
+        }
+        let due: Vec<Target> = self
+            .timelines
+            .iter()
+            .filter(|(_, tl)| tl.recatch.is_some_and(|at| at <= now))
+            .map(|(t, _)| t.clone())
+            .collect();
+        for target in &due {
+            self.ask_catch_up(target);
         }
         if self.older_at.is_some_and(|at| now < at + OLDER_GAP) {
             return changed;
