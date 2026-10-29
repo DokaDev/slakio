@@ -2,6 +2,8 @@
 //!
 //! * the **kill switch** — with the network off nothing is sent, and switching it off stops
 //!   the requests in flight too ([`Governor::stop`], `SLAKIO_NETWORK=off`, `network = "off"`);
+//!   the app's `:net` switches it off and on again ([`Governor::switch`]), never on when it was
+//!   off from the start or the run's cap was reached;
 //! * at most [`Limits::in_flight`] requests in flight, and at most [`Limits::waiting`] waiting
 //!   for a slot (more are refused as busy);
 //! * a **request cap** per minute, with a share that background work cannot use, so what the
@@ -166,6 +168,9 @@ pub struct Governor {
     clock: Box<dyn Clock>,
     counts: Mutex<Counts>,
     network: watch::Sender<bool>,
+    /// The network was off from the start (`SLAKIO_NETWORK=off`, `--offline`, the config): it
+    /// stays off for the run, whatever the app asks ([`Governor::switch`]).
+    locked: bool,
     slots: Arc<Semaphore>,
     waiting: AtomicUsize,
 }
@@ -237,18 +242,42 @@ impl Governor {
             clock,
             counts: Mutex::new(Counts::default()),
             network: watch::Sender::new(network),
+            locked: !network,
             slots: Arc::new(Semaphore::new(limits.in_flight)),
             waiting: AtomicUsize::new(0),
         })
     }
 
     /// The kill switch: nothing more is sent, and what is in flight stops ([`Governor::stopped`]).
+    /// Only [`Governor::switch`] turns it on again.
     pub fn stop(&self) {
         self.network.send_replace(false);
     }
 
     pub fn is_on(&self) -> bool {
         *self.network.borrow()
+    }
+
+    /// The app's switch (`:net off`, `:net on`): off is [`Governor::stop`]; on lets requests
+    /// through again, unless the network was off from the start or the cap of the run was
+    /// reached (then it stays off). Whether the network is now as asked.
+    pub fn switch(&self, on: bool) -> bool {
+        if !on {
+            self.stop();
+            return true;
+        }
+        let tripped = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).tripped;
+        if self.locked || tripped {
+            return false;
+        }
+        self.network.send_replace(true);
+        true
+    }
+
+    /// Done when the network is on (at once when it is).
+    pub async fn started(&self) {
+        let mut rx = self.network.subscribe();
+        let _ = rx.wait_for(|on| *on).await;
     }
 
     /// Done when the network is switched off (at once when it is off).

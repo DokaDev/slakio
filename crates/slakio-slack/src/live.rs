@@ -9,9 +9,13 @@
 //! up to [`Realtime::longest_retry`], each with a random part (so many clients do not come back at
 //! once), and never shorter than Slack asked for; the pause starts over only after a socket said
 //! hello and stayed open [`Realtime::steady`]. A socket
-//! silent for [`Realtime::silence`] (Slack pings it twice a minute) is taken as lost. Every
+//! silent for [`Realtime::silence`] (Slack pings it twice a minute) is taken as lost; so is one
+//! open while the machine slept (a laptop's lid closed: the wall clock ran ahead of the monotonic
+//! one, [`Realtime::slept`]), at once, and it opens again without a pause. After a socket was
+//! lost, Slack's unread counts are read again too (one `client.counts`), since what came
+//! meanwhile in conversations not open is counted nowhere else. Every
 //! opening passes the governor: with the network off nothing opens, and switching it off ends the
-//! socket; an opening counts against the request cap, and on the workspace's own part of the
+//! socket (switched on again, it opens again and asks to catch up); an opening counts against the request cap, and on the workspace's own part of the
 //! background share (while that has no room, the UI is told so: `Held`, not just lost). A workspace's socket is its own: one that fails holds no other back.
 //!
 //! Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the pause doubling from 1 s
@@ -30,11 +34,11 @@ use slakio_core::model::{ConversationId, User, WorkspaceId};
 use socket::{Incoming, Socket};
 use std::collections::HashSet;
 use std::sync::{Arc, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::mpsc;
 
 /// How the live updates connect, and connect again.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Realtime {
     /// The pause before the first new attempt.
     pub first_retry: Duration,
@@ -44,6 +48,13 @@ pub struct Realtime {
     pub steady: Duration,
     /// A socket that says nothing this long is lost.
     pub silence: Duration,
+    /// How often the clocks are compared while a socket is open.
+    pub wake_check: Duration,
+    /// The wall clock ahead of the monotonic one by more than this between two checks: the
+    /// machine slept.
+    pub wake_gap: Duration,
+    /// The wall clock (the tests' moves when they say).
+    pub wall: fn() -> SystemTime,
 }
 
 impl Default for Realtime {
@@ -53,6 +64,9 @@ impl Default for Realtime {
             longest_retry: Duration::from_secs(30),
             steady: Duration::from_secs(30),
             silence: Duration::from_secs(60),
+            wake_check: Duration::from_secs(5),
+            wake_gap: Duration::from_secs(10),
+            wall: SystemTime::now,
         }
     }
 }
@@ -65,10 +79,35 @@ impl Realtime {
         let doubled = self.first_retry.saturating_mul(1 << failures.min(16)).min(self.longest_retry);
         doubled / 2 + doubled.mul_f64(jitter.clamp(0.0, 1.0)) / 2
     }
+
+    /// The machine slept between two checks `ran` apart on the monotonic clock (which stops
+    /// while it sleeps), the wall clock reading `before` and `after` (which does not): the wall
+    /// clock moved on more than [`Realtime::wake_gap`] past the monotonic one. A wall clock set
+    /// back is no sleep.
+    pub fn slept(&self, ran: Duration, before: SystemTime, after: SystemTime) -> bool {
+        after.duration_since(before).is_ok_and(|wall| wall > ran.saturating_add(self.wake_gap))
+    }
+}
+
+/// Done when the machine slept while waiting ([`Realtime::slept`], checked every
+/// [`Realtime::wake_check`]).
+async fn woke(settings: Realtime) {
+    let mut at = (tokio::time::Instant::now(), (settings.wall)());
+    loop {
+        tokio::time::sleep(settings.wake_check).await;
+        let now = (tokio::time::Instant::now(), (settings.wall)());
+        if settings.slept(now.0 - at.0, at.1, now.1) {
+            return;
+        }
+        at = now;
+    }
 }
 
 /// The longest new authors' names are waited for before their messages are shown with their ids.
 const NAME_WAIT: Duration = Duration::from_secs(5);
+
+/// The longest a close of the client's own is waited for on a socket that may be gone.
+const CLOSE_WAIT: Duration = Duration::from_secs(1);
 
 /// How many updates wait to go to the UI (while names are looked up) before the socket's reading
 /// waits too.
@@ -76,12 +115,14 @@ const OUTBOX: usize = 256;
 
 /// How a socket ended.
 enum End {
-    /// The network was switched off, or the UI is gone: no more sockets.
+    /// The UI is gone: no more sockets.
     Stop,
+    /// The network was switched off: none opens until it is on again.
+    Off,
     /// It was lost (or never opened). `hello`: when it said hello, if it did; `wait`: how long
     /// Slack asked to wait before the next attempt; `held`: it was not opened because the
-    /// workspace's share of the request budget is used up.
-    Lost { hello: Option<Instant>, wait: Option<Duration>, held: bool },
+    /// workspace's share of the request budget is used up; `woke`: the machine slept.
+    Lost { hello: Option<Instant>, wait: Option<Duration>, held: bool, woke: bool },
 }
 
 /// An update on its way to the UI, and the author whose name it waits for, if one.
@@ -97,9 +138,9 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
         {
             break WorkspaceId::new(team);
         }
+        // The network may be switched off and on before the boot: it waits for it all the same.
         tokio::select! {
             () = ctx.booted.notified() => {}
-            () = client.governor().stopped() => return,
             () = tx.closed() => return,
         }
     };
@@ -108,14 +149,26 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     let (out, rx) = mpsc::channel::<Out>(OUTBOX);
     tokio::spawn(outbox(Arc::clone(&client), Arc::clone(&ctx), rx, tx));
     let mut jitter = RandomIds::default();
-    // What the UI was last told while not connected: lost, or held by the budget.
-    let (mut failures, mut told) = (0u32, None);
+    // What the UI was last told while not connected: lost, or held by the budget; and whether
+    // the network was switched off since the last hello.
+    let (mut failures, mut told, mut off) = (0u32, None, false);
     loop {
-        // What was missed while it was said to be lost (or not connected yet) is read again.
-        let ended = connection(&client, &ctx, &ws, &out, settings, told.is_some()).await;
-        let End::Lost { hello, wait, held } = ended else { return };
+        // What was missed while it was said to be lost (or not connected yet), or while the
+        // network was off, is read again.
+        let ended = connection(&client, &ctx, &ws, &out, settings, told.is_some() || off).await;
+        let (hello, wait, held, woke) = match ended {
+            End::Stop => return,
+            End::Off => {
+                off = true;
+                tokio::select! {
+                    () = client.governor().started() => continue,
+                    () = out.closed() => return,
+                }
+            }
+            End::Lost { hello, wait, held, woke } => (hello, wait, held, woke),
+        };
         if hello.is_some() {
-            told = None;
+            (told, off) = (None, false);
         }
         // Said once each time it changes: lost after it was open, or not open (yet, or again),
         // or held until the budget has room.
@@ -127,16 +180,39 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
                 return;
             }
         }
-        // The pause starts over only after a socket said hello and stayed open a while.
-        failures = if hello.is_some_and(|at| at.elapsed() >= settings.steady) { 0 } else { failures.saturating_add(1) };
+        // The pause starts over only after a socket said hello and stayed open a while, or when
+        // the machine woke (the network it slept on is not the one it may wake on).
+        failures = if woke || hello.is_some_and(|at| at.elapsed() >= settings.steady) {
+            0
+        } else {
+            failures.saturating_add(1)
+        };
         let r = f64::from(u16::from_str_radix(&jitter.hex(2), 16).unwrap_or(0)) / 65536.0;
         let pause = settings.retry_in(failures.saturating_sub(1), r).max(wait.unwrap_or_default());
         tokio::select! {
             () = tokio::time::sleep(pause) => {}
-            () = client.governor().stopped() => return,
+            () = client.governor().stopped() => off = true,
             () = out.closed() => return,
         }
+        if off {
+            tokio::select! {
+                () = client.governor().started() => {}
+                () = out.closed() => return,
+            }
+        }
     }
+}
+
+/// Slack's unread counts of `ws` read again after its socket came back (one `client.counts`, in
+/// the background share), pushed on `out`; when they cannot be read, the counts stay as they are.
+async fn recount(client: Arc<Client>, ws: WorkspaceId, out: mpsc::Sender<Out>) {
+    let Some(counts) = crate::boot::counts(&client).await else { return };
+    let mut counts: Vec<(ConversationId, u32, u32)> = crate::boot::unread_counts(counts)
+        .into_iter()
+        .map(|(id, (unread, mentions))| (ConversationId::new(id), unread, mentions))
+        .collect();
+    counts.sort_unstable_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+    let _ = out.send((Live::Counts { workspace: ws, counts }, None)).await;
 }
 
 /// Push `live` to the UI; `Err` when it is gone.
@@ -176,39 +252,56 @@ async fn outbox(client: Arc<Client>, ctx: Arc<Session>, mut rx: mpsc::Receiver<O
     }
 }
 
+/// Open `client`'s socket, or how that ended.
+async fn open(client: &Client) -> Result<Socket<crate::http::Upgraded>, End> {
+    let stopped = client.governor().stopped();
+    let opened = tokio::select! {
+        socket = client.open_socket() => socket,
+        () = stopped => return Err(End::Off),
+    };
+    match opened {
+        Ok(io) => Ok(Socket::new(io)),
+        Err(crate::SlackError::Offline { .. }) if !client.governor().is_on() => Err(End::Off),
+        // Slack asked to slow down: not before it said (its default pause when it did not).
+        Err(crate::SlackError::RateLimited { retry_after }) => {
+            let wait = retry_after.unwrap_or(crate::governor::DEFAULT_PAUSE);
+            Err(End::Lost { hello: None, wait: Some(wait), held: false, woke: false })
+        }
+        // The budget has no room for it: tried again after the pause, until it has.
+        Err(crate::SlackError::CapReached { .. }) => {
+            Err(End::Lost { hello: None, wait: None, held: true, woke: false })
+        }
+        Err(_) => Err(End::Lost { hello: None, wait: None, held: false, woke: false }),
+    }
+}
+
 /// One socket, from its opening to its end, its updates sent to `out`. `catch_up`: what came
 /// before it opened should be read again.
 async fn connection(
-    client: &Client,
+    client: &Arc<Client>,
     ctx: &Session,
     ws: &WorkspaceId,
     out: &mpsc::Sender<Out>,
     settings: Realtime,
     catch_up: bool,
 ) -> End {
-    let stopped = client.governor().stopped();
-    let opened = tokio::select! {
-        socket = client.open_socket() => socket,
-        () = stopped => return End::Stop,
-    };
-    let mut socket = match opened {
-        Ok(io) => Socket::new(io),
-        Err(crate::SlackError::Offline { .. }) if !client.governor().is_on() => return End::Stop,
-        // Slack asked to slow down: not before it said (its default pause when it did not).
-        Err(crate::SlackError::RateLimited { retry_after }) => {
-            let wait = retry_after.unwrap_or(crate::governor::DEFAULT_PAUSE);
-            return End::Lost { hello: None, wait: Some(wait), held: false };
-        }
-        // The budget has no room for it: tried again after the pause, until it has.
-        Err(crate::SlackError::CapReached { .. }) => return End::Lost { hello: None, wait: None, held: true },
-        Err(_) => return End::Lost { hello: None, wait: None, held: false },
+    let mut socket = match open(client).await {
+        Ok(socket) => socket,
+        Err(end) => return end,
     };
     let mut hello = None;
-    let lost = |hello| End::Lost { hello, wait: None, held: false };
+    let lost = |hello| End::Lost { hello, wait: None, held: false, woke: false };
+    let wake = woke(settings);
+    tokio::pin!(wake);
     loop {
         let next = tokio::select! {
             next = tokio::time::timeout(settings.silence, socket.next()) => next,
-            () = client.governor().stopped() => return End::Stop,
+            // The machine slept: whatever the socket was, it is gone by now.
+            () = &mut wake => {
+                let _ = tokio::time::timeout(CLOSE_WAIT, socket.close()).await;
+                return End::Lost { hello, wait: None, held: false, woke: true };
+            }
+            () = client.governor().stopped() => return End::Off,
             () = out.closed() => return End::Stop,
         };
         let text = match next {
@@ -226,6 +319,9 @@ async fn connection(
         let live = match events::frame(&text, me.as_ref()) {
             Frame::Hello if hello.is_none() => {
                 hello = Some(Instant::now());
+                if catch_up {
+                    tokio::spawn(recount(Arc::clone(client), ws.clone(), out.clone()));
+                }
                 Live::Connection { workspace: ws.clone(), state: Connection::Connected { catch_up } }
             }
             Frame::Goodbye => {

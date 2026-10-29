@@ -18,3 +18,16 @@ fn the_pause_doubles_within_its_bounds_with_a_random_part() {
         }
     }
 }
+
+#[test]
+fn a_wall_clock_far_ahead_of_the_monotonic_one_is_a_sleep_and_nothing_else_is() {
+    let r = Realtime::default();
+    let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(1_900_000_000);
+    let five = Duration::from_secs(5);
+    assert!(!r.slept(five, t0, t0 + five), "both moved on alike");
+    assert!(!r.slept(five, t0, t0 + five + r.wake_gap), "within the gap");
+    assert!(r.slept(five, t0, t0 + five + r.wake_gap + Duration::from_millis(1)));
+    assert!(r.slept(five, t0, t0 + Duration::from_secs(3600)), "an hour with the lid closed");
+    assert!(!r.slept(five, t0, t0 - Duration::from_secs(3600)), "a clock set back is no sleep");
+    assert!(!r.slept(Duration::from_secs(3600), t0, t0 + Duration::from_secs(3600)), "a long check, awake");
+}

@@ -101,15 +101,15 @@ impl Threads {
     }
 
     /// Up to `limit` messages of the thread at `thread` of `channel` older than `before` (the
-    /// newest: `None`).
+    /// newest: `None`), what it reads asked for at `priority`.
     pub(crate) async fn page(
         &self,
         client: &Client,
         me: Option<&UserId>,
-        channel: &str,
-        thread: Ts,
+        (channel, thread): (&str, Ts),
         before: Option<Ts>,
         limit: u32,
+        priority: Priority,
     ) -> Result<ThreadPage, SlackError> {
         let key = (channel.to_string(), thread);
         let read_first = {
@@ -124,11 +124,11 @@ impl Threads {
         match read_first {
             Read::Kept => {}
             Read::Whole => {
-                let walked = walk(client, me, channel, thread, None).await?;
+                let walked = walk(client, me, channel, thread, None, priority).await?;
                 self.keep(key.clone(), walked);
             }
             Read::From(from, old) => {
-                let new = walk(client, me, channel, thread, Some(from)).await?;
+                let new = walk(client, me, channel, thread, Some(from), priority).await?;
                 self.keep(key.clone(), merged(old, new, from));
             }
         }
@@ -204,13 +204,14 @@ fn merged(old: Walked, new: Walked, from: Ts) -> Walked {
 
 /// The thread at `thread` of `channel`, read from its start (or from `from` on): its messages
 /// oldest first (its own message first), the bots that posted, and whether it ended before the
-/// thread did: [`CALLS`] requests, or more to come with no way on.
+/// thread did: [`CALLS`] requests, or more to come with no way on. Each request at `priority`.
 async fn walk(
     client: &Client,
     me: Option<&UserId>,
     channel: &str,
     thread: Ts,
     from: Option<Ts>,
+    priority: Priority,
 ) -> Result<Walked, SlackError> {
     let (ts, limit, oldest) = (thread.to_string(), BATCH.to_string(), from.map(|t| t.to_string()));
     let mut raw: Vec<wire::Message> = Vec::new();
@@ -224,8 +225,7 @@ async fn walk(
         if let Some(c) = &cursor {
             params.push(("cursor", c.as_str()));
         }
-        let page: wire::History =
-            client.call(&Call::form(Method::ConversationsReplies, &params), Priority::User).await?;
+        let page: wire::History = client.call(&Call::form(Method::ConversationsReplies, &params), priority).await?;
         let next = page.next_cursor().map(str::to_string);
         let more = page.has_more;
         let got = page.messages.unwrap_or_default();

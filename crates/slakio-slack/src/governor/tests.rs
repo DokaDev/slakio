@@ -69,6 +69,25 @@ fn the_cap_of_a_run_stops_all_network_until_restart() {
         assert!(g.admit(M, Priority::User).await.is_err());
         assert!(!g.is_on());
         assert_eq!(g.sent(), 3);
+        assert!(!g.switch(true), "the app's switch cannot turn it on again");
+        assert!(!g.is_on());
+    });
+}
+
+#[test]
+fn the_apps_switch_turns_the_network_off_and_on_but_never_on_when_it_was_off_from_the_start() {
+    rt().block_on(async {
+        let (g, _) = governor(Limits::default(), true);
+        assert!(g.switch(false));
+        assert!(matches!(g.admit(M, Priority::User).await, Err(SlackError::Offline { .. })));
+        tokio::time::timeout(Duration::from_secs(1), g.stopped()).await.expect("off");
+        assert!(g.switch(true));
+        tokio::time::timeout(Duration::from_secs(1), g.started()).await.expect("on");
+        drop(g.admit(M, Priority::User).await.unwrap());
+        let (locked, _) = governor(Limits::default(), false);
+        assert!(!locked.switch(true));
+        assert!(matches!(locked.admit(M, Priority::User).await, Err(SlackError::Offline { .. })));
+        assert!(tokio::time::timeout(Duration::from_millis(50), locked.started()).await.is_err(), "never on");
     });
 }
 

@@ -194,6 +194,10 @@ pub enum Live {
     Marked { workspace: WorkspaceId, conversation: ConversationId, unread: u32, mentions: u32 },
     /// The live updates of `workspace` started, or stopped.
     Connection { workspace: WorkspaceId, state: Connection },
+    /// Slack's unread counts of `workspace`, read again after its live updates came back (what
+    /// came meanwhile in conversations not open is counted there): (conversation, unread,
+    /// mentions) of each conversation Slack listed; one it did not list has none, as at a boot.
+    Counts { workspace: WorkspaceId, counts: Vec<(ConversationId, u32, u32)> },
 }
 
 /// Whether a workspace's live updates arrive.

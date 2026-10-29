@@ -41,12 +41,7 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     client.set_team(&team.id);
     people.set_team(&team.id);
     *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
-    // An answer without one of its lists cannot be read: unknown, not zero.
-    let counts: Option<wire::Counts> = client
-        .call::<wire::Counts>(&Call::form(Method::ClientCounts, &[]), Priority::Background)
-        .await
-        .ok()
-        .filter(|c| c.channels.is_some() && c.mpims.is_some() && c.ims.is_some());
+    let counts = counts(client).await;
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
     let mut known = people.names(client, &peers, Priority::Background).await;
@@ -58,6 +53,16 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
         }
     }
     Ok(Event::Booted(Box::new(snapshot(boot, counts, known, now))))
+}
+
+/// The unread counts (`client.counts`, in the background share); `None` when they could not be
+/// read. An answer without one of its lists cannot be read: unknown, not zero.
+pub(crate) async fn counts(client: &Client) -> Option<wire::Counts> {
+    client
+        .call::<wire::Counts>(&Call::form(Method::ClientCounts, &[]), Priority::Background)
+        .await
+        .ok()
+        .filter(|c| c.channels.is_some() && c.mpims.is_some() && c.ims.is_some())
 }
 
 /// Whether each of `ids` is in do not disturb at `now`, as far as Slack says (in batches of
@@ -81,7 +86,7 @@ async fn dnd(client: &Client, ids: &[String], now: u64) -> HashMap<String, bool>
 }
 
 /// The unread counts of each conversation Slack listed: (unread, mentions).
-fn unread_counts(counts: wire::Counts) -> HashMap<String, (u32, u32)> {
+pub(crate) fn unread_counts(counts: wire::Counts) -> HashMap<String, (u32, u32)> {
     let mut out = HashMap::new();
     for n in [counts.channels, counts.mpims, counts.ims].into_iter().flatten().flatten() {
         let mentions = n.mention_count.unwrap_or(0);

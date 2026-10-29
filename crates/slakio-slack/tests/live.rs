@@ -4,7 +4,9 @@
 //! closed or silent opens again after a pause within its bounds and asks to catch up; with the
 //! network off none opens, and switching it off ends one; every opening counts against the cap;
 //! one workspace's failing socket leaves another's alone; an opening the budget has no room for
-//! is said as held. Events are synthetic, written here.
+//! is said as held; a machine that slept loses its socket at once; after a loss the unread counts
+//! are read again, once; the network switched off closes the socket, and on opens it again.
+//! Events are synthetic, written here.
 
 use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Connection, Envelope, Event, FailKind, Generation, Live, Request};
@@ -16,7 +18,8 @@ use slakio_slack::request::Endpoints;
 use slakio_slack::{Client, Realtime};
 use slakio_world::World;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime};
 
 const TOKEN: &str = concat!("xo", "xc-TEST");
 
@@ -26,7 +29,18 @@ const QUICK: Realtime = Realtime {
     longest_retry: Duration::from_millis(160),
     steady: Duration::from_secs(10),
     silence: Duration::from_secs(10),
+    wake_check: Duration::from_secs(5),
+    wake_gap: Duration::from_secs(10),
+    wall: SystemTime::now,
 };
+
+/// How far the tests' wall clock is ahead of the real one: moved on, it is as if the machine
+/// slept that long (the monotonic clock did not move).
+static SLEPT: AtomicU64 = AtomicU64::new(0);
+
+fn wall_after_sleep() -> SystemTime {
+    SystemTime::now() + Duration::from_secs(SLEPT.load(Ordering::SeqCst))
+}
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()
@@ -41,6 +55,8 @@ struct Run {
     id: u64,
     /// Pushed events that came while an answer was awaited.
     pushed: Vec<Live>,
+    /// The unread counts pushed, kept apart from the other updates.
+    counts: Vec<Live>,
 }
 
 impl Run {
@@ -54,7 +70,7 @@ impl Run {
         let endpoints = Endpoints::local(fake.addr()).unwrap();
         let client = Client::new(Credentials::new(TOKEN, "cookie-TEST"), endpoints, Arc::clone(&governor));
         let handle = slakio_slack::serve_live(client, realtime);
-        Self { fake, handle, governor, world: World::demo(), team, id: 0, pushed: Vec::new() }
+        Self { fake, handle, governor, world: World::demo(), team, id: 0, pushed: Vec::new(), counts: Vec::new() }
     }
 
     async fn ask(&mut self, command: Command) -> Event {
@@ -63,6 +79,7 @@ impl Run {
         loop {
             let e = self.envelope().await.expect("an answer");
             match e.event {
+                Event::Live(live) if matches!(*live, Live::Counts { .. }) => self.counts.push(*live),
                 Event::Live(live) => self.pushed.push(*live),
                 event => {
                     assert_eq!(e.generation, Generation(self.id));
@@ -76,24 +93,45 @@ impl Run {
         tokio::time::timeout(Duration::from_secs(10), self.handle.rx.recv()).await.ok().flatten()
     }
 
-    /// The next pushed event (those pushed while an answer was awaited first).
+    /// The next pushed event (those pushed while an answer was awaited first), the unread counts
+    /// put aside ([`Run::counted`]).
     async fn live(&mut self) -> Live {
         if !self.pushed.is_empty() {
             return self.pushed.remove(0);
         }
-        let e = self.envelope().await.expect("a live update");
-        assert_eq!(e.generation, Generation::PUSHED);
-        match e.event {
-            Event::Live(live) => *live,
-            other => panic!("{other:?}"),
+        loop {
+            let e = self.envelope().await.expect("a live update");
+            assert_eq!(e.generation, Generation::PUSHED);
+            match e.event {
+                Event::Live(live) if matches!(*live, Live::Counts { .. }) => self.counts.push(*live),
+                Event::Live(live) => return *live,
+                other => panic!("{other:?}"),
+            }
         }
     }
 
-    /// Nothing pushed for `wait`.
+    /// The unread counts pushed next (or put aside already).
+    async fn counted(&mut self) -> Live {
+        while self.counts.is_empty() {
+            let e = self.envelope().await.expect("the counts");
+            match e.event {
+                Event::Live(live) if matches!(*live, Live::Counts { .. }) => self.counts.push(*live),
+                Event::Live(live) => self.pushed.push(*live),
+                other => panic!("{other:?}"),
+            }
+        }
+        self.counts.remove(0)
+    }
+
+    /// Nothing pushed for `wait` (the unread counts put aside).
     async fn quiet(&mut self, wait: Duration) {
         assert!(self.pushed.is_empty(), "{:?}", self.pushed);
-        if let Ok(Some(e)) = tokio::time::timeout(wait, self.handle.rx.recv()).await {
-            panic!("pushed: {e:?}");
+        let deadline = tokio::time::Instant::now() + wait;
+        while let Ok(Some(e)) = tokio::time::timeout_at(deadline, self.handle.rx.recv()).await {
+            match e.event {
+                Event::Live(live) if matches!(*live, Live::Counts { .. }) => self.counts.push(*live),
+                other => panic!("pushed: {other:?}"),
+            }
         }
     }
 
@@ -327,7 +365,8 @@ fn a_dropped_socket_opens_again_and_catching_up_reads_one_page_in_the_background
         r.lost().await;
         assert!(r.connected().await, "what was missed should be read again");
         assert_eq!(r.fake.upgrades().len(), 2);
-        assert_eq!(r.fake.methods().len(), calls, "opening again asks the API nothing by itself");
+        assert!(matches!(r.counted().await, Live::Counts { .. }));
+        assert_eq!(r.fake.methods()[calls..], ["client.counts"], "opening again asks for the counts only");
         let c = r.channel("general");
         let target = Target::Conversation {
             workspace: r.ws().id.clone(),
@@ -344,13 +383,28 @@ fn a_dropped_socket_opens_again_and_catching_up_reads_one_page_in_the_background
         let fields = history[0].fields();
         assert!(fields.contains(&("limit", "28")) && !fields.iter().any(|(k, _)| *k == "latest"), "{fields:?}");
         assert_eq!(r.calls("conversations.view"), 0, "never an open, which could cancel one");
-        // A thread is not read again this way.
-        let thread = Target::Thread {
-            workspace: r.ws().id.clone(),
-            conversation: slakio_core::model::ConversationId::new(&c),
-            thread: Ts(1),
+    });
+}
+
+#[test]
+fn a_thread_is_caught_up_by_reading_what_is_new_in_it() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let c = r.channel("general");
+        let id = slakio_core::model::ConversationId::new(&c);
+        let (page, _) = r.world.history(&id, None, 200);
+        let parent = page.iter().find(|m| m.thread.is_some()).expect("a thread in general").ts;
+        let thread = Target::Thread { workspace: r.ws().id.clone(), conversation: id, thread: parent };
+        let before = r.calls("conversations.replies");
+        let Event::History(page) = r.ask(Command::Catchup { target: thread.clone(), limit: 200 }).await else {
+            panic!()
         };
-        assert!(matches!(r.ask(Command::Catchup { target: thread, limit: 28 }).await, Event::Failed { .. }));
+        assert_eq!(page.target, thread);
+        assert!(page.messages.len() <= 28 && page.messages.iter().all(|m| m.ts >= parent), "{page:?}");
+        assert_eq!(r.calls("conversations.replies"), before + 1, "one request");
+        assert_eq!(r.calls("conversations.view") + r.calls("conversations.history"), 0, "the thread only");
     });
 }
 
@@ -405,7 +459,7 @@ fn with_the_network_off_no_socket_ever_opens() {
 }
 
 #[test]
-fn switching_the_network_off_ends_the_socket_for_good() {
+fn the_kill_switch_ends_the_socket_for_good() {
     rt().block_on(async {
         let mut r = Run::new(QUICK).await;
         r.boot().await;
@@ -545,6 +599,7 @@ fn sockets_that_never_say_hello_keep_the_pause_doubling() {
             longest_retry: Duration::from_millis(640),
             steady: Duration::from_millis(50),
             silence: Duration::from_millis(120),
+            ..QUICK
         };
         let mut r = Run::new(quick).await;
         r.fake.set_hello(false);
@@ -571,5 +626,115 @@ fn an_opening_the_budget_has_no_room_for_is_said_as_held_once_and_tried_again() 
         tokio::time::sleep(Duration::from_millis(600)).await;
         r.quiet(Duration::from_millis(10)).await;
         assert!(r.fake.upgrades().is_empty(), "nothing went out");
+    });
+}
+
+#[test]
+fn a_machine_that_slept_loses_its_socket_at_once_and_reads_what_it_missed() {
+    rt().block_on(async {
+        let woke = Realtime {
+            wake_check: Duration::from_millis(30),
+            wake_gap: Duration::from_secs(2),
+            wall: wall_after_sleep,
+            ..QUICK
+        };
+        let mut r = Run::new(woke).await;
+        r.boot().await;
+        assert!(!r.connected().await);
+        // Running on as usual is no sleep.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(r.fake.upgrades().len(), 1);
+        let counts = r.calls("client.counts");
+        // The lid was closed an hour; the socket looks open, and Slack would say nothing for 10 s.
+        SLEPT.fetch_add(3600, Ordering::SeqCst);
+        let at = Instant::now();
+        r.lost().await;
+        assert!(at.elapsed() < Duration::from_secs(2), "at once, not after the silence: {:?}", at.elapsed());
+        until("the close", || r.fake.client_frames().iter().any(|f| f.opcode == 0x8)).await;
+        assert!(r.connected().await, "opened again, to catch up");
+        assert!(at.elapsed() < Duration::from_secs(3), "without the doubled pause: {:?}", at.elapsed());
+        assert_eq!(r.fake.upgrades().len(), 2);
+        let Live::Counts { workspace, counts: listed } = r.counted().await else { panic!() };
+        assert_eq!(workspace, r.ws().id);
+        assert!(!listed.is_empty());
+        assert_eq!(r.calls("client.counts"), counts + 1, "read again once");
+        r.quiet(Duration::from_millis(300)).await;
+        assert_eq!(r.fake.upgrades().len(), 2, "one wake, one reconnect");
+    });
+}
+
+#[test]
+fn the_counts_are_read_again_once_after_each_loss_and_never_on_the_first_socket() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        assert!(!r.connected().await);
+        let at_boot = r.calls("client.counts");
+        r.quiet(Duration::from_millis(200)).await;
+        assert!(r.counts.is_empty() && r.calls("client.counts") == at_boot, "the boot read them");
+        for n in 1..=3 {
+            r.fake.drop_sockets();
+            r.lost().await;
+            assert!(r.connected().await);
+            r.counted().await;
+            assert_eq!(r.calls("client.counts"), at_boot + n);
+        }
+        // Counts that cannot be read are not pushed: the UI keeps those it has.
+        r.fake.fail_next("client.counts", slakio_fake::Fault::Api("internal_error".to_string()));
+        r.fake.drop_sockets();
+        r.lost().await;
+        assert!(r.connected().await);
+        until("the counts asked", || r.calls("client.counts") == at_boot + 4).await;
+        r.quiet(Duration::from_millis(200)).await;
+        assert!(r.counts.is_empty());
+    });
+}
+
+#[test]
+fn switched_off_the_socket_closes_and_nothing_is_sent_switched_on_it_opens_again_and_catches_up() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        assert!(r.governor.switch(false));
+        until("the socket closed", || r.fake.open_sockets() == 0).await;
+        let (log, sockets) = (r.fake.log().len(), r.fake.upgrades().len());
+        // Nothing is sent: not a boot, nor a page, nor a catch-up.
+        let c = r.channel("general");
+        let target = Target::Conversation {
+            workspace: r.ws().id.clone(),
+            conversation: slakio_core::model::ConversationId::new(&c),
+        };
+        for command in [
+            Command::Boot,
+            Command::History { target: target.clone(), before: None, limit: 28 },
+            Command::History { target: target.clone(), before: Some(Ts(1_900_000_000_000_000)), limit: 28 },
+            Command::Catchup { target: target.clone(), limit: 28 },
+        ] {
+            let Event::Failed { kind, .. } = r.ask(command).await else { panic!() };
+            assert_eq!(kind, FailKind::Offline);
+        }
+        r.quiet(Duration::from_millis(300)).await;
+        assert_eq!((r.fake.log().len(), r.fake.upgrades().len()), (log, sockets), "nothing went out");
+        // On again: the socket opens, what was missed is read again.
+        assert!(r.governor.switch(true));
+        assert!(r.connected().await, "to catch up");
+        assert_eq!(r.fake.open_sockets(), 1);
+        r.counted().await;
+        assert!(matches!(r.ask(Command::Catchup { target, limit: 28 }).await, Event::History(_)));
+    });
+}
+
+#[test]
+fn a_network_off_from_the_start_is_never_switched_on() {
+    rt().block_on(async {
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), false);
+        let mut r = Run::team(0, QUICK, Arc::clone(&governor)).await;
+        assert!(!governor.switch(true), "off for the run");
+        assert!(!governor.is_on());
+        let Event::Failed { kind, .. } = r.ask(Command::Boot).await else { panic!() };
+        assert_eq!(kind, FailKind::Offline);
+        r.quiet(Duration::from_millis(300)).await;
+        assert!(r.fake.upgrades().is_empty() && r.fake.log().is_empty());
     });
 }

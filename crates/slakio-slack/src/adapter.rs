@@ -197,7 +197,7 @@ async fn history(
     let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
     let (messages, complete, bots, cut) = match (&target, before) {
         (Target::Thread { thread, .. }, _) => {
-            ctx.threads.page(client, me.as_ref(), &channel, *thread, before, limit).await?
+            ctx.threads.page(client, me.as_ref(), (&channel, *thread), before, limit, Priority::User).await?
         }
         (Target::Conversation { .. }, None) => {
             let count = limit.to_string();
@@ -256,14 +256,23 @@ async fn named(
     page
 }
 
-/// The newest `limit` messages of conversation `target` read again after live updates were lost:
-/// `conversations.history` with no bound, in the background share of the request budget, so it
-/// never waits for, nor cancels, an open.
+/// The newest `limit` messages of `target` read again after live updates were lost, in the
+/// background share of the request budget, so it never waits for, nor cancels, an open: a
+/// conversation's by `conversations.history` with no bound; a thread's by reading what is new in
+/// it ([`Threads`]: one request mostly, the whole thread again when it fits in one).
 async fn catch_up(client: &Client, ctx: &Session, target: Target, limit: u32) -> Result<Page, SlackError> {
-    let Target::Conversation { conversation, .. } = &target else {
-        return Err(SlackError::Api { code: "thread_not_caught_up".to_string() });
-    };
     let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    let conversation = match &target {
+        Target::Conversation { conversation, .. } => conversation,
+        Target::Thread { conversation, thread, .. } => {
+            let (channel, limit) = (conversation.as_str(), limit.clamp(1, PAGE_MAX));
+            let (messages, complete, bots, cut) =
+                ctx.threads.page(client, me.as_ref(), (channel, *thread), None, limit, Priority::Background).await?;
+            let everyone = Some(ctx.threads.authors(channel, *thread));
+            let page = Page { target: target.clone(), messages, complete, users: Vec::new(), cut };
+            return Ok(named(client, ctx, page, everyone, bots, me.as_ref(), Priority::Background).await);
+        }
+    };
     let count = limit.clamp(1, PAGE_MAX).to_string();
     let params = [("channel", conversation.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
     let call = Call::form(Method::ConversationsHistory, &params);
