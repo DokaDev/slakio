@@ -344,3 +344,29 @@ fn one_workspace_s_background_work_leaves_the_others_their_share() {
         drop(g.admit_in(&a, M, Priority::Background).await.unwrap());
     });
 }
+
+#[test]
+fn a_workspace_signed_in_again_shares_its_lane_and_keeps_its_background_hour() {
+    rt().block_on(async {
+        // As many slots as workspaces: each lane keeps one.
+        let limits = Limits { in_flight: 2, lane_background_per_hour: 3, ..Limits::default() };
+        let (g, _) = governor(limits, true);
+        let (old, b) = (g.lane_of("TA"), g.lane_of("TB"));
+        // Signed in again while the old client still holds its lane: the new one shares it, so
+        // A keeps its kept slot (none is left for a lane of its own).
+        let new = g.lane_of("TA");
+        assert!(Arc::ptr_eq(&old, &new));
+        assert!(new.kept.lock().unwrap().is_some(), "A's kept slot");
+        assert!(g.lane().kept.lock().unwrap().is_none(), "every slot is kept already");
+        // Its background hour goes on, also once the old lane is gone.
+        for _ in 0..2 {
+            g.dial(&old).unwrap();
+        }
+        drop((old, new));
+        let again = g.lane_of("TA");
+        assert!(again.kept.lock().unwrap().is_some(), "the old lane's slot came back to A");
+        g.dial(&again).unwrap();
+        assert!(g.dial(&again).is_err(), "the hour's share is spent, signed in again or not");
+        g.dial(&b).unwrap();
+    });
+}

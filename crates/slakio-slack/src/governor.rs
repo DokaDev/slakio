@@ -173,7 +173,13 @@ pub struct Governor {
     locked: bool,
     slots: Arc<Semaphore>,
     waiting: AtomicUsize,
+    /// Each workspace's lane while a client uses it, and its background work of the last hour
+    /// for as long as the process runs ([`Governor::lane_of`]).
+    lanes: Mutex<HashMap<String, (std::sync::Weak<Lane>, Background)>>,
 }
+
+/// When each background request of a lane in the last hour was let through, oldest first.
+type Background = Arc<Mutex<VecDeque<Duration>>>;
 
 impl std::fmt::Debug for Governor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -200,7 +206,7 @@ pub struct Lane {
     /// lane was made with every slot taken).
     kept: Arc<Mutex<Option<OwnedSemaphorePermit>>>,
     /// When each of its background requests of the last hour was let through, oldest first.
-    background: Mutex<VecDeque<Duration>>,
+    background: Background,
 }
 
 /// A lane's kept slot in use: it goes back to the lane when dropped.
@@ -245,6 +251,7 @@ impl Governor {
             locked: !network,
             slots: Arc::new(Semaphore::new(limits.in_flight)),
             waiting: AtomicUsize::new(0),
+            lanes: Mutex::default(),
         })
     }
 
@@ -307,13 +314,31 @@ impl Governor {
 
     /// A lane of its own for one workspace's requests.
     pub fn lane(&self) -> Lane {
+        self.new_lane(Background::default())
+    }
+
+    fn new_lane(&self, background: Background) -> Lane {
         Lane {
             slots: Arc::new(Semaphore::new(self.limits.lane_in_flight.clamp(1, self.limits.in_flight.max(1)))),
             waiting: AtomicUsize::new(0),
             limit: self.limits.lane_waiting,
             kept: Arc::new(Mutex::new(Arc::clone(&self.slots).try_acquire_owned().ok())),
-            background: Mutex::default(),
+            background,
         }
+    }
+
+    /// The lane of workspace `team`: the one its client uses already, while one does (signed in
+    /// again, the new client shares it, its kept slot with it), else a new one. Either way its
+    /// background work of the last hour still counts: signing in again starts no new share.
+    pub fn lane_of(&self, team: &str) -> Arc<Lane> {
+        let mut lanes = self.lanes.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (lane, background) = lanes.entry(team.to_owned()).or_default();
+        if let Some(lane) = lane.upgrade() {
+            return lane;
+        }
+        let made = Arc::new(self.new_lane(Arc::clone(background)));
+        *lane = Arc::downgrade(&made);
+        made
     }
 
     /// [`Governor::admit`] for a request of `lane`: it first waits for one of its lane's slots

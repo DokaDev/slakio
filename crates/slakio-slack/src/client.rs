@@ -21,7 +21,7 @@ pub struct Client {
     endpoints: Endpoints,
     governor: Arc<Governor>,
     /// This workspace's share of the governor's slots.
-    lane: Lane,
+    lane: Arc<Lane>,
     state: Mutex<(Session, RandomIds)>,
     /// Slack no longer accepts the sign-in: nothing more is sent.
     signed_out: AtomicBool,
@@ -31,9 +31,20 @@ pub struct Client {
 
 impl Client {
     pub fn new(credentials: Credentials, endpoints: Endpoints, governor: Arc<Governor>) -> Self {
+        let lane = Arc::new(governor.lane());
+        Self::with_lane(credentials, endpoints, governor, lane)
+    }
+
+    /// [`Client::new`] for workspace `team`, on its lane ([`Governor::lane_of`]): a client signed
+    /// in again shares the one before's, while that one lasts.
+    pub fn of_team(credentials: Credentials, endpoints: Endpoints, governor: Arc<Governor>, team: &str) -> Self {
+        let lane = governor.lane_of(team);
+        Self::with_lane(credentials, endpoints, governor, lane)
+    }
+
+    fn with_lane(credentials: Credentials, endpoints: Endpoints, governor: Arc<Governor>, lane: Arc<Lane>) -> Self {
         let mut ids = RandomIds::default();
         let session = Session::new(&mut ids);
-        let lane = governor.lane();
         let (signed_out, told) = (AtomicBool::new(false), tokio::sync::Notify::new());
         Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)), signed_out, told }
     }
