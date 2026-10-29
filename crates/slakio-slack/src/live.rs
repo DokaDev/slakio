@@ -283,6 +283,16 @@ async fn open(client: &Client) -> Result<Socket<crate::http::Upgraded>, End> {
     }
 }
 
+/// Close `socket` after the machine woke ([`CLOSE_WAIT`] at most), and how it ended: lost, or
+/// off when the network is switched off (then the close is not written).
+async fn close_after_wake(client: &Client, socket: &mut Socket<crate::http::Upgraded>, hello: Option<Instant>) -> End {
+    tokio::select! {
+        biased;
+        () = client.governor().stopped() => End::Off,
+        _ = tokio::time::timeout(CLOSE_WAIT, socket.close()) => End::Lost { hello, wait: None, held: false, woke: true },
+    }
+}
+
 /// One socket, from its opening to its end, its updates sent to `out`. `catch_up`: what came
 /// before it opened should be read again.
 async fn connection(
@@ -308,16 +318,8 @@ async fn connection(
             () = client.governor().stopped() => return End::Off,
             () = out.closed() => return End::Stop,
             next = tokio::time::timeout(settings.silence, socket.next()) => next,
-            // The machine slept: whatever the socket was, it is gone by now. Its close is not
-            // written once the network is off.
-            () = &mut wake => {
-                tokio::select! {
-                    biased;
-                    () = client.governor().stopped() => return End::Off,
-                    _ = tokio::time::timeout(CLOSE_WAIT, socket.close()) => {}
-                }
-                return End::Lost { hello, wait: None, held: false, woke: true };
-            }
+            // The machine slept: whatever the socket was, it is gone by now.
+            () = &mut wake => return close_after_wake(client, &mut socket, hello).await,
         };
         let text = match next {
             Ok(Ok(Incoming::Text(text))) => text,
