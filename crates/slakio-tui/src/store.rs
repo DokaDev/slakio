@@ -105,7 +105,7 @@ impl Local {
         match cache.claim(team, user, CLAIM_WAIT) {
             Some(Ok(true)) => {
                 let log = log_off_thread(self.paths.errors_log());
-                slakio_store::layer::serve(backend, cache, WorkspaceId::new(team), waits(), log)
+                slakio_store::layer::serve(backend, cache.writing_as(team, user), WorkspaceId::new(team), waits(), log)
             }
             Some(Ok(false)) => {
                 notice(notices, Msg::Label(Label::CacheInUse));

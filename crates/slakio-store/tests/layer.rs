@@ -510,3 +510,44 @@ async fn a_run_waits_while_a_closing_writer_holds_the_lock_and_its_file_cannot_b
     assert!(!store.read_only(), "the writer, once the lock was let go");
     gone.await.unwrap();
 }
+
+#[tokio::test]
+async fn a_sign_in_replaced_by_another_user_writes_nothing_into_that_users_part() {
+    let (dir, w) = (scratch("replaced"), world());
+    let ws = snapshot(&w).workspaces[0].id.clone();
+    let r = run(&dir, &ws, Caps::default(), false).await;
+    let claim = |user: &'static str| {
+        let (c, team) = (r.cache.clone(), ws.as_str().to_string());
+        tokio::task::spawn_blocking(move || c.claim(&team, user, Duration::from_secs(5)))
+    };
+    assert!(matches!(claim("UA").await.unwrap(), Some(Ok(true))));
+    // The first user's front, with a page on its way when someone else signs in to the workspace.
+    let (inner, mut old) = BackendHandle::pair(CAPS, 64);
+    let mut ui = layer::serve(
+        inner,
+        r.cache.writing_as(ws.as_str(), "UA"),
+        ws.clone(),
+        layer::Waits::default(),
+        Box::new(|_| {}),
+    );
+    let t = target(&w, "general");
+    ui.send(Request { id: Generation(1), workspace: None, command: history(&t, None) }).unwrap();
+    let asked = tokio::time::timeout(Duration::from_secs(5), old.rx.recv()).await.unwrap().unwrap();
+    while !matches!(ui.rx.try_recv(), Err(tokio::sync::mpsc::error::TryRecvError::Empty)) {}
+    assert!(matches!(claim("UB").await.unwrap(), Some(Ok(true))), "emptied for the other user");
+    // The first user's late answers still reach its UI, but none is kept in the part now UB's.
+    old.tx.send(Envelope { generation: asked.id, event: Event::History(Box::new(page(&w, &t, None))) }).await.unwrap();
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(5), ui.rx.recv()).await.unwrap().unwrap().event,
+        Event::History(_)
+    ));
+    r.cache.writing_as(ws.as_str(), "UA").put_snapshot(snapshot(&w));
+    r.settled().await;
+    assert!(r.cache.newest(t.clone(), 28).await.is_none(), "nothing of UA's in UB's part");
+    assert_eq!(r.cache.snapshot(vec![ws.clone()]).await, None);
+    // UB's own writes are kept.
+    r.cache.writing_as(ws.as_str(), "UB").put_page(page(&w, &t, None), None);
+    r.settled().await;
+    assert!(r.cache.newest(t, 28).await.is_some(), "UB's page is kept");
+    r.no_faults();
+}

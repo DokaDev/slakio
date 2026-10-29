@@ -146,6 +146,11 @@ impl Store {
         Ok(true)
     }
 
+    /// Workspace `team`'s part was claimed for `user` by this process, and still is theirs.
+    pub fn owned_by(&self, team: &str, user: &str) -> bool {
+        self.owners.iter().any(|(t, u)| t == team && u == user)
+    }
+
     fn own(&mut self, team: &str, user: &str) {
         self.owners.retain(|(t, _)| t != team);
         self.owners.push((team.to_owned(), user.to_owned()));

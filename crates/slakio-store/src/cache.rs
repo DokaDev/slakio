@@ -41,10 +41,11 @@ enum Job {
         limit: u32,
         reply: oneshot::Sender<Option<Page>>,
     },
-    PutSnapshot(Box<Snapshot>),
+    PutSnapshot(Box<Snapshot>, Writer),
     PutPage {
         page: Box<Page>,
         before: Option<Ts>,
+        writer: Writer,
     },
     Prune {
         protect: HashSet<Target>,
@@ -60,6 +61,10 @@ enum Job {
     Flush(std::sync::mpsc::Sender<()>),
 }
 
+/// Who a write is from: the sign-in (team, user) whose part it is for, when it is one's
+/// ([`Cache::writing_as`]); the writer drops it once that part is no longer that sign-in's.
+type Writer = Option<Arc<(String, String)>>;
+
 /// The cache's thread, as its users see it. Cloned freely; the thread ends with the last clone.
 /// Every workspace's backend shares one: the conversations any of them asked for are kept from
 /// pruning together.
@@ -68,6 +73,7 @@ pub struct Cache {
     tx: mpsc::UnboundedSender<Job>,
     read_only: bool,
     protect: Arc<Mutex<HashSet<Target>>>,
+    writer: Writer,
 }
 
 impl Cache {
@@ -78,7 +84,7 @@ impl Cache {
         std::thread::Builder::new()
             .name("slakio-cache".into())
             .spawn(move || run(store, caps, &*clock, &*on_fault, rx))?;
-        Ok(Self { tx, read_only, protect: Arc::default() })
+        Ok(Self { tx, read_only, protect: Arc::default(), writer: None })
     }
 
     /// Another process writes the cache: this one only reads it.
@@ -100,14 +106,22 @@ impl Cache {
         answer.await.ok().flatten()
     }
 
+    /// This cache, its writes made for the sign-in of `user` to workspace `team` (claimed for it
+    /// first): once another sign-in claims that part, or it is forgotten, they are dropped, so a
+    /// sign-in replaced never writes into the part of the one after it.
+    #[must_use]
+    pub fn writing_as(&self, team: &str, user: &str) -> Self {
+        Self { writer: Some(Arc::new((team.to_owned(), user.to_owned()))), ..self.clone() }
+    }
+
     /// Keep `snapshot` as the last boot's.
     pub fn put_snapshot(&self, snapshot: Snapshot) {
-        let _ = self.tx.send(Job::PutSnapshot(Box::new(snapshot)));
+        let _ = self.tx.send(Job::PutSnapshot(Box::new(snapshot), self.writer.clone()));
     }
 
     /// Keep `page`, asked for as the messages older than `before`.
     pub fn put_page(&self, page: Page, before: Option<Ts>) {
-        let _ = self.tx.send(Job::PutPage { page: Box::new(page), before });
+        let _ = self.tx.send(Job::PutPage { page: Box::new(page), before, writer: self.writer.clone() });
     }
 
     /// Keep `target` from pruning for the life of the process (a pane may show it).
@@ -185,12 +199,14 @@ fn run(
                 });
                 let _ = reply.send(got);
             }
-            Job::PutSnapshot(s) => {
+            // A replaced sign-in's late answer: its part is another's now.
+            Job::PutSnapshot(_, Some(w)) | Job::PutPage { writer: Some(w), .. } if !store.owned_by(&w.0, &w.1) => {}
+            Job::PutSnapshot(s, _) => {
                 if let Err(e) = store.put_snapshot(&s) {
                     failed(&mut store, &e);
                 }
             }
-            Job::PutPage { page, before } => {
+            Job::PutPage { page, before, .. } => {
                 if let Err(e) = store.put_page(&page, before, clock()) {
                     failed(&mut store, &e);
                 }
