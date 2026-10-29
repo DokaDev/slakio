@@ -119,8 +119,23 @@ too_many_lines = "warn"
 
 # A single codegen unit with LTO drops the code no caller reaches, and stripping drops the
 # symbol table (panic messages keep their file and line); the binary size is a budget
-# (crates/slakio-bench/budgets.toml).
+# (crates/slakio-bench/budgets.toml). Panics unwind (a panic is caught while the desktop app's
+# data is read, and the terminal is restored), so `panic = "abort"` is not an option.
 [profile.release]
 lto = true
 codegen-units = 1
 strip = true
+
+# Dependencies are optimized for size (the transport, TLS, JSON, TOML, SQLite and the rest run
+# rarely and briefly); slakio's own crates and what draws every frame stay optimized for speed.
+[profile.release.package."*"]
+opt-level = "s"
+
+[profile.release.package.ratatui-core]
+opt-level = 3
+
+[profile.release.package.unicode-width]
+opt-level = 3
+
+[profile.release.package.unicode-segmentation]
+opt-level = 3
