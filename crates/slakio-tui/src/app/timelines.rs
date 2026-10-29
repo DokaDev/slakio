@@ -27,6 +27,10 @@ pub const RETRY_PAUSE: Duration = Duration::from_secs(30);
 /// from [`RETRY_PAUSE`] each time it fails again).
 pub const RECATCH_MAX: Duration = Duration::from_secs(15 * 60);
 
+/// Slack's error codes that may pass by themselves: a catch-up refused with one is asked for
+/// again; one refused with any other code is not.
+pub const PASSING: [&str; 4] = ["internal_error", "fatal_error", "service_unavailable", "request_timeout"];
+
 #[derive(Clone, Debug, Default)]
 pub struct Timeline {
     /// Oldest first.
@@ -275,14 +279,18 @@ impl TimelineStore {
     /// when one waited for it.
     pub fn fail(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<Target> {
         // A catch-up that failed leaves what was loaded as it was, and is asked for again by
-        // itself after a pause that doubles each time (unless the sign-in failed).
+        // itself after a pause that doubles each time (unless the sign-in failed, or Slack
+        // refused it for good).
         if let Some((target, tl)) = self.timelines.iter_mut().find(|(_, t)| t.catchup == Some(id)) {
             tl.catchup = None;
             tl.catchup_fails = tl.catchup_fails.saturating_add(1);
             let pause = RETRY_PAUSE.saturating_mul(1 << (tl.catchup_fails - 1).min(6)).min(RECATCH_MAX);
-            tl.recatch = match kind {
+            tl.recatch = match &kind {
                 FailKind::Auth | FailKind::ReadOnly => None,
-                FailKind::RateLimited { retry_after: Some(after) } => Some(now + pause.max(after)),
+                // Slack refused it for good (the user left the channel, it is gone): asking
+                // again changes nothing. Only its own errors that pass are asked again.
+                FailKind::Api { code } if !PASSING.contains(&code.as_str()) => None,
+                FailKind::RateLimited { retry_after: Some(after) } => Some(now + pause.max(*after)),
                 _ => Some(now + pause),
             };
             return Some(target.clone());

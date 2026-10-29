@@ -209,3 +209,20 @@ fn a_failed_catch_up_is_asked_for_again_by_itself_after_a_pause_that_doubles() {
     store.fail(Generation(8), FailKind::Auth, now);
     assert_eq!(store.get(&target("T")).unwrap().recatch, None);
 }
+
+#[test]
+fn a_catch_up_slack_refused_for_good_is_not_asked_for_again() {
+    let mut store = TimelineStore::default();
+    let now = Instant::now();
+    let tl = store.entry(&target("T"));
+    tl.add_page(&page("T", false), (50..60).map(msg).collect());
+    for code in ["not_in_channel", "channel_not_found", "is_archived", "access_denied"] {
+        store.entry(&target("T")).ask_catch_up(Generation(9));
+        store.fail(Generation(9), FailKind::Api { code: code.into() }, now);
+        assert_eq!(store.get(&target("T")).unwrap().recatch, None, "{code}");
+    }
+    // Slack's own trouble passes: asked again.
+    store.entry(&target("T")).ask_catch_up(Generation(10));
+    store.fail(Generation(10), FailKind::Api { code: "internal_error".into() }, now);
+    assert!(store.get(&target("T")).unwrap().recatch.is_some());
+}
