@@ -57,6 +57,8 @@ pub enum AppAction {
     ToggleDensity,
     /// The network switched off, or on again (`:net`); for this run only.
     ToggleNetwork,
+    /// Sign in again while the app runs (`:login`): a workspace Slack signed out, or another.
+    SignInAgain,
 }
 
 /// Actions of the `:` command line.
@@ -247,6 +249,8 @@ pub enum SignInAction {
     Mark,
     /// Paste a browser request instead.
     Paste,
+    /// Back to the app (the sign-in screen over it, `:login`), signed in as before.
+    Cancel,
 }
 
 /// One registered action.
@@ -304,6 +308,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),
     app(AppAction::ToggleDensity, "density.toggle", Label::ActionDensity, &["density"]),
     app(AppAction::ToggleNetwork, "net.toggle", Label::ActionNet, &["net"]),
+    app(AppAction::SignInAgain, "signin.again", Label::ActionSigninAgain, &["login"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),
@@ -419,6 +424,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     spec_of(Action::SignIn(SignInAction::Pick), "signin.pick", Label::ActionSigninPick, &[]),
     spec_of(Action::SignIn(SignInAction::Mark), "signin.mark", Label::ActionSigninMark, &[]),
     spec_of(Action::SignIn(SignInAction::Paste), "signin.paste", Label::ActionSigninPaste, &[]),
+    spec_of(Action::SignIn(SignInAction::Cancel), "signin.cancel", Label::ActionSigninCancel, &[]),
 ];
 
 /// The registry entry of `action` (every action has one; a test checks it).

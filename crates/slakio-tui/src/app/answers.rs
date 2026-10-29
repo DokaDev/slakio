@@ -22,6 +22,10 @@ pub(crate) struct Boot {
     pub failed: Option<FailKind>,
     /// Nothing can be changed in the workspace.
     pub read_only: bool,
+    /// Slack no longer accepts the workspace's sign-in, which it did before in this run.
+    pub signed_out: bool,
+    /// Signed in again: once it has booted, its open panes catch up.
+    pub again: bool,
 }
 
 impl App {
@@ -29,7 +33,8 @@ impl App {
     pub fn connect(&mut self, caps: Capabilities) {
         self.backend = Some(caps);
         let id = self.work.requests.ask(None, Command::Boot);
-        self.boots = vec![Boot { workspace: None, id, failed: None, read_only: caps.read_only }];
+        let read_only = caps.read_only;
+        self.boots = vec![Boot { workspace: None, id, failed: None, read_only, signed_out: false, again: false }];
     }
 
     /// Use a backend of the workspaces `signed` (signed in to, in the switcher's order), each
@@ -46,6 +51,8 @@ impl App {
                 id: self.work.requests.ask(Some(s.id.clone()), Command::Boot),
                 failed: None,
                 read_only: caps.read_only || s.read_only,
+                signed_out: false,
+                again: false,
             })
             .collect();
     }
@@ -202,6 +209,9 @@ impl App {
         self.model.net = net;
         if !cached {
             self.boots[b].failed = None;
+            if let Some(ws) = self.boots[b].workspace.clone().filter(|_| std::mem::take(&mut self.boots[b].again)) {
+                self.work.catch_up(&ws);
+            }
             // Unknown is not zero: the counts kept are shown, and the status line says so (with
             // several workspaces, whose, short; its stripe found by id, two may have one name).
             // With none kept, the views say the counts are unknown until a later start reads them.
@@ -241,15 +251,22 @@ impl App {
     /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
-        let mut whose = None;
+        let (mut whose, mut page) = (None, None);
         let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
             b.failed = Some(kind.clone());
             whose = b.workspace.clone();
             true
         } else {
-            self.work.on_failed(id, kind.clone(), now) || self.on_save_failed(id)
+            page = self.work.on_failed(id, kind.clone(), now);
+            page.is_some() || self.on_save_failed(id)
         };
-        if waited {
+        // Refused for the sign-in in a workspace that was loaded: signed out while running.
+        let gone = whose.clone().or(page).filter(|ws| kind == FailKind::Auth && self.model.is_loaded_in(ws));
+        if let Some(ws) = gone.filter(|_| waited) {
+            self.signed_out(ws, now);
+            let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
+            self.effects.push(Effect::Record { context: "backend", fault });
+        } else if waited {
             // With several workspaces, the words say whose start failed.
             let name = whose.filter(|_| self.boots.len() > 1).and_then(|ws| self.model.workspace(&ws).cloned());
             // A notice about a workspace names it by id, so its stripe is its own whatever its name.

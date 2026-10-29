@@ -10,7 +10,7 @@
 use super::Work;
 use crate::app::pane::PAGE;
 use slakio_core::backend::Command;
-use slakio_core::model::Target;
+use slakio_core::model::{Target, WorkspaceId};
 use std::time::{Duration, Instant};
 
 /// Older pages are asked for at most this often (all panes together): under Slack's own pace
@@ -69,6 +69,21 @@ impl Work {
         for target in shown {
             let tl = self.timelines.entry(&target);
             if tl.retryable() {
+                tl.queued = tl.older_failed().is_some();
+                (tl.failed, tl.retry_at) = (None, None);
+            }
+        }
+        self.fill();
+    }
+
+    /// Signed in again to `ws`: the failed page of each of its panes is asked for again, whatever
+    /// it failed for (the sign-in it failed with is gone).
+    pub fn retry_signed_in(&mut self, ws: &WorkspaceId) {
+        let shown: Vec<Target> =
+            self.panes.values().map(|p| p.target.clone()).filter(|t| t.workspace() == ws).collect();
+        for target in shown {
+            let tl = self.timelines.entry(&target);
+            if tl.failed.is_some() {
                 tl.queued = tl.older_failed().is_some();
                 (tl.failed, tl.retry_at) = (None, None);
             }

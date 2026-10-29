@@ -417,3 +417,110 @@ fn signing_in_from_the_app_never_holds_up_the_screen_while_the_cache_is_slow() {
     run.wait_for("signed in to B", |t| t.contains(&format!("Signed in to {}", m.name(1))));
     run.quit();
 }
+
+/// A new sign-in of A (spelled in parts so no file holds a token-shaped string).
+const NEW_TOKEN: &str = concat!("xo", "xc-1-2-NEWTOKEN");
+
+/// A's paste with the new sign-in.
+fn new_sign_in() -> String {
+    format!("curl 'https://{}/api/client.counts' -H 'cookie: b=1; d={COOKIE}' --data-raw 'token={NEW_TOKEN}'", HOSTS[0])
+}
+
+fn boots(m: &Machine, i: usize) -> usize {
+    m.methods(i).iter().filter(|x| *x == "client.userBoot").count()
+}
+
+/// Slack signs A out while slakio runs (`by_socket`: it ends A's socket and refuses it opening
+/// again; else the next request is refused): A stays on screen, marked, and nothing more goes to
+/// its fake; `:login` and a paste sign in to it again: A alone boots again, its socket opens again
+/// and its open conversation stays; B is asked nothing all along. At `size`.
+fn signed_out_while_running(tag: &str, size: (u16, u16), by_socket: bool) {
+    let m = Machine::new(tag, &[0, 1]);
+    let Some(mut run) = m.start(1, size, &[]) else { return };
+    let a = m.channel(0);
+    run.wait_for("A's channels", |t| t.contains(&a));
+    wait_until("both booted, both sockets open", || {
+        boots(&m, 0) == 1 && boots(&m, 1) == 1 && m.fakes[0].open_sockets() == 1 && m.fakes[1].open_sockets() == 1
+    });
+    // A's first conversation open.
+    run.type_bytes(b"\r");
+    run.wait_for("A's conversation", |t| t.contains(&format!("Message #{a}")));
+    let (b_asked, b_sockets) = (m.methods(1).len(), m.fakes[1].upgrades().len());
+    m.fakes[0].revoke(TOKEN, by_socket);
+    if !by_socket {
+        // Reading back asks for an older page: refused for the sign-in.
+        run.type_bytes(b"gg");
+    }
+    run.wait_for("the mark", |t| t.contains("signed out, :login"));
+    wait_until("A's socket closed", || m.fakes[0].open_sockets() == 0);
+    let a_sent = (m.fakes[0].log().len(), m.fakes[0].upgrades().len());
+    // However long it waits, and whatever is asked there, nothing more goes to A.
+    run.type_bytes(b"gg");
+    run.type_bytes(b":retry\r");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!((m.fakes[0].log().len(), m.fakes[0].upgrades().len()), a_sent, "{:?}", m.methods(0));
+    assert!(run.output().contains(&format!("Message #{a}")), "the pane stays: {}", run.output());
+    // Signed in again from the app.
+    run.type_bytes(b":login\r");
+    run.wait_for("the paste screen over the app", |t| t.contains("Waiting for the paste") && t.contains("Esc back"));
+    run.type_bytes(format!("\x1b[200~{}\x1b[201~", new_sign_in()).as_bytes());
+    run.wait_for("signed in to A", |t| t.contains(&format!("Signed in to {}", m.name(0))));
+    // The check, then A's own boot; its socket open again with the new sign-in.
+    wait_until("A booted again, its socket open", || boots(&m, 0) == 3 && m.fakes[0].open_sockets() == 1);
+    let opened = m.fakes[0].upgrades();
+    assert!(opened.last().unwrap().query.contains(NEW_TOKEN), "the new sign-in's socket");
+    run.wait_for("the mark gone, the conversation kept", |t| {
+        !t.contains("signed out, :login") && t.contains(&format!("Message #{a}"))
+    });
+    assert_eq!((m.methods(1).len(), m.fakes[1].upgrades().len()), (b_asked, b_sockets), "B: {:?}", m.methods(1));
+    assert_eq!(m.fakes[1].open_sockets(), 1, "B's socket stayed open");
+    run.quit();
+}
+
+#[test]
+fn a_workspace_slack_signs_out_by_its_socket_signs_in_again_alone_at_120x40() {
+    signed_out_while_running("gone-socket-120", (120, 40), true);
+}
+
+#[test]
+fn a_workspace_slack_signs_out_by_a_request_signs_in_again_alone_at_80x24() {
+    signed_out_while_running("gone-request-80", (80, 24), false);
+}
+
+#[test]
+fn signing_in_again_as_another_user_keeps_the_other_workspace_and_its_cache() {
+    let m = Machine::new("gone-other-user", &[0, 1]);
+    let Some(mut run) = m.start(1, (100, 30), &[]) else { return };
+    let (a, b) = (m.channel(0), m.channel(1));
+    run.wait_for("A's channels", |t| t.contains(&a));
+    wait_until("both booted", || boots(&m, 0) == 1 && boots(&m, 1) == 1);
+    // B's answer is kept in the cache.
+    std::thread::sleep(Duration::from_millis(500));
+    m.fakes[0].revoke(TOKEN, true);
+    run.wait_for("the mark", |t| t.contains("signed out, :login"));
+    // The new sign-in is someone else's (Slack's check names another user).
+    let ws = &m.world.snapshot().workspaces[0];
+    let other = serde_json::json!({
+        "ok": true,
+        "self": {"id": "UOTHER", "name": "someone else", "team_id": ws.id.as_str()},
+        "team": {"id": ws.id.as_str(), "name": m.name(0), "domain": "fake"},
+    });
+    m.fakes[0].fail_next("client.userBoot", Fault::Answer(other));
+    run.type_bytes(b":login\r");
+    run.wait_for("the paste screen", |t| t.contains("Waiting for the paste"));
+    run.type_bytes(format!("\x1b[200~{}\x1b[201~", new_sign_in()).as_bytes());
+    run.wait_for("signed in to A", |t| t.contains(&format!("Signed in to {}", m.name(0))));
+    wait_until("A booted again", || boots(&m, 0) == 3);
+    std::thread::sleep(Duration::from_millis(500));
+    run.quit();
+    // A is kept as the other user's; B's line is as it was.
+    let file = m.file();
+    assert!(file.contains("user = \"UOTHER\""), "{file}");
+    assert!(file.contains(&m.entry(1)), "{file}");
+    // B's part of the cache is still there: its list comes back with the network off.
+    let Some(mut run) = m.start(2, (100, 30), &[("SLAKIO_NETWORK", "off")]) else { return };
+    run.wait_for("A from the cache", |t| t.contains(&a) && t.contains("cached"));
+    run.type_bytes(b" Wj\r");
+    run.wait_for("B from the cache", |t| t.contains(&b) && t.contains("cached"));
+    run.quit();
+}

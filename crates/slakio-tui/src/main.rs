@@ -1,6 +1,7 @@
 //! `slakio` binary: parses the command line, owns the terminal and runs the event loop.
 
 mod cli;
+mod inapp;
 mod signin;
 mod stats;
 mod store;
@@ -109,6 +110,8 @@ fn main() -> ExitCode {
         desktop: None,
         local,
         live: cfg.live != "off",
+        desktop_ok,
+        replace: Arc::default(),
     };
     let env = |k: &str| std::env::var(k).ok();
     // The background matters only to a theme with a light and a dark variant, and to the
@@ -205,7 +208,7 @@ fn main() -> ExitCode {
             }
         });
         let saved = Saved { config: config_path.filter(|_| writable), errors: paths.errors_log() };
-        run(&mut terminal, app, backend, &mut stats, saved, &wiring).await
+        run(&mut terminal, app, backend, &mut stats, saved, &mut wiring).await
     });
     // What the cache was asked to keep is written before the process ends.
     wiring.local.flush();
@@ -246,6 +249,10 @@ struct Wiring {
     local: store::Local,
     /// Live updates (`live = "off"`: no socket opens; requests go on).
     live: bool,
+    /// The Slack desktop app's sign-in may be read (the real keychain, no `--paste`).
+    desktop_ok: bool,
+    /// What replaces one workspace's backend in the handle the app runs with (signed in again).
+    replace: Arc<std::sync::Mutex<Option<slakio_tui::many::Replace>>>,
 }
 
 /// `SLAKIO_TEST_SLACK_ADDR`: the loopback addresses the tests' fake Slacks listen on, used
@@ -272,18 +279,6 @@ struct Kept {
     account: Account,
     credentials: Credentials,
     endpoints: Endpoints,
-}
-
-/// Signing in from the app ended: the workspaces it signed in to (their names), every
-/// signed-in workspace now (those signed in to before too) connected, as [`Wiring::connect`]
-/// gives them with what to tell about the cache, and why one asked for did not sign in, if one
-/// did not.
-struct Done {
-    names: Vec<String>,
-    /// The first workspace signed in to (its team id): the app shows it.
-    added: Option<String>,
-    connected: (BackendHandle, Vec<SignedInTo>, Vec<Msg>),
-    failed: Option<Label>,
 }
 
 impl Wiring {
@@ -354,39 +349,9 @@ impl Wiring {
             signed.push(SignedInTo { id: id.clone(), name: k.account.name.clone(), read_only });
             handles.push((id, handle));
         }
-        (slakio_tui::many::serve(handles), signed)
-    }
-
-    /// Sign in with a pasted request ([`Wiring::sign_in`]), then gather every signed-in
-    /// workspace.
-    async fn sign_in_app(self, text: Pasted) -> Result<Done, Label> {
-        let one = self.clone().sign_in(text).await?;
-        let connected = self.connect_all().await?;
-        let added = Some(one.account.team.clone());
-        Ok(Done { names: vec![words::shown(&one.account.name)], added, connected, failed: None })
-    }
-
-    /// Sign in with each of the picked desktop workspaces `teams`, one after the other; one that
-    /// does not sign in holds none of the others back (the first reason is kept). Then gather
-    /// every signed-in workspace.
-    async fn sign_in_desktop_all(self, teams: Vec<String>) -> Result<Done, Label> {
-        let (mut names, mut added, mut failed) = (Vec::new(), None, None);
-        for team in teams {
-            match self.clone().sign_in_desktop(team).await {
-                Ok(k) => {
-                    names.push(words::shown(&k.account.name));
-                    added.get_or_insert(k.account.team);
-                }
-                Err(why) => {
-                    failed.get_or_insert(why);
-                }
-            }
-        }
-        if names.is_empty() {
-            return Err(failed.unwrap_or(Label::SigninDesktopFailed));
-        }
-        let connected = self.connect_all().await?;
-        Ok(Done { names, added, connected, failed })
+        let (handle, replace) = slakio_tui::many::serve_replaceable(handles);
+        *self.replace.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(replace);
+        (handle, signed)
     }
 
     /// Read `text`, ask Slack whether it signs in (one call), and keep it; or the words for why
@@ -464,27 +429,6 @@ impl Wiring {
     }
 }
 
-/// Signing in from the app ended: with a sign-in the app connects to every signed-in
-/// workspace (the ones signed in to before too, each booted again), else says why not.
-fn signed_in(done: Result<Done, Label>, app: &mut App, backend: &mut Option<BackendHandle>) {
-    match done {
-        Ok(d) => {
-            let (handle, signed, mut notices) = d.connected;
-            let added = d.added.map(slakio_core::model::WorkspaceId::new);
-            app.signed_in(handle.capabilities, &signed, added.as_ref(), &d.names, Instant::now());
-            *backend = Some(handle);
-            if let Some(why) = d.failed {
-                notices.insert(0, Msg::Label(why));
-            }
-            // Queued after "Signed in to …", which stays readable.
-            for n in notices {
-                app.status.queue(n, Level::Warning, Instant::now());
-            }
-        }
-        Err(why) => app.sign_in_failed(why),
-    }
-}
-
 /// The event loop: draw when something changed, then sleep until the next input event, signal,
 /// backend event or deadline of the app. With nothing to do it never wakes up.
 /// Where the loop saves what the app asks it to: the config file, and the error log for a save
@@ -500,7 +444,7 @@ async fn run(
     mut backend: Option<BackendHandle>,
     stats: &mut Option<stats::Stats>,
     saved: Saved,
-    wiring: &Wiring,
+    wiring: &mut Wiring,
 ) -> io::Result<()> {
     let size = terminal.size()?;
     app.resize(size.width, size.height);
@@ -509,7 +453,7 @@ async fn run(
     let mut cursor = Cursor::default();
     let mut redraw = true;
     // A paste being checked with Slack.
-    let mut signing_in: Option<tokio::task::JoinHandle<Result<Done, Label>>> = None;
+    let mut signing_in: Option<tokio::task::JoinHandle<Result<inapp::Done, Label>>> = None;
     // Debug builds only: panic after the first frame, for the test that the panic hook
     // restores the terminal (tests/signals.rs).
     let panic_after_frame = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_PANIC").is_some_and(|v| v == "1");
@@ -527,10 +471,9 @@ async fn run(
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
                 Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_app(pasted))),
-                Effect::DesktopPick(teams) => {
-                    signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(teams)));
-                }
+                Effect::DesktopPick(t) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(t))),
                 Effect::Network(on) => app.net_switched(on, wiring.governor.switch(on), Instant::now()),
+                Effect::SignInAgain(team) => inapp::offer(&mut app, wiring, team.as_deref()),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),
@@ -576,7 +519,7 @@ async fn run(
             envelope = exchange::next(backend.as_mut()) => app.on_backend(envelope, Instant::now()),
             done = async { signing_in.as_mut().expect("guarded").await }, if signing_in.is_some() => {
                 signing_in = None;
-                signed_in(done.unwrap_or(Err(Label::SigninFailed)), &mut app, &mut backend);
+                inapp::signed_in(done.unwrap_or(Err(Label::SigninFailed)), &mut app, &mut backend);
                 true
             }
             // Asked to end from outside: the loop ends and the terminal is restored on the way

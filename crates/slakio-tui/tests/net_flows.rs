@@ -135,38 +135,71 @@ fn on_again_asks_again_for_every_pane_that_failed_meanwhile_not_only_the_one_sho
 }
 
 #[test]
-fn a_network_off_for_the_run_stays_off_and_says_why() {
-    let mut s = Scripted::booted(true, None);
-    s.d.app.model.net.locked = true;
-    assert!(s.d.status_line().contains("Offline"), "{}", s.d.status_line());
-    command(&mut s, "net on");
-    assert!(switched(&mut s).is_empty(), "never switched on");
-    let line = s.d.status_line();
-    assert!(line.contains("Network off for this run: started offline") && line.contains("Offline"), "{line}");
+fn a_network_off_for_the_run_stays_off_and_says_why_in_full_at_every_width() {
+    for lang in [Lang::En, Lang::Ko] {
+        for (w, h) in [(120, 40), (80, 24)] {
+            let mut s = Scripted::booted(true, None);
+            s.d.app = with_lang(s.d.app, lang, w, h);
+            s.d.app.model.net.locked = true;
+            assert!(s.d.status_line().contains(&label(lang, Label::StatusOffline)), "{}", s.d.status_line());
+            command(&mut s, "net on");
+            assert!(switched(&mut s).is_empty(), "never switched on");
+            let line = s.d.status_line();
+            let why = label(lang, Label::NetLocked);
+            assert!(
+                line.contains(&why) && line.contains(&label(lang, Label::StatusOffline)),
+                "{lang:?} {w}x{h}: {line}"
+            );
+            if lang == Lang::En {
+                assert!(line.contains("Network stays off: started offline"), "{line}");
+            }
+        }
+    }
 }
 
 #[test]
-fn on_refused_by_the_runs_cap_says_so_and_asks_nothing_again() {
-    let mut s = Scripted::connected(true);
-    s.pump();
-    command(&mut s, "net off");
-    switched(&mut s);
-    let i = s.b.held.iter().position(|r| r.command == Command::Boot).unwrap();
-    s.b.fail(i, FailKind::Offline);
-    s.pump();
-    command(&mut s, "net on");
-    assert_eq!(asked(&mut s), [true]);
-    assert!(!s.d.status_line().contains("Network on"), "{}", s.d.status_line());
-    // The binary could not switch it on (the run's request cap was reached): off for good.
-    s.d.app.net_switched(true, false, s.d.now);
-    s.pump();
-    let line = s.d.status_line();
-    assert!(line.contains("Network off for this run: the request limit was") && line.contains("Offline"), "{line}");
-    assert!(!s.b.held.iter().any(|r| r.command == Command::Boot), "nothing asked again: {:?}", s.b.held);
-    // Asked again, it says the same, without asking the binary.
-    command(&mut s, "net on");
-    assert!(asked(&mut s).is_empty());
-    assert!(s.d.status_line().contains("the request limit was"), "{}", s.d.status_line());
+fn on_refused_by_the_runs_cap_says_so_in_full_and_asks_nothing_again() {
+    for lang in [Lang::En, Lang::Ko] {
+        for (w, h) in [(120, 40), (80, 24)] {
+            let at = format!("{lang:?} {w}x{h}");
+            let mut s = Scripted::connected(true);
+            s.d.app = with_lang(s.d.app, lang, w, h);
+            s.pump();
+            command(&mut s, "net off");
+            switched(&mut s);
+            let i = s.b.held.iter().position(|r| r.command == Command::Boot).unwrap();
+            s.b.fail(i, FailKind::Offline);
+            s.pump();
+            command(&mut s, "net on");
+            assert_eq!(asked(&mut s), [true]);
+            assert!(!s.d.status_line().contains(&label(lang, Label::NetOn)), "{at}: {}", s.d.status_line());
+            // The binary could not switch it on (the run's request cap was reached): off for good.
+            s.d.app.net_switched(true, false, s.d.now);
+            s.pump();
+            let line = s.d.status_line();
+            let why = label(lang, Label::NetCapped);
+            assert!(line.contains(&why) && line.contains(&label(lang, Label::StatusOffline)), "{at}: {line}");
+            if lang == Lang::En {
+                assert!(line.contains("Network stays off: request limit reached"), "{line}");
+            }
+            assert!(!s.b.held.iter().any(|r| r.command == Command::Boot), "nothing asked again: {:?}", s.b.held);
+            // Asked again, it says the same, without asking the binary.
+            command(&mut s, "net on");
+            assert!(asked(&mut s).is_empty());
+            assert!(s.d.status_line().contains(&why), "{at}: {}", s.d.status_line());
+        }
+    }
+}
+
+/// `app` (connected already) speaking `lang`, at `w`×`h`.
+fn with_lang(mut app: slakio_tui::app::App, lang: Lang, w: u16, h: u16) -> slakio_tui::app::App {
+    app.i18n = I18n::new(lang);
+    app.resize(w, h);
+    app
+}
+
+fn label(lang: Lang, l: Label) -> String {
+    I18n::new(lang).label(l).to_string()
 }
 
 #[test]

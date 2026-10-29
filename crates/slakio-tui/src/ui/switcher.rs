@@ -1,7 +1,7 @@
 //! The workspace switcher: a small popup under the list panel's workspace chip, one row per
 //! workspace — its color band, its name and what it holds unread (`@3`, `●`), or that it could
-//! not be loaded (`signed out`), and faintly that its live updates stopped (`live off`) — the
-//! cursor on the one to switch to.
+//! not be loaded or Slack signed it out (`signed out`), and faintly that its live updates
+//! stopped (`live off`) — the cursor on the one to switch to.
 //!
 //! ```text
 //! ╭ Workspaces ──────────────────╮
@@ -39,11 +39,12 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
             ..Unread::default()
         };
         // A workspace that could not be loaded says so, quietly, where its count would be.
+        // So does one Slack signed out while the app ran, which still shows what it loaded.
         let failed = app.boot_failed_in(&w.id).filter(|_| !app.model.is_loaded_in(&w.id));
-        let failed = failed.map(|k| {
-            let l = if *k == FailKind::Auth { Label::SwitcherSignedOut } else { Label::SwitcherFailed };
-            app.i18n.label(l).to_string()
-        });
+        let failed =
+            failed.map(|k| if *k == FailKind::Auth { Label::SwitcherSignedOut } else { Label::SwitcherFailed });
+        let failed = failed.or(app.signed_out_in(&w.id).then_some(Label::SwitcherSignedOut));
+        let failed = failed.map(|l| app.i18n.label(l).to_string());
         let mark = failed.clone().or_else(|| unread.badge());
         let mark_w = mark.as_deref().map_or(0, width);
         // Its live updates stopped: said faintly before its count, until they are back.

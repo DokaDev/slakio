@@ -8,11 +8,13 @@
 //!
 //! The hint line shows the keys worth knowing where the keyboard is ([`crate::keymap::hints`]),
 //! read from the key map. When the line is short, parts go in this order: the workspace's name
-//! (its stripe stays), hints from the last, the middle of the place. The badge, `demo` and the
-//! mark of live updates that stopped (`live off`, until they are back) always stay.
+//! (its stripe stays), hints from the last, the middle of the place. The badge, `demo`, the
+//! mark of live updates that stopped (`live off`, until they are back) and that of a workspace
+//! Slack signed out (`signed out, :login`, until it is signed in again) always stay.
 
 use super::view_label;
 use super::work::breadcrumb;
+use crate::action::{Action, SignInAction};
 use crate::app::model::Row;
 use crate::app::signin::SignIn;
 use crate::app::status::Level;
@@ -124,7 +126,22 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     // desktop picker takes one too, after its own keys (`p` among them); while a sign-in is
     // being checked a paste is not taken, so it is not offered.
     let paste = ("Cmd+V".to_string(), Label::HintPaste);
-    match app.sign_in().filter(|_| app.backend.is_none() && !resolved.is_empty()) {
+    // Over the app (`:login`): the way back first (unless it is checking), then the picker's keys
+    // or none but the paste.
+    let mut back = None;
+    if app.backend.is_some()
+        && !resolved.is_empty()
+        && let Some(state) = app.sign_in()
+    {
+        if !matches!(state, SignIn::Desktop(_)) {
+            resolved.clear();
+        }
+        if !matches!(state, SignIn::Checking | SignIn::DesktopChecking(_)) {
+            let key = hints::key_label(&app.keymap, Action::SignIn(SignInAction::Cancel), Ctx::SignIn);
+            back = Some((key.unwrap_or_else(|| "Esc".to_string()), Label::HintBack));
+        }
+    }
+    match app.sign_in().filter(|_| !resolved.is_empty() || back.is_some()) {
         Some(SignIn::Waiting | SignIn::Failed(_)) => resolved.insert(0, paste),
         Some(SignIn::Desktop(_)) => {
             let after =
@@ -132,6 +149,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             resolved.insert(after, paste);
         }
         _ => {}
+    }
+    if let Some(b) = back {
+        resolved.insert(0, b);
     }
     // A workspace that could not be loaded has no views to go to.
     let ws_failed =
@@ -141,6 +161,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     }
     // What could not be loaded here, for a reason that may pass: asking again comes first.
     if !resolved.is_empty()
+        && app.sign_in().is_none()
         && app.can_retry()
         && let Some(k) = super::retry_key(app)
     {
@@ -225,6 +246,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     // stripes of those it is about), and why where the line is wide, when the budget holds them.
     // With the network off, that it is (nothing arrives, nothing is sent).
     let offline = app.offline().then(|| app.i18n.label(Label::StatusOffline).to_string());
+    // A workspace Slack signed out: a warm mark that says what to do, until it is signed in again
+    // (with several workspaces, the stripes of those it is about).
+    let gone = app.signed_out_workspaces();
+    let signed_out: Option<Spans> = (!gone.is_empty() && app.backend.is_some()).then(|| {
+        let mut out: Spans = Vec::new();
+        if app.model.workspaces().len() > 1 {
+            out.extend(gone.iter().map(|ws| Span::styled("▌", t.workspace(ws.color))));
+        }
+        out.push(Span::styled(app.i18n.label(Label::StatusSignedOut).to_string(), t.warm()));
+        out
+    });
     let live_off: Option<Spans> =
         app.backend.and_then(|_| app.live_off()).filter(|_| offline.is_none()).map(|(whose, held)| {
             let mut out: Spans = whose.iter().map(|ws| Span::styled("▌", t.workspace(ws.color))).collect();
@@ -277,6 +309,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
                 out.push(sep());
             }
             out.extend(off.iter().cloned());
+        }
+        if let Some(gone) = &signed_out {
+            if !out.is_empty() {
+                out.push(sep());
+            }
+            out.extend(gone.iter().cloned());
         }
         if let Some(off) = &offline {
             if !out.is_empty() {

@@ -108,12 +108,23 @@ fn every_action_is_registered() {
     };
     let sign_in = {
         use SignInAction::*;
-        [Down, Up, Pick, Mark, Paste].map(Action::SignIn)
+        [Down, Up, Pick, Mark, Paste, Cancel].map(Action::SignIn)
     };
     let app = {
         use AppAction::*;
-        [Quit, Interrupt, Palette, ChooseWorkspace, Retry, ToggleAvatars, ToggleIcons, ToggleDensity, ToggleNetwork]
-            .map(Action::App)
+        [
+            Quit,
+            Interrupt,
+            Palette,
+            ChooseWorkspace,
+            Retry,
+            ToggleAvatars,
+            ToggleIcons,
+            ToggleDensity,
+            ToggleNetwork,
+            SignInAgain,
+        ]
+        .map(Action::App)
     };
     let all = app
         .into_iter()

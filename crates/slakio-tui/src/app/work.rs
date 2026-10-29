@@ -41,7 +41,7 @@ use crate::screen::THREAD_SHARE;
 use slakio_core::backend::{FailKind, Generation, Page, Request};
 use slakio_core::layout::tabs::{Tab, Tabs};
 use slakio_core::layout::{Dir, Node, PaneId};
-use slakio_core::model::{Message, Target};
+use slakio_core::model::{Message, Target, WorkspaceId};
 use slakio_core::sanitize::{Safe, sanitize_block, sanitize_line};
 use std::collections::HashMap;
 use std::time::Instant;
@@ -462,10 +462,10 @@ impl Work {
     }
 
     /// Request `id` for a page failed at `now`: its timeline stops waiting and asks no more
-    /// until retried (by `r`, or by itself when Slack asked to slow down). `false` when nothing
-    /// waited for it.
-    pub fn on_failed(&mut self, id: Generation, kind: FailKind, now: Instant) -> bool {
-        self.timelines.fail(id, kind, now).is_some()
+    /// until retried (by `r`, or by itself when Slack asked to slow down). The workspace of the
+    /// page; `None` when nothing waited for it.
+    pub fn on_failed(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<WorkspaceId> {
+        self.timelines.fail(id, kind, now).map(|t| t.workspace().clone())
     }
 
     /// Why the active pane's messages could not be loaded, if they could not.

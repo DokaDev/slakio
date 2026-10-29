@@ -239,6 +239,7 @@ pub const DEFAULTS: &[Binding] = &[
     bind(Ctx::SignIn, "k", Action::SignIn(SignInAction::Up)),
     bind(Ctx::SignIn, "up", Action::SignIn(SignInAction::Up)),
     bind(Ctx::SignIn, "p", Action::SignIn(SignInAction::Paste)),
+    bind(Ctx::SignIn, "esc", Action::SignIn(SignInAction::Cancel)),
     // Between the panels. `Tab` goes round the view switcher, list, main pane and thread panel.
     // `Ctrl+R` and `Space r` go straight to the view switcher (on the view shown) and `Ctrl+R`
     // back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send

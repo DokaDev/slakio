@@ -22,4 +22,7 @@ pub enum Effect {
     /// Switch the network off (`false`) or on again for the rest of the run (`:net`): the binary
     /// tells the app whether it is as asked ([`super::App::net_switched`]).
     Network(bool),
+    /// Offer signing in again while the app runs (`:login`): the desktop picker with the cursor
+    /// on the workspace of this team id, when one is named, else the paste screen.
+    SignInAgain(Option<String>),
 }

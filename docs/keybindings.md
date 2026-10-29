@@ -32,6 +32,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `k` | Previous workspace | `signin.up` |
 | `Up` | Previous workspace | `signin.up` |
 | `p` | Paste a browser request instead | `signin.paste` |
+| `Esc` | Back to the app, signed in as before | `signin.cancel` |
 
 ## Main screen (`shell`)
 
@@ -281,6 +282,7 @@ Type `:` and the command, then `Enter`.
 | `:icons` |  | Show Nerd Font icons, or text instead |
 | `:density` |  | Comfortable or compact messages |
 | `:net` |  | Switch the network off, or on again |
+| `:login` |  | Sign in again: a workspace Slack signed out, or another |
 | `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
 | `:navrows` |  | Fold the view switcher to the view shown, or unfold it |

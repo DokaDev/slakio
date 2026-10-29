@@ -24,7 +24,8 @@ impl App {
             Some(Overlay::Switcher) => return self.switcher_mouse(m),
             _ => {}
         }
-        if self.backend.is_none() || screen::too_small(self.size) {
+        // The sign-in screen over the app (`:login`) takes no click.
+        if self.backend.is_none() || self.sign_in.state.is_some() || screen::too_small(self.size) {
             return false;
         }
         let at = Position { x: m.column, y: m.row };

@@ -117,6 +117,10 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   workspace's answer replaces its part of the model only, and each has its own failure ("Could
   not load", and the status line names whose start failed) and its own `read_only`. A backend
   that boots every workspace at once (the demo) answers `Command::Boot` without a workspace.
+  Once Slack refuses a workspace's sign-in while it runs (any request, or its socket), its client
+  sends nothing more and its live updates say `Connection::SignedOut`; the app keeps it on screen,
+  marked, and `:login` signs in again over the app: the binary puts a new backend in place of
+  that workspace's alone (`many::Replace`), and the app boots it again, keeping its panes.
 - **Live updates.** What a backend pushes (`Event::Live`) goes to every timeline that shows where
   it belongs (`app/work/live.rs`): a message posted into its conversation or thread (only among
   what is loaded, never into a span not read), a new copy over the one loaded, a deletion out, a

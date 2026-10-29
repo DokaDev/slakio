@@ -92,7 +92,8 @@ fn offered(a: Action, backend: bool) -> bool {
             | AppAction::ToggleAvatars
             | AppAction::ToggleIcons
             | AppAction::ToggleDensity
-            | AppAction::ToggleNetwork,
+            | AppAction::ToggleNetwork
+            | AppAction::SignInAgain,
         )
         | Action::Shell(_)
         | Action::Pane(_)
@@ -194,7 +195,8 @@ impl App {
             let works = offered(s.action, backend)
                 && (!s.action.changes() || !self.read_only())
                 && (s.action != Action::App(AppAction::Retry) || self.failed_here().is_some())
-                && (s.action != Action::App(AppAction::ToggleNetwork) || self.networked())
+                && (!matches!(s.action, Action::App(AppAction::ToggleNetwork | AppAction::SignInAgain))
+                    || self.networked())
                 && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty());
             if works && let Some((tier, score)) = action::rank_spec(word, s, &self.i18n) {
                 let quit = s.action == Action::App(AppAction::Quit);
@@ -516,6 +518,7 @@ impl App {
             AppAction::ToggleAvatars => self.set_avatars(if s.avatars { "off" } else { "initials" }, now),
             AppAction::ToggleDensity => self.set_density(if s.compact { "comfortable" } else { "compact" }, now),
             AppAction::ToggleNetwork => return self.set_net(self.offline(), now),
+            AppAction::SignInAgain => return self.sign_in_again(),
             _ => self.set_icons(if s.icons { "off" } else { "on" }, now),
         };
         if let Err(msg) = done {

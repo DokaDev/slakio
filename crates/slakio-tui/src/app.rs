@@ -237,8 +237,8 @@ impl App {
     /// Where the keyboard is in the regions of the screen, under the command line too (the keys
     /// the palette shows are those of this context).
     pub fn region_context(&self) -> Ctx {
-        if self.backend.is_none() {
-            return if self.picking() { Ctx::SignIn } else { Ctx::Root };
+        if self.backend.is_none() || self.sign_in.state.is_some() {
+            return if self.picking() || self.backend.is_some() { Ctx::SignIn } else { Ctx::Root };
         }
         match self.focus() {
             Focus::ViewSwitcher => Ctx::ViewSwitcher,

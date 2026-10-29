@@ -217,6 +217,8 @@
 "action.signin.pick" = "Sign in to the marked workspaces, else to this one"
 "action.signin.mark" = "Mark this workspace to sign in to it too (again: unmark it)"
 "action.signin.paste" = "Paste a browser request instead"
+"action.signin.cancel" = "Back to the app, signed in as before"
+"action.signin.again" = "Sign in again: a workspace Slack signed out, or another"
 
 # Key contexts (key help and docs/keybindings.md).
 "ctx.root" = "Everywhere"
@@ -405,8 +407,8 @@
 "action.net" = "Switch the network off, or on again"
 "net.off" = "Network off: nothing is sent"
 "net.on" = "Network on"
-"net.locked" = "Network off for this run: started offline"
-"net.capped" = "Network off for this run: the request limit was reached"
+"net.locked" = "Network stays off: started offline"
+"net.capped" = "Network stays off: request limit reached"
 "net.demo" = "The demo sends nothing: :net is not available in the demo"
 "net.unknown" = "Unknown network setting {name} (one of {names})"
 "net.value_on" = "Send and receive"
@@ -417,6 +419,11 @@
 "fail.workspace" = "{workspace}: {why}"
 # A workspace whose sign-in Slack refused at its start: short, so its name fits beside it.
 "fail.workspace_auth" = "{workspace}: signed out, run slakio login"
+# A workspace Slack signed out while the app ran: the notice (alone, and after its name with
+# several), and the status line's steady mark until it is signed in again.
+"signed_out" = "Signed out by Slack: use :login"
+"signed_out_why" = "signed out, use :login"
+"status.signed_out" = "signed out, :login"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"
 "hint.todo_save" = "to Saved"

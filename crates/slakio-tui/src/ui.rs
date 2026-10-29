@@ -51,7 +51,8 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
     let area = f.area();
     f.buffer_mut().set_style(area, app.theme.base());
     let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
-    if let (None, Some(state)) = (app.backend, app.sign_in()) {
+    // Before the first sign-in, or over the app (`:login`).
+    if let Some(state) = app.sign_in() {
         signin::draw(f, app, body, state);
     } else if app.backend.is_none() {
         draw_welcome(f, app, body);

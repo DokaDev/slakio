@@ -211,7 +211,11 @@ its own: one that Slack refuses or that does not answer shows "Could not load" i
 and leaves the others working. `slakio logout <workspace>` (its name, host or team id) signs out
 of one and removes its credentials and its part of the local cache, keeping the others;
 `slakio logout --all` signs out of every one (with one workspace, `slakio logout` alone does).
-If Slack signs the session out, slakio says "run slakio login" and you sign in again.
+If Slack refuses a workspace at start, slakio says "run slakio login". If Slack signs a
+workspace out while slakio runs, it stays on screen as it was, marked `signed out, :login`, and
+nothing more is sent for it; `:login` signs in to it again without quitting (the desktop app's
+picker or a paste; `Esc` goes back), and only that workspace starts over: tabs, panes and drafts
+stay, and the other workspaces are not touched.
 
 The desktop-app import is adapted from the open-source client
 [gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.

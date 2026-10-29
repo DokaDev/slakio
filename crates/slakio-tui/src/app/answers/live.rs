@@ -45,8 +45,11 @@ impl App {
     /// workspaces when several are signed in (their stripes show), and whether the request
     /// budget holds any of them. `None` while every one heard of arrives.
     pub fn live_off(&self) -> Option<(Vec<&Workspace>, bool)> {
-        let off: Vec<(&Workspace, bool)> =
-            self.model.workspaces().iter().filter_map(|w| Some((w, self.model.live_off(&w.id)?))).collect();
+        // A workspace Slack signed out has a mark of its own.
+        let off: Vec<(&Workspace, bool)> = (self.model.workspaces().iter())
+            .filter(|w| !self.signed_out_in(&w.id))
+            .filter_map(|w| Some((w, self.model.live_off(&w.id)?)))
+            .collect();
         if off.is_empty() {
             return None;
         }
@@ -68,6 +71,12 @@ impl App {
             }
             Connection::Lost => (if ever { Label::LiveLost } else { Label::LiveWaiting }, Level::Warning),
             Connection::Held => (Label::LiveHeld, Level::Warning),
+            // Said as a sign-out, not as live updates that stopped.
+            Connection::SignedOut => {
+                self.model.live.insert(ws.clone(), (state, ever));
+                self.signed_out(ws, now);
+                return true;
+            }
         };
         let on = matches!(state, Connection::Connected { .. });
         self.model.live.insert(ws.clone(), (state, ever || on));
@@ -94,6 +103,18 @@ impl App {
             self.status.restate_about(msg, level, about, now, stale);
         }
         true
+    }
+
+    /// Forget what was said of the live updates of `ws` (Slack signed it out: none come again).
+    pub(in crate::app) fn forget_live(&mut self, ws: &WorkspaceId, now: Instant) {
+        let name = self.model.workspace(ws).map(|w| w.name.line().into_string());
+        let words: Vec<String> = WORDS.iter().map(|l| self.i18n.label(*l).to_string()).collect();
+        let alone = self.boots.len() <= 1;
+        self.status.forget(now, |m| match m {
+            Msg::Label(l) => alone && WORDS.contains(l),
+            Msg::FailWorkspace { workspace, why } => name.as_ref() == Some(workspace) && words.contains(why),
+            _ => false,
+        });
     }
 }
 
