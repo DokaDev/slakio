@@ -377,6 +377,7 @@ pub const DEFAULTS: &[Binding] = &[
     pane(Ctx::PaneNormal, "i", PaneAction::Insert),
     pane(Ctx::PaneNormal, "a", PaneAction::Insert),
     pane(Ctx::PaneNormal, "y", PaneAction::Copy),
+    pane(Ctx::PaneNormal, "o", PaneAction::OpenLink),
     pane(Ctx::PaneNormal, "V", PaneAction::Visual),
     tab(Ctx::PaneNormal, "t", TabAction::Open),
     // VISUAL, the selection, the thread panel and the main pane are left one `Esc` at a time;

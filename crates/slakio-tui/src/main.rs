@@ -439,6 +439,16 @@ struct Saved {
 }
 
 impl Saved {
+    /// Open `url` in the browser; a failure is said and goes to the error log.
+    fn open(&self, url: &str, app: &mut App) {
+        if let Err(e) = slakio_tui::opener::open(url) {
+            ErrorLog::new(self.errors.clone()).record("open", &slakio_core::fault::Fault::io(&e));
+            app.warn(Msg::Label(Label::OpenFailed), Instant::now());
+        }
+    }
+}
+
+impl Saved {
     /// Save setting `key` as `value` in the config file; `true` when that failed (the app says so).
     fn save(&self, key: &str, value: &str, app: &mut App) -> bool {
         let result = match &self.config {
@@ -491,6 +501,7 @@ async fn run(
                 Effect::SignInAgain(team) if scanning.is_none() => scanning = inapp::offer(&mut app, wiring, team),
                 Effect::SignInAgain(_) => {}
                 Effect::Save { key, value } => redraw |= saved.save(key, &value, &mut app),
+                Effect::OpenLink(url) => saved.open(&url, &mut app),
             }
         }
         if redraw {

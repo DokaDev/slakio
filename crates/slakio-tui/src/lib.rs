@@ -12,7 +12,8 @@
 //! * [`theme`] — color and style tokens; [`avatar`] — a person's initials chip.
 //! * [`terminal`] — the terminal modes the binary sets and restores, and the cursor's shape.
 //! * [`kitty`] — the kitty keyboard protocol flags.
-//! * [`input`] — Hangul typed where a key command was meant.
+//! * [`input`] — Hangul typed where a key command was meant; [`opener`] — links opened in the
+//!   browser.
 //! * [`mrkdwn`] — Slack's message markup read into styled pieces.
 //! * [`text`] — display widths and wrapping; [`time`] — message dates and times.
 //!
@@ -30,6 +31,7 @@ pub mod kitty;
 pub mod many;
 pub mod mrkdwn;
 pub mod navbar;
+pub mod opener;
 pub mod screen;
 pub mod tabbar;
 pub mod terminal;

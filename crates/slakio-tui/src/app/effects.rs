@@ -25,4 +25,6 @@ pub enum Effect {
     /// Offer signing in again while the app runs (`:login`): the desktop picker with the cursor
     /// on the workspace of this team id, when one is named, else the paste screen.
     SignInAgain(Option<String>),
+    /// Open this web address in the browser (checked: `http` or `https`); nothing goes to Slack.
+    OpenLink(String),
 }

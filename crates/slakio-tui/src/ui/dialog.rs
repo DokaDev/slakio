@@ -36,12 +36,17 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         Question::Clear => {
             (Label::DialogClearTitle, Label::DialogClearText, Label::DialogClearNo, Label::DialogClearYes)
         }
+        Question::Open => (Label::DialogOpenTitle, Label::DialogOpenTitle, Label::DialogOpenNo, Label::DialogOpenYes),
     };
     let (no, yes) = (app.i18n.label(no).to_string(), app.i18n.label(yes).to_string());
     let w = area.width.saturating_sub(4).min(60);
     let inner_w = usize::from(w.saturating_sub(4)).max(8);
-    let mut lines: Vec<Line> =
-        wrap(&app.i18n.label(text), inner_w, 6).0.into_iter().map(|l| Line::styled(l, t.text())).collect();
+    // A link asked about: what its text says, and the host it really goes to.
+    let text = match app.opening().filter(|_| d.question == Question::Open) {
+        Some(o) => app.i18n.msg(&Msg::DialogOpenText { said: o.said.clone(), host: o.host.clone() }).to_string(),
+        None => app.i18n.label(text).to_string(),
+    };
+    let mut lines: Vec<Line> = wrap(&text, inner_w, 6).0.into_iter().map(|l| Line::styled(l, t.text())).collect();
     if d.question == Question::Icons {
         lines.push(Line::default());
         lines.push(Line::styled(PREVIEW, t.bold()).alignment(Alignment::Center));

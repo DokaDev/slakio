@@ -58,6 +58,8 @@ pub enum Item {
     Avatars(usize),
     /// `:rename <name>`: name the tab shown that (nothing: after what it shows).
     Rename,
+    /// `:open <link number or address>`.
+    Open,
     /// A value for `:icons <value>` (index into [`ICON_VALUES`]).
     Icons(usize),
     /// A value for `:density <value>` (index into [`DENSITY_VALUES`]).
@@ -134,6 +136,10 @@ fn theme_label(name: &str) -> Label {
 }
 
 /// The name of `:rename <name>` (empty: `:rename ` with nothing after it).
+fn open_arg(line: &str) -> Option<&str> {
+    line.trim_start().strip_prefix("open").filter(|r| r.starts_with(char::is_whitespace)).map(str::trim)
+}
+
 fn rename_arg(line: &str) -> Option<&str> {
     let rest = line.trim_start().strip_prefix("rename")?;
     rest.starts_with(char::is_whitespace).then(|| rest.trim())
@@ -148,6 +154,9 @@ impl App {
         let line = self.cmdline.text().trim_start();
         if rename_arg(line).is_some() && self.backend.is_some() {
             return vec![Item::Rename];
+        }
+        if open_arg(line).is_some_and(|a| !a.is_empty()) {
+            return vec![Item::Open];
         }
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
@@ -281,6 +290,7 @@ impl App {
                 }
                 Item::TodoFilter(_) | Item::TodoSort(_) => self.todo_palette_row(item).unwrap_or_default(),
                 Item::Net(i) => self.net_row(i),
+                Item::Open => self.open_row(open_arg(self.cmdline.text()).unwrap_or_default()),
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -366,6 +376,11 @@ impl App {
             Some(Item::Net(i)) => {
                 self.cmdline.close();
                 self.set_net(NET_VALUES[i] == "on", now);
+            }
+            Some(Item::Open) => {
+                let arg = open_arg(&text).unwrap_or_default().to_string();
+                self.cmdline.close();
+                self.open_typed(&arg, now);
             }
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();

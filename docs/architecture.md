@@ -173,7 +173,14 @@ comes back); people and channels are named from the read model when drawn
   (`fsutil::create_new`, `fsutil::rename_new`).
 - **Failures as data.** Core never words a failure: a `Fault` has a kind the UI turns into a
   catalog message and a raw detail that only goes to `<state>/errors.log`. The status line never
-  shows OS or parser text.
+  shows OS or parser text. The log redacts each detail (`fault::redact`: tokens, cookies,
+  addresses past their host, quoted text), is mode 0600 and never written through a link, and
+  rotates at 1 MiB to one `errors.log.1`.
+- **Links.** `opener` opens only `http`/`https` addresses with a plain ASCII host, handing the
+  address as one argument to the system's opener (`open`, `xdg-open`, `rundll32
+  url.dll,FileProtocolHandler`; no shell); a link whose text names another host is asked about
+  first (`dialog::Question::Open`). Tests stand in for the opener (`SLAKIO_TEST_OPENER`, debug
+  builds only) and never start a browser.
 
 ## The Slack transport
 

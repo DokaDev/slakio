@@ -190,3 +190,54 @@ fn net_off_closes_the_socket_and_sends_nothing_net_on_opens_it_again_and_catches
     assert_eq!(m.fake.upgrades().len(), sockets + 1);
     run.quit();
 }
+
+#[test]
+fn a_link_opens_through_the_opener_with_its_address_as_one_argument_and_nothing_goes_to_slack() {
+    let m = Machine::new("open-link");
+    // The tests' stand-in for the system's opener: it writes what it is handed, one per line.
+    let (opener, record) = (m.dir.join("opener.sh"), m.dir.join("opened.txt"));
+    std::fs::write(
+        &opener,
+        format!("#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n", record.display()),
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&opener, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let opener_path = opener.to_string_lossy().into_owned();
+    let Some(mut run) = m.start((100, 30), &[("SLAKIO_TEST_OPENER", &opener_path)]) else { return };
+    run.wait_for("live updates on", |t| t.contains("Live updates on"));
+    click(&mut run, "deploys");
+    wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+    run.wait_for("its messages", |t| t.contains("Message #deploys"));
+    // Its page is in before anything is posted live (a page that came later would replace it).
+    std::thread::sleep(Duration::from_millis(500));
+    let (c, who) = (m.channel("deploys"), m.other());
+    let text = "read <https://docs.example.com/run?a=1&b=$(id)|the runbook> or <javascript:alert(1)|that>";
+    m.fake.push(&json!({"type": "message", "channel": c, "user": who, "text": text, "ts": "1900000000.000100"}));
+    run.wait_for("the message", |t| t.contains("the runbook"));
+    let asked = m.fake.log().len();
+    // The pane gets the keyboard (`Ctrl+L`), its newest message selected.
+    run.type_bytes(b"\x0c");
+    run.type_bytes(b"G");
+    run.type_bytes(b"o");
+    run.wait_for("said", |t| t.contains("Opening docs.example.com in the browser"));
+    wait_until("the opener ran", || std::fs::read_to_string(&record).is_ok_and(|r| r.lines().count() == 1));
+    assert_eq!(std::fs::read_to_string(&record).unwrap(), "https://docs.example.com/run?a=1&b=$(id)\n");
+    // Its second link runs code: refused, the opener not run.
+    run.type_bytes(b":open 2\r");
+    run.wait_for("refused", |t| t.contains("Not opened: only web links open"));
+    // A link whose text names another host: asked first, the real host shown, then opened.
+    let text = "<https://login.evil.test/x|https://docs.example.com/login>";
+    m.fake.push(&json!({"type": "message", "channel": c, "user": who, "text": text, "ts": "1900000000.000200"}));
+    // Below the message selected: said on the composer's border.
+    run.wait_for("the second message", |t| t.contains("↓ 1 new"));
+    run.type_bytes(b"G");
+    run.type_bytes(b"o");
+    run.wait_for("the question", |t| t.contains("Open this link?") && t.contains("login.evil.test"));
+    run.type_bytes(b"y");
+    wait_until("opened after yes", || std::fs::read_to_string(&record).is_ok_and(|r| r.lines().count() == 2));
+    assert!(std::fs::read_to_string(&record).unwrap().ends_with("https://login.evil.test/x\n"));
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(m.fake.log().len(), asked, "nothing went to Slack: {:?}", m.fake.methods());
+    run.quit();
+}

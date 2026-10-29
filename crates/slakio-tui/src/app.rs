@@ -35,6 +35,7 @@ mod effects;
 mod focus;
 pub mod help;
 mod layout;
+pub mod links;
 pub mod model;
 mod mouse;
 mod nav;
@@ -137,8 +138,9 @@ pub struct App {
     pub model: Model,
     /// The keyboard help, while open.
     pub(crate) help: Option<Help>,
-    /// A question, while asked.
+    /// A question, while asked; the link it asks about, if it does.
     pub(crate) dialog: Option<Dialog>,
+    opening: Option<links::Opening>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: signin::Offer,
@@ -176,6 +178,7 @@ impl App {
             model: Model::default(),
             help: None,
             dialog: None,
+            opening: None,
             backend: None,
             sign_in: signin::Offer::default(),
             boots: Vec::new(),
@@ -507,6 +510,7 @@ impl App {
             }),
             PaneAction::Escape => self.escape(main_target),
             PaneAction::Copy => self.copy(now),
+            PaneAction::OpenLink => self.open_link(1, now),
             PaneAction::Insert => self.write(now),
             PaneAction::Left => {
                 if self.focus().is_pane()
@@ -527,30 +531,6 @@ impl App {
             }
             PaneAction::Close => self.close_pane(now),
         }
-    }
-
-    /// Copy the selected messages (the VISUAL range, or the selected one) as text: one
-    /// message alone as its text, a range as `time  author: text` lines. Sanitised text only.
-    fn copy(&mut self, now: Instant) {
-        let Some(p) = self.work.focused() else { return };
-        let Some((a, b)) = p.range(self.work.timeline(p)) else { return };
-        let one = a == b && p.visual.is_none();
-        let items = &self.work.timeline(p).items[a..=b];
-        let text = if one {
-            items[0].text.to_string()
-        } else {
-            items
-                .iter()
-                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts), m.author, m.text))
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
-        let count = items.len() as u64;
-        if let Some(p) = self.work.focused_mut() {
-            p.visual = None;
-        }
-        self.effects.push(Effect::Copy(text));
-        self.info(Msg::StatusCopied { count }, now);
     }
 
     fn composer(&mut self, a: ComposerAction, now: Instant) {

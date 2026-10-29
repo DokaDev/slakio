@@ -17,6 +17,8 @@ pub enum Question {
     Icons,
     /// Clear the saved item under the cursor? (It leaves To-dos and Saved.)
     Clear,
+    /// Open a link whose text names another host than the one it goes to?
+    Open,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +35,11 @@ impl Dialog {
 }
 
 impl App {
+    /// What is asked, while it is.
+    pub fn question(&self) -> Option<Question> {
+        self.dialog.map(|d| d.question)
+    }
+
     /// An answer to the question asked (`Tab` moves the focus between the answers).
     pub(super) fn answer(&mut self, a: DialogAction) {
         let Some(mut d) = self.dialog else { return };
@@ -54,6 +61,7 @@ impl App {
         match d.question {
             Question::Quit | Question::QuitConfirm => self.quit = yes,
             Question::Clear => self.answer_clear(yes),
+            Question::Open => self.answer_open(yes),
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });
