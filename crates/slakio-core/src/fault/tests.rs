@@ -96,7 +96,7 @@ fn no_token_cookie_address_past_its_host_or_quoted_text_reaches_the_log() {
     // What says why stays.
     for kept in [
         "/x/workspace.toml: Permission denied (os error 13)",
-        "cache: /Users/someone/Library/Caches/slakio/slakio-store/part-of-a-team",
+        "cache: /var/cache/slakio/slakio-store/part-of-a-team-of-someone",
         "invalid_auth",
         "HTTP 503",
         "don't panic",
