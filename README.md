@@ -27,11 +27,16 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.9, reads real history (one page of older messages per `gg` or scroll, paced to
-protect the request budget) and thread replies, shows Slack's formatting (bold, code, quotes and links,
-with the link's real host shown), honours mute (muted channels show only mentions, muted direct
-messages nothing) and do not disturb, marks Slack Connect people `ext` and bots `app`, and caches
-threads; it is still read-only and has no realtime updates. 0.0.8 signed in to several workspaces at once (from the Slack desktop app, or a
+([Install](#install)); the latest release, 0.0.10, shows messages as they happen: new, edited and deleted messages, unread
+counts and thread reply counts follow live, over a connection per workspace that only receives. When
+the connection drops the status line shows a `live off` marker, and after it comes back the
+conversations that are open are read again to catch up. `live = "off"` in the config turns it off.
+While live is on, your coworkers may see you as active in Slack. It is still read-only: it sends nothing
+and marks nothing as read. 0.0.9 read real history (one page of older messages per `gg` or scroll, paced to
+protect the request budget) and thread replies, showed Slack's formatting (bold, code, quotes and links,
+with the link's real host shown), honoured mute (muted channels show only mentions, muted direct
+messages nothing) and do not disturb, marked Slack Connect people `ext` and bots `app`, and cached
+threads, without realtime updates. 0.0.8 signed in to several workspaces at once (from the Slack desktop app, or a
 pasted request; the desktop picker lets you tick several with Space, signing in keeps the others,
 and `logout <workspace>` or `logout --all` signs out) and reads them; one failing workspace does
 not affect the others. It was read-only without realtime updates; it kept a local cache
