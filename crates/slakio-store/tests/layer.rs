@@ -9,7 +9,7 @@ use slakio_core::backend::{
 };
 use slakio_core::model::{Target, Ts, WorkspaceId};
 use slakio_store::cache::{Cache, system_clock};
-use slakio_store::{Caps, Store, layer};
+use slakio_store::{Caps, OpenError, Store, layer};
 use slakio_world::World;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -44,13 +44,17 @@ async fn run(dir: &Path, workspace: &WorkspaceId, caps: Caps, reader: bool) -> R
     Run { ui, backend, cache, faults }
 }
 
+/// While an earlier run's thread still holds the writer's lock, the cache opens read-only, or not
+/// at all (`InUse`) when its file cannot be read at that moment (the closing writer checkpoints
+/// the database and takes its `-wal` and `-shm` files away; Windows lets a reader see that). Both
+/// mean "not yet": tried again.
 async fn open(dir: &Path, reader: bool) -> Store {
     for _ in 0..100 {
-        let store = Store::open(dir).unwrap().store;
-        if store.read_only() == reader {
-            return store;
+        match Store::open(dir) {
+            Ok(opened) if opened.store.read_only() == reader => return opened.store,
+            Ok(_) | Err(OpenError::InUse) => {}
+            Err(OpenError::Failed(fault)) => panic!("the cache could not be opened: {fault}"),
         }
-        drop(store);
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     panic!("the cache never opened as {}", if reader { "a reader" } else { "the writer" });
@@ -488,4 +492,21 @@ async fn a_thread_read_only_in_part_is_not_kept() {
     r.ask(2, history(&thread, None));
     r.backend_next().await;
     assert!(r.ui.rx.try_recv().is_err(), "no word on what is newer: nothing of it kept");
+}
+
+#[tokio::test]
+async fn a_run_waits_while_a_closing_writer_holds_the_lock_and_its_file_cannot_be_read() {
+    let dir = scratch("closing");
+    // A writer that is going away: it holds the lock, and there is no database to read meanwhile.
+    std::fs::create_dir_all(dir.join("slakio-store")).unwrap();
+    let lock = std::fs::File::create(dir.join("slakio-store").join("cache.lock")).unwrap();
+    lock.try_lock().unwrap();
+    assert!(matches!(Store::open(&dir), Err(OpenError::InUse)));
+    let gone = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        drop(lock);
+    });
+    let store = open(&dir, false).await;
+    assert!(!store.read_only(), "the writer, once the lock was let go");
+    gone.await.unwrap();
 }
