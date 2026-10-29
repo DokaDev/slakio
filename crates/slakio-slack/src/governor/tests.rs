@@ -74,6 +74,33 @@ fn the_cap_of_a_run_stops_all_network_until_restart() {
     });
 }
 
+/// Wakes when the network is switched on, noting whether the counts were locked right then.
+struct Probe(Arc<Governor>, std::sync::atomic::AtomicBool);
+
+impl std::task::Wake for Probe {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.1.store(self.0.counts.try_lock().is_err(), Ordering::SeqCst);
+    }
+}
+
+#[test]
+fn the_switch_turns_the_network_on_under_the_counts_lock_so_a_trip_cannot_land_in_between() {
+    let (g, _) = governor(Limits::default(), true);
+    assert!(g.switch(false));
+    let probe = Arc::new(Probe(Arc::clone(&g), std::sync::atomic::AtomicBool::new(false)));
+    let waker = std::task::Waker::from(Arc::clone(&probe));
+    let mut rx = g.network.subscribe();
+    let mut changed = Box::pin(rx.changed());
+    let mut cx = std::task::Context::from_waker(&waker);
+    assert!(changed.as_mut().poll(&mut cx).is_pending());
+    assert!(g.switch(true));
+    assert!(probe.1.load(Ordering::SeqCst), "the network went on with the counts unlocked");
+}
+
 #[test]
 fn the_apps_switch_turns_the_network_off_and_on_but_never_on_when_it_was_off_from_the_start() {
     rt().block_on(async {

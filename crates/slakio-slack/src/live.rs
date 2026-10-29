@@ -152,6 +152,8 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     // What the UI was last told while not connected: lost, or held by the budget; and whether
     // the network was switched off since the last hello.
     let (mut failures, mut told, mut off) = (0u32, None, false);
+    // When the machine last woke: a wake starts the pause over only once in a while.
+    let mut last_wake: Option<Instant> = None;
     loop {
         // What was missed while it was said to be lost (or not connected yet), or while the
         // network was off, is read again.
@@ -181,8 +183,13 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
             }
         }
         // The pause starts over only after a socket said hello and stayed open a while, or when
-        // the machine woke (the network it slept on is not the one it may wake on).
-        failures = if woke || hello.is_some_and(|at| at.elapsed() >= settings.steady) {
+        // the machine woke (the network it slept on is not the one it may wake on) at least that
+        // long after it last woke: a clock that keeps jumping on does not keep the pause short.
+        let fresh_wake = woke && last_wake.is_none_or(|at| at.elapsed() >= settings.steady);
+        if woke {
+            last_wake = Some(Instant::now());
+        }
+        failures = if fresh_wake || hello.is_some_and(|at| at.elapsed() >= settings.steady) {
             0
         } else {
             failures.saturating_add(1)
@@ -256,8 +263,9 @@ async fn outbox(client: Arc<Client>, ctx: Arc<Session>, mut rx: mpsc::Receiver<O
 async fn open(client: &Client) -> Result<Socket<crate::http::Upgraded>, End> {
     let stopped = client.governor().stopped();
     let opened = tokio::select! {
-        socket = client.open_socket() => socket,
+        biased;
         () = stopped => return Err(End::Off),
+        socket = client.open_socket() => socket,
     };
     match opened {
         Ok(io) => Ok(Socket::new(io)),
@@ -294,15 +302,22 @@ async fn connection(
     let wake = woke(settings);
     tokio::pin!(wake);
     loop {
+        // The switch is looked at first: once it is off, not even an answer to a ping goes out.
         let next = tokio::select! {
-            next = tokio::time::timeout(settings.silence, socket.next()) => next,
-            // The machine slept: whatever the socket was, it is gone by now.
-            () = &mut wake => {
-                let _ = tokio::time::timeout(CLOSE_WAIT, socket.close()).await;
-                return End::Lost { hello, wait: None, held: false, woke: true };
-            }
+            biased;
             () = client.governor().stopped() => return End::Off,
             () = out.closed() => return End::Stop,
+            next = tokio::time::timeout(settings.silence, socket.next()) => next,
+            // The machine slept: whatever the socket was, it is gone by now. Its close is not
+            // written once the network is off.
+            () = &mut wake => {
+                tokio::select! {
+                    biased;
+                    () = client.governor().stopped() => return End::Off,
+                    _ = tokio::time::timeout(CLOSE_WAIT, socket.close()) => {}
+                }
+                return End::Lost { hello, wait: None, held: false, woke: true };
+            }
         };
         let text = match next {
             Ok(Ok(Incoming::Text(text))) => text,

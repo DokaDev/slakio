@@ -266,8 +266,10 @@ impl Governor {
             self.stop();
             return true;
         }
-        let tripped = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).tripped;
-        if self.locked || tripped {
+        // Switched on under the counts lock: a trip of the cap cannot land between the check
+        // and the switch (and leave the network on after it).
+        let counts = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if self.locked || counts.tripped {
             return false;
         }
         self.network.send_replace(true);

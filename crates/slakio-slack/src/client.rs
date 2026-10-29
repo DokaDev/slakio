@@ -44,9 +44,11 @@ impl Client {
             let ids: &mut dyn Ids = ids;
             prepare(call, &self.credentials, session, &self.endpoints, now_ms(), ids, Os::current())?
         };
+        // The switch is looked at first: once it is off, nothing more of the request is written.
         let raw = tokio::select! {
-            raw = crate::http::send(&self.endpoints, &prepared) => raw?,
+            biased;
             () = self.governor.stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
+            raw = crate::http::send(&self.endpoints, &prepared) => raw?,
         };
         let answer = decode(&raw);
         if let Err(SlackError::RateLimited { retry_after }) = &answer {
@@ -65,8 +67,9 @@ impl Client {
             opening(&self.credentials, session, &self.endpoints, ids, Os::current())?
         };
         tokio::select! {
-            socket = crate::http::socket(&self.endpoints, &opening) => socket,
+            biased;
             () = self.governor.stopped() => Err(SlackError::Offline { why: "the network was switched off" }),
+            socket = crate::http::socket(&self.endpoints, &opening) => socket,
         }
     }
 

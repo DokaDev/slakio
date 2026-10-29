@@ -42,6 +42,14 @@ fn wall_after_sleep() -> SystemTime {
     SystemTime::now() + Duration::from_secs(SLEPT.load(Ordering::SeqCst))
 }
 
+/// The same for the test of wakes that come one after the other (a test of its own, so the two
+/// can run at once).
+static SLEPT_AGAIN: AtomicU64 = AtomicU64::new(0);
+
+fn wall_after_sleeps() -> SystemTime {
+    SystemTime::now() + Duration::from_secs(SLEPT_AGAIN.load(Ordering::SeqCst))
+}
+
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()
 }
@@ -660,6 +668,35 @@ fn a_machine_that_slept_loses_its_socket_at_once_and_reads_what_it_missed() {
         assert_eq!(r.calls("client.counts"), counts + 1, "read again once");
         r.quiet(Duration::from_millis(300)).await;
         assert_eq!(r.fake.upgrades().len(), 2, "one wake, one reconnect");
+    });
+}
+
+#[test]
+fn wakes_one_after_the_other_do_not_keep_the_pause_short() {
+    rt().block_on(async {
+        let woke = Realtime {
+            first_retry: Duration::from_millis(400),
+            longest_retry: Duration::from_secs(10),
+            wake_check: Duration::from_millis(30),
+            wake_gap: Duration::from_secs(2),
+            wall: wall_after_sleeps,
+            ..QUICK
+        };
+        let mut r = Run::new(woke).await;
+        r.boot().await;
+        assert!(!r.connected().await);
+        let mut took = Vec::new();
+        for _ in 0..4 {
+            SLEPT_AGAIN.fetch_add(3600, Ordering::SeqCst);
+            r.lost().await;
+            let at = Instant::now();
+            assert!(r.connected().await);
+            took.push(at.elapsed());
+        }
+        // The first wake starts the pause over (at most 400 ms); the ones that come within the
+        // steady time of it count as failures: the pause doubles (at least 800 ms by the fourth).
+        assert!(took[0] < Duration::from_millis(700), "{took:?}");
+        assert!(took[3] >= Duration::from_millis(800), "{took:?}");
     });
 }
 
