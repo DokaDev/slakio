@@ -428,7 +428,7 @@ impl App {
                 self.info(Msg::StatusQuitHint { keys }, now);
             }
             AppAction::Palette => {
-                if self.dialog.is_none() {
+                if self.dialog.is_none() && !self.checking_sign_in() {
                     self.help = None;
                     if self.cmdline.is_open() {
                         self.cmdline.close();
@@ -578,11 +578,11 @@ impl App {
 
     fn command_line(&mut self, a: CommandLineAction, now: Instant) {
         match a {
-            CommandLineAction::Open => {
+            CommandLineAction::Open if !self.checking_sign_in() => {
                 self.help = None;
                 self.cmdline.open();
             }
-            CommandLineAction::Cancel => self.cmdline.close(),
+            CommandLineAction::Cancel | CommandLineAction::Open => self.cmdline.close(),
             CommandLineAction::Run => self.palette_run(now),
             CommandLineAction::Next => self.palette_step(1),
             CommandLineAction::Prev => self.palette_step(-1),

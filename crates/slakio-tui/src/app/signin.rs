@@ -252,7 +252,8 @@ impl App {
     /// `:login`: sign in again, the picker's cursor on the workspace shown when Slack does not
     /// accept its sign-in, else on the first that it does not accept (else on none).
     pub(super) fn sign_in_again(&mut self) {
-        if !self.networked() {
+        // One sign-in at a time: not while one is being checked.
+        if !self.networked() || self.checking_sign_in() {
             return;
         }
         let refused = |ws: &WorkspaceId| self.signed_out_in(ws) || self.boot_failed_in(ws) == Some(&FailKind::Auth);
@@ -261,17 +262,30 @@ impl App {
         self.effects.push(Effect::SignInAgain(team.map(|t| t.as_str().to_string())));
     }
 
+    /// A sign-in is being checked (pasted, or picked from the desktop app's).
+    pub(super) fn checking_sign_in(&self) -> bool {
+        matches!(self.sign_in.state, Some(SignIn::Checking | SignIn::DesktopChecking(_)))
+    }
+
     /// Signed in again to the workspaces `signed` (Slack's names `workspaces`), which the app
     /// shows already: the binary started their backends again with the new sign-in, the others
     /// go on as they were. Each boots again (its part of the model replaced when it answers),
     /// then its open panes catch up; the pages that failed are asked for again. Tabs, panes,
-    /// where they were read and drafts stay.
+    /// where they were read and drafts stay — for the same user. Signed in as someone else,
+    /// nothing of the user before stays: that workspace's panes, messages, drafts and lists go
+    /// (and nothing of theirs is asked for).
     pub fn signed_in_again(&mut self, signed: &[SignedIn], workspaces: &[String], now: Instant) {
         self.sign_in = Offer::default();
         for s in signed {
+            let other = self.model.me(&s.id).is_some_and(|me| me.as_str() != s.user);
+            if other {
+                self.work.forget_workspace(&s.id);
+                self.model.forget_workspace(&s.id);
+                self.shell.clamp(&self.model, self.list_height());
+            }
             let id = self.work.requests.ask(Some(s.id.clone()), Command::Boot);
             if let Some(b) = self.boots.iter_mut().find(|b| b.workspace.as_ref() == Some(&s.id)) {
-                (b.id, b.failed, b.signed_out, b.again) = (id, None, false, true);
+                (b.id, b.failed, b.signed_out, b.again, b.since) = (id, None, false, !other, id);
                 b.read_only |= s.read_only;
             }
             self.work.retry_signed_in(&s.id);

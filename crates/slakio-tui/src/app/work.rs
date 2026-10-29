@@ -568,6 +568,24 @@ impl Work {
         // user wrote is never dropped silently.
         gone
     }
+
+    /// Workspace `ws` is signed in to again as someone else: nothing of the user before stays —
+    /// its panes close in every tab, and its messages, drafts and places to go back to go.
+    pub fn forget_workspace(&mut self, ws: &WorkspaceId) {
+        let of = |t: &Target| t.workspace() == ws;
+        let gone: Vec<PaneId> =
+            self.tabs.panes().into_iter().filter(|id| self.panes.get(id).is_some_and(|p| of(&p.target))).collect();
+        for id in gone {
+            self.close_pane(id);
+        }
+        self.timelines.retain(|t| !of(t));
+        self.drafts.retain(|t, _| !of(t));
+        for p in self.panes.values_mut() {
+            p.history.retain(|t| !of(t));
+        }
+        self.closed.retain_mut(|c| c.retain(|t| !of(t)));
+        self.check();
+    }
 }
 
 pub(crate) mod live;

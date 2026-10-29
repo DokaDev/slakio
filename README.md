@@ -215,7 +215,9 @@ If Slack refuses a workspace at start, slakio says "run slakio login". If Slack 
 workspace out while slakio runs, it stays on screen as it was, marked `signed out, :login`, and
 nothing more is sent for it; `:login` signs in to it again without quitting (the desktop app's
 picker or a paste; `Esc` goes back), and only that workspace starts over: tabs, panes and drafts
-stay, and the other workspaces are not touched.
+stay, what was posted meanwhile is read, and the other workspaces are not touched. Signed in
+again as someone else, nothing of the user before stays on screen: that workspace's panes,
+messages and drafts go.
 
 The desktop-app import is adapted from the open-source client
 [gammons/slk](https://github.com/gammons/slk) (MIT); see `NOTICE`.

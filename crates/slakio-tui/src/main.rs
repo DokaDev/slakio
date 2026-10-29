@@ -329,9 +329,9 @@ impl Wiring {
         connected.await.ok().flatten().ok_or(Label::SigninStoreRead)
     }
 
-    /// A workspace's backend, with its live updates unless they are off.
-    fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
-        let client = slakio_slack::Client::new(credentials, endpoints, Arc::clone(&self.governor));
+    /// Workspace `team`'s backend, with its live updates unless they are off.
+    fn serve(&self, credentials: Credentials, endpoints: Endpoints, team: &str) -> BackendHandle {
+        let client = slakio_slack::Client::of_team(credentials, endpoints, Arc::clone(&self.governor), team);
         slakio_slack::serve_with(client, self.live.then(slakio_slack::Realtime::default))
     }
 
@@ -343,10 +343,10 @@ impl Wiring {
         let mut signed = Vec::with_capacity(kept.len());
         for k in kept {
             let (team, user) = (&k.account.team, &k.account.user);
-            let handle = self.local.front(self.serve(k.credentials, k.endpoints), team, user, notices);
+            let handle = self.local.front(self.serve(k.credentials, k.endpoints, team), team, user, notices);
             let id = slakio_core::model::WorkspaceId::new(team);
             let read_only = handle.capabilities.read_only;
-            signed.push(SignedInTo { id: id.clone(), name: k.account.name.clone(), read_only });
+            signed.push(SignedInTo { id: id.clone(), name: k.account.name.clone(), read_only, user: user.clone() });
             handles.push((id, handle));
         }
         let (handle, replace) = slakio_tui::many::serve_replaceable(handles);
@@ -438,6 +438,20 @@ struct Saved {
     errors: Option<std::path::PathBuf>,
 }
 
+impl Saved {
+    /// Save setting `key` as `value` in the config file; `true` when that failed (the app says so).
+    fn save(&self, key: &str, value: &str, app: &mut App) -> bool {
+        let result = match &self.config {
+            Some(path) => config::set(path, key, value),
+            None => Err(slakio_core::fault::Fault::other("no config directory")),
+        };
+        let Err(fault) = result else { return false };
+        ErrorLog::new(self.errors.clone()).record("config", &fault);
+        app.warn(Msg::Label(Label::ConfigSaveFailed), Instant::now());
+        true
+    }
+}
+
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     mut app: App,
@@ -452,8 +466,9 @@ async fn run(
     let mut signals = term::Signals::new()?;
     let mut cursor = Cursor::default();
     let mut redraw = true;
-    // A paste being checked with Slack.
-    let mut signing_in: Option<tokio::task::JoinHandle<Result<inapp::Done, Label>>> = None;
+    // A paste being checked with Slack; the desktop app's workspaces being read for `:login`.
+    let mut signing_in: inapp::Signing = None;
+    let mut scanning: Option<inapp::Scan> = None;
     // Debug builds only: panic after the first frame, for the test that the panic hook
     // restores the terminal (tests/signals.rs).
     let panic_after_frame = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_PANIC").is_some_and(|v| v == "1");
@@ -470,21 +485,12 @@ async fn run(
                     out.flush()?;
                 }
                 Effect::Record { context, fault } => ErrorLog::new(saved.errors.clone()).record(context, &fault),
-                Effect::SignIn(pasted) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_app(pasted))),
-                Effect::DesktopPick(t) => signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(t))),
+                Effect::SignIn(pasted) => inapp::start(&mut signing_in, wiring.clone().sign_in_app(pasted)),
+                Effect::DesktopPick(t) => inapp::start(&mut signing_in, wiring.clone().sign_in_desktop_all(t)),
                 Effect::Network(on) => app.net_switched(on, wiring.governor.switch(on), Instant::now()),
-                Effect::SignInAgain(team) => inapp::offer(&mut app, wiring, team.as_deref()),
-                Effect::Save { key, value } => {
-                    let result = match &saved.config {
-                        Some(path) => config::set(path, key, &value),
-                        None => Err(slakio_core::fault::Fault::other("no config directory")),
-                    };
-                    if let Err(fault) = result {
-                        ErrorLog::new(saved.errors.clone()).record("config", &fault);
-                        app.warn(Msg::Label(Label::ConfigSaveFailed), Instant::now());
-                        redraw = true;
-                    }
-                }
+                Effect::SignInAgain(team) if scanning.is_none() => scanning = inapp::offer(&mut app, wiring, team),
+                Effect::SignInAgain(_) => {}
+                Effect::Save { key, value } => redraw |= saved.save(key, &value, &mut app),
             }
         }
         if redraw {
@@ -520,6 +526,11 @@ async fn run(
             done = async { signing_in.as_mut().expect("guarded").await }, if signing_in.is_some() => {
                 signing_in = None;
                 inapp::signed_in(done.unwrap_or(Err(Label::SigninFailed)), &mut app, &mut backend);
+                true
+            }
+            done = async { (&mut scanning.as_mut().expect("guarded").0).await }, if scanning.is_some() => {
+                let team = scanning.take().and_then(|s| s.1);
+                inapp::scanned(&mut app, wiring, done, team.as_deref());
                 true
             }
             // Asked to end from outside: the loop ends and the terminal is restored on the way

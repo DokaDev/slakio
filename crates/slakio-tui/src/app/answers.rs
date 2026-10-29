@@ -26,6 +26,9 @@ pub(crate) struct Boot {
     pub signed_out: bool,
     /// Signed in again: once it has booted, its open panes catch up.
     pub again: bool,
+    /// The first request of the backend that serves the workspace now: an answer to one asked
+    /// before was the backend's it replaced (signed in again).
+    pub since: Generation,
 }
 
 impl App {
@@ -34,7 +37,9 @@ impl App {
         self.backend = Some(caps);
         let id = self.work.requests.ask(None, Command::Boot);
         let read_only = caps.read_only;
-        self.boots = vec![Boot { workspace: None, id, failed: None, read_only, signed_out: false, again: false }];
+        let since = Generation::default();
+        self.boots =
+            vec![Boot { workspace: None, id, failed: None, read_only, signed_out: false, again: false, since }];
     }
 
     /// Use a backend of the workspaces `signed` (signed in to, in the switcher's order), each
@@ -53,6 +58,7 @@ impl App {
                 read_only: caps.read_only || s.read_only,
                 signed_out: false,
                 again: false,
+                since: Generation::default(),
             })
             .collect();
     }
@@ -210,7 +216,7 @@ impl App {
         if !cached {
             self.boots[b].failed = None;
             if let Some(ws) = self.boots[b].workspace.clone().filter(|_| std::mem::take(&mut self.boots[b].again)) {
-                self.work.catch_up(&ws);
+                self.work.catch_up(&ws, true);
             }
             // Unknown is not zero: the counts kept are shown, and the status line says so (with
             // several workspaces, whose, short; its stripe found by id, two may have one name).
@@ -250,18 +256,31 @@ impl App {
 
     /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
     /// the error log gets the backend's detail.
-    fn on_failed(&mut self, id: Generation, kind: FailKind, detail: &str, now: Instant) -> bool {
-        let (mut whose, mut page) = (None, None);
+    fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
+        let (mut whose, mut page, mut stale) = (None, None, None);
         let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
             b.failed = Some(kind.clone());
             whose = b.workspace.clone();
             true
         } else {
-            page = self.work.on_failed(id, kind.clone(), now);
-            page.is_some() || self.on_save_failed(id)
+            let pane = self.work.on_failed(id, kind.clone(), now);
+            stale = pane.as_ref().map(|ws| self.replaced_since(ws, id));
+            page = pane.or_else(|| self.on_save_failed(id));
+            page.is_some()
         };
-        // Refused for the sign-in in a workspace that was loaded: signed out while running.
-        let gone = whose.clone().or(page).filter(|ws| kind == FailKind::Auth && self.model.is_loaded_in(ws));
+        // Asked of the backend a sign-in replaced since, whatever it said: a page is asked again
+        // of the new one; a change is said to have failed for the network (it may have been made).
+        match (stale, &page) {
+            (Some(true), Some(ws)) => {
+                self.work.retry_signed_in(&ws.clone());
+                return true;
+            }
+            (None, Some(ws)) if self.replaced_since(ws, id) => kind = FailKind::Network,
+            _ => {}
+        }
+        // Refused for the sign-in in a workspace whose backend answered in this run: signed out
+        // while running (one shown only from the cache was refused at the start).
+        let gone = whose.clone().or(page).filter(|ws| kind == FailKind::Auth && self.model.is_fresh(ws));
         if let Some(ws) = gone.filter(|_| waited) {
             self.signed_out(ws, now);
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
@@ -288,6 +307,13 @@ impl App {
             self.effects.push(Effect::Record { context: "backend", fault });
         }
         waited
+    }
+}
+
+impl App {
+    /// Request `id` of workspace `ws` was asked of a backend that a sign-in replaced since.
+    fn replaced_since(&self, ws: &WorkspaceId, id: Generation) -> bool {
+        self.boots.iter().any(|b| b.workspace.as_ref() == Some(ws) && id < b.since)
     }
 }
 

@@ -15,6 +15,7 @@ use slakio_tui::app::signin::Pasted;
 use slakio_tui::app::status::Level;
 use std::sync::{Arc, PoisonError};
 use std::time::Instant;
+use tokio::task::{JoinError, JoinHandle};
 
 /// Signing in from the app ended: the workspaces it signed in to (their names), how the app is
 /// connected now, and why one asked for did not sign in, if one did not.
@@ -35,14 +36,48 @@ enum Connected {
     Again(Vec<SignedInTo>, Vec<Msg>),
 }
 
-/// `:login`: the sign-in screen over the app, as at the start (the desktop app's workspaces when
-/// they may be read, the cursor on `team`'s; else the paste screen).
-pub(crate) fn offer(app: &mut App, wiring: &mut Wiring, team: Option<&str>) {
-    wiring.desktop = crate::signin::offer_sign_in_screen(app, wiring.desktop_ok, None).map(Arc::new);
+/// A sign-in being checked with Slack, then connected.
+pub(crate) type Signing = Option<JoinHandle<Result<Done, Label>>>;
+
+/// Check a sign-in (`task`) off the loop's thread: one at a time (the app asks for none while
+/// one is checked), so one before, should there be one, is given up.
+pub(crate) fn start(signing_in: &mut Signing, task: impl Future<Output = Result<Done, Label>> + Send + 'static) {
+    if let Some(earlier) = signing_in.replace(tokio::spawn(task)) {
+        earlier.abort();
+    }
+}
+
+/// The desktop app's workspaces being read for `:login` (off the loop's thread), and the team
+/// the picker's cursor goes on.
+pub(crate) type Scan = (JoinHandle<Result<slakio_auth::Found, slakio_auth::DesktopError>>, Option<String>);
+
+/// `:login`: the sign-in screen over the app, as at the start — the paste screen at once when
+/// the desktop app's workspaces may not be read; else they are read first ([`Scan`]: the files
+/// are read off the loop's thread, which goes on drawing), then offered ([`scanned`]).
+pub(crate) fn offer(app: &mut App, wiring: &Wiring, team: Option<String>) -> Option<Scan> {
+    if !wiring.desktop_ok {
+        app.offer_sign_in(None);
+        return None;
+    }
+    Some((tokio::task::spawn_blocking(slakio_auth::desktop::scan), team))
+}
+
+/// The desktop scan of `:login` is done: its workspaces as a picker, the cursor on `team`'s (or
+/// the paste screen, with why).
+pub(crate) fn scanned(app: &mut App, wiring: &mut Wiring, done: Result<ScanResult, JoinError>, team: Option<&str>) {
+    wiring.desktop = match done {
+        Ok(found) => crate::signin::show_scan(app, found).map(Arc::new),
+        Err(_) => {
+            app.offer_sign_in(Some(Label::SigninDesktopFailed));
+            None
+        }
+    };
     if let Some(team) = team {
         app.sign_in_select(team);
     }
 }
+
+type ScanResult = Result<slakio_auth::Found, slakio_auth::DesktopError>;
 
 impl Wiring {
     /// Sign in with a pasted request ([`Wiring::sign_in`]), then connect.
@@ -92,10 +127,10 @@ impl Wiring {
             for k in kept {
                 let id = WorkspaceId::new(&k.account.team);
                 let (team, user) = (k.account.team.clone(), k.account.user.clone());
-                let handle = w.local.front(w.serve(k.credentials, k.endpoints), &team, &user, &mut notices);
+                let handle = w.local.front(w.serve(k.credentials, k.endpoints, &team), &team, &user, &mut notices);
                 let read_only = handle.capabilities.read_only;
                 if replace.put(&id, handle) {
-                    signed.push(SignedInTo { id, name: k.account.name, read_only });
+                    signed.push(SignedInTo { id, name: k.account.name, read_only, user });
                 }
             }
             (signed, notices)

@@ -73,6 +73,8 @@ pub struct SignedIn {
     pub name: String,
     /// Nothing can be changed in it.
     pub read_only: bool,
+    /// The user signed in to it, as Slack named them.
+    pub user: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -589,5 +591,6 @@ impl Model {
     }
 }
 
+mod forget;
 #[cfg(test)]
 mod tests;

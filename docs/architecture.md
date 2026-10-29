@@ -120,7 +120,11 @@ composer — and drawing, the mouse and scrolling all read that one layout. Rule
   Once Slack refuses a workspace's sign-in while it runs (any request, or its socket), its client
   sends nothing more and its live updates say `Connection::SignedOut`; the app keeps it on screen,
   marked, and `:login` signs in again over the app: the binary puts a new backend in place of
-  that workspace's alone (`many::Replace`), and the app boots it again, keeping its panes.
+  that workspace's alone (`many::Replace`), and the app boots it again, keeping its panes. Each
+  request the old backend had not answered is answered once, as failed for the network, and
+  asked again of the new one; the new client shares the workspace's governor lane (its kept slot,
+  its background hour). The old cache layer's writes are refused once the part is another
+  user's; signed in as someone else, the app forgets that workspace's panes, drafts and lists.
 - **Live updates.** What a backend pushes (`Event::Live`) goes to every timeline that shows where
   it belongs (`app/work/live.rs`): a message posted into its conversation or thread (only among
   what is loaded, never into a span not read), a new copy over the one loaded, a deletion out, a

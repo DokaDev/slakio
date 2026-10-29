@@ -266,6 +266,7 @@ fn with_several_workspaces_the_notice_names_whose() {
             id: w.id.clone(),
             name: w.name.unsanitized().to_string(),
             read_only: true,
+            user: String::new(),
         })
         .collect();
     s.d.app.connect_workspaces(s.b.caps, &signed);
@@ -390,6 +391,7 @@ fn two_workspaces() -> (Scripted, Vec<slakio_core::model::Workspace>) {
             id: w.id.clone(),
             name: w.name.unsanitized().to_string(),
             read_only: true,
+            user: String::new(),
         })
         .collect();
     s.d.app.connect_workspaces(s.b.caps, &signed);

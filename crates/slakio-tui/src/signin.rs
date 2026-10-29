@@ -19,13 +19,23 @@ use std::process::ExitCode;
 /// desktop app first and show its workspaces as a picker; otherwise (or when it finds nothing)
 /// fall back to the paste screen, with a short reason.
 pub(crate) fn offer_sign_in_screen(app: &mut App, desktop_ok: bool, why: Option<Label>) -> Option<slakio_auth::Found> {
-    use slakio_auth::DesktopError;
     if why.is_some() || !desktop_ok {
         app.offer_sign_in(why);
         return None;
     }
-    // Before the terminal is set up: the scan reads files only (no keychain, no network).
-    match slakio_auth::desktop::scan() {
+    // At the start, before the terminal is set up (`:login` scans off the loop's thread): the
+    // scan reads files only (no keychain, no network).
+    show_scan(app, slakio_auth::desktop::scan())
+}
+
+/// What the desktop scan found, as the sign-in screen offers it: its workspaces as a picker,
+/// else the paste screen with a short reason.
+pub(crate) fn show_scan(
+    app: &mut App,
+    scanned: Result<slakio_auth::Found, slakio_auth::DesktopError>,
+) -> Option<slakio_auth::Found> {
+    use slakio_auth::DesktopError;
+    match scanned {
         Ok(found) => {
             app.offer_desktop(
                 found

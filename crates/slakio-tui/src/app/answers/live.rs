@@ -65,7 +65,7 @@ impl App {
         let (label, level) = match state {
             Connection::Connected { catch_up } => {
                 if catch_up {
-                    self.work.catch_up(&ws);
+                    self.work.catch_up(&ws, false);
                 }
                 (if ever { Label::LiveBack } else { Label::LiveOn }, Level::Info)
             }

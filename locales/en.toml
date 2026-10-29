@@ -408,7 +408,7 @@
 "net.off" = "Network off: nothing is sent"
 "net.on" = "Network on"
 "net.locked" = "Network stays off: started offline"
-"net.capped" = "Network stays off: request limit reached"
+"net.capped" = "Network stays off: request limit hit"
 "net.demo" = "The demo sends nothing: :net is not available in the demo"
 "net.unknown" = "Unknown network setting {name} (one of {names})"
 "net.value_on" = "Send and receive"

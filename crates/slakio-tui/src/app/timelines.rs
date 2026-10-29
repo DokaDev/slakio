@@ -227,6 +227,8 @@ impl Timeline {
         } else {
             self.items = shown;
             (self.complete, self.paged) = (false, false);
+            // An older page on its way reads back from what is gone now: not put in.
+            self.pending = None;
         }
         self.items.extend(tail);
     }

@@ -150,8 +150,10 @@ impl Work {
     /// (one newest page each, [`CATCHUP_MAX`] at most, the one in focus first), then its open
     /// threads ([`CATCHUP_THREADS_MAX`] at most; not one read only in part, whose newest replies
     /// are not read anyway), so what was missed meanwhile shows. One loading, or caught up
-    /// already, is left as it is.
-    pub fn catch_up(&mut self, ws: &WorkspaceId) {
+    /// already, is left as it is — but `again` (signed in again, so whatever was on its way may
+    /// have gone to the sign-in before) one reading back an older page, or catching up, is read
+    /// again too: the newest end is not the older page's.
+    pub fn catch_up(&mut self, ws: &WorkspaceId, again: bool) {
         let active = self.active().and_then(|id| self.pane(id)).map(|p| p.target.clone());
         let mut targets: Vec<Target> = self
             .timelines
@@ -161,8 +163,7 @@ impl Work {
                     && !tl.items.is_empty()
                     && !tl.cached
                     && !tl.cut
-                    && tl.pending.is_none()
-                    && tl.catchup.is_none()
+                    && (again || (tl.pending.is_none() && tl.catchup.is_none()))
             })
             .map(|(t, _)| t.clone())
             .collect();

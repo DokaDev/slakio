@@ -155,6 +155,7 @@ fn signed() -> Vec<slakio_tui::app::model::SignedIn> {
             id: w.id.clone(),
             name: w.name.unsanitized().to_string(),
             read_only: true,
+            user: String::new(),
         })
         .collect()
 }

@@ -100,8 +100,8 @@ fn once_signed_in_the_app_connects_and_says_where() {
     let mut app = signing_in();
     app.handle_event(Event::Paste("x".into()), now);
     let signed = [
-        SignedIn { id: WorkspaceId::new("T1"), name: "Kept".into(), read_only: true },
-        SignedIn { id: WorkspaceId::new("T2"), name: "Example".into(), read_only: true },
+        SignedIn { id: WorkspaceId::new("T1"), name: "Kept".into(), read_only: true, user: String::new() },
+        SignedIn { id: WorkspaceId::new("T2"), name: "Example".into(), read_only: true, user: String::new() },
     ];
     app.signed_in(Capabilities { demo: false, read_only: false }, &signed, None, &["Example".into()], now);
     assert_eq!(app.sign_in(), None);
@@ -131,8 +131,8 @@ fn signing_in_beside_a_workspace_says_it_adds_one_and_lands_on_the_one_added() {
     assert!(!screen(&first, 120, 40, now).contains("already"));
     // Signed in: the one just added is shown, the first stays first in the switcher.
     let signed = [
-        SignedIn { id: WorkspaceId::new("T1"), name: "A company".into(), read_only: true },
-        SignedIn { id: WorkspaceId::new("T2"), name: "B side".into(), read_only: true },
+        SignedIn { id: WorkspaceId::new("T1"), name: "A company".into(), read_only: true, user: String::new() },
+        SignedIn { id: WorkspaceId::new("T2"), name: "B side".into(), read_only: true, user: String::new() },
     ];
     app.signed_in(Capabilities { demo: false, read_only: true }, &signed, Some(&signed[1].id), &["B side".into()], now);
     assert_eq!(app.workspace(), 1, "B, just added, is shown");

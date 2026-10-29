@@ -14,7 +14,9 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use scripted::Scripted;
 use slakio_core::backend::{Command, FailKind};
 use slakio_core::i18n::{I18n, Label, Lang};
+use slakio_core::sanitize::Remote;
 use slakio_tui::app::Effect;
+use slakio_world::World;
 
 /// Run `:text` in the palette.
 fn command(s: &mut Scripted, text: &str) {
@@ -180,7 +182,7 @@ fn on_refused_by_the_runs_cap_says_so_in_full_and_asks_nothing_again() {
             let why = label(lang, Label::NetCapped);
             assert!(line.contains(&why) && line.contains(&label(lang, Label::StatusOffline)), "{at}: {line}");
             if lang == Lang::En {
-                assert!(line.contains("Network stays off: request limit reached"), "{line}");
+                assert!(line.contains("Network stays off: request limit hit"), "{line}");
             }
             assert!(!s.b.held.iter().any(|r| r.command == Command::Boot), "nothing asked again: {:?}", s.b.held);
             // Asked again, it says the same, without asking the binary.
@@ -188,6 +190,37 @@ fn on_refused_by_the_runs_cap_says_so_in_full_and_asks_nothing_again() {
             assert!(asked(&mut s).is_empty());
             assert!(s.d.status_line().contains(&why), "{at}: {}", s.d.status_line());
         }
+    }
+}
+
+#[test]
+fn each_refusal_is_short_enough_to_show_whole_beside_a_long_breadcrumb_at_80x24() {
+    let long = "backend-platform-infrastructure-oncall-rotation";
+    for lang in [Lang::En, Lang::Ko] {
+        // The notice's room at 80 columns: about 38 cells, whatever the breadcrumb.
+        for l in [Label::NetLocked, Label::NetCapped] {
+            let why = label(lang, l);
+            assert!(
+                slakio_tui::text::width(&why) <= 38,
+                "{lang:?}: \"{why}\" is {} cells",
+                slakio_tui::text::width(&why)
+            );
+        }
+        let mut snapshot = World::demo().snapshot().clone();
+        let c = snapshot.conversations.iter_mut().find(|c| c.name.unsanitized() == "backend").unwrap();
+        c.name = Remote::new(long);
+        let mut s = Scripted::booted(true, Some(snapshot));
+        s.d.app = with_lang(s.d.app, lang, 80, 24);
+        s.d.list_cursor_on(long);
+        s.keys("enter");
+        command(&mut s, "net off");
+        switched(&mut s);
+        command(&mut s, "net on");
+        assert_eq!(asked(&mut s), [true]);
+        s.d.app.net_switched(true, false, s.d.now);
+        s.pump();
+        let line = s.d.status_line();
+        assert!(line.contains(&label(lang, Label::NetCapped)), "{lang:?}: {line}");
     }
 }
 

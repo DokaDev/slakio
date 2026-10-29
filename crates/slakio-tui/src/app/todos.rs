@@ -236,8 +236,9 @@ impl App {
     }
 
     /// The change asked last as request `id` failed: nothing changed, and nothing waits for it.
-    pub(super) fn on_save_failed(&mut self, id: Generation) -> bool {
-        self.shell.todo.asked.take_if(|(g, ..)| *g == id).is_some()
+    /// The workspace it was asked of; `None` when nothing waited for it.
+    pub(super) fn on_save_failed(&mut self, id: Generation) -> Option<WorkspaceId> {
+        self.shell.todo.asked.take_if(|(g, ..)| *g == id).map(|(.., ws)| ws)
     }
 
     /// `Enter` (`focus`) or `l` on an item: its message in the work area, selected — in its

@@ -8,16 +8,23 @@
 //! its target's. A request that names none, or one not signed in to, fails without going
 //! anywhere. A change goes only to a workspace that can change things: each backend's own handle
 //! refuses it for a read-only one. One workspace's backend can be replaced while the others run
-//! on ([`Replace`]): signed in again, only that workspace starts over.
+//! on ([`Replace`]): signed in again, only that workspace starts over. Every request the old
+//! backend had not answered then is answered once, as failed for the network (asking again may
+//! help), and nothing more of the old backend is handed up.
 
-use slakio_core::backend::{BackendHandle, Capabilities, Command, Envelope, FailKind, Request};
+use slakio_core::backend::{BackendHandle, Capabilities, Command, Envelope, Event, FailKind, Generation, Request};
 use slakio_core::model::WorkspaceId;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, PoisonError};
 use tokio::sync::mpsc;
 use tokio::task::AbortHandle;
 
 /// How many requests, and how many events, wait in the handle's channels at most.
 pub const BOUND: usize = 64;
+
+/// The most requests of one backend remembered as not answered yet (a backend may drop a
+/// superseded request unanswered; the oldest are forgotten).
+const ASKED_MAX: usize = 1024;
 
 /// The workspace `request` is about, if it names one.
 pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
@@ -47,6 +54,21 @@ struct Served {
     ws: WorkspaceId,
     backend: BackendHandle,
     answers: AbortHandle,
+    asked: Arc<Mutex<Asked>>,
+}
+
+/// A backend's requests not answered yet; `replaced` once another backend is in its place
+/// (nothing more of it is handed up then).
+#[derive(Default)]
+struct Asked {
+    ids: BTreeSet<Generation>,
+    replaced: bool,
+}
+
+/// The answer that ends request `generation`'s wait (not one of the cache's, given first, nor
+/// a live update).
+fn ends(event: &Event) -> bool {
+    matches!(event, Event::Booted(_) | Event::History(_) | Event::Saved { .. } | Event::Failed { .. })
 }
 
 impl Replace {
@@ -56,25 +78,52 @@ impl Replace {
     }
 
     /// Serve `ws` with `backend` from now on, the one before dropped (its requests end, its late
-    /// answers are not handed up). `false`, and nothing changes, when `ws` is not served.
+    /// answers are not handed up; each it had not answered is answered as failed for the
+    /// network, once). `false`, and nothing changes, when `ws` is not served.
     pub fn put(&self, ws: &WorkspaceId, backend: BackendHandle) -> bool {
         let mut served = self.served.lock().unwrap_or_else(PoisonError::into_inner);
         let Some(s) = served.iter_mut().find(|s| &s.ws == ws) else { return false };
-        let (backend, answers) = forward(backend, self.up.clone());
+        let unanswered = {
+            let mut asked = s.asked.lock().unwrap_or_else(PoisonError::into_inner);
+            asked.replaced = true;
+            std::mem::take(&mut asked.ids)
+        };
         s.answers.abort();
-        (s.backend, s.answers) = (backend, answers);
+        let asked = Arc::default();
+        let (backend, answers) = forward(backend, self.up.clone(), Arc::clone(&asked));
+        (s.backend, s.answers, s.asked) = (backend, answers, asked);
+        let up = self.up.clone();
+        tokio::spawn(async move {
+            for id in unanswered {
+                if up.send(Envelope::failed(id, FailKind::Network, "signed in again")).await.is_err() {
+                    return;
+                }
+            }
+        });
         true
     }
 }
 
 /// Hand `backend`'s answers to `up` on a task of their own (a slow workspace never delays
-/// another's): its handle for requests, and that task.
-fn forward(backend: BackendHandle, up: mpsc::Sender<Envelope>) -> (BackendHandle, AbortHandle) {
+/// another's), each request's answer once, and none once `asked` says it was replaced: its
+/// handle for requests, and that task.
+fn forward(
+    backend: BackendHandle,
+    up: mpsc::Sender<Envelope>,
+    asked: Arc<Mutex<Asked>>,
+) -> (BackendHandle, AbortHandle) {
     let BackendHandle { capabilities, tx, mut rx } = backend;
     let task = tokio::spawn(async move {
         while let Some(envelope) = rx.recv().await {
-            if up.send(envelope).await.is_err() {
+            let Ok(room) = up.reserve().await else { return };
+            // Looked at once there is room, then handed up at once: no answer is lost or doubled
+            // by a replacement in between.
+            let mut a = asked.lock().unwrap_or_else(PoisonError::into_inner);
+            if a.replaced {
                 return;
+            }
+            if !ends(&envelope.event) || a.ids.remove(&envelope.generation) {
+                room.send(envelope);
             }
         }
     });
@@ -92,8 +141,9 @@ pub fn serve_replaceable(backends: Vec<(WorkspaceId, BackendHandle)>) -> (Backen
     let served: Vec<Served> = backends
         .into_iter()
         .map(|(ws, b)| {
-            let (backend, answers) = forward(b, end.tx.clone());
-            Served { ws, backend, answers }
+            let asked = Arc::default();
+            let (backend, answers) = forward(b, end.tx.clone(), Arc::clone(&asked));
+            Served { ws, backend, answers, asked }
         })
         .collect();
     let replace = Replace { served: Arc::new(Mutex::new(served)), up: end.tx.clone() };
@@ -103,7 +153,19 @@ pub fn serve_replaceable(backends: Vec<(WorkspaceId, BackendHandle)>) -> (Backen
             let refused = {
                 let served = served.lock().unwrap_or_else(PoisonError::into_inner);
                 match workspace_of(&request).and_then(|ws| served.iter().find(|s| &s.ws == ws)) {
-                    Some(s) => s.backend.send(request).err(),
+                    Some(s) => {
+                        let id = request.id;
+                        let mut asked = s.asked.lock().unwrap_or_else(PoisonError::into_inner);
+                        asked.ids.insert(id);
+                        while asked.ids.len() > ASKED_MAX {
+                            asked.ids.pop_first();
+                        }
+                        let refused = s.backend.send(request).err();
+                        if refused.is_some() {
+                            asked.ids.remove(&id);
+                        }
+                        refused
+                    }
                     None => {
                         Some(Envelope::failed(request.id, FailKind::Auth, "no workspace signed in for this request"))
                     }

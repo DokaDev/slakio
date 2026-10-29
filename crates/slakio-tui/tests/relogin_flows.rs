@@ -11,22 +11,31 @@ mod demo;
 
 use demo::Demo;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use slakio_core::backend::{BackendHandle, Capabilities, Connection, Envelope, FailKind, Generation, Live};
+use slakio_core::backend::{
+    BackendHandle, Capabilities, Command, Connection, Envelope, Event as Answer, FailKind, Generation, Live, Request,
+};
 use slakio_core::i18n::{I18n, Label, Lang};
-use slakio_core::model::WorkspaceId;
+use slakio_core::model::{Target, WorkspaceId};
+use slakio_tui::action::{Action, AppAction};
 use slakio_tui::app::model::SignedIn;
+use slakio_tui::app::signin::SignIn;
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::keymap::parse_keys;
 use slakio_tui::theme::Theme;
 use slakio_tui::{exchange, many};
 use slakio_world::World;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()
+}
+
+/// The user signed in to A (the same user signs in again).
+fn me_a() -> String {
+    World::demo().snapshot().workspaces[0].me.as_str().to_string()
 }
 
 fn ids() -> (WorkspaceId, WorkspaceId) {
@@ -90,8 +99,8 @@ impl Two {
         app.settings = Settings::default();
         app.resize(w, h);
         let signed = [
-            SignedIn { id: ia, name: "A company".into(), read_only: false },
-            SignedIn { id: ib, name: "B side".into(), read_only: false },
+            SignedIn { id: ia, name: "A company".into(), read_only: false, user: String::new() },
+            SignedIn { id: ib, name: "B side".into(), read_only: false, user: String::new() },
         ];
         app.connect_workspaces(handle.capabilities, &signed);
         d.app = app;
@@ -185,7 +194,7 @@ fn a_workspace_signed_out_while_running_keeps_its_panes_and_drafts_and_alone_sig
             t.d.app.offer_sign_in(None);
             let fresh = revocable(Arc::default(), Arc::clone(&t.asked_a));
             assert!(t.replace.put(&ids().0, fresh));
-            let a = SignedIn { id: ids().0, name: "A company".into(), read_only: false };
+            let a = SignedIn { id: ids().0, name: "A company".into(), read_only: false, user: me_a() };
             t.d.app.signed_in_again(&[a], &["A company".to_string()], t.d.now);
             let before = t.asked_a.load(Ordering::SeqCst);
             t.settle().await;
@@ -246,4 +255,257 @@ fn the_demo_has_no_login() {
     d.keys("esc");
     d.command("login");
     assert!(!d.app.take_effects().iter().any(|e| matches!(e, Effect::SignInAgain(_))));
+}
+
+/// A workspace's backend over the demo world that logs every request it is handed (`log`) and
+/// holds, unanswered, those `hold` says (their ids go to `held`); the others the demo answers.
+fn holding(
+    log: Arc<Mutex<Vec<Command>>>,
+    held: Arc<Mutex<Vec<Generation>>>,
+    hold: fn(&Command) -> bool,
+) -> BackendHandle {
+    let BackendHandle { tx: inner, rx: mut answers, .. } = exchange::serve(Box::new(DemoBackend::new(World::demo())));
+    let (handle, mut end) = BackendHandle::pair(Capabilities { demo: false, read_only: false }, 16);
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                r = end.rx.recv() => {
+                    let Some(r) = r else { return };
+                    log.lock().unwrap().push(r.command.clone());
+                    if hold(&r.command) {
+                        held.lock().unwrap().push(r.id);
+                    } else if inner.send(r).await.is_err() {
+                        return;
+                    }
+                }
+                e = answers.recv() => {
+                    let Some(e) = e else { return };
+                    if end.tx.send(e).await.is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    handle
+}
+
+/// A's conversation `name`.
+fn target_a(name: &str) -> Target {
+    let w = World::demo();
+    let ws = ids().0;
+    Target::Conversation { workspace: ws.clone(), conversation: w.find(ws.as_str(), name).unwrap().id.clone() }
+}
+
+/// The app over A, whose backend is `a`, and B (which answers everything).
+fn two_with(a: BackendHandle, w: u16, h: u16) -> Two {
+    let (ia, ib) = ids();
+    let (asked_b, gone) = (Arc::default(), Arc::default());
+    let b = revocable(Arc::default(), Arc::clone(&asked_b));
+    let (handle, replace) = many::serve_replaceable(vec![(ia.clone(), a), (ib.clone(), b)]);
+    let mut d = Demo::new(w, h);
+    let mut app = App::new(Lang::En, Theme::terminal());
+    app.settings = Settings::default();
+    app.resize(w, h);
+    let signed = [
+        SignedIn { id: ia, name: "A company".into(), read_only: false, user: me_a() },
+        SignedIn { id: ib, name: "B side".into(), read_only: false, user: String::new() },
+    ];
+    app.connect_workspaces(handle.capabilities, &signed);
+    d.app = app;
+    Two { d, handle, replace, gone, asked_a: Arc::default(), asked_b }
+}
+
+fn again_as(user: String) -> [SignedIn; 1] {
+    [SignedIn { id: ids().0, name: "A company".into(), read_only: false, user }]
+}
+
+#[test]
+fn requests_the_replaced_backend_had_not_answered_are_answered_once_as_failed_for_the_network() {
+    rt().block_on(async {
+        let (ia, ib) = ids();
+        let caps = Capabilities { demo: false, read_only: false };
+        let (old, mut old_end) = BackendHandle::pair(caps, 16);
+        let (b, _b_end) = BackendHandle::pair(caps, 16);
+        let (mut handle, replace) = many::serve_replaceable(vec![(ia.clone(), old), (ib, b)]);
+        let history = Command::History { target: target_a("general"), before: None, limit: 28 };
+        handle.send(Request { id: Generation(7), workspace: None, command: history }).unwrap();
+        handle.send(Request { id: Generation(8), workspace: Some(ia.clone()), command: Command::Boot }).unwrap();
+        for _ in 0..2 {
+            old_end.rx.recv().await.unwrap();
+        }
+        // The boot is answered before the swap: handed up once, and not answered again.
+        old_end.tx.send(Envelope::failed(Generation(8), FailKind::Api { code: "x".into() }, "")).await.unwrap();
+        let first = tokio::time::timeout(Duration::from_secs(2), handle.rx.recv()).await.unwrap().unwrap();
+        assert_eq!(first.generation, Generation(8));
+        let (fresh, _fresh_end) = BackendHandle::pair(caps, 16);
+        assert!(replace.put(&ia, fresh));
+        // The old backend's late refusal is not handed up: the page gets one answer, retryable.
+        let _ = old_end.tx.send(Envelope::failed(Generation(7), FailKind::Auth, "invalid_auth")).await;
+        let mut got = Vec::new();
+        while let Ok(Some(e)) = tokio::time::timeout(Duration::from_millis(300), handle.rx.recv()).await {
+            got.push(e);
+        }
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert_eq!(got[0].generation, Generation(7));
+        assert!(matches!(&got[0].event, Answer::Failed { kind: FailKind::Network, .. }), "{got:?}");
+    });
+}
+
+#[test]
+fn a_page_on_its_way_when_signing_in_again_loads_and_a_late_refusal_marks_nothing() {
+    rt().block_on(async {
+        let (log, held) = (Arc::default(), Arc::default());
+        let a = holding(Arc::clone(&log), Arc::clone(&held), |c| matches!(c, Command::History { .. }));
+        let mut t = two_with(a, 120, 40);
+        t.settle().await;
+        t.d.list_cursor_on("general");
+        t.keys("enter").await;
+        assert_eq!(held.lock().unwrap().len(), 1, "the page is on its way");
+        // Signed in again (same user) while A's old backend still holds it.
+        let fresh_log: Arc<Mutex<Vec<Command>>> = Arc::default();
+        let fresh = holding(Arc::clone(&fresh_log), Arc::default(), |_| false);
+        assert!(t.replace.put(&ids().0, fresh));
+        t.d.app.signed_in_again(&again_as(me_a()), &["A company".to_string()], t.d.now);
+        t.settle().await;
+        assert!(t.d.app.failed_here().is_none(), "{:?}", t.d.app.failed_here());
+        let asked_again = fresh_log
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|c| matches!(c, Command::History { target, .. } if *target == target_a("general")));
+        assert!(asked_again, "asked again of the new backend: {:?}", fresh_log.lock().unwrap());
+        assert!(!t.d.screen().contains(&t.label(Label::PaneLoading)), "{}", t.d.screen());
+        // A refusal of the old backend arriving late marks nothing.
+        let old = held.lock().unwrap()[0];
+        t.d.app.on_backend(Envelope::failed(old, FailKind::Auth, "invalid_auth"), t.d.now);
+        assert!(!t.d.app.signed_out_in(&ids().0));
+        assert!(!t.d.status_line().contains(&t.label(Label::StatusSignedOut)), "{}", t.d.status_line());
+    });
+}
+
+#[test]
+fn signed_in_again_an_open_conversation_reading_back_an_older_page_is_caught_up_too() {
+    rt().block_on(async {
+        let gone = Arc::new(AtomicBool::new(false));
+        let a = revocable(Arc::clone(&gone), Arc::default());
+        let mut t = two_with(a, 120, 40);
+        t.settle().await;
+        t.d.list_cursor_on("big-history");
+        t.keys("enter").await;
+        // Slack signs A out; reading back is refused for the sign-in.
+        gone.store(true, Ordering::SeqCst);
+        t.keys("g g").await;
+        assert!(t.d.app.signed_out_in(&ids().0), "{}", t.d.screen());
+        // Signed in again: the older page goes out again (held here), and the newest end of the
+        // conversation is read again as well, so what was posted meanwhile shows.
+        let fresh_log: Arc<Mutex<Vec<Command>>> = Arc::default();
+        let fresh =
+            holding(Arc::clone(&fresh_log), Arc::default(), |c| matches!(c, Command::History { before: Some(_), .. }));
+        assert!(t.replace.put(&ids().0, fresh));
+        // Older pages are paced: the one asked again goes out at once only past its gap.
+        tokio::time::sleep(Duration::from_millis(1600)).await;
+        t.d.app.signed_in_again(&again_as(me_a()), &["A company".to_string()], t.d.now);
+        t.settle().await;
+        let log = fresh_log.lock().unwrap().clone();
+        assert!(log.iter().any(|c| matches!(c, Command::History { before: Some(_), .. })), "{log:?}");
+        assert!(
+            log.iter().any(|c| matches!(c, Command::Catchup { target, .. } if *target == target_a("big-history"))),
+            "{log:?}"
+        );
+    });
+}
+
+#[test]
+fn signed_in_again_as_someone_else_nothing_of_the_user_before_stays() {
+    rt().block_on(async {
+        let mut t = Two::new(120, 40, Lang::En);
+        t.settle().await;
+        t.d.list_cursor_on("general");
+        t.keys("enter i").await;
+        t.text("half a thought").await;
+        t.keys("esc").await;
+        assert!(t.d.screen().contains("Message #general"), "{}", t.d.screen());
+        t.gone.store(true, Ordering::SeqCst);
+        t.keys("g g").await;
+        let fresh_log: Arc<Mutex<Vec<Command>>> = Arc::default();
+        let fresh = holding(Arc::clone(&fresh_log), Arc::default(), |c| matches!(c, Command::Boot));
+        assert!(t.replace.put(&ids().0, fresh));
+        t.d.app.signed_in_again(&again_as("UOTHER".into()), &["A company".to_string()], t.d.now);
+        // At once: A's lists, panes and draft are gone; B's are not touched.
+        let a = ids().0;
+        assert!(t.d.app.model.conversations().iter().all(|c| c.workspace != a));
+        assert!(t.d.app.model.conversations().iter().any(|c| c.workspace == ids().1));
+        assert!(t.d.app.model.me(&a).is_none());
+        t.settle().await;
+        let shown = t.d.screen();
+        assert!(!shown.contains("half a thought") && !shown.contains("Message #general"), "{shown}");
+        // Nothing of the user before is asked of the new sign-in: its boot only.
+        assert_eq!(*fresh_log.lock().unwrap(), [Command::Boot]);
+        // No draft is left to ask about.
+        t.d.app.dispatch(Action::App(AppAction::Quit), t.d.now);
+        assert!(t.d.app.quit, "nothing unsent is left");
+    });
+}
+
+#[test]
+fn while_a_sign_in_is_checked_no_other_can_start() {
+    rt().block_on(async {
+        let mut t = Two::new(120, 40, Lang::En);
+        t.settle().await;
+        t.d.app.offer_sign_in(None);
+        t.d.app.handle_event(Event::Paste("curl 'https://a.slack.com/api/x'".into()), t.d.now);
+        assert_eq!(t.d.app.sign_in(), Some(SignIn::Checking));
+        let started = |t: &mut Two| t.d.app.take_effects().iter().filter(|e| matches!(e, Effect::SignIn(_))).count();
+        assert_eq!(started(&mut t), 1);
+        // Neither the command line nor the palette opens; `:login` cannot be asked.
+        t.keys(":").await;
+        t.text("login").await;
+        t.keys("enter").await;
+        t.keys("ctrl+p").await;
+        assert!(!t.d.app.cmdline.is_open());
+        assert!(t.sign_ins_asked().is_empty());
+        assert_eq!(t.d.app.sign_in(), Some(SignIn::Checking), "still the one being checked");
+        t.d.app.handle_event(Event::Paste("curl 'https://a.slack.com/api/y'".into()), t.d.now);
+        assert_eq!(started(&mut t), 0, "one at a time");
+    });
+}
+
+#[test]
+fn a_change_refused_for_the_sign_in_marks_the_workspace_signed_out() {
+    rt().block_on(async {
+        let mut t = Two::new(120, 40, Lang::En);
+        t.settle().await;
+        t.keys("space o").await;
+        t.gone.store(true, Ordering::SeqCst);
+        t.keys("x").await;
+        assert!(t.d.app.signed_out_in(&ids().0));
+        assert!(t.d.status_line().contains(&t.label(Label::StatusSignedOut)), "{}", t.d.status_line());
+    });
+}
+
+#[test]
+fn a_workspace_refused_at_the_start_while_shown_from_the_cache_says_run_slakio_login() {
+    rt().block_on(async {
+        let (ia, ib) = ids();
+        let caps = Capabilities { demo: false, read_only: false };
+        // A's backend: the cache's boot first, then Slack refuses the sign-in.
+        let (a, mut a_end) = BackendHandle::pair(caps, 16);
+        let cached = World::demo().snapshot().only(&ia);
+        tokio::spawn(async move {
+            while let Some(r) = a_end.rx.recv().await {
+                let cached = Envelope { generation: r.id, event: Answer::CachedBoot(Box::new(cached.clone())) };
+                let _ = a_end.tx.send(cached).await;
+                let _ = a_end.tx.send(Envelope::failed(r.id, FailKind::Auth, "invalid_auth")).await;
+            }
+        });
+        let mut t = two_with(a, 120, 40);
+        let _ = ib;
+        t.settle().await;
+        assert!(t.d.app.model.is_cached_in(&ia), "shown from the cache");
+        assert!(!t.d.app.signed_out_in(&ia));
+        let status = t.d.status_line();
+        assert!(status.contains("A company: signed out, run slakio login"), "{status}");
+        assert!(!status.contains(&t.label(Label::StatusSignedOut)), "{status}");
+    });
 }

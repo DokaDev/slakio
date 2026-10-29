@@ -426,6 +426,25 @@ fn new_sign_in() -> String {
     format!("curl 'https://{}/api/client.counts' -H 'cookie: b=1; d={COOKIE}' --data-raw 'token={NEW_TOKEN}'", HOSTS[0])
 }
 
+/// A page of A's first channel with one message, newer than any, posted while A was signed out.
+fn posted_meanwhile(m: &Machine) -> serde_json::Value {
+    let me = m.world.snapshot().workspaces[0].me.as_str().to_string();
+    serde_json::json!({
+        "ok": true,
+        "messages": [{"type": "message", "ts": "1900000000.000100", "user": me, "text": "posted while signed out"}],
+        "has_more": true,
+    })
+}
+
+/// The first words of the newest message of A's first channel, as its pane shows them.
+fn newest_words(m: &Machine) -> String {
+    let s = m.world.snapshot();
+    let ws = &s.workspaces[0].id;
+    let c = m.world.find(ws.as_str(), &m.channel(0)).unwrap();
+    let (newest, _) = m.world.history(&c.id, None, 1);
+    newest[0].text.unsanitized().split_whitespace().take(3).collect::<Vec<_>>().join(" ")
+}
+
 fn boots(m: &Machine, i: usize) -> usize {
     m.methods(i).iter().filter(|x| *x == "client.userBoot").count()
 }
@@ -442,9 +461,10 @@ fn signed_out_while_running(tag: &str, size: (u16, u16), by_socket: bool) {
     wait_until("both booted, both sockets open", || {
         boots(&m, 0) == 1 && boots(&m, 1) == 1 && m.fakes[0].open_sockets() == 1 && m.fakes[1].open_sockets() == 1
     });
-    // A's first conversation open.
+    // A's first conversation open, its messages loaded.
+    let words = newest_words(&m);
     run.type_bytes(b"\r");
-    run.wait_for("A's conversation", |t| t.contains(&format!("Message #{a}")));
+    run.wait_for("A's conversation", |t| t.contains(&format!("Message #{a}")) && t.contains(&words));
     let (b_asked, b_sockets) = (m.methods(1).len(), m.fakes[1].upgrades().len());
     m.fakes[0].revoke(TOKEN, by_socket);
     if !by_socket {
@@ -460,6 +480,13 @@ fn signed_out_while_running(tag: &str, size: (u16, u16), by_socket: bool) {
     std::thread::sleep(Duration::from_millis(1500));
     assert_eq!((m.fakes[0].log().len(), m.fakes[0].upgrades().len()), a_sent, "{:?}", m.methods(0));
     assert!(run.output().contains(&format!("Message #{a}")), "the pane stays: {}", run.output());
+    // Posted while A was signed out: read when A's open conversation is caught up (its older page,
+    // asked again, gets the same page and adds nothing older).
+    if !by_socket {
+        for _ in 0..2 {
+            m.fakes[0].fail_next("conversations.history", Fault::Answer(posted_meanwhile(&m)));
+        }
+    }
     // Signed in again from the app.
     run.type_bytes(b":login\r");
     run.wait_for("the paste screen over the app", |t| t.contains("Waiting for the paste") && t.contains("Esc back"));
@@ -472,6 +499,9 @@ fn signed_out_while_running(tag: &str, size: (u16, u16), by_socket: bool) {
     run.wait_for("the mark gone, the conversation kept", |t| {
         !t.contains("signed out, :login") && t.contains(&format!("Message #{a}"))
     });
+    if !by_socket {
+        run.wait_for("what was posted meanwhile", |t| t.contains("posted while signed out"));
+    }
     assert_eq!((m.methods(1).len(), m.fakes[1].upgrades().len()), (b_asked, b_sockets), "B: {:?}", m.methods(1));
     assert_eq!(m.fakes[1].open_sockets(), 1, "B's socket stayed open");
     run.quit();
@@ -494,6 +524,11 @@ fn signing_in_again_as_another_user_keeps_the_other_workspace_and_its_cache() {
     let (a, b) = (m.channel(0), m.channel(1));
     run.wait_for("A's channels", |t| t.contains(&a));
     wait_until("both booted", || boots(&m, 0) == 1 && boots(&m, 1) == 1);
+    // A's first conversation open, its newest message shown (Slack's backend is read-only, so no
+    // draft can be written here: relogin_flows shows a draft goes too).
+    let words = newest_words(&m);
+    run.type_bytes(b"\r");
+    run.wait_for("A's conversation", |t| t.contains(&format!("Message #{a}")) && t.contains(&words));
     // B's answer is kept in the cache.
     std::thread::sleep(Duration::from_millis(500));
     m.fakes[0].revoke(TOKEN, true);
@@ -512,6 +547,10 @@ fn signing_in_again_as_another_user_keeps_the_other_workspace_and_its_cache() {
     run.wait_for("signed in to A", |t| t.contains(&format!("Signed in to {}", m.name(0))));
     wait_until("A booted again", || boots(&m, 0) == 3);
     std::thread::sleep(Duration::from_millis(500));
+    // Nothing of the user before stays on screen: their conversation and its messages are gone.
+    let shown = run.output();
+    assert!(!shown.contains(&words), "{shown}");
+    assert!(!shown.contains(&format!("Message #{a}")), "{shown}");
     run.quit();
     // A is kept as the other user's; B's line is as it was.
     let file = m.file();
