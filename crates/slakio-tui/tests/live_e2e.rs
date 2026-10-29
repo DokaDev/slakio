@@ -220,7 +220,7 @@ fn a_link_opens_through_the_opener_with_its_address_as_one_argument_and_nothing_
     run.type_bytes(b"\x0c");
     run.type_bytes(b"G");
     run.type_bytes(b"o");
-    run.wait_for("said", |t| t.contains("Opening docs.example.com in the browser"));
+    run.wait_for("said", |t| t.contains("Opening docs.example.com"));
     wait_until("the opener ran", || std::fs::read_to_string(&record).is_ok_and(|r| r.lines().count() == 1));
     assert_eq!(std::fs::read_to_string(&record).unwrap(), "https://docs.example.com/run?a=1&b=$(id)\n");
     // Its second link runs code: refused, the opener not run.

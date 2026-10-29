@@ -43,7 +43,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let inner_w = usize::from(w.saturating_sub(4)).max(8);
     // A link asked about: what its text says, and the host it really goes to.
     let text = match app.opening().filter(|_| d.question == Question::Open) {
-        Some(o) => app.i18n.msg(&Msg::DialogOpenText { said: o.said.clone(), host: o.host.clone() }).to_string(),
+        // The real host first, cut from its start so its end (whose it is) always shows.
+        Some(o) => {
+            let host = crate::opener::host_tail(&o.host, inner_w.saturating_sub(2));
+            app.i18n.msg(&Msg::DialogOpenText { said: o.said.clone(), host }).to_string()
+        }
         None => app.i18n.label(text).to_string(),
     };
     let mut lines: Vec<Line> = wrap(&text, inner_w, 6).0.into_iter().map(|l| Line::styled(l, t.text())).collect();

@@ -1,7 +1,7 @@
 //! What the selected message holds, taken out of the app: its text copied (`y`), its links
 //! opened in the browser (`o`, `:open`, `:open 2` for its second, `:open <address>`). Opening is
 //! a local action — nothing goes to Slack — so a read-only workspace opens links too. Only a web
-//! address opens ([`opener::openable`]); one whose text names another host than it goes to is
+//! address opens ([`opener::check`]); one whose text names another host than it goes to is
 //! asked about first, the real host shown.
 
 use super::dialog::{Dialog, Question};
@@ -24,6 +24,9 @@ pub struct Opening {
 
 /// The most cells of a link's text the question shows.
 const SAID_MAX: usize = 40;
+
+/// The most of a host the status line names (its end), so the words fit at 80 columns.
+const HOST_SAID: usize = 19;
 
 impl App {
     /// Copy the selected messages (the VISUAL range, or the selected one) as text: one
@@ -82,20 +85,21 @@ impl App {
         }
     }
 
-    /// Open `url`, a link's address whose text is `label`: refused unless it is a web address;
-    /// asked about first when the text names another host; else handed to the binary, the host
-    /// it goes to said.
+    /// Open `url`, a link's address whose text is `label`: refused unless it is a web address
+    /// ([`opener::check`], handed over in its checked form); asked about first when the text
+    /// names another host; else handed to the binary, the host it goes to said.
     fn open_address(&mut self, url: &str, label: Option<&str>, now: Instant) {
-        let Some(host) = opener::openable(url) else { return self.warn(Msg::Label(Label::OpenRefused), now) };
+        let Some(checked) = opener::check(url) else { return self.warn(Msg::Label(Label::OpenRefused), now) };
         match label.filter(|l| mrkdwn::real_target(url, l).is_some()) {
             Some(said) => {
                 let said = clip(said, SAID_MAX);
-                self.opening = Some(Opening { url: url.to_string(), host, said });
+                self.opening = Some(Opening { url: checked.url, host: checked.host, said });
                 self.dialog = Some(Dialog::new(Question::Open));
             }
             None => {
-                self.effects.push(Effect::OpenLink(url.to_string()));
-                self.info(Msg::OpenOpening { host }, now);
+                self.effects.push(Effect::OpenLink(checked.url));
+                // The end of a long host is what says whose it is: cut from its start, last.
+                self.info(Msg::OpenOpening { host: opener::host_tail(&checked.host, HOST_SAID) }, now);
             }
         }
     }

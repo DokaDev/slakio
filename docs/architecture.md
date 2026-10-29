@@ -174,12 +174,16 @@ comes back); people and channels are named from the read model when drawn
 - **Failures as data.** Core never words a failure: a `Fault` has a kind the UI turns into a
   catalog message and a raw detail that only goes to `<state>/errors.log`. The status line never
   shows OS or parser text. The log redacts each detail (`fault::redact`: tokens, cookies,
-  addresses past their host, quoted text), is mode 0600 and never written through a link, and
-  rotates at 1 MiB to one `errors.log.1`.
-- **Links.** `opener` opens only `http`/`https` addresses with a plain ASCII host, handing the
-  address as one argument to the system's opener (`open`, `xdg-open`, `rundll32
-  url.dll,FileProtocolHandler`; no shell); a link whose text names another host is asked about
-  first (`dialog::Question::Open`). Tests stand in for the opener (`SLAKIO_TEST_OPENER`, debug
+  addresses past their host, quoted text), is mode 0600, opened with `O_NOFOLLOW`, its directory
+  kept 0700, and rotates at 1 MiB to one `errors.log.1` (both kept 0600).
+- **Links.** `opener::check` lets only `http`/`https` addresses through (at most 8 KiB, a
+  plain ASCII host within the DNS limits, no user or password, no host that reads as a number
+  but a dotted IPv4 address) and hands over a normalised form (scheme and host lower case,
+  anything past the host that is not plain ASCII percent-encoded) as one argument to the
+  system's opener (`/usr/bin/open`, `xdg-open` on `PATH`, `%SystemRoot%\System32\rundll32.exe
+  url.dll,FileProtocolHandler`; no shell). A link whose text names another host is asked about
+  first (`dialog::Question::Open`), the real host first and cut from its start, so its end
+  shows. Tests stand in for the opener (`SLAKIO_TEST_OPENER`, debug
   builds only) and never start a browser.
 
 ## The Slack transport

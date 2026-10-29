@@ -141,3 +141,39 @@ fn only_web_addresses_open_the_others_are_refused_with_a_reason() {
         assert!(s.d.status_line().contains(&refused), "{at}: {}", s.d.status_line());
     }
 }
+
+/// A host of about 200 characters that starts like a trusted one and ends with another's.
+fn long_host() -> String {
+    format!("docs.google.com.{}.{}.{}.evil.test", "x".repeat(60), "y".repeat(60), "z".repeat(52))
+}
+
+// 50 columns is the narrowest screen slakio draws (below it says the terminal is too small).
+#[test]
+fn a_long_host_is_shown_first_and_cut_from_its_start_so_its_end_stays() {
+    let host = long_host();
+    assert!(host.len() > 190 && host.len() <= 253, "{}", host.len());
+    for (lang, w, h) in [(Lang::En, 50, 24), (Lang::Ko, 50, 24), (Lang::En, 80, 24), (Lang::En, 120, 40)] {
+        let at = format!("{lang:?} {w}x{h}");
+        let text = format!("<https://{host}/x|https://docs.google.com/x> <https://{host}/y>");
+        let mut s = shown(&[text.as_str()], w, h, lang);
+        s.keys("o");
+        let screen = s.d.screen();
+        assert!(screen.contains("zz.evil.test"), "{at}: the real host's end: {screen}");
+        // The real host comes before what the link's text says.
+        let (host_at, said_at) =
+            (screen.find("evil.test").unwrap(), screen.find("docs.google.com/x").unwrap_or(usize::MAX));
+        assert!(host_at < said_at, "{at}: {screen}");
+        s.keys("n");
+        // Without text of its own, the status line names the host's end.
+        command(&mut s, "open 2");
+        assert_eq!(opened(&mut s), [format!("https://{host}/y")], "{at}");
+        let status = s.d.status_line();
+        if w >= 80 {
+            assert!(status.contains("…") && status.contains("zz.evil.test"), "{at}: {status}");
+        }
+    }
+    // Longer than the DNS allows: refused.
+    let mut s = shown(&[&format!("<https://{}.{host}/>", "w".repeat(60))], 80, 24, Lang::En);
+    s.keys("o");
+    assert!(opened(&mut s).is_empty());
+}
