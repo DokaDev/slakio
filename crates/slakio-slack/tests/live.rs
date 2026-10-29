@@ -3,7 +3,8 @@
 //! as they happen; the client sends nothing over it but pongs and a close; a socket dropped,
 //! closed or silent opens again after a pause within its bounds and asks to catch up; with the
 //! network off none opens, and switching it off ends one; every opening counts against the cap;
-//! one workspace's failing socket leaves another's alone. Events are synthetic, written here.
+//! one workspace's failing socket leaves another's alone; an opening the budget has no room for
+//! is said as held. Events are synthetic, written here.
 
 use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Connection, Envelope, Event, FailKind, Generation, Live, Request};
@@ -555,5 +556,20 @@ fn sockets_that_never_say_hello_keep_the_pause_doubling() {
         let n = r.fake.upgrades().len();
         assert!((3..=8).contains(&n), "{n} openings in 2 s");
         r.quiet(Duration::from_millis(10)).await;
+    });
+}
+
+#[test]
+fn an_opening_the_budget_has_no_room_for_is_said_as_held_once_and_tried_again() {
+    rt().block_on(async {
+        let limits = Limits { lane_background_per_hour: 0, ..Limits::default() };
+        let governor = Governor::new(limits, Box::new(FakeClock::default()), true);
+        let mut r = Run::team(0, QUICK, governor).await;
+        r.boot().await;
+        assert!(matches!(r.live().await, Live::Connection { state: Connection::Held, .. }));
+        // Tried again after each pause, without a word more while it stays held.
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        r.quiet(Duration::from_millis(10)).await;
+        assert!(r.fake.upgrades().is_empty(), "nothing went out");
     });
 }

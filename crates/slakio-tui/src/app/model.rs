@@ -6,7 +6,7 @@
 
 use super::shell::View;
 use super::todos::{Due, DueFilter, Group, Sort, StatusFilter, TodoView};
-use slakio_core::backend::Snapshot;
+use slakio_core::backend::{Connection, Snapshot};
 use slakio_core::model::{
     Conversation, ConversationId, SavedId, SavedItem, SavedState, Section, SectionId, Target, User, UserId, Workspace,
     WorkspaceColor, WorkspaceId,
@@ -92,9 +92,10 @@ pub struct Model {
     pub counts_unknown: HashSet<WorkspaceId>,
     /// Each bot's author ids of the names it posted as, oldest first ([`BOT_NAMES`] at most).
     bot_names: HashMap<(WorkspaceId, String), std::collections::VecDeque<UserId>>,
-    /// Each workspace's live updates as last heard of: whether they arrive now, and whether they
-    /// ever did this run.
-    pub live: HashMap<WorkspaceId, (bool, bool)>,
+    /// Each workspace's live updates as last heard of: their state now, and whether they ever
+    /// arrived this run. A workspace never heard of (live updates switched off, the network off)
+    /// has none.
+    pub live: HashMap<WorkspaceId, (Connection, bool)>,
 }
 
 /// The names of one bot kept as people at most.
@@ -243,6 +244,15 @@ impl Model {
 
     pub fn workspaces(&self) -> &[Workspace] {
         &self.snapshot.workspaces
+    }
+
+    /// The live updates of workspace `ws` were heard of and do not arrive now: `Some(held)`,
+    /// `held` when the request budget holds them.
+    pub fn live_off(&self, ws: &WorkspaceId) -> Option<bool> {
+        match self.live.get(ws)?.0 {
+            Connection::Connected { .. } => None,
+            state => Some(state == Connection::Held),
+        }
     }
 
     /// Where workspace `ws` is in the switcher's order.

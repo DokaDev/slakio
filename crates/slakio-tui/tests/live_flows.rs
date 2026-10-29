@@ -13,6 +13,7 @@ mod scripted;
 
 use scripted::Scripted;
 use slakio_core::backend::{Command, Connection, Envelope, Event, Generation, Live};
+use slakio_core::i18n::Label;
 use slakio_core::model::{ConversationId, Message, Target, Ts, UserId, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::PaneKind;
@@ -375,4 +376,181 @@ fn unknown_counts_stay_unknown_and_a_deletion_said_twice_counts_once() {
         },
     );
     assert_eq!(replies(&s), before);
+}
+
+/// Two workspaces signed in and started, each one's live updates on.
+fn two_workspaces() -> (Scripted, Vec<slakio_core::model::Workspace>) {
+    let mut s = Scripted::connected(true);
+    let snapshot = slakio_world::World::demo().snapshot().clone();
+    let signed: Vec<slakio_tui::app::model::SignedIn> = snapshot
+        .workspaces
+        .iter()
+        .map(|w| slakio_tui::app::model::SignedIn {
+            id: w.id.clone(),
+            name: w.name.unsanitized().to_string(),
+            read_only: true,
+        })
+        .collect();
+    s.d.app.connect_workspaces(s.b.caps, &signed);
+    s.pump();
+    while !s.b.held.is_empty() {
+        s.b.answer(0);
+        s.pump();
+    }
+    for w in &snapshot.workspaces {
+        push(&mut s, Live::Connection { workspace: w.id.clone(), state: Connection::Connected { catch_up: false } });
+    }
+    s.d.now += Duration::from_secs(10);
+    s.d.app.on_tick(s.d.now);
+    (s, snapshot.workspaces)
+}
+
+#[test]
+fn while_live_updates_are_down_the_status_line_keeps_saying_so_until_they_are_back() {
+    for (w, h) in [(120, 40), (80, 24)] {
+        let (mut s, at) = opened("general", w, h);
+        assert!(!s.d.status_line().contains("live off"), "never heard of: nothing to say");
+        push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: false } });
+        assert!(!s.d.status_line().contains("live off"));
+        push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Lost });
+        let line = s.d.status_line();
+        assert!(line.contains("Live updates lost: reconnecting") && line.contains("live off"), "{w}x{h}: {line}");
+        // Long after the notice went, still said.
+        for _ in 0..12 {
+            s.d.now += Duration::from_secs(10);
+            s.d.app.on_tick(s.d.now);
+        }
+        let line = s.d.status_line();
+        assert!(line.contains("live off") && !line.contains("Live updates"), "{w}x{h}: {line}");
+        push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: true } });
+        let line = s.d.status_line();
+        assert!(line.contains("Live updates back") && !line.contains("live off"), "{w}x{h}: {line}");
+    }
+}
+
+#[test]
+fn the_mark_fits_at_80_columns_in_korean_beside_the_notice() {
+    let mut d = demo::Demo::with(80, 24, slakio_core::i18n::Lang::Ko, slakio_tui::app::Settings::default());
+    let ws = d.app.model.workspaces()[0].id.clone();
+    let lost = |state| Envelope {
+        generation: Generation::PUSHED,
+        event: Event::Live(Box::new(Live::Connection { workspace: ws.clone(), state })),
+    };
+    d.app.on_backend(lost(Connection::Connected { catch_up: false }), d.now);
+    d.app.on_backend(lost(Connection::Lost), d.now);
+    let ko = slakio_core::i18n::I18n::new(slakio_core::i18n::Lang::Ko);
+    let said = |l| ko.label(l).to_string();
+    let (off, lost_words, held) = (said(Label::StatusLiveOff), said(Label::LiveLost), said(Label::LiveHeld));
+    let line = d.status_line();
+    assert!(line.contains(&lost_words) && line.contains(&off), "{line}");
+    d.app.on_backend(lost(Connection::Held), d.now);
+    let line = d.status_line();
+    assert!(line.contains(&held) && line.contains(&off), "{line}");
+}
+
+#[test]
+fn held_by_the_budget_says_why_and_the_mark_too_where_the_line_is_wide() {
+    let (mut s, at) = opened("general", 120, 40);
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: false } });
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Held });
+    let line = s.d.status_line();
+    assert!(line.contains("Live updates paused: share used, retrying later"), "{line}");
+    assert!(line.contains("live off: share used"), "{line}");
+    s.d.app.resize(80, 24);
+    let line = s.d.status_line();
+    assert!(line.contains("live off") && !line.contains("live off: share used"), "{line}");
+}
+
+#[test]
+fn two_workspaces_lost_at_once_are_each_said_and_none_is_back_unsaid() {
+    let (mut s, ws) = two_workspaces();
+    let (a, b) = (&ws[0], &ws[1]);
+    let (an, bn) = (a.name.unsanitized().to_string(), b.name.unsanitized().to_string());
+    push(&mut s, Live::Connection { workspace: a.id.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: b.id.clone(), state: Connection::Lost });
+    assert!(s.d.status_line().contains(&format!("{bn}: Live updates lost")), "{}", s.d.status_line());
+    assert!(s.d.status_line().contains("live off"), "{}", s.d.status_line());
+    s.d.now += Duration::from_secs(7);
+    s.d.app.on_tick(s.d.now);
+    assert!(s.d.status_line().contains(&format!("{an}: Live updates lost")), "A's turn: {}", s.d.status_line());
+    push(&mut s, Live::Connection { workspace: a.id.clone(), state: Connection::Connected { catch_up: true } });
+    assert!(s.d.status_line().contains(&format!("{an}: Live updates back")), "{}", s.d.status_line());
+    assert!(s.d.status_line().contains("live off"), "B is still down: {}", s.d.status_line());
+    push(&mut s, Live::Connection { workspace: b.id.clone(), state: Connection::Connected { catch_up: true } });
+    for _ in 0..4 {
+        s.d.now += Duration::from_secs(4);
+        s.d.app.on_tick(s.d.now);
+    }
+    assert!(!s.d.status_line().contains("live off"), "{}", s.d.status_line());
+    // A back again before its loss was seen (B's showed meanwhile): neither is said late.
+    push(&mut s, Live::Connection { workspace: a.id.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: b.id.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: a.id.clone(), state: Connection::Connected { catch_up: true } });
+    let mut said = Vec::new();
+    for _ in 0..8 {
+        said.push(s.d.status_line());
+        s.d.now += Duration::from_secs(2);
+        s.d.app.on_tick(s.d.now);
+    }
+    assert!(!said.iter().any(|l| l.contains(&format!("{an}: Live updates"))), "{said:#?}");
+}
+
+/// The screen row of the selected message's first row in the conversation pane.
+fn selected_row(s: &mut Scripted) -> u16 {
+    s.d.screen();
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    let i = pane.selected().unwrap();
+    pane.drawn_rows().iter().filter(|(m, _)| *m == i).map(|(_, y)| *y).min().expect("on screen")
+}
+
+#[test]
+fn a_catch_up_page_spliced_below_the_selection_leaves_it_on_its_row() {
+    let (mut s, at) = opened("general", 120, 40);
+    s.keys("k k k");
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    let chosen = pane.messages()[pane.selected().unwrap()].ts;
+    let next = pane.messages()[pane.selected().unwrap() + 1].ts;
+    let row = selected_row(&mut s);
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: true } });
+    let i = s.b.held.iter().position(|r| matches!(r.command, Command::Catchup { .. })).unwrap();
+    let mut answer = s.b.reply(i);
+    let Event::History(page) = &mut answer.event else { panic!("{:?}", answer.event) };
+    // Missed messages older than one loaded: they go in between the selection and the bottom.
+    let at_ = page.messages.iter().position(|m| m.ts == next).unwrap();
+    for k in (1..=4).rev() {
+        page.messages.insert(at_, message(chosen.0 + k, &at.other, "missed meanwhile"));
+    }
+    s.b.push(answer);
+    s.pump();
+    assert!(s.d.screen().contains("missed meanwhile") || s.d.screen().contains("↓"), "{}", s.d.screen());
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    assert_eq!(pane.messages()[pane.selected().unwrap()].ts, chosen);
+    assert_eq!(selected_row(&mut s), row, "the selection stays on its row");
+}
+
+#[test]
+fn a_held_view_says_how_many_came_below_it_until_the_newest_is_reached() {
+    let (mut s, at) = opened("general", 120, 40);
+    s.keys("k k k");
+    assert!(!s.d.screen().contains("↓"));
+    for i in 1..=3 {
+        let ts = newest(&s).0 + i;
+        push(&mut s, at.post(ts, &at.other, "more"));
+    }
+    assert!(s.d.screen().contains("↓ 3 new"), "{}", s.d.screen());
+    s.keys("j");
+    assert!(s.d.screen().contains("↓ 3 new"), "still below: {}", s.d.screen());
+    s.keys("G");
+    assert!(!s.d.screen().contains("↓"), "{}", s.d.screen());
+    // The selection still holds the view: the next one is counted again, until the pane
+    // follows the newest (`Esc`).
+    let ts = newest(&s).0 + 1;
+    push(&mut s, at.post(ts, &at.other, "after"));
+    assert!(s.d.screen().contains("↓ 1 new"), "{}", s.d.screen());
+    s.keys("esc");
+    assert!(!s.d.screen().contains("↓"), "{}", s.d.screen());
+    let ts = newest(&s).0 + 1;
+    push(&mut s, at.post(ts, &at.other, "followed"));
+    assert!(!s.d.screen().contains("↓") && s.d.screen().contains("followed"), "{}", s.d.screen());
 }

@@ -1,8 +1,8 @@
 //! Live updates with the real binary in a pseudo terminal, against the tests' fake Slack, at
 //! 120x40 and 80x24: once the workspace started its socket opens and the status line says so; a
 //! message posted shows in the open conversation, its edit replaces it, its deletion takes it
-//! away; a dropped socket is said, opens again by itself and the open conversation is read again
-//! (one page, nothing more); with the network off no socket ever opens, nor with live updates
+//! away; a dropped socket is said, marked in the status line until it opens again by itself, and
+//! the open conversation is read again (one page, nothing more); with the network off no socket ever opens, nor with live updates
 //! switched off (the rest works). Unix only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line and passes; with
@@ -119,14 +119,16 @@ fn messages_arrive_live_and_a_dropped_socket_comes_back_and_catches_up() {
         run.wait_for("the deletion", |t| !t.contains("live hello"));
         // The network goes away: said, then back by itself, and the open conversation read again.
         let before = m.fake.log().len();
+        m.fake.refuse_sockets(2);
         m.fake.drop_sockets();
-        run.wait_for("lost", |t| t.contains("Live updates lost: reconnecting"));
+        run.wait_for("lost", |t| t.contains("Live updates lost: reconnecting") && t.contains("live off"));
         run.wait_for("back", |t| t.contains("Live updates back"));
+        run.wait_for("the mark gone", |t| !t.contains("live off"));
         wait_until("caught up", || m.calls("conversations.history") == 1);
         std::thread::sleep(Duration::from_millis(500));
         let after: Vec<String> = m.fake.methods()[before..].to_vec();
         assert!(after.len() <= 2, "one page (and its names at most): {after:?}");
-        assert_eq!(m.fake.upgrades().len(), 2);
+        assert_eq!(m.fake.upgrades().len(), 4, "two refused, then open again");
         assert_eq!(m.calls("conversations.view"), 1, "not opened again");
         run.quit();
     }
@@ -140,7 +142,7 @@ fn with_the_network_off_no_socket_ever_opens() {
     std::thread::sleep(Duration::from_secs(3));
     assert!(m.fake.upgrades().is_empty(), "no socket");
     assert!(m.fake.log().is_empty(), "no request");
-    assert!(!run.output().contains("Live updates"), "{}", run.output());
+    assert!(!run.output().contains("Live updates") && !run.output().contains("live off"), "{}", run.output());
     run.quit();
 }
 
@@ -155,6 +157,6 @@ fn with_live_updates_off_no_socket_opens_and_the_rest_works() {
     run.wait_for("its messages", |t| t.contains("Message #deploys"));
     std::thread::sleep(Duration::from_secs(2));
     assert!(m.fake.upgrades().is_empty(), "no socket");
-    assert!(!run.output().contains("Live updates"), "{}", run.output());
+    assert!(!run.output().contains("Live updates") && !run.output().contains("live off"), "{}", run.output());
     run.quit();
 }

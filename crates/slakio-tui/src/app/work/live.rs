@@ -83,11 +83,20 @@ impl Work {
     }
 
     /// The panes on `targets` where the user chose a message keep their view while what they
-    /// show changes: their bottom is pinned to the newest message shown.
+    /// show changes: the selected message stays on its row (held there), whatever comes in
+    /// below it; until a pane is drawn, its bottom is pinned to the newest message shown. What is
+    /// newer than that newest one counts as new below the view.
     fn pin(&self, targets: &[Target]) {
         for pane in self.panes.values().filter(|p| targets.contains(&p.target) && p.selected.is_some()) {
+            let newest = self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts);
             if pane.bottom.get().is_none() {
-                pane.bottom.set(self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts));
+                pane.bottom.set(newest);
+            }
+            if pane.held.get().is_none() {
+                pane.held.set(pane.below.get().filter(|(ts, _)| pane.selected == Some(*ts)));
+            }
+            if pane.fresh.get().is_none() {
+                pane.fresh.set(newest);
             }
         }
     }

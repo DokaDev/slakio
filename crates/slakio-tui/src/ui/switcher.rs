@@ -1,6 +1,7 @@
 //! The workspace switcher: a small popup under the list panel's workspace chip, one row per
 //! workspace — its color band, its name and what it holds unread (`@3`, `●`), or that it could
-//! not be loaded (`signed out`) — the cursor on the one to switch to.
+//! not be loaded (`signed out`), and faintly that its live updates stopped (`live off`) — the
+//! cursor on the one to switch to.
 //!
 //! ```text
 //! ╭ Workspaces ──────────────────╮
@@ -45,15 +46,23 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         });
         let mark = failed.clone().or_else(|| unread.badge());
         let mark_w = mark.as_deref().map_or(0, width);
+        // Its live updates stopped: said faintly before its count, until they are back.
+        let off = app.model.live_off(&w.id).filter(|_| failed.is_none());
+        let off = off.map(|_| app.i18n.label(Label::StatusLiveOff).to_string());
+        let off_w = off.as_deref().map_or(0, |o| width(o) + 1);
         let buf = f.buffer_mut();
         buf.set_string(row.x + 1, y, "▌", t.workspace(w.color));
-        let room = usize::from(row.width).saturating_sub(4 + mark_w);
+        let room = usize::from(row.width).saturating_sub(4 + mark_w + off_w);
         let name_style = if i == app.workspace() { t.current() } else { t.text() };
         buf.set_string(row.x + 2, y, clip(w.name.line().as_str(), room), name_style);
         if let Some(m) = &mark {
             let x = row.right().saturating_sub(mark_w as u16 + 1);
             let style = if failed.is_some() { t.muted() } else { t.marker(m.starts_with('@')) };
             buf.set_string(x, y, m, style);
+        }
+        if let Some(o) = &off {
+            let x = row.right().saturating_sub((mark_w + off_w) as u16 + u16::from(mark.is_some()));
+            buf.set_string(x, y, o, t.faint());
         }
         if i == cursor {
             let bar = Rect { x: row.x + 2, width: row.width.saturating_sub(2), ..row };

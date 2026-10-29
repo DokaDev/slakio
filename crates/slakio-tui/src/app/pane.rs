@@ -132,6 +132,14 @@ pub struct Pane {
     pub visual: Option<Ts>,
     /// The message on the last row (`None`: the newest). Kept by drawing.
     pub bottom: Cell<Option<Ts>>,
+    /// The selected message and the rows below it to the pane's last one, as drawn last.
+    pub below: Cell<Option<(Ts, usize)>>,
+    /// The selected message is held that many rows above the last one (messages came in between
+    /// it and the bottom): drawing keeps it there while the selection stays on it.
+    pub held: Cell<Option<(Ts, usize)>>,
+    /// Messages newer than this one came live below the view (`↓ N new` at the bottom edge),
+    /// until the view reaches the newest.
+    pub fresh: Cell<Option<Ts>>,
     /// The last gesture moved up (or to the oldest): near the top, it wants one more older
     /// page. Asking for pages takes it back.
     pub older: bool,
@@ -156,6 +164,9 @@ impl Pane {
             selected: None,
             visual: None,
             bottom: Cell::new(None),
+            below: Cell::new(None),
+            held: Cell::new(None),
+            fresh: Cell::new(None),
             older: false,
             to_root: false,
             insert: false,

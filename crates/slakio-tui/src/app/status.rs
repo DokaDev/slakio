@@ -81,7 +81,8 @@ impl Status {
 
     /// Say `msg` in place of what `stale` says is no longer true: those notices waiting are
     /// forgotten, and the one showing too, so `msg` shows at once in its place. Otherwise a
-    /// warning shows as [`Status::show_about`] says and anything else is queued.
+    /// warning shows as [`Status::show_about`] says, and must be seen (when another notice takes
+    /// the slot from it, it shows again after that one, as a queued one); anything else is queued.
     pub fn restate_about(
         &mut self,
         msg: impl Into<Msg>,
@@ -90,14 +91,35 @@ impl Status {
         now: Instant,
         stale: impl Fn(&Msg) -> bool,
     ) {
+        self.forget(now, stale);
+        match level {
+            Level::Warning => {
+                let msg = msg.into();
+                self.show_about(msg.clone(), level, about, now);
+                if self.notice(now).is_some_and(|n| n.msg == msg) {
+                    self.queued = true;
+                }
+            }
+            Level::Info => self.queue_about(msg, level, about, now),
+        }
+    }
+
+    /// Forget the notices `stale` says are no longer true at `now`: those waiting, and the one
+    /// showing, whose slot the next one waiting takes.
+    pub fn forget(&mut self, now: Instant, stale: impl Fn(&Msg) -> bool) {
         self.waiting.retain(|(m, _, _)| !stale(m));
         if self.notice(now).is_some_and(|n| stale(&n.msg)) {
             self.notice = None;
+            if let Some((msg, level, about)) = self.waiting.pop_front() {
+                self.put(msg, level, about, now, true);
+            }
         }
-        match level {
-            Level::Warning => self.show_about(msg, level, about, now),
-            Level::Info => self.queue_about(msg, level, about, now),
-        }
+    }
+
+    /// A notice `stale` matches waits for the slot, and none shows: it was not seen (yet, or
+    /// again after another took the slot from it).
+    pub fn unseen(&self, now: Instant, stale: impl Fn(&Msg) -> bool) -> bool {
+        self.waiting.iter().any(|(m, _, _)| stale(m)) && !self.notice(now).is_some_and(|n| stale(&n.msg))
     }
 
     fn put(&mut self, msg: Msg, level: Level, about: Option<WorkspaceId>, now: Instant, queued: bool) {

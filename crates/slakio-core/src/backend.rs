@@ -204,6 +204,9 @@ pub enum Connection {
     Connected { catch_up: bool },
     /// They stopped; the backend connects again by itself.
     Lost,
+    /// They stopped and cannot connect for now: the workspace's share of the request budget is
+    /// used up. The backend tries again by itself once there is room.
+    Held,
 }
 
 impl FailKind {

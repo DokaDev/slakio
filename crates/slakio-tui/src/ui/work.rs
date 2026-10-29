@@ -1,7 +1,9 @@
 //! The work area: the main pane with the conversation the list opened and, beside it, the auto
 //! thread panel. Each pane is titled with the workspace stripe and the conversation's name,
 //! shows its messages ([`super::timeline`]) and, below a divider joined to its border, its own
-//! composer: a prompt and the text, no box of its own.
+//! composer: a prompt and the text, no box of its own. A pane that holds its view while
+//! messages come live below it says how many at its bottom edge (`↓ 3 new`), until the view
+//! reaches the newest.
 //!
 //! ```text
 //! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮   a DM: ▌MK @Minsu Kim ● active
@@ -83,25 +85,9 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && pane.insert;
     timeline::draw(f, app, pane, layout.parts.messages, focused);
-    let Some(divider) = layout.parts.divider else { return };
-    // The divider is joined to the pane's border: `├─ Message #backend ───┤`.
-    let label = if thread {
-        app.i18n.label(Label::ComposerReply).to_string()
-    } else {
-        app.i18n.msg(&Msg::ComposerMessage { name }).to_string()
-    };
-    let w = usize::from(area.width);
-    let label = clip(&format!(" {label} "), w.saturating_sub(5));
-    let rule = "─".repeat(w.saturating_sub(3 + width(&label)));
-    // One color, the pane's border's, so the tees join it.
-    let style = t.border(focused);
-    let line = Line::from(vec![
-        Span::styled("├─", style),
-        Span::styled(label, style),
-        Span::styled(rule, style),
-        Span::styled("┤", style),
-    ]);
-    f.render_widget(Paragraph::new(line), Rect { y: divider, height: 1, ..area });
+    if !draw_divider(f, app, pane, (area, layout.parts.divider), (name, focused)) {
+        return;
+    }
     let input = layout.parts.input;
     let prompt = Rect { x: input.x + 1, width: 2.min(input.width), ..input };
     f.render_widget(Paragraph::new("›").style(if insert { t.accent() } else { t.faint() }), prompt);
@@ -127,6 +113,54 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 }
 
 pub(super) use crate::app::model::breadcrumb;
+
+/// The divider over `pane`'s composer, joined to its border (`├─ Message #backend ───┤`), and the
+/// count of messages that came live below a view the user holds, said faintly at the pane's
+/// bottom edge: on the divider, or on the border where there is none (then `false`).
+fn draw_divider(
+    f: &mut Frame,
+    app: &App,
+    pane: &Pane,
+    (area, divider): (Rect, Option<u16>),
+    (name, focused): (String, bool),
+) -> bool {
+    let t = &app.theme;
+    let new = new_below(app, pane);
+    let new = (new > 0).then(|| format!(" {} ", app.i18n.msg(&Msg::PaneNewBelow { count: new as u64 })));
+    let Some(divider) = divider else {
+        if let Some(n) = new.filter(|n| width(n) + 4 <= usize::from(area.width)) {
+            let nw = width(&n) as u16;
+            let at = Rect::new(area.right() - 2 - nw, area.bottom() - 1, nw, 1);
+            f.render_widget(Paragraph::new(Span::styled(n, t.faint())), at);
+        }
+        return false;
+    };
+    let label = if pane.is_thread() {
+        app.i18n.label(Label::ComposerReply).to_string()
+    } else {
+        app.i18n.msg(&Msg::ComposerMessage { name }).to_string()
+    };
+    let w = usize::from(area.width);
+    let label = clip(&format!(" {label} "), w.saturating_sub(5));
+    let new = new.filter(|n| 3 + width(&label) + width(n) + 2 <= w);
+    let rule = "─".repeat(w.saturating_sub(3 + width(&label) + new.as_deref().map_or(0, |n| width(n) + 1)));
+    // One color, the pane's border's, so the tees join it.
+    let style = t.border(focused);
+    let mut spans = vec![Span::styled("├─", style), Span::styled(label, style), Span::styled(rule, style)];
+    if let Some(n) = new {
+        spans.extend([Span::styled(n, t.faint()), Span::styled("─", style)]);
+    }
+    spans.push(Span::styled("┤", style));
+    f.render_widget(Paragraph::new(Line::from(spans)), Rect { y: divider, height: 1, ..area });
+    true
+}
+
+/// How many messages came live below the view `pane` holds, since it held it.
+fn new_below(app: &App, pane: &Pane) -> usize {
+    let (Some(since), Some(bottom)) = (pane.fresh.get(), pane.bottom.get()) else { return 0 };
+    let items = &app.work.timeline(pane).items;
+    items.iter().rev().take_while(|m| m.ts > bottom).filter(|m| m.ts > since).count()
+}
 
 /// What an empty composer says: how to write (or reply), or, where nothing can be sent, that.
 fn composer_hint(app: &App, thread: bool) -> String {

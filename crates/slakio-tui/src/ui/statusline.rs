@@ -8,8 +8,8 @@
 //!
 //! The hint line shows the keys worth knowing where the keyboard is ([`crate::keymap::hints`]),
 //! read from the key map. When the line is short, parts go in this order: the workspace's name
-//! (its stripe stays), hints from the last, the middle of the place. The badge and `demo` always
-//! stay.
+//! (its stripe stays), hints from the last, the middle of the place. The badge, `demo` and the
+//! mark of live updates that stopped (`live off`, until they are back) always stay.
 
 use super::view_label;
 use super::work::breadcrumb;
@@ -221,6 +221,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
         })
     });
 
+    // Live updates that stopped: a faint mark until they are back (with several workspaces, the
+    // stripes of those it is about), and why where the line is wide, when the budget holds them.
+    let live_off: Option<Spans> = app.backend.and_then(|_| app.live_off()).map(|(whose, held)| {
+        let mut out: Spans = whose.iter().map(|ws| Span::styled("▌", t.workspace(ws.color))).collect();
+        let label = if held && w >= WHY_FROM { Label::StatusLiveHeld } else { Label::StatusLiveOff };
+        out.push(Span::styled(app.i18n.label(label).to_string(), t.faint()));
+        out
+    });
+
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {
         let mut out = badge.clone();
         if let Some(s) = &stripe {
@@ -259,6 +268,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
                 out.push(sep());
             }
             out.push(Span::styled(dnd.clone(), t.presence(Presence::Dnd)));
+        }
+        if let Some(off) = &live_off {
+            if !out.is_empty() {
+                out.push(sep());
+            }
+            out.extend(off.iter().cloned());
         }
         if let Some(d) = &demo {
             if !out.is_empty() {
@@ -424,6 +439,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
 
 /// The width from which the user's do-not-disturb mark has its words beside it.
 const DND_WORDS_FROM: usize = 100;
+
+/// The width from which the mark of live updates the budget holds says why.
+const WHY_FROM: usize = 100;
 
 /// The most cells the hints make room for a notice.
 const NOTICE_MAX: usize = 48;

@@ -12,7 +12,7 @@
 //! silent for [`Realtime::silence`] (Slack pings it twice a minute) is taken as lost. Every
 //! opening passes the governor: with the network off nothing opens, and switching it off ends the
 //! socket; an opening counts against the request cap, and on the workspace's own part of the
-//! background share. A workspace's socket is its own: one that fails holds no other back.
+//! background share (while that has no room, the UI is told so: `Held`, not just lost). A workspace's socket is its own: one that fails holds no other back.
 //!
 //! Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the pause doubling from 1 s
 //! to 30 s, the 60 s silence limit, and that the socket replays nothing.
@@ -79,8 +79,9 @@ enum End {
     /// The network was switched off, or the UI is gone: no more sockets.
     Stop,
     /// It was lost (or never opened). `hello`: when it said hello, if it did; `wait`: how long
-    /// Slack asked to wait before the next attempt.
-    Lost { hello: Option<Instant>, wait: Option<Duration> },
+    /// Slack asked to wait before the next attempt; `held`: it was not opened because the
+    /// workspace's share of the request budget is used up.
+    Lost { hello: Option<Instant>, wait: Option<Duration>, held: bool },
 }
 
 /// An update on its way to the UI, and the author whose name it waits for, if one.
@@ -107,18 +108,21 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     let (out, rx) = mpsc::channel::<Out>(OUTBOX);
     tokio::spawn(outbox(Arc::clone(&client), Arc::clone(&ctx), rx, tx));
     let mut jitter = RandomIds::default();
-    let (mut failures, mut told_lost) = (0u32, false);
+    // What the UI was last told while not connected: lost, or held by the budget.
+    let (mut failures, mut told) = (0u32, None);
     loop {
         // What was missed while it was said to be lost (or not connected yet) is read again.
-        let ended = connection(&client, &ctx, &ws, &out, settings, told_lost).await;
-        let End::Lost { hello, wait } = ended else { return };
+        let ended = connection(&client, &ctx, &ws, &out, settings, told.is_some()).await;
+        let End::Lost { hello, wait, held } = ended else { return };
         if hello.is_some() {
-            told_lost = false;
+            told = None;
         }
-        // Said once each time: lost after it was open, or not open (yet, or again).
-        if !told_lost {
-            told_lost = true;
-            let lost = Live::Connection { workspace: ws.clone(), state: Connection::Lost };
+        // Said once each time it changes: lost after it was open, or not open (yet, or again),
+        // or held until the budget has room.
+        let state = if held { Connection::Held } else { Connection::Lost };
+        if told != Some(state) {
+            told = Some(state);
+            let lost = Live::Connection { workspace: ws.clone(), state };
             if out.send((lost, None)).await.is_err() {
                 return;
             }
@@ -193,12 +197,14 @@ async fn connection(
         // Slack asked to slow down: not before it said (its default pause when it did not).
         Err(crate::SlackError::RateLimited { retry_after }) => {
             let wait = retry_after.unwrap_or(crate::governor::DEFAULT_PAUSE);
-            return End::Lost { hello: None, wait: Some(wait) };
+            return End::Lost { hello: None, wait: Some(wait), held: false };
         }
-        Err(_) => return End::Lost { hello: None, wait: None },
+        // The budget has no room for it: tried again after the pause, until it has.
+        Err(crate::SlackError::CapReached { .. }) => return End::Lost { hello: None, wait: None, held: true },
+        Err(_) => return End::Lost { hello: None, wait: None, held: false },
     };
     let mut hello = None;
-    let lost = |hello| End::Lost { hello, wait: None };
+    let lost = |hello| End::Lost { hello, wait: None, held: false };
     loop {
         let next = tokio::select! {
             next = tokio::time::timeout(settings.silence, socket.next()) => next,

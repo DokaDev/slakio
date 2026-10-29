@@ -72,15 +72,29 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut laid: HashMap<usize, Vec<Laid>> = HashMap::new();
     let selected = pane.selected_index(tl);
     let range = pane.range(tl);
+    let selected_one = selected;
     let rows = |i: usize| {
         let out = message::rows(app, pane, tl, i, w, selected == Some(i) && range.is_none_or(|(a, b)| a == b));
         LAID_OUT.with(|c| c.set(c.get() + out.len() as u64));
         out
     };
     let height = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| laid.entry(i).or_insert_with(|| rows(i)).len();
+    // A selection held on its row (messages came in between it and the bottom) stays there:
+    // the bottom is the message that many rows below it, its last rows cut off when it does
+    // not end there.
+    let held = pane.held.get().filter(|(ts, below)| pane.selected == Some(*ts) && *below < h);
+    pane.held.set(held);
+    let mut cut = 0;
     // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
     let mut bottom = pane.bottom.get().and_then(|ts| tl.index_near(ts)).unwrap_or(n - 1).min(n - 1);
-    if let Some(sel) = selected.map(|s| s.min(n - 1)) {
+    if let (Some((_, below)), Some(sel)) = (held, selected.map(|s| s.min(n - 1))) {
+        let (mut total, mut j) = (0, sel);
+        while total < below && j + 1 < n {
+            j += 1;
+            total += height(j, &mut laid);
+        }
+        (bottom, cut) = (j, total.saturating_sub(below));
+    } else if let Some(sel) = selected.map(|s| s.min(n - 1)) {
         if sel > bottom {
             bottom = sel;
         } else {
@@ -114,9 +128,14 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
         }
     }
-    // At the newest, new messages stay in view; elsewhere the view stays put.
+    // At the newest, new messages stay in view (none is new below it any more); elsewhere the
+    // view stays put.
     pane.bottom.set((bottom != n - 1).then(|| tl.items[bottom].ts));
-    // From the bottom message upwards until the area is full.
+    if bottom == n - 1 && cut == 0 {
+        pane.fresh.set(None);
+    }
+    // From the bottom message upwards until the area is full (and the rows cut off below).
+    let reach = h + cut;
     let mut shown: Vec<(usize, Vec<Laid>)> = Vec::new();
     let mut total = 0;
     let mut i = bottom;
@@ -124,7 +143,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         let rows = laid.remove(&i).unwrap_or_else(|| rows(i));
         total += rows.len();
         shown.push((i, rows));
-        if total >= h || i == 0 {
+        if total >= reach || i == 0 {
             break;
         }
         i -= 1;
@@ -134,9 +153,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     // `gg`): those fill the rest, so the history starts on the first row with no gap above it.
     // A conversation that fits whole stays at the bottom, as in any chat; a thread starts at
     // the top.
-    let from_top = total < h && (bottom + 1 < n || pane.is_thread());
+    let from_top = cut == 0 && total < h && (bottom + 1 < n || pane.is_thread());
     let mut i = bottom + 1;
-    while total < h && i < n {
+    while cut == 0 && total < h && i < n {
         let rows = laid.remove(&i).unwrap_or_else(|| rows(i));
         total += rows.len();
         shown.push((i, rows));
@@ -149,9 +168,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     };
     // Rows cut off at the top when the area is full (at the bottom when filled from the top);
     // rows start at the bottom otherwise.
-    let mut skip = if from_top { 0 } else { total.saturating_sub(h) };
+    let mut skip = if from_top { 0 } else { total.saturating_sub(reach) };
     let mut y = if from_top { area.y } else { area.y + h.saturating_sub(total) as u16 };
     let mut hits = pane.hits.borrow_mut();
+    let mut sel_last = None;
     for (i, rows) in shown {
         let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i));
         for (line, kind) in rows {
@@ -161,6 +181,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
             if y >= area.bottom() {
                 break;
+            }
+            if Some(i) == selected_one {
+                sel_last = Some(y);
             }
             let row = Rect { y, height: 1, ..area };
             f.render_widget(Paragraph::new(line), text_area(row));
@@ -173,4 +196,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             y += 1;
         }
     }
+    // Where the selection is, for a change that must not move it ([`Pane::held`]).
+    let below = sel_last.map(|y| usize::from(area.bottom() - 1 - y));
+    pane.below.set(pane.selected.zip(below));
 }
