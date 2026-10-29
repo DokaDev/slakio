@@ -2,8 +2,10 @@
 //! 120x40 and 80x24: once the workspace started its socket opens and the status line says so; a
 //! message posted shows in the open conversation, its edit replaces it, its deletion takes it
 //! away; a dropped socket is said, marked in the status line until it opens again by itself, and
-//! the open conversation is read again (one page, nothing more); with the network off no socket ever opens, nor with live updates
-//! switched off (the rest works). Unix only.
+//! the open conversation is read again (one page and the unread counts, nothing more); with the
+//! network off no socket ever opens, nor with live updates switched off (the rest works); `:net
+//! off` closes the socket and sends nothing more, `:net on` opens it again and catches up. Unix
+//! only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line and passes; with
 //! `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead.
@@ -127,7 +129,8 @@ fn messages_arrive_live_and_a_dropped_socket_comes_back_and_catches_up() {
         wait_until("caught up", || m.calls("conversations.history") == 1);
         std::thread::sleep(Duration::from_millis(500));
         let after: Vec<String> = m.fake.methods()[before..].to_vec();
-        assert!(after.len() <= 2, "one page (and its names at most): {after:?}");
+        assert!(after.len() <= 3, "one page, the counts (and its names at most): {after:?}");
+        assert_eq!(after.iter().filter(|m| *m == "client.counts").count(), 1, "{after:?}");
         assert_eq!(m.fake.upgrades().len(), 4, "two refused, then open again");
         assert_eq!(m.calls("conversations.view"), 1, "not opened again");
         run.quit();
@@ -158,5 +161,32 @@ fn with_live_updates_off_no_socket_opens_and_the_rest_works() {
     std::thread::sleep(Duration::from_secs(2));
     assert!(m.fake.upgrades().is_empty(), "no socket");
     assert!(!run.output().contains("Live updates") && !run.output().contains("live off"), "{}", run.output());
+    run.quit();
+}
+
+#[test]
+fn net_off_closes_the_socket_and_sends_nothing_net_on_opens_it_again_and_catches_up() {
+    let m = Machine::new("net");
+    let Some(mut run) = m.start((80, 24), &[]) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    run.wait_for("live updates on", |t| t.contains("Live updates on"));
+    click(&mut run, "deploys");
+    wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+    run.wait_for("its messages", |t| t.contains("Message #deploys"));
+    run.type_bytes(b":net off\r");
+    run.wait_for("off", |t| t.contains("Network off: nothing is sent") && t.contains("Offline"));
+    wait_until("the socket closed", || m.fake.open_sockets() == 0);
+    let (requests, sockets) = (m.fake.log().len(), m.fake.upgrades().len());
+    // Reading back, asking again: nothing goes out.
+    run.type_bytes(b"gg");
+    run.type_bytes(b":retry\r");
+    std::thread::sleep(Duration::from_secs(2));
+    assert_eq!((m.fake.log().len(), m.fake.upgrades().len()), (requests, sockets), "nothing went out");
+    assert!(run.output().contains("Offline"), "{}", run.output());
+    run.type_bytes(b":net on\r");
+    run.wait_for("the mark gone", |t| !t.contains("Offline"));
+    wait_until("the socket open again", || m.fake.open_sockets() == 1);
+    wait_until("caught up", || m.calls("conversations.history") >= 1 && m.calls("client.counts") >= 2);
+    assert_eq!(m.fake.upgrades().len(), sockets + 1);
     run.quit();
 }

@@ -394,11 +394,21 @@
 "live.back" = "Live updates back"
 "live.lost" = "Live updates lost: reconnecting"
 "live.waiting" = "Live updates not connected: trying again"
-"live.held" = "Live updates paused: share used, retrying later"
+"live.held" = "Live updates paused: request share used"
 # The status line's steady mark while a workspace's live updates do not arrive (until they are
 # back); with the reason when the request budget holds them, where the line is wide.
 "status.live_off" = "live off"
 "status.live_held" = "live off: share used"
+# The network switched off in the app (`:net off`) or for the whole run: the status line's mark,
+# what `:net` says, and its values in the palette.
+"status.offline" = "Offline"
+"action.net" = "Switch the network off, or on again"
+"net.off" = "Network off: nothing is sent"
+"net.on" = "Network on"
+"net.locked" = "Network off for this run: started offline"
+"net.unknown" = "Unknown network setting {name} (one of {names})"
+"net.value_on" = "Send and receive"
+"net.value_off" = "Send nothing, live updates off"
 # At the bottom edge of a pane that holds its view: messages that came live below it.
 "pane.new_below" = { one = "↓ {count} new", other = "↓ {count} new" }
 # A failure of one workspace's start: its name, then why (one of the fail.* words).

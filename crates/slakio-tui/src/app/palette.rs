@@ -18,6 +18,8 @@
 //! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
 //! ```
 
+mod net;
+
 use super::todos::{FILTER_VALUES, SORT_VALUES};
 use super::{App, Effect};
 use crate::action::TabAction;
@@ -26,6 +28,7 @@ use crate::keymap::keys;
 use crate::screen::{self, PaletteBox};
 use crate::text::wrap;
 use crate::theme::{self, NAMES};
+pub use net::NET_VALUES;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 use slakio_core::i18n::{Label, Msg};
@@ -63,6 +66,8 @@ pub enum Item {
     TodoFilter(usize),
     /// A value for `:sort <value>` (index into [`SORT_VALUES`]).
     TodoSort(usize),
+    /// A value for `:net <value>` (index into [`NET_VALUES`]).
+    Net(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
 }
@@ -86,7 +91,8 @@ fn offered(a: Action, backend: bool) -> bool {
             | AppAction::Retry
             | AppAction::ToggleAvatars
             | AppAction::ToggleIcons
-            | AppAction::ToggleDensity,
+            | AppAction::ToggleDensity
+            | AppAction::ToggleNetwork,
         )
         | Action::Shell(_)
         | Action::Pane(_)
@@ -154,6 +160,9 @@ impl App {
         if let Some(arg) = setting_arg(line, "sort").filter(|_| self.backend.is_some()) {
             return ranked(SORT_VALUES, arg).into_iter().map(Item::TodoSort).collect();
         }
+        if let Some(arg) = setting_arg(line, "net").filter(|_| self.networked()) {
+            return ranked(NET_VALUES, arg).into_iter().map(Item::Net).collect();
+        }
         if let Some(arg) = icons_arg(line) {
             let mut hits: Vec<(u8, i32, usize)> = ICON_VALUES
                 .iter()
@@ -185,6 +194,7 @@ impl App {
             let works = offered(s.action, backend)
                 && (!s.action.changes() || !self.read_only())
                 && (s.action != Action::App(AppAction::Retry) || self.failed_here().is_some())
+                && (s.action != Action::App(AppAction::ToggleNetwork) || self.networked())
                 && (!s.commands.is_empty() || !self.keymap.keys_for(s.action, below).is_empty());
             if works && let Some((tier, score)) = action::rank_spec(word, s, &self.i18n) {
                 let quit = s.action == Action::App(AppAction::Quit);
@@ -268,6 +278,7 @@ impl App {
                     }
                 }
                 Item::TodoFilter(_) | Item::TodoSort(_) => self.todo_palette_row(item).unwrap_or_default(),
+                Item::Net(i) => self.net_row(i),
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -350,6 +361,10 @@ impl App {
                 self.cmdline.close();
                 self.run_todo_item(item, now);
             }
+            Some(Item::Net(i)) => {
+                self.cmdline.close();
+                self.set_net(NET_VALUES[i] == "on", now);
+            }
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();
                 self.cmdline.close();
@@ -357,36 +372,7 @@ impl App {
                     self.info(Msg::Label(Label::StatusNoTab), now);
                 }
             }
-            None => {
-                let error = match (theme_arg(&text), avatars_arg(&text), icons_arg(&text)) {
-                    (Some(name), ..) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
-                    (_, Some(name), _) => {
-                        Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") }
-                    }
-                    (.., Some(name)) => Msg::IconsUnknown { name: name.to_string(), names: ICON_VALUES.join(", ") },
-                    _ if setting_arg(&text, "density").is_some() => Msg::DensityUnknown {
-                        name: setting_arg(&text, "density").unwrap_or_default().to_string(),
-                        names: DENSITY_VALUES.join(", "),
-                    },
-                    _ if setting_arg(&text, "filter").is_some() => Msg::FilterUnknown {
-                        name: setting_arg(&text, "filter").unwrap_or_default().to_string(),
-                        names: FILTER_VALUES.join(", "),
-                    },
-                    _ if setting_arg(&text, "sort").is_some() => Msg::SortUnknown {
-                        name: setting_arg(&text, "sort").unwrap_or_default().to_string(),
-                        names: SORT_VALUES.join(", "),
-                    },
-                    _ => {
-                        let word = text.split_whitespace().next().unwrap_or_default().to_string();
-                        if action::by_command(&word).is_some() {
-                            Msg::CommandNoArgs { name: word }
-                        } else {
-                            Msg::CommandUnknown { name: text }
-                        }
-                    }
-                };
-                self.cmdline.error = Some(error);
-            }
+            None => self.cmdline.error = Some(unknown(text)),
         }
     }
 
@@ -418,6 +404,39 @@ impl App {
             _ => return false,
         }
         true
+    }
+}
+
+/// Why `text` (a command line that matches no entry) runs nothing.
+fn unknown(text: String) -> Msg {
+    match (theme_arg(&text), avatars_arg(&text), icons_arg(&text)) {
+        (Some(name), ..) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
+        (_, Some(name), _) => Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") },
+        (.., Some(name)) => Msg::IconsUnknown { name: name.to_string(), names: ICON_VALUES.join(", ") },
+        _ if setting_arg(&text, "density").is_some() => Msg::DensityUnknown {
+            name: setting_arg(&text, "density").unwrap_or_default().to_string(),
+            names: DENSITY_VALUES.join(", "),
+        },
+        _ if setting_arg(&text, "filter").is_some() => Msg::FilterUnknown {
+            name: setting_arg(&text, "filter").unwrap_or_default().to_string(),
+            names: FILTER_VALUES.join(", "),
+        },
+        _ if setting_arg(&text, "sort").is_some() => Msg::SortUnknown {
+            name: setting_arg(&text, "sort").unwrap_or_default().to_string(),
+            names: SORT_VALUES.join(", "),
+        },
+        _ if setting_arg(&text, "net").is_some() => Msg::NetUnknown {
+            name: setting_arg(&text, "net").unwrap_or_default().to_string(),
+            names: NET_VALUES.join(", "),
+        },
+        _ => {
+            let word = text.split_whitespace().next().unwrap_or_default().to_string();
+            if action::by_command(&word).is_some() {
+                Msg::CommandNoArgs { name: word }
+            } else {
+                Msg::CommandUnknown { name: text }
+            }
+        }
     }
 }
 
@@ -485,12 +504,14 @@ impl App {
         Ok(())
     }
 
-    /// `:avatars`, `:density`, `:icons` alone: the other value of the setting, saved.
+    /// `:avatars`, `:density`, `:icons` alone: the other value of the setting, saved; `:net`
+    /// alone: the network the other way.
     pub(super) fn toggle(&mut self, a: AppAction, now: Instant) {
         let s = self.settings;
         let done = match a {
             AppAction::ToggleAvatars => self.set_avatars(if s.avatars { "off" } else { "initials" }, now),
             AppAction::ToggleDensity => self.set_density(if s.compact { "comfortable" } else { "compact" }, now),
+            AppAction::ToggleNetwork => return self.set_net(self.offline(), now),
             _ => self.set_icons(if s.icons { "off" } else { "on" }, now),
         };
         if let Err(msg) = done {

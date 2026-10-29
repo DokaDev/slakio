@@ -55,6 +55,8 @@ pub enum AppAction {
     ToggleIcons,
     /// Messages comfortable or compact (`:density`); saved in the config file.
     ToggleDensity,
+    /// The network switched off, or on again (`:net`); for this run only.
+    ToggleNetwork,
 }
 
 /// Actions of the `:` command line.
@@ -301,6 +303,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::ToggleAvatars, "avatars.toggle", Label::ActionAvatars, &["avatars"]),
     app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),
     app(AppAction::ToggleDensity, "density.toggle", Label::ActionDensity, &["density"]),
+    app(AppAction::ToggleNetwork, "net.toggle", Label::ActionNet, &["net"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),

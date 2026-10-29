@@ -1,8 +1,9 @@
 //! What the backend pushes as it happens ([`Event::Live`](slakio_core::backend::Event::Live)):
 //! messages into the panes that show them, the list's counts, and whether a workspace's live
 //! updates arrive — said briefly in the status line each time that changes (with several
-//! workspaces, whose). When they come back after they were lost, the open conversations are read
-//! again, since nothing missed meanwhile is replayed.
+//! workspaces, whose). When they come back after they were lost, the open conversations and
+//! threads are read again, since nothing missed meanwhile is replayed, and the list takes Slack's
+//! counts again.
 
 use super::super::App;
 use super::super::status::Level;
@@ -35,6 +36,7 @@ impl App {
             Live::Marked { workspace, conversation, unread, mentions } => {
                 self.model.mark(&workspace, &conversation, unread, mentions)
             }
+            Live::Counts { workspace, counts } => self.model.recount(&workspace, &counts),
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),
         }
     }

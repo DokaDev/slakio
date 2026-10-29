@@ -133,6 +133,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     pane.bottom.set((bottom != n - 1).then(|| tl.items[bottom].ts));
     if bottom == n - 1 && cut == 0 {
         pane.fresh.set(None);
+        pane.seen.borrow_mut().clear();
     }
     // From the bottom message upwards until the area is full (and the rows cut off below).
     let reach = h + cut;

@@ -223,12 +223,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
 
     // Live updates that stopped: a faint mark until they are back (with several workspaces, the
     // stripes of those it is about), and why where the line is wide, when the budget holds them.
-    let live_off: Option<Spans> = app.backend.and_then(|_| app.live_off()).map(|(whose, held)| {
-        let mut out: Spans = whose.iter().map(|ws| Span::styled("▌", t.workspace(ws.color))).collect();
-        let label = if held && w >= WHY_FROM { Label::StatusLiveHeld } else { Label::StatusLiveOff };
-        out.push(Span::styled(app.i18n.label(label).to_string(), t.faint()));
-        out
-    });
+    // With the network off, that it is (nothing arrives, nothing is sent).
+    let offline = app.offline().then(|| app.i18n.label(Label::StatusOffline).to_string());
+    let live_off: Option<Spans> =
+        app.backend.and_then(|_| app.live_off()).filter(|_| offline.is_none()).map(|(whose, held)| {
+            let mut out: Spans = whose.iter().map(|ws| Span::styled("▌", t.workspace(ws.color))).collect();
+            let label = if held && w >= WHY_FROM { Label::StatusLiveHeld } else { Label::StatusLiveOff };
+            out.push(Span::styled(app.i18n.label(label).to_string(), t.faint()));
+            out
+        });
 
     let left = |ws_name: &Option<String>, place_text: &Option<String>| -> Spans {
         let mut out = badge.clone();
@@ -274,6 +277,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
                 out.push(sep());
             }
             out.extend(off.iter().cloned());
+        }
+        if let Some(off) = &offline {
+            if !out.is_empty() {
+                out.push(sep());
+            }
+            out.push(Span::styled(off.clone(), t.warm()));
         }
         if let Some(d) = &demo {
             if !out.is_empty() {

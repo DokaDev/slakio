@@ -145,6 +145,19 @@ impl App {
         }
     }
 
+    /// Ask again for every boot that failed for a reason that may pass (the network is on again).
+    pub(super) fn boot_failed_again(&mut self) {
+        let failed: Vec<Option<WorkspaceId>> = self
+            .boots
+            .iter()
+            .filter(|b| b.failed.as_ref().is_some_and(FailKind::retryable))
+            .map(|b| b.workspace.clone())
+            .collect();
+        for ws in failed {
+            self.boot_again(ws);
+        }
+    }
+
     /// Ask again for the boot of `ws`: the answer to the one asked before is dropped.
     fn boot_again(&mut self, ws: Option<WorkspaceId>) {
         let id = self.work.requests.ask(ws.clone(), Command::Boot);
@@ -179,13 +192,14 @@ impl App {
     /// The answer of boot `b` (the cache's, when `cached`: drawn only while the backend's own
     /// has not come). The list's cursor stays on the row it was on.
     fn on_boot(&mut self, b: usize, snapshot: &Snapshot, cached: bool, now: Instant) -> bool {
-        let anchor = self.shell.anchor(&self.model);
+        let (anchor, net) = (self.shell.anchor(&self.model), self.model.net);
         match self.boots[b].workspace.clone() {
             None if !cached => self.model = Model::new(snapshot.clone()),
             None if !self.model.is_loaded() || self.model.is_cached() => self.model = Model::cached(snapshot.clone()),
             Some(ws) if !cached || !self.model.is_fresh(&ws) => self.model.merge(&ws, snapshot, cached),
             _ => return false,
         }
+        self.model.net = net;
         if !cached {
             self.boots[b].failed = None;
             // Unknown is not zero: the counts kept are shown, and the status line says so (with

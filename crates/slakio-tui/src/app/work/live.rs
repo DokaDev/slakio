@@ -3,8 +3,8 @@
 //! replies under a thread's own message follows. Panes name their selection and anchor by
 //! timestamp, and one where the user chose a message keeps its view, so nothing moves under the
 //! user; a pane following the newest message keeps following it. After live updates were lost a
-//! while, the open conversations are read again, one newest page each ([`Work::catch_up`]); one
-//! that fails is asked for again by itself later.
+//! while, the open conversations and threads are read again, one newest page each
+//! ([`Work::catch_up`]); one that fails is asked for again by itself later.
 
 use super::{Work, shown};
 use crate::app::model::Model;
@@ -13,6 +13,10 @@ use slakio_core::model::{ConversationId, Message, Target, Ts, WorkspaceId};
 
 /// The most conversations of a workspace read again after live updates were lost.
 pub const CATCHUP_MAX: usize = 8;
+
+/// The most threads of a workspace read again after live updates were lost (after its
+/// conversations).
+pub const CATCHUP_THREADS_MAX: usize = 4;
 
 /// The messages each one reads again: the newest page an open shows.
 pub const CATCHUP_PAGE: u32 = 28;
@@ -97,6 +101,9 @@ impl Work {
             }
             if pane.fresh.get().is_none() {
                 pane.fresh.set(newest);
+                let items = self.timelines.get(&pane.target).map(|tl| &tl.items);
+                let below = |ts: &Ts| pane.selected.is_some_and(|s| *ts > s);
+                *pane.seen.borrow_mut() = items.into_iter().flatten().map(|m| m.ts).filter(below).collect();
             }
         }
     }
@@ -140,24 +147,34 @@ impl Work {
     }
 
     /// Live updates of `ws` came back after they were lost: read its open conversations again
-    /// (one newest page each, [`CATCHUP_MAX`] at most, the one in focus first), so what was
-    /// missed meanwhile shows. One loading, or caught up already, is left as it is.
+    /// (one newest page each, [`CATCHUP_MAX`] at most, the one in focus first), then its open
+    /// threads ([`CATCHUP_THREADS_MAX`] at most; not one read only in part, whose newest replies
+    /// are not read anyway), so what was missed meanwhile shows. One loading, or caught up
+    /// already, is left as it is.
     pub fn catch_up(&mut self, ws: &WorkspaceId) {
         let active = self.active().and_then(|id| self.pane(id)).map(|p| p.target.clone());
         let mut targets: Vec<Target> = self
             .timelines
             .iter()
             .filter(|(t, tl)| {
-                matches!(t, Target::Conversation { workspace, .. } if workspace == ws)
+                t.workspace() == ws
                     && !tl.items.is_empty()
                     && !tl.cached
+                    && !tl.cut
                     && tl.pending.is_none()
                     && tl.catchup.is_none()
             })
             .map(|(t, _)| t.clone())
             .collect();
-        targets.sort_by_key(|t| (Some(t) != active.as_ref(), t.conversation().clone()));
-        for target in targets.into_iter().take(CATCHUP_MAX) {
+        let thread = |t: &Target| match t {
+            Target::Thread { thread, .. } => Some(*thread),
+            Target::Conversation { .. } => None,
+        };
+        targets.sort_by_key(|t| (Some(t) != active.as_ref(), t.conversation().clone(), thread(t)));
+        let (threads, conversations): (Vec<Target>, Vec<Target>) =
+            targets.into_iter().partition(|t| thread(t).is_some());
+        let wanted = conversations.into_iter().take(CATCHUP_MAX).chain(threads.into_iter().take(CATCHUP_THREADS_MAX));
+        for target in wanted.collect::<Vec<_>>() {
             self.ask_catch_up(&target);
         }
     }

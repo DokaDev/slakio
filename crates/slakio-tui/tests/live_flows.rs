@@ -4,7 +4,8 @@
 //! the open thread; the list's counts follow (a muted channel still badges its mentions only, the
 //! user's own messages count for nothing), and a conversation read elsewhere takes Slack's counts.
 //! The status line says when live updates start, stop and come back; when they come back the open
-//! conversations are read again, one page each. At 120x40 and 80x24.
+//! conversations and threads are read again, one page each, and the list takes Slack's counts
+//! again. At 120x40 and 80x24.
 
 #[path = "support/demo.rs"]
 mod demo;
@@ -454,11 +455,12 @@ fn held_by_the_budget_says_why_and_the_mark_too_where_the_line_is_wide() {
     push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: false } });
     push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Held });
     let line = s.d.status_line();
-    assert!(line.contains("Live updates paused: share used, retrying later"), "{line}");
+    assert!(line.contains("Live updates paused: request share used"), "{line}");
     assert!(line.contains("live off: share used"), "{line}");
     s.d.app.resize(80, 24);
     let line = s.d.status_line();
     assert!(line.contains("live off") && !line.contains("live off: share used"), "{line}");
+    assert!(line.contains("Live updates paused: request share used"), "in full at 80: {line}");
 }
 
 #[test]
@@ -518,7 +520,7 @@ fn a_catch_up_page_spliced_below_the_selection_leaves_it_on_its_row() {
     let Event::History(page) = &mut answer.event else { panic!("{:?}", answer.event) };
     // Missed messages older than one loaded: they go in between the selection and the bottom.
     let at_ = page.messages.iter().position(|m| m.ts == next).unwrap();
-    for k in (1..=4).rev() {
+    for k in (1..=12).rev() {
         page.messages.insert(at_, message(chosen.0 + k, &at.other, "missed meanwhile"));
     }
     s.b.push(answer);
@@ -527,6 +529,86 @@ fn a_catch_up_page_spliced_below_the_selection_leaves_it_on_its_row() {
     let pane = s.d.pane(PaneKind::Conversation).unwrap();
     assert_eq!(pane.messages()[pane.selected().unwrap()].ts, chosen);
     assert_eq!(selected_row(&mut s), row, "the selection stays on its row");
+    // What the splice put below the view counts as new there; what was shown before does not.
+    let screen = s.d.screen();
+    let shown = screen.matches("missed meanwhile").count();
+    assert!(shown < 12, "some below the view: {screen}");
+    assert_eq!(new_below(&screen), Some(12 - shown), "{screen}");
+}
+
+/// The `N` of `↓ N new` on the screen.
+fn new_below(screen: &str) -> Option<usize> {
+    let at = screen.find("↓ ")? + "↓ ".len();
+    screen[at..].split_whitespace().next()?.parse().ok()
+}
+
+#[test]
+fn coming_back_takes_slacks_counts_again_and_unknown_counts_are_known_again() {
+    let (mut s, at) = opened("general", 120, 40);
+    let counts = |s: &Scripted| -> Vec<(ConversationId, u32, u32)> {
+        let all = s.d.app.model.conversations();
+        all.iter().filter(|c| c.workspace == at.ws).map(|c| (c.id.clone(), c.unread, c.mentions)).collect()
+    };
+    let before = counts(&s);
+    assert!(before.len() > 2);
+    s.d.app.model.counts_unknown.insert(at.ws.clone());
+    let random = before.iter().find(|(id, ..)| *id != at.conversation).unwrap().0.clone();
+    let listed = vec![(at.conversation.clone(), 5, 2), (random.clone(), 1, 0)];
+    push(&mut s, Live::Counts { workspace: at.ws.clone(), counts: listed });
+    assert!(!s.d.app.model.counts_unknown.contains(&at.ws), "known again");
+    for (id, unread, mentions) in counts(&s) {
+        let want = if id == at.conversation {
+            (5, 2)
+        } else if id == random {
+            (1, 0)
+        } else {
+            (0, 0)
+        };
+        assert_eq!((unread, mentions), want, "{id:?}: one Slack did not list has none");
+    }
+    // Another workspace's counts are left as they are.
+    let elsewhere = WorkspaceId::new("TNOTHERE");
+    push(&mut s, Live::Counts { workspace: elsewhere, counts: Vec::new() });
+    assert_eq!(counts(&s).iter().find(|c| c.0 == at.conversation).map(|c| (c.1, c.2)), Some((5, 2)));
+}
+
+#[test]
+fn coming_back_reads_the_open_thread_again_too() {
+    let (mut s, at) = opened("general", 120, 40);
+    s.keys("k");
+    let pane = s.d.pane(PaneKind::Conversation).unwrap();
+    let parent = pane.messages()[pane.selected().unwrap()].ts;
+    let thread = Target::Thread { workspace: at.ws.clone(), conversation: at.conversation.clone(), thread: parent };
+    s.keys("enter");
+    let i =
+        s.b.held
+            .iter()
+            .position(|r| matches!(&r.command, Command::History { target, .. } if *target == thread))
+            .unwrap();
+    s.b.answer(i);
+    s.pump();
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Lost });
+    push(&mut s, Live::Connection { workspace: at.ws.clone(), state: Connection::Connected { catch_up: true } });
+    let asked: Vec<Target> =
+        s.b.held
+            .iter()
+            .filter_map(|r| match &r.command {
+                Command::Catchup { target, limit: 28 } => Some(target.clone()),
+                _ => None,
+            })
+            .collect();
+    let conversation = Target::Conversation { workspace: at.ws.clone(), conversation: at.conversation.clone() };
+    assert_eq!(asked, [conversation, thread.clone()], "the conversation first, then its thread");
+    // The reply missed meanwhile shows in the thread.
+    let i = s.b.held.iter().position(|r| matches!(&r.command, Command::Catchup { target, .. } if *target == thread));
+    let mut answer = s.b.reply(i.unwrap());
+    let Event::History(page) = &mut answer.event else { panic!("{:?}", answer.event) };
+    let last = page.messages.last().unwrap().ts;
+    page.messages.push(message(last.0 + 1, &at.other, "missed reply"));
+    s.b.push(answer);
+    s.pump();
+    let shown = s.d.app.pane_showing(&thread).unwrap().messages().iter().any(|m| m.ts == Ts(last.0 + 1));
+    assert!(shown, "in the thread");
 }
 
 #[test]

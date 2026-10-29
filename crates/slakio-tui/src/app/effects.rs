@@ -19,4 +19,7 @@ pub enum Effect {
     /// ([`super::signin`]); the binary reads their credentials (the keychain may prompt) and
     /// checks them with Slack, one after the other.
     DesktopPick(Vec<String>),
+    /// Switch the network off (`false`) or on again for the rest of the run (`:net`): the binary
+    /// tells the app whether it is as asked ([`super::App::net_switched`]).
+    Network(bool),
 }

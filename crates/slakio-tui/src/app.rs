@@ -437,9 +437,9 @@ impl App {
                     }
                 }
             }
-            AppAction::ToggleAvatars | AppAction::ToggleDensity | AppAction::ToggleIcons => self.toggle(a, now),
             AppAction::ChooseWorkspace => self.open_switcher(),
             AppAction::Retry => self.retry(now),
+            _ => self.toggle(a, now),
         }
     }
 

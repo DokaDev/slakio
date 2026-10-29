@@ -20,8 +20,8 @@ use slakio_core::i18n::{self, Label, Msg};
 use slakio_core::paths::Paths;
 use slakio_core::secret::{Credentials, MemoryStore, STORE_ENV, SecretStore, StoreKind};
 use slakio_slack::governor::{Governor, Limits, SystemClock};
+use slakio_slack::login;
 use slakio_slack::request::Endpoints;
-use slakio_slack::{SlackError, login};
 use slakio_tui::app::model::SignedIn as SignedInTo;
 use slakio_tui::app::signin::Pasted;
 use slakio_tui::app::status::Level;
@@ -117,6 +117,7 @@ fn main() -> ExitCode {
         if env("NO_COLOR").is_some_and(|v| !v.is_empty()) { Background::Unknown } else { term::background() };
     let look = Look::from_env(env, background);
     let mut app = App::new(lang, look.theme(&cfg.theme));
+    app.model.net.locked = !network;
     app.look = look;
     app.theme_setting.clone_from(&cfg.theme);
     app.settings = Settings {
@@ -439,7 +440,7 @@ impl Wiring {
         let client = slakio_slack::Client::new(credentials.clone(), endpoints.clone(), Arc::clone(&self.governor));
         let who = login::check(&client).await.map_err(|e| {
             self.record(&slakio_core::fault::Fault::other(e.detail()));
-            check_label(&e)
+            words::check_label(&e)
         })?;
         let account =
             Account { name: who.team_name.unwrap_or_else(|| who.team.clone()), team: who.team, host, user: who.user };
@@ -460,16 +461,6 @@ impl Wiring {
 
     fn record(&self, fault: &slakio_core::fault::Fault) {
         ErrorLog::new(self.errors.clone()).record("signin", fault);
-    }
-}
-
-/// The words for a sign-in Slack did not accept, or could not be asked about.
-fn check_label(e: &SlackError) -> Label {
-    match e {
-        SlackError::Auth { .. } => Label::SigninRefused,
-        SlackError::Network { .. } => Label::SigninNetwork,
-        SlackError::Offline { .. } => Label::SigninOffline,
-        _ => Label::SigninFailed,
     }
 }
 
@@ -539,6 +530,7 @@ async fn run(
                 Effect::DesktopPick(teams) => {
                     signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(teams)));
                 }
+                Effect::Network(on) => app.net_switched(wiring.governor.switch(on), Instant::now()),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

@@ -280,6 +280,7 @@ Type `:` and the command, then `Enter`.
 | `:avatars` |  | Show or hide avatars (initials) |
 | `:icons` |  | Show Nerd Font icons, or text instead |
 | `:density` |  | Comfortable or compact messages |
+| `:net` |  | Switch the network off, or on again |
 | `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
 | `:navrows` |  | Fold the view switcher to the view shown, or unfold it |

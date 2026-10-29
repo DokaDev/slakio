@@ -28,7 +28,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
-use slakio_core::model::{ConversationKind, Presence};
+use slakio_core::model::{ConversationKind, Presence, Ts};
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)]) {
     if app.work.ids().is_empty() {
@@ -155,11 +155,13 @@ fn draw_divider(
     true
 }
 
-/// How many messages came live below the view `pane` holds, since it held it.
+/// How many messages came below the view `pane` holds since it held it: live, or spliced in by a
+/// catch-up.
 fn new_below(app: &App, pane: &Pane) -> usize {
     let (Some(since), Some(bottom)) = (pane.fresh.get(), pane.bottom.get()) else { return 0 };
-    let items = &app.work.timeline(pane).items;
-    items.iter().rev().take_while(|m| m.ts > bottom).filter(|m| m.ts > since).count()
+    let (items, seen) = (&app.work.timeline(pane).items, pane.seen.borrow());
+    let new = |ts: Ts| ts > since || seen.binary_search(&ts).is_err();
+    items.iter().rev().take_while(|m| m.ts > bottom).filter(|m| new(m.ts)).count()
 }
 
 /// What an empty composer says: how to write (or reply), or, where nothing can be sent, that.

@@ -96,6 +96,18 @@ pub struct Model {
     /// arrived this run. A workspace never heard of (live updates switched off, the network off)
     /// has none.
     pub live: HashMap<WorkspaceId, (Connection, bool)>,
+    /// The network as the app knows it: switched off with `:net off`, and whether it was off
+    /// from the start of the run (then `:net on` cannot switch it on).
+    pub net: Net,
+}
+
+/// Whether anything may be sent.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Net {
+    /// Switched off with `:net off`.
+    pub off: bool,
+    /// Off for the whole run (`--offline`, `SLAKIO_NETWORK=off`, `network = "off"`).
+    pub locked: bool,
 }
 
 /// The names of one bot kept as people at most.
@@ -115,6 +127,7 @@ impl Model {
             counts_unknown: HashSet::new(),
             bot_names: HashMap::new(),
             live: HashMap::new(),
+            net: Net::default(),
         };
         m.index_users();
         m
@@ -304,6 +317,20 @@ impl Model {
         };
         (c.unread, c.mentions) = (unread.max(mentions), mentions);
         true
+    }
+
+    /// Slack's counts of `ws` read again (after its live updates came back): each conversation
+    /// listed gets its counts, one not listed has none (as at a boot), and the counts are known.
+    /// `true` when one changed.
+    pub fn recount(&mut self, ws: &WorkspaceId, counts: &[(ConversationId, u32, u32)]) -> bool {
+        let mut changed = self.counts_unknown.remove(ws);
+        let listed: HashMap<&ConversationId, (u32, u32)> = counts.iter().map(|(id, u, m)| (id, (*u, *m))).collect();
+        for c in self.snapshot.conversations.iter_mut().filter(|c| &c.workspace == ws) {
+            let (unread, mentions) = listed.get(&c.id).map_or((0, 0), |(u, m)| ((*u).max(*m), *m));
+            changed |= (c.unread, c.mentions) != (unread, mentions);
+            (c.unread, c.mentions) = (unread, mentions);
+        }
+        changed
     }
 
     /// The id of `row` (of the rows of this model), which outlives the row's index.

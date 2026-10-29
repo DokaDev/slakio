@@ -7,6 +7,17 @@ use slakio_core::config::ConfigError;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::sanitize::Remote;
 
+/// The words for a sign-in Slack did not accept, or could not be asked about.
+pub(crate) fn check_label(e: &slakio_slack::SlackError) -> Label {
+    use slakio_slack::SlackError;
+    match e {
+        SlackError::Auth { .. } => Label::SigninRefused,
+        SlackError::Network { .. } => Label::SigninNetwork,
+        SlackError::Offline { .. } => Label::SigninOffline,
+        _ => Label::SigninFailed,
+    }
+}
+
 /// The words for a desktop import that could not sign in.
 pub(crate) fn desktop_label(e: slakio_auth::DesktopError) -> Label {
     use slakio_auth::DesktopError;

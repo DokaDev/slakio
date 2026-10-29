@@ -138,3 +138,18 @@ fn an_arrow_wraps_with_what_it_points_to() {
     let (lines, _) = wrap("a →  b", 3, 9);
     assert_eq!(lines.iter().map(|l| l.trim()).collect::<Vec<_>>(), ["a →", "b"]);
 }
+
+#[test]
+fn an_arrow_and_a_long_hyphenated_host_stay_on_one_row_whenever_they_fit() {
+    let s = "L5 click me and docs.example.com → very-long-subdomain.attacker.example:8443 tail";
+    let unit = "→ very-long-subdomain.attacker.example:8443";
+    // From the unit's own width on, it is one row: never split at the hyphen.
+    for w in width(unit)..=60 {
+        let (lines, _) = wrap(s, w, 9);
+        assert!(lines.iter().any(|l| l.trim_end() == unit || l.trim_end().starts_with(unit)), "{w}: {lines:?}");
+    }
+    // Narrower than the unit, the host breaks inside, its registrable part and port kept whole.
+    let (lines, _) = wrap(s, width(unit) - 1, 9);
+    assert!(lines.iter().any(|l| l.contains("attacker.example:8443")), "{lines:?}");
+    assert!(lines.iter().all(|l| !l.trim_end().ends_with('→')), "{lines:?}");
+}

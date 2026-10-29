@@ -140,6 +140,9 @@ pub struct Pane {
     /// Messages newer than this one came live below the view (`↓ N new` at the bottom edge),
     /// until the view reaches the newest.
     pub fresh: Cell<Option<Ts>>,
+    /// The messages below the selection when the view was held, oldest first: any other one
+    /// below the view now came after (live, or spliced in by a catch-up) and counts as new.
+    pub seen: RefCell<Vec<Ts>>,
     /// The last gesture moved up (or to the oldest): near the top, it wants one more older
     /// page. Asking for pages takes it back.
     pub older: bool,
@@ -167,6 +170,7 @@ impl Pane {
             below: Cell::new(None),
             held: Cell::new(None),
             fresh: Cell::new(None),
+            seen: RefCell::new(Vec::new()),
             older: false,
             to_root: false,
             insert: false,
