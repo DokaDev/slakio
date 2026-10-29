@@ -45,8 +45,10 @@ pub fn decode<T: DeserializeOwned>(raw: &Raw) -> Result<T, SlackError> {
 
 /// Slack's error `code`, as the transport tells it apart.
 fn api_error(code: String) -> SlackError {
-    // A code is Slack's word, but it reaches the error log: keep it short and plain.
-    let code: String = code.chars().filter(|c| c.is_ascii_graphic()).take(64).collect();
+    // A code is Slack's word, but it reaches the error log: kept only when it is one (short,
+    // `snake_case`), never what else a server put there.
+    let plain = code.len() <= 64 && code.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+    let code = if plain && !code.is_empty() { code } else { "not_a_slack_code".to_string() };
     if AUTH_CODES.contains(&code.as_str()) {
         SlackError::Auth { code }
     } else if code == "ratelimited" {

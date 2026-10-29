@@ -62,4 +62,12 @@ fn an_error_code_is_kept_short_and_plain() {
     let long = format!(r#"{{"ok":false,"error":"bad\u001b[31m{}"}}"#, "x".repeat(200));
     let SlackError::Api { code } = decode::<Answer>(&raw(200, &long)).unwrap_err() else { panic!() };
     assert!(code.len() <= 64 && code.chars().all(|c| c.is_ascii_graphic()), "{code}");
+    assert_eq!(code, "not_a_slack_code");
+    // A server's words or a token where the code goes never reach the log.
+    let words = r#"{"ok":false,"error":"see https://x.test/?a=1 lunch at noon"}"#;
+    assert_eq!(decode::<Answer>(&raw(200, words)).unwrap_err(), SlackError::Api { code: "not_a_slack_code".into() });
+    let token = format!(r#"{{"ok":false,"error":"{}"}}"#, ["xo", "xc-1-2-abc"].concat());
+    assert_eq!(decode::<Answer>(&raw(200, &token)).unwrap_err(), SlackError::Api { code: "not_a_slack_code".into() });
+    let plain = r#"{"ok":false,"error":"channel_not_found"}"#;
+    assert_eq!(decode::<Answer>(&raw(200, plain)).unwrap_err(), SlackError::Api { code: "channel_not_found".into() });
 }
