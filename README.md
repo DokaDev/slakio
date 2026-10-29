@@ -297,6 +297,7 @@ avatars = "initials"     # a person's initials on a colored chip, or "off"
 density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
 nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" (`Space v` switches)
 network = "on"           # "off": nothing is ever sent to Slack (also SLAKIO_NETWORK=off)
+live = "on"              # "off": no live updates connection (the rest of the network stays on)
 cache = "on"             # "off": nothing is kept on disk between runs (every start fetches)
 cache_messages = 200     # the most messages kept a conversation (10 to 10000)
 cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
@@ -317,6 +318,10 @@ left rail (later the top bar, now the view switcher), is ignored (the status lin
 switch for the Slack connection: with any of them set, slakio sends nothing at all and opens no
 live updates connection. Every request also goes through a request cap and an allowlist of
 read-only methods; each opening of the live updates connection counts against the cap.
+
+While the live updates connection is open, Slack may show you as active to your coworkers, as
+it does for its own apps, even when slakio sits idle. `live = "off"` opens no such connection
+(and so shows no live updates) while everything else keeps working.
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.

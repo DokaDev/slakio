@@ -108,6 +108,7 @@ fn main() -> ExitCode {
         test_addrs: test_addrs(),
         desktop: None,
         local,
+        live: cfg.live != "off",
     };
     let env = |k: &str| std::env::var(k).ok();
     // The background matters only to a theme with a light and a dark variant, and to the
@@ -242,6 +243,8 @@ struct Wiring {
     desktop: Option<Arc<slakio_auth::Found>>,
     /// The local cache, put in front of the Slack backend.
     local: store::Local,
+    /// Live updates (`live = "off"`: no socket opens; requests go on).
+    live: bool,
 }
 
 /// `SLAKIO_TEST_SLACK_ADDR`: the loopback addresses the tests' fake Slacks listen on, used
@@ -330,10 +333,10 @@ impl Wiring {
         connected.await.ok().flatten().ok_or(Label::SigninStoreRead)
     }
 
-    /// A workspace's backend, with its live updates.
+    /// A workspace's backend, with its live updates unless they are off.
     fn serve(&self, credentials: Credentials, endpoints: Endpoints) -> BackendHandle {
         let client = slakio_slack::Client::new(credentials, endpoints, Arc::clone(&self.governor));
-        slakio_slack::serve_live(client, slakio_slack::Realtime::default())
+        slakio_slack::serve_with(client, self.live.then(slakio_slack::Realtime::default))
     }
 
     /// One backend per workspace of `kept`, each with the cache in front of it (what to tell

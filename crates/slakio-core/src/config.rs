@@ -11,6 +11,7 @@
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
 //! nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" to the view shown
 //! network = "on"           # "off": nothing is sent to Slack at all (also SLAKIO_NETWORK=off)
+//! live = "on"              # "off": no live updates (their socket may show you as active)
 //! cache = "on"             # "off": nothing is kept on disk between runs (every start fetches)
 //! cache_messages = 200     # the most messages kept a conversation (10 to 10000)
 //! cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
@@ -55,6 +56,8 @@ pub struct Config {
     pub nav_rows: String,
     /// `off`: no request leaves the process ([`NETWORK`]); the environment can turn it off too.
     pub network: String,
+    /// `off`: no live updates' socket is opened, the rest of the network stays ([`LIVE`]).
+    pub live: String,
     /// `off`: nothing is read from or kept in the local cache ([`CACHE`]).
     pub cache: String,
     /// The most messages the cache keeps of a conversation ([`CACHE_MESSAGES`]).
@@ -80,6 +83,7 @@ impl Default for Config {
             density: "comfortable".to_string(),
             nav_rows: "expanded".to_string(),
             network: "on".to_string(),
+            live: "on".to_string(),
             cache: "on".to_string(),
             cache_messages: 200,
             cache_max_mb: 500,
@@ -127,6 +131,9 @@ pub const NAV_ROWS: &[&str] = &["expanded", "collapsed"];
 
 /// The values `network` takes.
 pub const NETWORK: &[&str] = &["on", "off"];
+
+/// The values `live` takes.
+pub const LIVE: &[&str] = &["on", "off"];
 
 /// The values `cache` takes.
 pub const CACHE: &[&str] = &["on", "off"];
@@ -201,6 +208,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "density" => cfg.density = one_of(item, DENSITIES).ok_or_else(|| bad(DENSITIES.join(", ")))?,
             "nav_rows" => cfg.nav_rows = one_of(item, NAV_ROWS).ok_or_else(|| bad(NAV_ROWS.join(", ")))?,
             "network" => cfg.network = one_of(item, NETWORK).ok_or_else(|| bad(NETWORK.join(", ")))?,
+            "live" => cfg.live = one_of(item, LIVE).ok_or_else(|| bad(LIVE.join(", ")))?,
             "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,
             "cache_messages" => {
                 cfg.cache_messages = within(item, &CACHE_MESSAGES).ok_or_else(|| bad(span(&CACHE_MESSAGES)))?

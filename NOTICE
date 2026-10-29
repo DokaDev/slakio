@@ -14,6 +14,8 @@ Also, ported into `crates/slakio-slack/src/live*`: `internal/slack/client.go`
 and `connection.go` (the live updates socket's address and parameters, its
 header set, the reconnect pause and silence limit) and `internal/slack/events.go`
 (which events and message subtypes are read, and their fields).
+Note: like Slack's own clients, an open live updates socket may show the
+user as active to coworkers; `live = "off"` in the config file disables it.
 
 MIT License
 

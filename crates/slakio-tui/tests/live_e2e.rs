@@ -2,7 +2,8 @@
 //! 120x40 and 80x24: once the workspace started its socket opens and the status line says so; a
 //! message posted shows in the open conversation, its edit replaces it, its deletion takes it
 //! away; a dropped socket is said, opens again by itself and the open conversation is read again
-//! (one page, nothing more); with the network off no socket ever opens. Unix only.
+//! (one page, nothing more); with the network off no socket ever opens, nor with live updates
+//! switched off (the rest works). Unix only.
 //!
 //! When `script` cannot start, each test prints a visible `SKIPPED` line and passes; with
 //! `SLAKIO_REQUIRE_PTY=1` (CI on Linux and macOS) it fails instead.
@@ -139,6 +140,21 @@ fn with_the_network_off_no_socket_ever_opens() {
     std::thread::sleep(Duration::from_secs(3));
     assert!(m.fake.upgrades().is_empty(), "no socket");
     assert!(m.fake.log().is_empty(), "no request");
+    assert!(!run.output().contains("Live updates"), "{}", run.output());
+    run.quit();
+}
+
+#[test]
+fn with_live_updates_off_no_socket_opens_and_the_rest_works() {
+    let m = Machine::new("live-off");
+    std::fs::write(m.dir.join("config.toml"), "icons = \"off\"\ncache = \"off\"\nlive = \"off\"\n").unwrap();
+    let Some(mut run) = m.start((120, 40), &[]) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    click(&mut run, "deploys");
+    wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+    run.wait_for("its messages", |t| t.contains("Message #deploys"));
+    std::thread::sleep(Duration::from_secs(2));
+    assert!(m.fake.upgrades().is_empty(), "no socket");
     assert!(!run.output().contains("Live updates"), "{}", run.output());
     run.quit();
 }

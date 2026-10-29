@@ -216,16 +216,24 @@ the client writes nothing on it but a pong for each ping and a close (frames rea
 hand, `live/socket.rs`: masked, no extension, a message at most 4 MiB, anything a server must not
 send fails it). Messages posted, changed and deleted and conversations read elsewhere
 (`*_marked`) are pushed to the UI as `Event::Live` (generation `Generation::PUSHED`, no request
-asked for it), a new author named by one lookup a socket; everything else on the socket is left
-unread. A socket that drops, closes or is silent for 60 seconds opens again after a pause doubling
-from 1 to 30 seconds, each a random half to all of it, reset once one stayed open 30 seconds; each
-opening goes past the kill switch and counts against the request cap (`Governor::dial`), and
-switching the network off ends the socket for good. The socket replays nothing it missed, so when
-one opens again the UI is told to catch up (`Connection::Connected { catch_up: true }`) and asks
+asked for it). They go out in order through a task of their own, so reading the socket (and
+answering its pings) never waits for a lookup: new authors of a conversation the UI read are
+looked up together (in the background share, each once a run, an id Slack does not name kept as
+such); those elsewhere are not looked up. Everything else on the socket is left unread. A socket
+that drops, closes or is silent for 60 seconds opens again after a pause doubling from 1 to 30
+seconds, each a random half to all of it, never shorter than a `429`'s `Retry-After`, reset once
+one said hello and stayed open 30 seconds; each opening goes past the kill switch and counts
+against the request cap and the workspace's part of the background share (`Governor::dial`), and
+switching the network off ends the socket for good; `live = "off"` opens none
+(`slakio_slack::serve_with`). The socket replays nothing it missed, so when one opens after it
+was said to be lost or not connected the UI is told to catch up (`Connection::Connected { catch_up: true }`) and asks
 for the newest page of each conversation open again (`Command::Catchup`, at most 8, one page each,
 `conversations.history` in the background share of the budget, never an open), each page the
 truth for the span it covers, the whole timeline replaced when it does not reach back to what was
-loaded (no gap is hidden). Each workspace's socket is its own; one that fails holds none back.
+loaded when it was asked (no gap is hidden), what came live meanwhile kept after it; one that
+fails is asked again by itself after a pause that doubles up to 15 minutes. Each workspace's
+socket is its own; one that fails holds none back, and the background share is split so it
+cannot spend another's either (`Limits::lane_background_*`).
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
 is refused before any request, and a newer page of the same conversation supersedes one in
