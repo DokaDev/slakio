@@ -13,6 +13,7 @@ mod scripted;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use scripted::Scripted;
 use slakio_core::backend::{Command, FailKind};
+use slakio_core::i18n::{I18n, Label, Lang};
 use slakio_tui::app::Effect;
 
 /// Run `:text` in the palette.
@@ -24,11 +25,29 @@ fn command(s: &mut Scripted, text: &str) {
     s.keys("enter");
 }
 
-fn switched(s: &mut Scripted) -> Vec<bool> {
+/// The switches the app asked the binary for (taken, not answered).
+fn asked(s: &mut Scripted) -> Vec<bool> {
     s.d.app
         .take_effects()
         .into_iter()
         .filter_map(|e| if let Effect::Network(on) = e { Some(on) } else { None })
+        .collect()
+}
+
+/// The switches the app asked for, each done by the binary as asked.
+fn switched(s: &mut Scripted) -> Vec<bool> {
+    let asked = asked(s);
+    for &on in &asked {
+        s.d.app.net_switched(on, true, s.d.now);
+    }
+    asked
+}
+
+/// The History requests held, by target.
+fn histories(s: &Scripted) -> Vec<slakio_core::model::Target> {
+    s.b.held
+        .iter()
+        .filter_map(|r| if let Command::History { target, .. } = &r.command { Some(target.clone()) } else { None })
         .collect()
 }
 
@@ -84,7 +103,35 @@ fn on_again_asks_again_for_the_workspace_that_could_not_start_meanwhile() {
     assert!(!s.b.held.iter().any(|r| r.command == Command::Boot));
     command(&mut s, "net on");
     s.pump();
+    assert!(!s.b.held.iter().any(|r| r.command == Command::Boot), "not before the network is on");
+    switched(&mut s);
+    s.pump();
     assert!(s.b.held.iter().any(|r| r.command == Command::Boot), "booted again: {:?}", s.b.held);
+}
+
+#[test]
+fn on_again_asks_again_for_every_pane_that_failed_meanwhile_not_only_the_one_shown() {
+    let mut s = Scripted::booted(true, None);
+    command(&mut s, "net off");
+    switched(&mut s);
+    s.d.list_cursor_on("backend");
+    s.keys("t");
+    s.d.list_cursor_on("general");
+    s.keys("t");
+    assert_eq!(histories(&s).len(), 2, "{:?}", s.b.held);
+    while let Some(i) = s.b.held.iter().position(|r| matches!(r.command, Command::History { .. })) {
+        s.b.fail(i, FailKind::Offline);
+    }
+    s.pump();
+    assert!(histories(&s).is_empty());
+    command(&mut s, "net on");
+    assert!(histories(&s).is_empty(), "not before the network is on");
+    switched(&mut s);
+    s.pump();
+    assert_eq!(histories(&s).len(), 1, "the pane shown asked again: {:?}", s.b.held);
+    // The other tab's pane asks again once shown, without a retry of its own.
+    s.keys("g T");
+    assert_eq!(histories(&s).len(), 2, "both panes asked again: {:?}", s.b.held);
 }
 
 #[test]
@@ -96,13 +143,30 @@ fn a_network_off_for_the_run_stays_off_and_says_why() {
     assert!(switched(&mut s).is_empty(), "never switched on");
     let line = s.d.status_line();
     assert!(line.contains("Network off for this run: started offline") && line.contains("Offline"), "{line}");
-    // Switched on, the binary could not (the run's request cap was reached): off for good.
-    let mut s = Scripted::booted(true, None);
+}
+
+#[test]
+fn on_refused_by_the_runs_cap_says_so_and_asks_nothing_again() {
+    let mut s = Scripted::connected(true);
+    s.pump();
+    command(&mut s, "net off");
+    switched(&mut s);
+    let i = s.b.held.iter().position(|r| r.command == Command::Boot).unwrap();
+    s.b.fail(i, FailKind::Offline);
+    s.pump();
     command(&mut s, "net on");
-    assert_eq!(switched(&mut s), [true]);
-    s.d.app.net_switched(false, s.d.now);
+    assert_eq!(asked(&mut s), [true]);
+    assert!(!s.d.status_line().contains("Network on"), "{}", s.d.status_line());
+    // The binary could not switch it on (the run's request cap was reached): off for good.
+    s.d.app.net_switched(true, false, s.d.now);
+    s.pump();
     let line = s.d.status_line();
-    assert!(line.contains("Request limit reached") && line.contains("Offline"), "{line}");
+    assert!(line.contains("Network off for this run: the request limit was") && line.contains("Offline"), "{line}");
+    assert!(!s.b.held.iter().any(|r| r.command == Command::Boot), "nothing asked again: {:?}", s.b.held);
+    // Asked again, it says the same, without asking the binary.
+    command(&mut s, "net on");
+    assert!(asked(&mut s).is_empty());
+    assert!(s.d.status_line().contains("the request limit was"), "{}", s.d.status_line());
 }
 
 #[test]
@@ -115,4 +179,10 @@ fn the_demo_has_no_net() {
     d.command("net off");
     assert!(!d.app.take_effects().iter().any(|e| matches!(e, Effect::Network(_))));
     assert!(!d.status_line().contains("Offline"), "{}", d.status_line());
+    let why = d.app.palette_error(d.app.size).join(" ");
+    assert_eq!(why, "The demo sends nothing: :net is not available in the demo");
+    let mut d = demo::Demo::with(120, 40, Lang::Ko, slakio_tui::app::Settings::default());
+    d.command("net on");
+    let why = d.app.palette_error(d.app.size).join(" ");
+    assert_eq!(why, I18n::new(Lang::Ko).label(Label::NetDemo).to_string());
 }

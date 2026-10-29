@@ -530,7 +530,7 @@ async fn run(
                 Effect::DesktopPick(teams) => {
                     signing_in = Some(tokio::spawn(wiring.clone().sign_in_desktop_all(teams)));
                 }
-                Effect::Network(on) => app.net_switched(wiring.governor.switch(on), Instant::now()),
+                Effect::Network(on) => app.net_switched(on, wiring.governor.switch(on), Instant::now()),
                 Effect::Save { key, value } => {
                     let result = match &saved.config {
                         Some(path) => config::set(path, key, &value),

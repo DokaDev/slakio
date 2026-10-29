@@ -372,6 +372,10 @@ impl App {
                     self.info(Msg::Label(Label::StatusNoTab), now);
                 }
             }
+            // The demo has no network to switch: said so, not as an unknown value.
+            None if self.backend.is_some_and(|c| c.demo) && setting_arg(&text, "net").is_some() => {
+                self.cmdline.error = Some(Msg::Label(Label::NetDemo));
+            }
             None => self.cmdline.error = Some(unknown(text)),
         }
     }

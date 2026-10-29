@@ -108,6 +108,8 @@ pub struct Net {
     pub off: bool,
     /// Off for the whole run (`--offline`, `SLAKIO_NETWORK=off`, `network = "off"`).
     pub locked: bool,
+    /// Off for the rest of the run because its request cap was reached (`locked` too).
+    pub capped: bool,
 }
 
 /// The names of one bot kept as people at most.

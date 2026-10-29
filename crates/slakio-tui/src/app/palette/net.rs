@@ -1,8 +1,9 @@
 //! `:net off` and `:net on`: the network switched off for a while and on again, for the rest of
 //! the run (the config is not changed). Off, nothing is sent: the binary switches the process's
 //! kill switch, which ends the requests in flight and every live updates socket, and the status
-//! line says `Offline` until it is on again. On, the sockets open again by themselves (and catch
-//! up), and the workspaces that could not boot meanwhile are asked for again. A network that was
+//! line says `Offline` until it is on again. On (once the binary did switch it on), the sockets
+//! open again by themselves (and catch up), and the workspaces that could not boot meanwhile and
+//! the pages that failed meanwhile, in every pane, are asked for again. A network that was
 //! off from the start (`--offline`, `SLAKIO_NETWORK=off`, `network = "off"`) stays off: that
 //! switch is the user's word for the whole run. The demo sends nothing anyway: it has no `:net`.
 
@@ -24,31 +25,39 @@ impl App {
         self.networked() && (self.model.net.off || self.model.net.locked)
     }
 
-    /// `:net on` (`on`) or `:net off`.
+    /// `:net on` (`on`) or `:net off`. Off is said at once; on only once the binary switched
+    /// it on ([`App::net_switched`]): the run's request cap may keep it off.
     pub fn set_net(&mut self, on: bool, now: Instant) {
         if !self.networked() {
             return;
         }
         if on && self.model.net.locked {
-            return self.warn(Msg::Label(Label::NetLocked), now);
+            let why = if self.model.net.capped { Label::NetCapped } else { Label::NetLocked };
+            return self.warn(Msg::Label(why), now);
         }
-        self.model.net.off = !on;
         self.effects.push(Effect::Network(on));
-        self.info(Msg::Label(if on { Label::NetOn } else { Label::NetOff }), now);
-        if on {
-            // What failed while it was off may load now: the workspaces, the page shown.
-            self.boot_failed_again();
-            self.work.retry();
+        if !on {
+            self.model.net.off = true;
+            self.info(Msg::Label(Label::NetOff), now);
         }
     }
 
-    /// The binary switched the network as asked (`ok`), or could not switch it on (the run's
-    /// request cap was reached): then it is off for good, and the status line says so.
-    pub fn net_switched(&mut self, ok: bool, now: Instant) {
-        if !ok {
-            self.model.net.locked = true;
-            self.warn(Msg::Label(Label::FailCapReached), now);
+    /// The binary switched the network as asked (`ok`), or could not switch it on (`on`; the
+    /// run's request cap was reached): then it is off for good, and the status line says so.
+    /// Switched on, what failed while it was off is asked for again: the workspaces that could
+    /// not boot and the page of every pane (not only the one shown).
+    pub fn net_switched(&mut self, on: bool, ok: bool, now: Instant) {
+        if !on {
+            return;
         }
+        if !ok {
+            (self.model.net.locked, self.model.net.capped) = (true, true);
+            return self.warn(Msg::Label(Label::NetCapped), now);
+        }
+        self.model.net.off = false;
+        self.info(Msg::Label(Label::NetOn), now);
+        self.boot_failed_again();
+        self.work.retry_all();
     }
 
     /// The palette's row of `:net <value>`.

@@ -62,6 +62,20 @@ impl Work {
         next.into_iter().chain(retry).chain(recatch).min()
     }
 
+    /// Ask again for the failed page of every pane that may be asked for again (the network is
+    /// on again): not only the active one's.
+    pub fn retry_all(&mut self) {
+        let shown: Vec<Target> = self.panes.values().map(|p| p.target.clone()).collect();
+        for target in shown {
+            let tl = self.timelines.entry(&target);
+            if tl.retryable() {
+                tl.queued = tl.older_failed().is_some();
+                (tl.failed, tl.retry_at) = (None, None);
+            }
+        }
+        self.fill();
+    }
+
     /// At `now`: the failed pages whose pause passed are asked for again, and one queued older
     /// page goes out when its turn came (the active pane's first). `true` when the screen
     /// changes (a failed row turns into a loading one).
