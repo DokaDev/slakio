@@ -22,7 +22,8 @@ and people in do not disturb `◐` (the status line shows it when it is you). It
 reads: it sends no message, reacts to nothing and marks nothing as read. Messages posted,
 edited and deleted show as they happen in the conversations and threads open, and the unread
 counts follow (live updates, over one connection per workspace that only receives; the status
-line says when it drops and comes back, and the conversations open are read again then);
+line says when it drops and comes back, and the conversations and threads open and the unread
+counts are read again then, also after the computer slept);
 reactions show when a conversation is opened again, and who is typing or online is not shown.
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
@@ -321,7 +322,8 @@ left rail (later the top bar, now the view switcher), is ignored (the status lin
 
 `network = "off"` (or `SLAKIO_NETWORK=off` in the environment, or `slakio --offline`) is a kill
 switch for the Slack connection: with any of them set, slakio sends nothing at all and opens no
-live updates connection. Every request also goes through a request cap and an allowlist of
+live updates connection. While it runs, `:net off` does the same until `:net on` (the status
+line shows `Offline` meanwhile); a run started with the network off stays off. Every request also goes through a request cap and an allowlist of
 read-only methods; each opening of the live updates connection counts against the cap.
 
 While the live updates connection is open, Slack may show you as active to your coworkers, as

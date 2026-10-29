@@ -181,7 +181,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
    (`users.list`, `conversations.list`), is on it.
 2. **Kill switch.** `SLAKIO_NETWORK=off` or `network = "off"` in the config file: nothing is
    sent. A value of the variable that is not `on` or `off` stops the program (exit code 2).
-   `Governor::stop` turns it off while running and ends what is in flight.
+   `Governor::stop` turns it off while running and ends what is in flight; `Governor::switch`
+   (the app's `:net off` / `:net on`, an `Effect::Network` the binary carries out) turns it off
+   and on again, never on when it was off from the start or the run's cap was reached.
 3. **Request cap**, for the whole process: 120 requests a minute, of which background work
    (counts, lookups) may use 90, so what the user waits for always has room; 1,500 an hour;
    and a safety ceiling of 10,000 for a run, after which all network stops until the program
@@ -223,12 +225,18 @@ such); those elsewhere are not looked up. Everything else on the socket is left 
 that drops, closes or is silent for 60 seconds opens again after a pause doubling from 1 to 30
 seconds, each a random half to all of it, never shorter than a `429`'s `Retry-After`, reset once
 one said hello and stayed open 30 seconds; each opening goes past the kill switch and counts
-against the request cap and the workspace's part of the background share (`Governor::dial`), and
-switching the network off ends the socket for good; `live = "off"` opens none
+against the request cap and the workspace's part of the background share (`Governor::dial`).
+Switching the network off ends the socket; switched on again, it opens again and catches up. A
+socket open while the machine slept (the wall clock ran more than 10 s ahead of the monotonic
+one between two checks 5 s apart, `Realtime::slept`) is taken as lost at once and opens again
+without the doubled pause. After a loss, Slack's unread counts are read again once
+(`client.counts`, background share, `Live::Counts`; a conversation not listed has none, as at a
+boot); `live = "off"` opens none
 (`slakio_slack::serve_with`). The socket replays nothing it missed, so when one opens after it
 was said to be lost or not connected the UI is told to catch up (`Connection::Connected { catch_up: true }`) and asks
 for the newest page of each conversation open again (`Command::Catchup`, at most 8, one page each,
-`conversations.history` in the background share of the budget, never an open), each page the
+`conversations.history` in the background share of the budget, never an open), then of each
+thread open (at most 4, not one read only in part: what is new in it through `conversations.replies`), each page the
 truth for the span it covers, the whole timeline replaced when it does not reach back to what was
 loaded when it was asked (no gap is hidden), what came live meanwhile kept after it; one that
 fails is asked again by itself after a pause that doubles up to 15 minutes. Each workspace's
