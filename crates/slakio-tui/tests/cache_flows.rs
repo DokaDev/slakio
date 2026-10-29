@@ -167,6 +167,15 @@ fn failing_tmutil(m: &Machine) {
 }
 
 #[test]
+fn every_run_gets_a_do_nothing_opener_by_default() {
+    let mut cmd = Command::new("slakio-test-never-started");
+    dirs(&mut cmd, &std::env::temp_dir());
+    let opener = cmd.get_envs().find(|(k, _)| *k == "SLAKIO_TEST_OPENER").and_then(|(_, v)| v);
+    assert_eq!(opener, Some(std::ffi::OsStr::new(pty::SAFE_OPENER)));
+    assert!(pty::SAFE_OPENER == "/usr/bin/false" || cfg!(windows));
+}
+
+#[test]
 fn a_warm_start_with_the_network_off_draws_from_the_cache_and_asks_slack_nothing() {
     let m = Machine::new("offline");
     let Some(words) = first_run(&m) else { return };

@@ -58,6 +58,19 @@ fn command(s: &mut Scripted, line: &str) {
     s.keys("enter");
 }
 
+#[test]
+fn open_zero_is_no_link_and_opens_nothing() {
+    let mut s = shown(&["see <https://example.com/a> now"], 80, 24, Lang::En);
+    command(&mut s, "open 0");
+    assert!(opened(&mut s).is_empty());
+    assert!(s.d.app.question().is_none());
+    let none = s.d.app.i18n.label(Label::OpenNone).to_string();
+    assert!(s.d.status_line().contains(&none), "{}", s.d.status_line());
+    // The first link is still link 1.
+    command(&mut s, "open 1");
+    assert_eq!(opened(&mut s), ["https://example.com/a"]);
+}
+
 const SIZES: [(Lang, u16, u16); 3] = [(Lang::En, 120, 40), (Lang::En, 80, 24), (Lang::Ko, 80, 24)];
 
 #[test]
@@ -142,6 +155,21 @@ fn only_web_addresses_open_the_others_are_refused_with_a_reason() {
     }
 }
 
+/// The text of the confirmation dialog alone: its rows between the box's corners, so the message
+/// list behind it is left out.
+fn dialog_rows(screen: &str, title: &str) -> String {
+    let lines: Vec<&str> = screen.lines().collect();
+    let top = lines.iter().position(|l| l.contains(&format!("╭ {title}"))).expect("the dialog");
+    let left = lines[top].chars().position(|c| c == '╭').unwrap();
+    let bottom = lines.iter().skip(top).position(|l| l.chars().nth(left) == Some('╰')).expect("its bottom") + top;
+    // From the box's left border to its right one (a wide character moves the corners).
+    let rows = lines[top + 1..bottom].iter().map(|l| {
+        let inside: String = l.chars().skip(left + 1).collect();
+        inside.trim_end().trim_end_matches('│').trim_end().trim_end_matches('│').trim().to_string()
+    });
+    rows.collect::<Vec<_>>().join("\n")
+}
+
 /// A host of about 200 characters that starts like a trusted one and ends with another's.
 fn long_host() -> String {
     format!("docs.google.com.{}.{}.{}.evil.test", "x".repeat(60), "y".repeat(60), "z".repeat(52))
@@ -158,11 +186,12 @@ fn a_long_host_is_shown_first_and_cut_from_its_start_so_its_end_stays() {
         let mut s = shown(&[text.as_str()], w, h, lang);
         s.keys("o");
         let screen = s.d.screen();
-        assert!(screen.contains("zz.evil.test"), "{at}: the real host's end: {screen}");
-        // The real host comes before what the link's text says.
-        let (host_at, said_at) =
-            (screen.find("evil.test").unwrap(), screen.find("docs.google.com/x").unwrap_or(usize::MAX));
-        assert!(host_at < said_at, "{at}: {screen}");
+        let dialog = dialog_rows(&screen, &s.d.app.i18n.label(Label::DialogOpenTitle));
+        assert!(dialog.contains("zz.evil.test"), "{at}: the real host's end: {dialog}");
+        assert!(!dialog.contains("docs.google.com.x"), "{at}: the host's start: {dialog}");
+        // The real host comes before what the link's text says, which is there.
+        let (host_at, said_at) = (dialog.find("evil.test").unwrap(), dialog.find("docs.google.com/x"));
+        assert!(said_at.is_some_and(|said| host_at < said), "{at}: {dialog}");
         s.keys("n");
         // Without text of its own, the status line names the host's end.
         command(&mut s, "open 2");

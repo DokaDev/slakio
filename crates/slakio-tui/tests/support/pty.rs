@@ -17,9 +17,14 @@ pub const REQUIRE_PTY: &str = "SLAKIO_REQUIRE_PTY";
 pub const TOKEN: &str = concat!("xo", "xc-1-2-TESTTOKEN");
 pub const COOKIE: &str = concat!("xo", "xd-TESTCOOKIE");
 
+/// The opener every run gets unless a test sets its own: a program that does nothing, so no
+/// test can start a real browser.
+pub const SAFE_OPENER: &str = if cfg!(windows) { "hostname.exe" } else { "/usr/bin/false" };
+
 /// Every directory the binary could read or write inside `dir`; credentials in memory.
 pub fn dirs(cmd: &mut Command, dir: &Path) {
     cmd.env("SLAKIO_SECRET_STORE", "memory")
+        .env("SLAKIO_TEST_OPENER", SAFE_OPENER)
         .env("XDG_CONFIG_HOME", dir.join("config"))
         .env("XDG_DATA_HOME", dir.join("data"))
         .env("XDG_STATE_HOME", dir.join("state"))

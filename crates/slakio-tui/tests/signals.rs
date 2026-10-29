@@ -106,6 +106,7 @@ fn start(dir: &Path, env: &[(&str, &str)]) -> Option<Child> {
         cmd.args(["-q", "-F"]).arg(&out).arg(bin).arg("--config").arg(&config);
     }
     cmd.env("SLAKIO_SECRET_STORE", "memory")
+        .env("SLAKIO_TEST_OPENER", "/usr/bin/false")
         .env("XDG_CONFIG_HOME", dir.join("config"))
         .env("XDG_DATA_HOME", dir.join("data"))
         .env("XDG_STATE_HOME", dir.join("state"))

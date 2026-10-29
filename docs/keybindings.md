@@ -168,7 +168,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `i` | Write in the composer | `pane.insert` |
 | `a` | Write in the composer | `pane.insert` |
 | `y` | Copy the selected messages | `pane.copy` |
-| `o` | Open a message's link in the browser (:open 2 its second, :open <address>) | `pane.open_link` |
+| `o` | Open a message's link in the browser (:open 2 its second, :open &lt;address&gt;) | `pane.open_link` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
 | `Esc` | One step out (VISUAL, selection, thread, list) | `pane.escape` |
@@ -294,7 +294,7 @@ Type `:` and the command, then `Enter`.
 | `:todos` | `:later` | Show To-dos |
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
-| `:open` |  | Open a message's link in the browser (:open 2 its second, :open <address>) |
+| `:open` |  | Open a message's link in the browser (:open 2 its second, :open &lt;address&gt;) |
 | `:q` | `:quit` `:close` | Close the pane, then its tab |
 | `:back` |  | Back to the conversation before |
 | `:forward` |  | Forward again |

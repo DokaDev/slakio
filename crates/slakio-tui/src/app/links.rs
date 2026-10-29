@@ -70,7 +70,7 @@ impl App {
 
     /// `o` (`:open`): open link `n` (from 1) of the selected message.
     pub(super) fn open_link(&mut self, n: usize, now: Instant) {
-        match self.selected_links().into_iter().nth(n.saturating_sub(1)) {
+        match n.checked_sub(1).and_then(|i| self.selected_links().into_iter().nth(i)) {
             Some((url, label)) => self.open_address(&url, label.as_deref(), now),
             None => self.info(Msg::Label(Label::OpenNone), now),
         }

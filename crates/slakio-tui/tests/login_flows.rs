@@ -31,6 +31,7 @@ fn slakio(dir: &Path, fake: Option<String>, args: &[&str], stdin: &str) -> Outpu
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_slakio"));
     cmd.args(args)
         .env("SLAKIO_SECRET_STORE", "memory")
+        .env("SLAKIO_TEST_OPENER", if cfg!(windows) { "hostname.exe" } else { "/usr/bin/false" })
         .env("XDG_CONFIG_HOME", dir.join("config"))
         .env("XDG_DATA_HOME", dir.join("data"))
         .env("XDG_STATE_HOME", dir.join("state"))

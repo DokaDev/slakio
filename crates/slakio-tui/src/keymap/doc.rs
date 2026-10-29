@@ -5,6 +5,11 @@ use super::{Ctx, Keymap, check, keys, parse_keys};
 use crate::action::REGISTRY;
 use slakio_core::i18n::Lang;
 
+/// `text` as markdown table text: `<` and `>` would read as an HTML tag.
+fn md(text: &str) -> String {
+    text.replace('<', "&lt;").replace('>', "&gt;")
+}
+
 /// The whole document (LF line endings).
 pub fn render() -> String {
     // With the kitty keyboard protocol: every default binding (`Ctrl+I` is bound only then, and
@@ -36,7 +41,7 @@ pub fn render() -> String {
         s.push_str("| Keys | Action | Id |\n|---|---|---|\n");
         for (k, action) in km.bindings(ctx) {
             let spec = crate::action::spec(action);
-            s.push_str(&format!("| `{}` | {} | `{}` |\n", keys::label(k), spec.label.text(Lang::En), spec.id));
+            s.push_str(&format!("| `{}` | {} | `{}` |\n", keys::label(k), md(spec.label.text(Lang::En)), spec.id));
         }
     }
     s.push_str(
@@ -44,7 +49,7 @@ pub fn render() -> String {
     );
     for spec in REGISTRY.iter().filter(|s| !s.commands.is_empty()) {
         let also = spec.commands[1..].iter().map(|c| format!("`:{c}`")).collect::<Vec<_>>().join(" ");
-        s.push_str(&format!("| `:{}` | {also} | {} |\n", spec.commands[0], spec.label.text(Lang::En)));
+        s.push_str(&format!("| `:{}` | {also} | {} |\n", spec.commands[0], md(spec.label.text(Lang::En))));
     }
     let fragile: Vec<_> = km.all().iter().filter(|b| b.keys.iter().any(|k| check::fragile(*k))).collect();
     if !fragile.is_empty() {
@@ -71,7 +76,7 @@ pub fn render() -> String {
                 } else {
                     ""
                 };
-            s.push_str(&format!("| `{}`{only} | {} | {also} |\n", keys::label(&b.keys), spec.label.text(Lang::En)));
+            s.push_str(&format!("| `{}`{only} | {} | {also} |\n", keys::label(&b.keys), md(spec.label.text(Lang::En))));
         }
     }
     s
