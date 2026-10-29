@@ -146,15 +146,27 @@ impl App {
         match here {
             Some((ws, Some(kind))) if kind.retryable() => self.boot_again(ws),
             // Asking again cannot help: say why once more.
-            Some((_, Some(kind))) => self.warn(Msg::Label(failure(&kind)), now),
+            Some((ws, Some(kind))) => self.say_failed(ws.or_else(|| self.shell.current_id(&self.model)), &kind, now),
             // An answer to the older ask, should it still come, is dropped.
             Some((ws, None)) if loading => self.boot_again(ws),
             _ if self.work.retry() => {}
             // The page cannot be asked for again (now): say why once more.
-            _ => match self.work.active_failed().map(failure) {
-                Some(why) => self.warn(Msg::Label(why), now),
+            _ => match self.work.active_failed().cloned() {
+                Some(kind) => {
+                    let pane = self.work.active().and_then(|id| self.work.pane(id));
+                    self.say_failed(pane.map(|p| p.target.workspace().clone()), &kind, now);
+                }
                 None => self.info(Msg::Label(Label::StatusNothingToRetry), now),
             },
+        }
+    }
+
+    /// Why asking again cannot help, said once more: for a workspace Slack signed out while the
+    /// app ran, that `:login` signs in again (the words for a refusal at the start stay).
+    fn say_failed(&mut self, ws: Option<WorkspaceId>, kind: &FailKind, now: Instant) {
+        match ws.filter(|ws| *kind == FailKind::Auth && self.signed_out_in(ws)) {
+            Some(ws) => self.say_signed_out(&ws, now),
+            None => self.warn(Msg::Label(failure(kind)), now),
         }
     }
 

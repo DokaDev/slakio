@@ -123,13 +123,21 @@ fn render_parts(
     mid: impl FnOnce(&mut Frame, Rect),
     bottom: Vec<Line<'static>>,
 ) {
-    use crate::action::{Action, AppAction, HelpAction};
+    use crate::action::{Action, AppAction, HelpAction, SignInAction};
     use crate::keymap::Ctx;
-    let keys = Content::keys(
+    // Over the app, `Esc` goes back to it (not while a sign-in is being checked).
+    let checking = matches!(app.sign_in(), Some(SignIn::Checking | SignIn::DesktopChecking(_)));
+    let back = if app.backend.is_some() && !checking {
+        &[(Action::SignIn(SignInAction::Cancel), Label::SigninBack)][..]
+    } else {
+        &[]
+    };
+    let mut keys = Content::keys(app, Ctx::SignIn, back);
+    keys.extend(Content::keys(
         app,
         Ctx::Root,
         &[(Action::App(AppAction::Quit), Label::EmptyQuit), (Action::Help(HelpAction::Open), Label::EmptyHelp)],
-    );
+    ));
     let keys = Content { headline: None, sentence: None, keys, tip: None };
     let (top_h, bottom_h) = (top.len() as u16, bottom.len() as u16);
     let h = top_h + mid_h + bottom_h;

@@ -390,8 +390,8 @@
 "pane.new_below" = "↓ 새 메시지 {count}개"
 "fail.workspace" = "{workspace}: {why}"
 "fail.workspace_auth" = "{workspace}: 로그아웃됨, slakio login으로 로그인"
-"signed_out" = "Slack에서 로그아웃됨: :login 필요"
-"signed_out_why" = "로그아웃됨, :login 필요"
+"signed_out" = "로그아웃됨: :login 필요"
+"signed_out_why" = ":login 필요"
 "status.signed_out" = "로그아웃됨, :login"
 "retry.hint" = "{keys} 다시 시도"
 "hint.todo_done" = "완료"
@@ -412,6 +412,7 @@
 
 # Signing in.
 "signin.title" = "Slack에 로그인"
+"signin.back" = "앱으로 돌아가기"
 "signin.step1" = "1. 브라우저에서 워크스페이스를 열고 평소처럼 로그인하세요."
 "signin.step2" = "2. 개발자 도구(Cmd+Option+I)를 열어 Network 탭을 고르고 페이지를 새로 고치세요."
 "signin.step3" = "3. 주소에 /api/가 들어간 요청 아무거나 오른쪽 클릭해 Copy > Copy as cURL을 고르세요."

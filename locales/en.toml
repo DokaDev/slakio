@@ -421,8 +421,8 @@
 "fail.workspace_auth" = "{workspace}: signed out, run slakio login"
 # A workspace Slack signed out while the app ran: the notice (alone, and after its name with
 # several), and the status line's steady mark until it is signed in again.
-"signed_out" = "Signed out by Slack: use :login"
-"signed_out_why" = "signed out, use :login"
+"signed_out" = "Signed out: use :login"
+"signed_out_why" = "use :login"
 "status.signed_out" = "signed out, :login"
 "retry.hint" = "{keys} retry"
 "hint.todo_done" = "done"
@@ -444,6 +444,7 @@
 # Signing in: the screen without a workspace (`slakio`, `slakio login`), and the command line's
 # `slakio login` / `slakio logout`.
 "signin.title" = "Sign in to Slack"
+"signin.back" = "Back to the app"
 "signin.step1" = "1. Open your workspace in a browser and sign in as usual."
 "signin.step2" = "2. Open the developer tools (Cmd+Option+I), choose the Network tab and reload the page."
 "signin.step3" = "3. Right-click any request whose address has /api/ and choose Copy > Copy as cURL."

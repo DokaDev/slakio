@@ -223,13 +223,18 @@ impl App {
     /// was, nothing more is asked of it (its backend sends nothing more), and the status line
     /// says so and what to do, then keeps a mark of it.
     pub(super) fn signed_out(&mut self, ws: WorkspaceId, now: Instant) {
-        let several = self.boots.len() > 1;
         let Some(b) = self.boots.iter_mut().find(|b| b.workspace.as_ref().is_none_or(|w| *w == ws)) else { return };
         if std::mem::replace(&mut b.signed_out, true) {
             return;
         }
         self.forget_live(&ws, now);
-        match self.model.workspace(&ws).filter(|_| several).cloned() {
+        self.say_signed_out(&ws, now);
+    }
+
+    /// The status line says Slack signed `ws` out and that `:login` signs in again (with several
+    /// workspaces, whose).
+    pub(super) fn say_signed_out(&mut self, ws: &WorkspaceId, now: Instant) {
+        match self.model.workspace(ws).filter(|_| self.boots.len() > 1).cloned() {
             Some(w) => {
                 let why = self.i18n.label(Label::SignedOutWhy).to_string();
                 let msg = Msg::FailWorkspace { workspace: w.name.line().into_string(), why };
@@ -256,10 +261,15 @@ impl App {
         if !self.networked() || self.checking_sign_in() {
             return;
         }
-        let refused = |ws: &WorkspaceId| self.signed_out_in(ws) || self.boot_failed_in(ws) == Some(&FailKind::Auth);
-        let shown = self.shell.current_id(&self.model).filter(|ws| refused(ws));
-        let team = shown.or_else(|| self.model.workspaces().iter().map(|w| w.id.clone()).find(|ws| refused(ws)));
+        let shown = self.shell.current_id(&self.model).filter(|ws| self.refused(ws));
+        let team = shown.or_else(|| self.model.workspaces().iter().map(|w| w.id.clone()).find(|ws| self.refused(ws)));
         self.effects.push(Effect::SignInAgain(team.map(|t| t.as_str().to_string())));
+    }
+
+    /// Slack does not accept the sign-in of `ws`: signed out while the app ran, or refused at
+    /// its start.
+    fn refused(&self, ws: &WorkspaceId) -> bool {
+        self.signed_out_in(ws) || self.boot_failed_in(ws) == Some(&FailKind::Auth)
     }
 
     /// A sign-in is being checked (pasted, or picked from the desktop app's).
