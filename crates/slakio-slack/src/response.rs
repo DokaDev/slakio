@@ -56,10 +56,13 @@ fn api_error(code: String) -> SlackError {
     }
 }
 
-/// A `Retry-After` of whole seconds; `None` when absent or in another form (unknown is not a
-/// default).
+/// The longest pause a `Retry-After` is taken for: a larger one is read as this.
+pub(crate) const RETRY_AFTER_MAX: Duration = Duration::from_secs(60 * 60);
+
+/// A `Retry-After` of whole seconds, at most [`RETRY_AFTER_MAX`]; `None` when absent or in
+/// another form (unknown is not a default).
 pub(crate) fn retry_after(header: Option<&str>) -> Option<Duration> {
-    header?.trim().parse::<u64>().ok().map(Duration::from_secs)
+    header?.trim().parse::<u64>().ok().map(|s| Duration::from_secs(s).min(RETRY_AFTER_MAX))
 }
 
 #[cfg(test)]

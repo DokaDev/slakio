@@ -48,6 +48,16 @@ fn a_429_carries_retry_after() {
 }
 
 #[test]
+fn a_retry_after_longer_than_an_hour_is_read_as_an_hour() {
+    let hour = Some(Duration::from_secs(3600));
+    assert_eq!(retry_after(Some("3600")), hour);
+    assert_eq!(retry_after(Some("3601")), hour);
+    assert_eq!(retry_after(Some("18446744073709551615")), hour);
+    let r = Raw { status: 429, retry_after: Some("99999999".into()), body: Vec::new() };
+    assert_eq!(decode::<Answer>(&r).unwrap_err(), SlackError::RateLimited { retry_after: hour });
+}
+
+#[test]
 fn an_error_code_is_kept_short_and_plain() {
     let long = format!(r#"{{"ok":false,"error":"bad\u001b[31m{}"}}"#, "x".repeat(200));
     let SlackError::Api { code } = decode::<Answer>(&raw(200, &long)).unwrap_err() else { panic!() };
