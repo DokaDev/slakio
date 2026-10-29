@@ -61,8 +61,12 @@ pub fn serve(client: Client) -> BackendHandle {
 pub fn serve_live(client: Client, realtime: crate::live::Realtime) -> BackendHandle {
     let (handle, end) = BackendHandle::pair(CAPABILITIES, BOUND);
     let (client, session) = (Arc::new(client), Arc::<Session>::default());
-    tokio::spawn(crate::live::run(Arc::clone(&client), Arc::clone(&session), end.tx.clone(), realtime));
-    tokio::spawn(run(client, end, session));
+    let live = tokio::spawn(crate::live::run(Arc::clone(&client), Arc::clone(&session), end.tx.clone(), realtime));
+    // Once the UI drops the handle (or puts another sign-in's in its place), the socket goes too.
+    tokio::spawn(async move {
+        run(client, end, session).await;
+        live.abort();
+    });
     handle
 }
 

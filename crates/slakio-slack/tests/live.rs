@@ -775,3 +775,56 @@ fn a_network_off_from_the_start_is_never_switched_on() {
         assert!(r.fake.upgrades().is_empty() && r.fake.log().is_empty());
     });
 }
+
+/// What `command` failed with.
+async fn failed(r: &mut Run, command: Command) -> FailKind {
+    let Event::Failed { kind, .. } = r.ask(command).await else { panic!("not a failure") };
+    kind
+}
+
+#[test]
+fn a_request_slack_no_longer_signs_in_closes_the_socket_and_nothing_more_is_sent() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        // Signed out elsewhere; the socket stays open, the next request is refused.
+        r.fake.revoke(TOKEN, false);
+        let c = r.channel("general");
+        let target = Target::Conversation {
+            workspace: r.ws().id.clone(),
+            conversation: slakio_core::model::ConversationId::new(&c),
+        };
+        let history = Command::History { target: target.clone(), before: None, limit: 28 };
+        assert_eq!(failed(&mut r, history.clone()).await, FailKind::Auth);
+        assert!(matches!(r.live().await, Live::Connection { state: Connection::SignedOut, .. }));
+        until("the socket closed", || r.fake.open_sockets() == 0).await;
+        let (sent, opened) = (r.fake.log().len(), r.fake.upgrades().len());
+        // Every later request fails the same way without leaving the machine; no socket opens.
+        assert_eq!(failed(&mut r, Command::Boot).await, FailKind::Auth);
+        assert_eq!(failed(&mut r, history).await, FailKind::Auth);
+        assert_eq!(failed(&mut r, Command::Catchup { target, limit: 200 }).await, FailKind::Auth);
+        r.quiet(Duration::from_millis(600)).await;
+        assert_eq!((r.fake.log().len(), r.fake.upgrades().len()), (sent, opened), "nothing more went out");
+    });
+}
+
+#[test]
+fn a_socket_closed_and_refused_for_its_sign_in_is_said_once_and_never_opened_again() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let sent = r.fake.log().len();
+        // Slack ends the session's socket; opening it again is refused for the sign-in.
+        r.fake.revoke(TOKEN, true);
+        r.lost().await;
+        assert!(matches!(r.live().await, Live::Connection { state: Connection::SignedOut, .. }));
+        assert_eq!(r.fake.upgrades().len(), 2, "one opening again, refused");
+        r.quiet(Duration::from_millis(600)).await;
+        assert_eq!(r.fake.upgrades().len(), 2, "never opened again");
+        // Requests are refused without going out (the counts after the loss never went either).
+        assert_eq!(failed(&mut r, Command::Boot).await, FailKind::Auth);
+        assert_eq!(r.fake.log().len(), sent, "{:?}", r.fake.methods());
+    });
+}

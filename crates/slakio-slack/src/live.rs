@@ -17,6 +17,8 @@
 //! opening passes the governor: with the network off nothing opens, and switching it off ends the
 //! socket (switched on again, it opens again and asks to catch up); an opening counts against the request cap, and on the workspace's own part of the
 //! background share (while that has no room, the UI is told so: `Held`, not just lost). A workspace's socket is its own: one that fails holds no other back.
+//! Once Slack no longer accepts the workspace's sign-in (a request or the socket's opening said
+//! so), the socket closes, the UI is told `SignedOut` once, and nothing opens again.
 //!
 //! Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the pause doubling from 1 s
 //! to 30 s, the 60 s silence limit, and that the socket replays nothing.
@@ -123,6 +125,8 @@ enum End {
     /// Slack asked to wait before the next attempt; `held`: it was not opened because the
     /// workspace's share of the request budget is used up; `woke`: the machine slept.
     Lost { hello: Option<Instant>, wait: Option<Duration>, held: bool, woke: bool },
+    /// Slack no longer accepts the sign-in: none opens again.
+    SignedOut,
 }
 
 /// An update on its way to the UI, and the author whose name it waits for, if one.
@@ -142,6 +146,7 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
         tokio::select! {
             () = ctx.booted.notified() => {}
             () = tx.closed() => return,
+            () = client.signed_out() => return,
         }
     };
     // Updates go out in order through a task of their own, which looks up new authors: reading
@@ -160,6 +165,10 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
         let ended = connection(&client, &ctx, &ws, &out, settings, told.is_some() || off).await;
         let (hello, wait, held, woke) = match ended {
             End::Stop => return,
+            End::SignedOut => {
+                let _ = out.send((Live::Connection { workspace: ws, state: Connection::SignedOut }, None)).await;
+                return;
+            }
             End::Off => {
                 off = true;
                 tokio::select! {
@@ -200,6 +209,8 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
             () = tokio::time::sleep(pause) => {}
             () = client.governor().stopped() => off = true,
             () = out.closed() => return,
+            // Told at the next opening, which sends nothing.
+            () = client.signed_out() => continue,
         }
         if off {
             tokio::select! {
@@ -270,6 +281,7 @@ async fn open(client: &Client) -> Result<Socket<crate::http::Upgraded>, End> {
     match opened {
         Ok(io) => Ok(Socket::new(io)),
         Err(crate::SlackError::Offline { .. }) if !client.governor().is_on() => Err(End::Off),
+        Err(crate::SlackError::Auth { .. }) => Err(End::SignedOut),
         // Slack asked to slow down: not before it said (its default pause when it did not).
         Err(crate::SlackError::RateLimited { retry_after }) => {
             let wait = retry_after.unwrap_or(crate::governor::DEFAULT_PAUSE);
@@ -317,6 +329,11 @@ async fn connection(
             biased;
             () = client.governor().stopped() => return End::Off,
             () = out.closed() => return End::Stop,
+            // A request learnt that Slack no longer takes the sign-in: the socket closes too.
+            () = client.signed_out() => {
+                let _ = tokio::time::timeout(CLOSE_WAIT, socket.close()).await;
+                return End::SignedOut;
+            }
             next = tokio::time::timeout(settings.silence, socket.next()) => next,
             // The machine slept: whatever the socket was, it is gone by now.
             () = &mut wake => return close_after_wake(client, &mut socket, hello).await,

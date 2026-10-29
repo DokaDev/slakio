@@ -142,7 +142,6 @@ fn slacks_errors_reach_the_ui_as_failure_kinds() {
     rt().block_on(async {
         let (fake, client, _) = setup(Limits::default(), true).await;
         let cases = [
-            (Fault::Api("invalid_auth".into()), FailKind::Auth),
             (Fault::Api("channel_not_found".into()), FailKind::Api { code: "channel_not_found".into() }),
             (Fault::Status { status: 502, retry_after: None }, FailKind::Network),
             (Fault::Malformed, FailKind::Network),
@@ -157,6 +156,14 @@ fn slacks_errors_reach_the_ui_as_failure_kinds() {
             let e = client.call_named("client.counts", &[], Priority::User).await.unwrap_err();
             assert_eq!(e.kind(), kind, "{fault:?}");
         }
+        // A sign-in Slack refuses: said as such, and the client sends nothing more after it.
+        let (fake, client, _) = setup(Limits::default(), true).await;
+        fake.fail_next("client.counts", Fault::Api("invalid_auth".into()));
+        let e = client.call_named("client.counts", &[], Priority::User).await.unwrap_err();
+        assert_eq!(e.kind(), FailKind::Auth);
+        let e = client.call_named("client.counts", &[], Priority::User).await.unwrap_err();
+        assert_eq!(e.kind(), FailKind::Auth);
+        assert_eq!(fake.log().len(), 1, "nothing sent after the refusal");
     });
 }
 

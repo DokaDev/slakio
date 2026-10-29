@@ -211,6 +211,9 @@ pub enum Connection {
     /// They stopped and cannot connect for now: the workspace's share of the request budget is
     /// used up. The backend tries again by itself once there is room.
     Held,
+    /// Slack no longer accepts the workspace's sign-in: nothing more is sent for it, and the
+    /// backend never connects again (a new sign-in starts a new backend).
+    SignedOut,
 }
 
 impl FailKind {

@@ -53,13 +53,19 @@ fn accept(key: &str) -> String {
 /// Serve the socket asked for by `logged` on `stream`.
 pub(crate) async fn serve(mut stream: TcpStream, logged: Logged, shared: Arc<Mutex<Shared>>) {
     let header = |name: &str| logged.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.clone());
-    let (refused, hello, retry_after) = {
+    let (revoked, refused, hello, retry_after) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.upgrades.push(logged.clone());
+        let revoked = s.revoked(&logged);
         let refused = s.refuse_sockets > 0;
         s.refuse_sockets = s.refuse_sockets.saturating_sub(1);
-        (refused, s.hello, s.refuse_retry_after.clone())
+        (revoked, refused, s.hello, s.refuse_retry_after.clone())
     };
+    if revoked {
+        let head = "HTTP/1.1 401 FAKE\r\ncontent-length: 0\r\nconnection: close\r\n\r\n";
+        let _ = stream.write_all(head.as_bytes()).await;
+        return;
+    }
     let Some(key) = header("sec-websocket-key").filter(|_| !refused) else {
         let status = match retry_after {
             Some(after) => format!("429 FAKE\r\nretry-after: {after}"),

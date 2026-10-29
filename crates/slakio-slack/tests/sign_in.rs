@@ -78,9 +78,14 @@ fn a_sign_in_that_slack_refuses_is_an_auth_failure_and_says_nothing_secret() {
         assert_eq!(e.kind(), FailKind::Auth);
         let said = format!("{e:?} {}", e.detail());
         assert!(!said.contains(TOKEN) && !said.contains(COOKIE), "{said}");
+        assert_eq!(fake.methods().len(), 1, "never retried on its own");
+        // Checked again with the same client: refused at once, nothing sent.
+        assert_eq!(login::check(&client).await.unwrap_err().kind(), FailKind::Auth);
+        assert_eq!(fake.methods().len(), 1);
+        let (fake, client) = setup().await;
         fake.fail_next("client.userBoot", Fault::Status { status: 503, retry_after: None });
         assert_eq!(login::check(&client).await.unwrap_err().kind(), FailKind::Network);
-        assert_eq!(fake.methods().len(), 2, "never retried on its own");
+        assert_eq!(fake.methods().len(), 1, "never retried on its own");
     });
 }
 

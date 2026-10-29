@@ -9,6 +9,10 @@
 //!
 //! It also opens the live updates' socket ([`FakeSlack::push`] and the controls beside it); its
 //! opening requests are kept apart from the API's ([`FakeSlack::upgrades`]).
+//!
+//! A session token can be revoked ([`FakeSlack::revoke`]), as when the user signs out of the
+//! workspace elsewhere: every request carrying it is answered `invalid_auth` (and still logged),
+//! a socket opened with it is refused `401`.
 
 mod shapes;
 mod socket;
@@ -84,6 +88,15 @@ struct Shared {
     /// A socket says hello when it opens (the default).
     hello: bool,
     client_frames: Vec<ClientFrame>,
+    /// Session tokens no longer accepted.
+    revoked: Vec<String>,
+}
+
+impl Shared {
+    /// `logged` carries a revoked token (in its body or its address).
+    fn revoked(&self, logged: &Logged) -> bool {
+        self.revoked.iter().any(|t| logged.body.contains(t.as_str()) || logged.query.contains(t.as_str()))
+    }
 }
 
 /// A running fake Slack; it stops when dropped.
@@ -178,6 +191,16 @@ impl FakeSlack {
         self.to_sockets(&socket::Push::Drop);
     }
 
+    /// Accept `token` no more: requests carrying it are answered `invalid_auth`, sockets opened
+    /// with it are refused `401`. With `close`, the open sockets are closed too (Slack ends the
+    /// session's socket); without, they stay open until the client closes them.
+    pub fn revoke(&self, token: &str, close: bool) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).revoked.push(token.to_string());
+        if close {
+            self.close_sockets();
+        }
+    }
+
     /// Refuse the next `n` openings (`503`).
     pub fn refuse_sockets(&self, n: usize) {
         let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -223,7 +246,8 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     let (fault, delay) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());
-        (s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front), s.delay)
+        let revoked = s.revoked(&logged).then(|| Fault::Api("invalid_auth".to_string()));
+        (revoked.or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front)), s.delay)
     };
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;

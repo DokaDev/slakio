@@ -128,6 +128,10 @@ where
         let after = answer.headers().get("retry-after").and_then(|v| v.to_str().ok());
         return Err(SlackError::RateLimited { retry_after: crate::response::retry_after(after) });
     }
+    // Slack no longer takes the sign-in the socket was asked with.
+    if answer.status() == hyper::StatusCode::UNAUTHORIZED {
+        return Err(SlackError::Auth { code: "the socket was refused (401)".to_string() });
+    }
     if !agreed {
         return Err(SlackError::Network { detail: format!("the socket was refused ({})", answer.status().as_u16()) });
     }

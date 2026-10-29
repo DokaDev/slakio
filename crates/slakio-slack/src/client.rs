@@ -1,5 +1,8 @@
 //! One workspace's client: every call passes the allowlist, then the process's rails
 //! ([`Governor`], through this workspace's own lane of it), then goes out in the web client's format and comes back decoded.
+//! Once Slack no longer accepts the sign-in (any answer of the `Auth` kind), the client sends
+//! nothing more: every later call and socket fails the same way without leaving the machine, so a
+//! workspace signed out while running never retries in a loop.
 
 use crate::error::SlackError;
 use crate::governor::{Governor, Lane, Priority};
@@ -8,6 +11,7 @@ use crate::request::{Call, Endpoints, Ids, Os, RandomIds, Session, opening, prep
 use crate::response::decode;
 use serde::de::DeserializeOwned;
 use slakio_core::secret::Credentials;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -19,6 +23,10 @@ pub struct Client {
     /// This workspace's share of the governor's slots.
     lane: Lane,
     state: Mutex<(Session, RandomIds)>,
+    /// Slack no longer accepts the sign-in: nothing more is sent.
+    signed_out: AtomicBool,
+    /// Told when [`Client::signed_out`] becomes true.
+    told: tokio::sync::Notify,
 }
 
 impl Client {
@@ -26,7 +34,8 @@ impl Client {
         let mut ids = RandomIds::default();
         let session = Session::new(&mut ids);
         let lane = governor.lane();
-        Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)) }
+        let (signed_out, told) = (AtomicBool::new(false), tokio::sync::Notify::new());
+        Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)), signed_out, told }
     }
 
     /// Signed in to `team`: later requests carry it.
@@ -37,6 +46,7 @@ impl Client {
     /// Call `call` and decode its answer as `T`. With the network off, or the cap reached,
     /// nothing is sent; switching the network off while it is in flight ends it.
     pub async fn call<T: DeserializeOwned>(&self, call: &Call, priority: Priority) -> Result<T, SlackError> {
+        self.still_signed_in()?;
         let _slot = self.governor.admit_in(&self.lane, call.method, priority).await?;
         let prepared = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
@@ -51,26 +61,61 @@ impl Client {
             raw = crate::http::send(&self.endpoints, &prepared) => raw?,
         };
         let answer = decode(&raw);
-        if let Err(SlackError::RateLimited { retry_after }) = &answer {
-            self.governor.pause(call.method, *retry_after);
+        match &answer {
+            Err(SlackError::RateLimited { retry_after }) => self.governor.pause(call.method, *retry_after),
+            Err(SlackError::Auth { .. }) => self.sign_out(),
+            _ => {}
         }
         answer
+    }
+
+    /// Slack no longer accepts this sign-in: nothing more is sent, and whoever waits on
+    /// [`Client::signed_out`] is told.
+    pub(crate) fn sign_out(&self) {
+        self.signed_out.store(true, Ordering::SeqCst);
+        self.told.notify_waiters();
+    }
+
+    /// `Err` (nothing to send) once Slack no longer accepts this sign-in.
+    fn still_signed_in(&self) -> Result<(), SlackError> {
+        if self.signed_out.load(Ordering::SeqCst) {
+            return Err(SlackError::Auth { code: "signed out earlier in this run".to_string() });
+        }
+        Ok(())
+    }
+
+    /// Ends once Slack no longer accepts this sign-in (at once when it already does not).
+    pub(crate) async fn signed_out(&self) {
+        loop {
+            let told = self.told.notified();
+            tokio::pin!(told);
+            told.as_mut().enable();
+            if self.signed_out.load(Ordering::SeqCst) {
+                return;
+            }
+            told.await;
+        }
     }
 
     /// Open the live updates' socket: past the kill switch and the cap (an opening counts as
     /// one request), to the realtime host only. Switching the network off while it opens ends it.
     pub(crate) async fn open_socket(&self) -> Result<crate::http::Upgraded, SlackError> {
+        self.still_signed_in()?;
         self.governor.dial(&self.lane)?;
         let opening = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;
             opening(&self.credentials, session, &self.endpoints, ids, Os::current())?
         };
-        tokio::select! {
+        let socket = tokio::select! {
             biased;
             () = self.governor.stopped() => Err(SlackError::Offline { why: "the network was switched off" }),
             socket = crate::http::socket(&self.endpoints, &opening) => socket,
+        };
+        if let Err(SlackError::Auth { .. }) = &socket {
+            self.sign_out();
         }
+        socket
     }
 
     /// The process's rails.
