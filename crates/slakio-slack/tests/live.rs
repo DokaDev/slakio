@@ -127,6 +127,21 @@ impl Run {
         s.users.iter().find(|u| u.workspace == self.ws().id && u.id != self.ws().me && !u.bot).unwrap().id.to_string()
     }
 
+    /// Read conversation `c` (its newest page), as the UI does when a pane opens it.
+    async fn open(&mut self, c: &str) {
+        let target = Target::Conversation {
+            workspace: self.ws().id.clone(),
+            conversation: slakio_core::model::ConversationId::new(c),
+        };
+        let command = Command::History { target, before: None, limit: 28 };
+        assert!(matches!(self.ask(command).await, Event::History(_)));
+    }
+
+    /// Push a message by `who` at `ts` into `c`.
+    fn post(&self, c: &str, who: &str, ts: &str) {
+        self.fake.push(&json!({"type": "message", "channel": c, "user": who, "text": "x", "ts": ts}));
+    }
+
     fn calls(&self, method: &str) -> usize {
         self.fake.methods().iter().filter(|m| *m == method).count()
     }
@@ -218,12 +233,13 @@ fn posts_replies_edits_deletions_and_reads_elsewhere_arrive_as_they_happen() {
 }
 
 #[test]
-fn a_new_author_is_named_once_a_socket() {
+fn a_new_author_is_named_once_a_run() {
     rt().block_on(async {
         let mut r = Run::new(QUICK).await;
         r.boot().await;
         r.connected().await;
         let c = r.channel("general");
+        r.open(&c).await;
         // Someone the boot did not name (not a DM peer).
         let s = r.world.snapshot();
         let peers: Vec<String> = s
@@ -235,10 +251,18 @@ fn a_new_author_is_named_once_a_socket() {
             })
             .collect();
         let me = r.ws().me.clone();
+        // Nor an author of the page read (its people come with it).
+        let (read, _) = r.world.history(&slakio_core::model::ConversationId::new(&c), None, 28);
         let who = s
             .users
             .iter()
-            .find(|u| u.workspace == r.ws().id && u.id != me && !u.bot && !peers.contains(&u.id.to_string()))
+            .find(|u| {
+                u.workspace == r.ws().id
+                    && u.id != me
+                    && !u.bot
+                    && !peers.contains(&u.id.to_string())
+                    && !read.iter().any(|m| m.user == u.id)
+            })
             .unwrap()
             .id
             .to_string();
@@ -251,6 +275,13 @@ fn a_new_author_is_named_once_a_socket() {
             }
         }
         assert_eq!(r.calls("users/info"), before + 1, "looked up once");
+        // Nor again after the socket opened again.
+        r.fake.drop_sockets();
+        r.lost().await;
+        r.connected().await;
+        r.post(&c, &who, "1900000000.000300");
+        r.live().await;
+        assert_eq!(r.calls("users/info"), before + 1, "looked up once a run");
     });
 }
 
@@ -331,7 +362,7 @@ fn refused_openings_are_tried_again_after_pauses_within_their_bounds() {
         r.boot().await;
         // Said once, however many attempts fail.
         r.lost().await;
-        assert!(!r.connected().await, "never open before: nothing to catch up on");
+        assert!(r.connected().await, "what came while it was not connected is read again");
         let took = start.elapsed();
         assert_eq!(r.fake.upgrades().len(), 5);
         // Pauses of 20–40, 40–80, 80–160 and 80–160 ms.
@@ -429,5 +460,100 @@ fn one_workspace_s_failing_socket_leaves_the_other_alone() {
         assert!(a.fake.upgrades().len() > 2, "A keeps trying");
         assert_eq!(b.fake.upgrades().len(), 1, "B's socket stayed open");
         a.quiet(Duration::from_millis(200)).await;
+    });
+}
+
+#[test]
+fn new_authors_are_named_only_where_the_user_reads_and_in_batches() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let (c, elsewhere) = (r.channel("general"), r.channel("random"));
+        r.open(&c).await;
+        let before = r.calls("users/info");
+        // A large workspace: many people nobody named yet, in a conversation the user did not read.
+        for i in 0..300 {
+            r.post(&elsewhere, &format!("UNEW{i:04}"), &format!("1900000000.{i:06}"));
+        }
+        for _ in 0..300 {
+            let Live::Message { users, .. } = r.live().await else { panic!() };
+            assert!(users.is_empty());
+        }
+        assert_eq!(r.calls("users/info"), before, "never looked up where nobody reads");
+        // Where the user reads: looked up together, not one request each, and in order.
+        for i in 0..400 {
+            r.post(&c, &format!("UOPEN{i:04}"), &format!("1900000001.{i:06}"));
+        }
+        for i in 0..400 {
+            let Live::Message { message, .. } = r.live().await else { panic!() };
+            assert_eq!(message.ts, Ts(1_900_000_001_000_000 + i), "in the order they came");
+        }
+        let lookups = r.calls("users/info") - before;
+        assert!((1..=40).contains(&lookups), "{lookups} requests for 400 new authors");
+        // Ids Slack does not name are not asked about again.
+        for i in 0..400 {
+            r.post(&c, &format!("UOPEN{i:04}"), &format!("1900000002.{i:06}"));
+            r.live().await;
+        }
+        assert_eq!(r.calls("users/info") - before, lookups);
+        assert!(r.governor.sent() < 60, "well within the background share: {}", r.governor.sent());
+    });
+}
+
+#[test]
+fn the_socket_answers_pings_while_names_are_looked_up() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let c = r.channel("general");
+        r.open(&c).await;
+        r.fake.fail_next("users/info", slakio_fake::Fault::Hang);
+        r.post(&c, "UHANGS0001", "1900000000.000100");
+        until("the lookup sent", || r.calls("users/info") >= 1).await;
+        let asked = Instant::now();
+        r.fake.ping(b"still");
+        until("the pong", || r.fake.client_frames().iter().any(|f| f.opcode == 0xA)).await;
+        assert!(asked.elapsed() < Duration::from_secs(2), "answered at once: {:?}", asked.elapsed());
+        // The message comes once the lookup gave up, with its author's id.
+        let Live::Message { users, .. } = r.live().await else { panic!() };
+        assert!(users.is_empty());
+    });
+}
+
+#[test]
+fn an_opening_slack_refuses_as_too_many_waits_what_slack_asked() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.fake.rate_limit_sockets(1, "1");
+        let start = Instant::now();
+        r.boot().await;
+        r.lost().await;
+        assert!(r.connected().await);
+        assert_eq!(r.fake.upgrades().len(), 2);
+        assert!(start.elapsed() >= Duration::from_secs(1), "{:?}: Retry-After, not the backoff", start.elapsed());
+    });
+}
+
+#[test]
+fn sockets_that_never_say_hello_keep_the_pause_doubling() {
+    rt().block_on(async {
+        let quick = Realtime {
+            first_retry: Duration::from_millis(40),
+            longest_retry: Duration::from_millis(640),
+            steady: Duration::from_millis(50),
+            silence: Duration::from_millis(120),
+        };
+        let mut r = Run::new(quick).await;
+        r.fake.set_hello(false);
+        r.boot().await;
+        r.lost().await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        // Each socket stays open longer than `steady`, but none said hello: the pause doubles
+        // (20–40, 40–80, … ms after each 120 ms of silence) and never starts over.
+        let n = r.fake.upgrades().len();
+        assert!((3..=8).contains(&n), "{n} openings in 2 s");
+        r.quiet(Duration::from_millis(10)).await;
     });
 }

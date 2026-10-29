@@ -48,7 +48,7 @@ pub mod response;
 pub(crate) mod threads;
 pub mod wire;
 
-pub use adapter::{serve, serve_live};
+pub use adapter::{serve, serve_live, serve_with};
 pub use client::Client;
 pub use error::SlackError;
 pub use governor::{Governor, Limits, Priority};

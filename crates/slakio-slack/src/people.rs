@@ -2,7 +2,8 @@
 //! memory): never a directory listing. What a view brings along is kept as it comes; the rest
 //! is asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's
 //! batch), each id once. A lookup that fails is not kept, so the id shows until a later page
-//! asks again; unknown is not absent.
+//! asks again; unknown is not absent. An id Slack answered for without a name to show is not
+//! asked again this session.
 
 use crate::client::Client;
 use crate::governor::Priority;
@@ -12,7 +13,7 @@ use crate::wire;
 use serde_json::{Map, Value, json};
 use slakio_core::model::{Org, Presence, User, UserId, WorkspaceId};
 use slakio_core::sanitize::Remote;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, PoisonError};
 
 /// How many people one edge lookup asks for.
@@ -22,6 +23,8 @@ pub const LOOKUP_BATCH: usize = 80;
 #[derive(Debug, Default)]
 pub(crate) struct People {
     known: Mutex<HashMap<String, User>>,
+    /// Ids Slack was asked about and gave no name for.
+    unnamed: Mutex<HashSet<String>>,
     team: Mutex<Option<String>>,
 }
 
@@ -55,7 +58,8 @@ impl People {
         wanted.dedup();
         let missing: Vec<&String> = {
             let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
-            wanted.iter().copied().filter(|id| !known.contains_key(*id)).collect()
+            let unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
+            wanted.iter().copied().filter(|id| !known.contains_key(*id) && !unnamed.contains(*id)).collect()
         };
         for batch in missing.chunks(LOOKUP_BATCH) {
             let updated: Map<String, Value> = batch.iter().map(|id| ((*id).clone(), json!(0))).collect();
@@ -73,6 +77,8 @@ impl People {
                     known.insert(p.id.clone(), u);
                 }
             }
+            let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
+            unnamed.extend(batch.iter().filter(|id| !known.contains_key(**id)).map(|id| (*id).clone()));
         }
         let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         wanted.iter().filter_map(|id| known.get(*id).cloned()).collect()

@@ -124,6 +124,10 @@ where
         // No extension or subprotocol was asked for: one the server picks anyway cannot be read.
         && answer.headers().get("sec-websocket-extensions").is_none()
         && answer.headers().get("sec-websocket-protocol").is_none();
+    if answer.status() == hyper::StatusCode::TOO_MANY_REQUESTS {
+        let after = answer.headers().get("retry-after").and_then(|v| v.to_str().ok());
+        return Err(SlackError::RateLimited { retry_after: crate::response::retry_after(after) });
+    }
     if !agreed {
         return Err(SlackError::Network { detail: format!("the socket was refused ({})", answer.status().as_u16()) });
     }

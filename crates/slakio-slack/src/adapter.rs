@@ -26,7 +26,9 @@ use crate::wire;
 use slakio_core::backend::{
     BackendEnd, BackendHandle, Capabilities, Command, Envelope, Event, Generation, Page, Request, refuse_change,
 };
-use slakio_core::model::{Message, Org, Presence, Reaction, Target, ThreadSummary, Ts, User, UserId, WorkspaceId};
+use slakio_core::model::{
+    ConversationId, Message, Org, Presence, Reaction, Target, ThreadSummary, Ts, User, UserId, WorkspaceId,
+};
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
 use std::sync::{Arc, PoisonError};
@@ -64,6 +66,14 @@ pub fn serve_live(client: Client, realtime: crate::live::Realtime) -> BackendHan
     handle
 }
 
+/// [`serve_live`] connecting as `realtime` says, or [`serve`] without it (live updates off).
+pub fn serve_with(client: Client, realtime: Option<crate::live::Realtime>) -> BackendHandle {
+    match realtime {
+        Some(realtime) => serve_live(client, realtime),
+        None => serve(client),
+    }
+}
+
 /// What the backend learns in a session: the user's own id once booted (whose reactions are
 /// "mine"), the people named so far, the threads read.
 #[derive(Default)]
@@ -73,6 +83,8 @@ pub(crate) struct Session {
     pub(crate) threads: Threads,
     /// Told each time a boot succeeded (the live updates wait for the first).
     pub(crate) booted: tokio::sync::Notify,
+    /// The conversations the UI read this session: the live updates name new authors only there.
+    pub(crate) opened: std::sync::Mutex<std::collections::HashSet<ConversationId>>,
 }
 
 pub use crate::people::LOOKUP_BATCH;
@@ -92,6 +104,9 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         }
         let (client, tx, ctx) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&session));
         let Request { id, command, .. } = request;
+        if let Command::History { target, .. } | Command::Catchup { target, .. } = &command {
+            session.opened.lock().unwrap_or_else(PoisonError::into_inner).insert(target.conversation().clone());
+        }
         match command {
             Command::Boot => {
                 tasks.spawn(async move {

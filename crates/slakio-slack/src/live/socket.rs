@@ -6,8 +6,8 @@
 //!
 //! Anything the protocol forbids a server to send fails the socket: a masked frame, reserved
 //! bits (no extension was asked for), a control frame that is fragmented or longer than 125
-//! bytes, a continuation out of place, text that is not UTF-8, a message longer than
-//! [`MESSAGE_MAX`].
+//! bytes, a close frame with a code or reason it may not carry, a continuation out of place, text
+//! that is not UTF-8, a message longer than [`MESSAGE_MAX`] (counting its data frames only).
 
 use crate::error::SlackError;
 use crate::request::{Ids, RandomIds};
@@ -67,9 +67,17 @@ impl<IO: AsyncRead + AsyncWrite + Unpin> Socket<IO> {
                     }
                 }
                 CLOSE => {
-                    // The close is answered with the code it carried (none when it had none).
-                    let code = payload.get(..2).unwrap_or_default().to_vec();
-                    let _ = self.write(CLOSE, &code).await;
+                    // The close is answered with the code it carried (none when it had none); one
+                    // the protocol forbids is answered as a protocol error, and fails the socket.
+                    let code = payload.get(..2).map(|c| u16::from_be_bytes([c[0], c[1]]));
+                    let valid = std::str::from_utf8(payload.get(2..).unwrap_or_default()).is_ok()
+                        && payload.len() != 1
+                        && code.is_none_or(|c| matches!(c, 1000..=1003 | 1007..=1014 | 3000..=4999));
+                    if !valid {
+                        let _ = self.write(CLOSE, &1002u16.to_be_bytes()).await;
+                        return Err(broken("a close frame the protocol forbids"));
+                    }
+                    let _ = self.write(CLOSE, payload.get(..2).unwrap_or_default()).await;
                     return Ok(Incoming::Closed);
                 }
                 TEXT | BINARY if message.is_none() => message = Some((opcode, payload)),
@@ -117,6 +125,8 @@ impl<IO: AsyncRead + AsyncWrite + Unpin> Socket<IO> {
         if control && (!fin || len > 125) {
             return Err(broken("a control frame fragmented or too long"));
         }
+        // A control frame between a message's fragments is not part of it.
+        let so_far = if control { 0 } else { so_far };
         let len = usize::try_from(len).ok().filter(|n| so_far.saturating_add(*n) <= MESSAGE_MAX);
         let Some(len) = len else { return Err(broken("a message too long")) };
         let mut payload = vec![0u8; len];

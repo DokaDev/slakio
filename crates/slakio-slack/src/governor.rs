@@ -5,13 +5,17 @@
 //! * at most [`Limits::in_flight`] requests in flight, and at most [`Limits::waiting`] waiting
 //!   for a slot (more are refused as busy);
 //! * a **request cap** per minute, with a share that background work cannot use, so what the
-//!   user asked for goes first; a budget per hour; and a ceiling for the life of the process
-//!   that, once reached, stops all network until the program is started again;
+//!   user asked for goes first; a budget per hour, with such a share too; and a ceiling for the
+//!   life of the process that, once reached, stops all network until the program is started
+//!   again;
 //! * **fair between workspaces** — each workspace's client has a [`Lane`] of its own: one of
 //!   the slots is kept for it alone (for as many lanes as there are slots), and it holds at most
 //!   [`Limits::lane_in_flight`] of the slots and [`Limits::lane_waiting`] of the waiting places,
 //!   so busy workspaces, however many, never leave another without a slot; the caps and
-//!   budgets are shared;
+//!   budgets are shared, but one workspace's background work (its socket's openings, catching
+//!   up, lookups) takes at most [`Limits::lane_background_per_minute`] and
+//!   [`Limits::lane_background_per_hour`] of them, so one that keeps reconnecting leaves the
+//!   others room;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
 //!   one); the others go on.
@@ -61,6 +65,12 @@ pub struct Limits {
     pub background_per_minute: u32,
     /// Requests in any [`HOUR`], all priorities together.
     pub per_hour: u32,
+    /// Of those, the most background work may use: the rest of the hour is kept for the user.
+    pub background_per_hour: u32,
+    /// Of the background share of a minute, the most one workspace's lane uses.
+    pub lane_background_per_minute: u32,
+    /// Of the background share of an hour, the most one workspace's lane uses.
+    pub lane_background_per_hour: u32,
     /// Requests for the life of the process: a safety ceiling far above any real use;
     /// reaching it stops all network until the program starts again.
     pub per_process: u32,
@@ -80,6 +90,9 @@ impl Default for Limits {
             per_minute: 120,
             background_per_minute: 90,
             per_hour: 1500,
+            background_per_hour: 1000,
+            lane_background_per_minute: 60,
+            lane_background_per_hour: 700,
             per_process: 10_000,
             in_flight: 8,
             waiting: 64,
@@ -181,6 +194,8 @@ pub struct Lane {
     /// The process's slot kept for this lane, while no request of it uses it (none when the
     /// lane was made with every slot taken).
     kept: Arc<Mutex<Option<OwnedSemaphorePermit>>>,
+    /// When each of its background requests of the last hour was let through, oldest first.
+    background: Mutex<VecDeque<Duration>>,
 }
 
 /// A lane's kept slot in use: it goes back to the lane when dropped.
@@ -266,6 +281,7 @@ impl Governor {
             waiting: AtomicUsize::new(0),
             limit: self.limits.lane_waiting,
             kept: Arc::new(Mutex::new(Arc::clone(&self.slots).try_acquire_owned().ok())),
+            background: Mutex::default(),
         }
     }
 
@@ -294,10 +310,10 @@ impl Governor {
                 if !self.is_on() {
                     return Err(off());
                 }
-                self.count(priority)?;
+                self.count(priority, Some(lane))?;
                 Admitted { _slot: None, _kept: Some(kept), _lane: None }
             }
-            None => self.admit(method, priority).await?,
+            None => self.admit_for(method, priority, Some(lane)).await?,
         };
         admitted._lane = Some(own);
         Ok(admitted)
@@ -306,6 +322,11 @@ impl Governor {
     /// Let a request for `method` of `priority` through, waiting for a slot when all are
     /// taken: nothing may be sent without it.
     pub async fn admit(&self, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
+        self.admit_for(method, priority, None).await
+    }
+
+    /// [`Governor::admit`], counted on `lane`'s share as well when it came through one.
+    async fn admit_for(&self, method: Method, priority: Priority, lane: Option<&Lane>) -> Result<Admitted, SlackError> {
         let off = || SlackError::Offline { why: "the network is switched off" };
         if !self.is_on() {
             return Err(off());
@@ -323,12 +344,12 @@ impl Governor {
         if !self.is_on() {
             return Err(off());
         }
-        self.count(priority)?;
+        self.count(priority, lane)?;
         Ok(Admitted { _slot: Some(slot), _kept: None, _lane: None })
     }
 
-    /// Count a request against the caps, or refuse it.
-    fn count(&self, priority: Priority) -> Result<(), SlackError> {
+    /// Count a request (of `lane`, when it came through one) against the caps, or refuse it.
+    fn count(&self, priority: Priority, lane: Option<&Lane>) -> Result<(), SlackError> {
         let now = self.clock.now();
         let mut c = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if c.tripped {
@@ -337,8 +358,12 @@ impl Governor {
         while c.window.front().is_some_and(|at| now.saturating_sub(*at) >= HOUR) {
             c.window.pop_front();
         }
-        if u32::try_from(c.window.len()).unwrap_or(u32::MAX) >= self.limits.per_hour {
+        let hour = u32::try_from(c.window.len()).unwrap_or(u32::MAX);
+        if hour >= self.limits.per_hour {
             return Err(SlackError::CapReached { why: "the hourly request budget is reached" });
+        }
+        if priority == Priority::Background && hour >= self.limits.background_per_hour {
+            return Err(SlackError::CapReached { why: "the hourly background share is reached" });
         }
         // Background work stops once the minute holds its share, whoever sent those: the rest
         // of the minute stays free for the user.
@@ -357,6 +382,20 @@ impl Governor {
             self.stop();
             return Err(SlackError::CapReached { why: "the request cap of this run is reached" });
         }
+        // A workspace's background work keeps within its part of the shares.
+        if let Some(lane) = lane.filter(|_| priority == Priority::Background) {
+            let mut own = lane.background.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            while own.front().is_some_and(|at| now.saturating_sub(*at) >= HOUR) {
+                own.pop_front();
+            }
+            let minute = own.iter().rev().take_while(|at| now.saturating_sub(**at) < WINDOW).count();
+            if u32::try_from(minute).unwrap_or(u32::MAX) >= self.limits.lane_background_per_minute
+                || u32::try_from(own.len()).unwrap_or(u32::MAX) >= self.limits.lane_background_per_hour
+            {
+                return Err(SlackError::CapReached { why: "this workspace's background share is reached" });
+            }
+            own.push_back(now);
+        }
         c.total += 1;
         c.window.push_back(now);
         Ok(())
@@ -365,11 +404,12 @@ impl Governor {
     /// The live updates' socket may open now: the network is on and the caps have room. An
     /// opening counts as one background request; what comes over the socket afterwards is not a
     /// request and is not counted.
-    pub fn dial(&self) -> Result<(), SlackError> {
+    /// It counts on `lane`'s background share too.
+    pub fn dial(&self, lane: &Lane) -> Result<(), SlackError> {
         if !self.is_on() {
             return Err(SlackError::Offline { why: "the network is switched off" });
         }
-        self.count(Priority::Background)
+        self.count(Priority::Background, Some(lane))
     }
 
     /// Requests let through so far.

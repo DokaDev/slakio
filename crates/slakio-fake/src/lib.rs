@@ -78,8 +78,9 @@ struct Shared {
     upgrades: Vec<Logged>,
     /// The open sockets, to push to.
     sockets: Vec<tokio::sync::mpsc::UnboundedSender<socket::Push>>,
-    /// How many of the next openings are refused (`503`).
+    /// How many of the next openings are refused (`503`, or `429` with this `Retry-After`).
     refuse_sockets: usize,
+    refuse_retry_after: Option<String>,
     /// A socket says hello when it opens (the default).
     hello: bool,
     client_frames: Vec<ClientFrame>,
@@ -179,7 +180,14 @@ impl FakeSlack {
 
     /// Refuse the next `n` openings (`503`).
     pub fn refuse_sockets(&self, n: usize) {
-        self.shared.lock().unwrap_or_else(PoisonError::into_inner).refuse_sockets = n;
+        let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
+        (s.refuse_sockets, s.refuse_retry_after) = (n, None);
+    }
+
+    /// Refuse the next `n` openings as too many (`429`), asking to wait `retry_after` seconds.
+    pub fn rate_limit_sockets(&self, n: usize, retry_after: &str) {
+        let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
+        (s.refuse_sockets, s.refuse_retry_after) = (n, Some(retry_after.to_string()));
     }
 
     /// Whether a socket says hello when it opens (it does unless told otherwise).

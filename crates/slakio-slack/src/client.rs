@@ -58,7 +58,7 @@ impl Client {
     /// Open the live updates' socket: past the kill switch and the cap (an opening counts as
     /// one request), to the realtime host only. Switching the network off while it opens ends it.
     pub(crate) async fn open_socket(&self) -> Result<crate::http::Upgraded, SlackError> {
-        self.governor.dial()?;
+        self.governor.dial(&self.lane)?;
         let opening = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;

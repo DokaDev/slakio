@@ -118,6 +118,48 @@ async fn what_a_server_must_not_send_fails_the_socket() {
 }
 
 #[tokio::test]
+async fn a_close_frame_the_protocol_forbids_fails_the_socket_with_a_protocol_error() {
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        ("one byte", vec![0x03]),
+        ("reserved code", 1005u16.to_be_bytes().to_vec()),
+        ("code below the range", 999u16.to_be_bytes().to_vec()),
+        ("unassigned code", 2000u16.to_be_bytes().to_vec()),
+        ("reason not UTF-8", [&1000u16.to_be_bytes()[..], &[0xFF]].concat()),
+    ];
+    for (what, payload) in cases {
+        let (mut s, mut server) = pair();
+        server.write_all(&frame(true, CLOSE, &payload)).await.unwrap();
+        assert!(matches!(s.next().await, Err(SlackError::Network { .. })), "{what}");
+        assert_eq!(written(&mut server).await, (CLOSE, 1002u16.to_be_bytes().to_vec()), "{what}");
+    }
+    // An empty close, and one with an application's code and a reason, are fine.
+    for payload in [Vec::new(), [&4000u16.to_be_bytes()[..], b"bye"].concat()] {
+        let (mut s, mut server) = pair();
+        server.write_all(&frame(true, CLOSE, &payload)).await.unwrap();
+        assert_eq!(s.next().await.unwrap(), Incoming::Closed);
+        assert_eq!(written(&mut server).await.1, payload.get(..2).unwrap_or_default());
+    }
+}
+
+#[tokio::test]
+async fn a_ping_inside_a_message_at_its_limit_is_not_counted_on_it() {
+    let (mut s, mut server) = pair();
+    let most = vec![b'a'; MESSAGE_MAX - 10];
+    let rest = vec![b'b'; 10];
+    let expected = format!("{}{}", "a".repeat(MESSAGE_MAX - 10), "b".repeat(10));
+    let writer = tokio::spawn(async move {
+        server.write_all(&frame(false, TEXT, &most)).await.unwrap();
+        server.write_all(&frame(true, PING, &[b'p'; 125])).await.unwrap();
+        server.write_all(&frame(true, CONTINUATION, &rest)).await.unwrap();
+        assert_eq!(written(&mut server).await, (PONG, vec![b'p'; 125]));
+        server
+    });
+    let got = s.next().await.unwrap();
+    assert!(got == Incoming::Text(expected), "the whole message, read on past the ping");
+    drop(writer.await.unwrap());
+}
+
+#[tokio::test]
 async fn an_ended_connection_is_an_error_not_a_message() {
     let (mut s, server) = pair();
     drop(server);

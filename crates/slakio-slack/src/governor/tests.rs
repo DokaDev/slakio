@@ -240,3 +240,61 @@ fn busy_workspaces_never_take_every_slot_from_a_third() {
         drop(tokio::time::timeout(Duration::from_secs(1), b2).await.expect("B's turn").unwrap());
     });
 }
+
+#[test]
+fn background_work_keeps_to_its_share_of_the_hour_and_the_user_keeps_the_rest() {
+    rt().block_on(async {
+        let limits = Limits { per_hour: 10, background_per_hour: 6, ..Limits::default() };
+        let (g, clock) = governor(limits, true);
+        assert_eq!(Limits::default().background_per_hour, 1000);
+        for _ in 0..6 {
+            drop(g.admit(M, Priority::Background).await.unwrap());
+            clock.advance(Duration::from_secs(61));
+        }
+        let e = g.admit(M, Priority::Background).await.unwrap_err();
+        assert_eq!(e, SlackError::CapReached { why: "the hourly background share is reached" });
+        for _ in 0..4 {
+            drop(g.admit(M, Priority::User).await.unwrap());
+        }
+        assert!(g.admit(M, Priority::User).await.is_err(), "the hour is full");
+        clock.advance(Duration::from_secs(3600));
+        drop(g.admit(M, Priority::Background).await.unwrap());
+    });
+}
+
+#[test]
+fn one_workspace_s_background_work_leaves_the_others_their_share() {
+    rt().block_on(async {
+        let limits = Limits {
+            background_per_minute: 10,
+            lane_background_per_minute: 6,
+            lane_background_per_hour: 8,
+            ..Limits::default()
+        };
+        let (g, clock) = governor(limits, true);
+        let (a, b) = (g.lane(), g.lane());
+        for _ in 0..5 {
+            drop(g.admit_in(&a, M, Priority::Background).await.unwrap());
+        }
+        // An opening of the socket counts on the same share.
+        g.dial(&a).unwrap();
+        assert_eq!(
+            g.admit_in(&a, M, Priority::Background).await.unwrap_err(),
+            SlackError::CapReached { why: "this workspace's background share is reached" }
+        );
+        assert!(g.dial(&a).is_err());
+        for _ in 0..4 {
+            drop(g.admit_in(&b, M, Priority::Background).await.unwrap());
+        }
+        drop(g.admit_in(&a, M, Priority::User).await.unwrap());
+        // A's hour holds 8 at most, whatever the minutes.
+        clock.advance(Duration::from_secs(60));
+        drop(g.admit_in(&a, M, Priority::Background).await.unwrap());
+        g.dial(&a).unwrap();
+        clock.advance(Duration::from_secs(60));
+        assert!(g.admit_in(&a, M, Priority::Background).await.is_err());
+        drop(g.admit_in(&b, M, Priority::Background).await.unwrap());
+        clock.advance(Duration::from_secs(3600));
+        drop(g.admit_in(&a, M, Priority::Background).await.unwrap());
+    });
+}
