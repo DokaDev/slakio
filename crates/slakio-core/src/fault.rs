@@ -83,13 +83,20 @@ impl From<io::Error> for Fault {
     }
 }
 
-/// `<state>/errors.log`: the raw detail of every failure the UI reported in words, one line
-/// each (`<unix seconds> <context>: <detail>`), so nothing is lost by keeping the status line
-/// short. Appending is best effort; without a state directory nothing is written.
+/// `<state>/errors.log`: the detail of every failure the UI reported in words, one line each
+/// (`<unix seconds> <context>: <kind>: <detail>`), so nothing is lost by keeping the status line
+/// short. The detail is redacted first ([`redact::redact`]): no token, cookie, address past its
+/// host or quoted text reaches the file. The file is private to the user (mode 0600, its
+/// directory 0700 when made here; never written through a link) and at most [`LOG_MAX`] bytes:
+/// past that it becomes `errors.log.1` (the one before is dropped) and a new one starts.
+/// Appending is best effort; without a state directory nothing is written.
 #[derive(Clone, Debug, Default)]
 pub struct ErrorLog {
     path: Option<PathBuf>,
 }
+
+/// The most bytes one error log file holds before it is rotated.
+pub const LOG_MAX: u64 = 1024 * 1024;
 
 impl ErrorLog {
     pub fn new(path: Option<PathBuf>) -> Self {
@@ -105,20 +112,55 @@ impl ErrorLog {
     pub fn record(&self, context: &str, fault: &Fault) {
         let Some(path) = &self.path else { return };
         let secs = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-        let detail = fault.detail.replace('\n', " | ");
+        let detail = redact::redact(&fault.detail);
         // A fault without a detail says so instead of ending the line after its kind.
         let line = match detail.trim() {
-            "" => format!("{secs} {context}: {:?} (no detail given)\n", fault.kind),
-            _ => format!("{secs} {context}: {:?}: {detail}\n", fault.kind),
+            "" => format!("{secs} {}: {:?} (no detail given)\n", redact::redact(context), fault.kind),
+            _ => format!("{secs} {}: {:?}: {detail}\n", redact::redact(context), fault.kind),
         };
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-            let _ = f.write_all(line.as_bytes());
-        }
+        let _ = append(path, line.as_bytes(), LOG_MAX);
     }
 }
+
+/// Append `bytes` to the private file at `path`, rotating it first when it would grow past `max`.
+fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
+    if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+        let mut b = std::fs::DirBuilder::new();
+        b.recursive(true);
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+        b.create(dir)?;
+    }
+    match std::fs::symlink_metadata(path) {
+        // A link (or anything but a file) is not written through.
+        Ok(m) if !m.file_type().is_file() => return Err(io::Error::other("the error log is not a plain file")),
+        Ok(m) if m.len() + bytes.len() as u64 > max => {
+            let mut old = path.as_os_str().to_owned();
+            old.push(".1");
+            std::fs::rename(path, PathBuf::from(old))?;
+        }
+        _ => {}
+    }
+    let mut opts = std::fs::OpenOptions::new();
+    opts.create(true).append(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path)?;
+    // A file made by an older version may be readable by others: no longer.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if f.metadata()?.permissions().mode() & 0o077 != 0 {
+            f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    f.write_all(bytes)
+}
+
+pub mod redact;
 
 #[cfg(test)]
 mod tests;

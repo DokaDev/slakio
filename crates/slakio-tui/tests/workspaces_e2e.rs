@@ -563,3 +563,44 @@ fn signing_in_again_as_another_user_keeps_the_other_workspace_and_its_cache() {
     run.wait_for("B from the cache", |t| t.contains(&b) && t.contains("cached"));
     run.quit();
 }
+
+#[test]
+fn the_error_log_keeps_no_secret_and_no_remote_text_and_only_the_user_reads_it() {
+    let m = Machine::new("log-secrets", &[0, 1]);
+    let words = newest_words(&m);
+    // B's Slack puts secrets and someone's words where its error code goes: B is refused.
+    let remote = format!("{TOKEN} d={COOKIE} https://{}/api/x?token={TOKEN} {words}", HOSTS[1]);
+    m.fakes[1].fail_next("client.userBoot", Fault::Api(remote));
+    let Some(mut run) = m.start(1, (100, 30), &[]) else { return };
+    let a = m.channel(0);
+    run.wait_for("A's channels", |t| t.contains(&a));
+    run.type_bytes(b"\r");
+    run.wait_for("A's conversation", |t| t.contains(&words));
+    // Slack signs A out; reading back is refused for the sign-in.
+    m.fakes[0].revoke(TOKEN, false);
+    run.type_bytes(b"gg");
+    run.wait_for("the mark", |t| t.contains("signed out, :login"));
+    // A sign-in pasted with its token, cookies and an address with a query, that Slack refuses.
+    m.fakes[0].revoke(NEW_TOKEN, false);
+    let paste = format!(
+        "curl 'https://{}/api/client.counts?_x_id=abc-123&slack_route=T1' -H 'cookie: b=1; d={COOKIE}; d-s=99' \
+         -H 'authorization: Bearer {NEW_TOKEN}' --data-raw 'token={NEW_TOKEN}&text={words}'",
+        HOSTS[0]
+    );
+    run.type_bytes(b":login\r");
+    run.wait_for("the paste screen", |t| t.contains("Waiting for the paste"));
+    let checks = boots(&m, 0);
+    run.type_bytes(format!("\x1b[200~{paste}\x1b[201~").as_bytes());
+    wait_until("the paste checked", || boots(&m, 0) > checks);
+    std::thread::sleep(Duration::from_millis(500));
+    run.quit();
+    let path = m.dir.join("state").join("slakio").join("errors.log");
+    let log = std::fs::read_to_string(&path).unwrap();
+    assert!(log.lines().count() >= 3, "B's refusal, A's sign-out and the refused sign-in: {log}");
+    assert!(log.contains("invalid_auth") && log.contains("not_a_slack_code"), "{log}");
+    for leak in [TOKEN, COOKIE, NEW_TOKEN, "xoxc", "xoxd", "_x_id", "slack_route", "?token", "Bearer", &words] {
+        assert!(!log.contains(leak), "{leak:?} in the error log: {log}");
+    }
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+}
