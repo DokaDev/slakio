@@ -440,7 +440,7 @@ impl Wiring {
         let client = slakio_slack::Client::new(credentials.clone(), endpoints.clone(), Arc::clone(&self.governor));
         let who = login::check(&client).await.map_err(|e| {
             self.record(&slakio_core::fault::Fault::other(e.detail()));
-            words::check_label(&e)
+            words::check_label(&e.kind())
         })?;
         let account =
             Account { name: who.team_name.unwrap_or_else(|| who.team.clone()), team: who.team, host, user: who.user };

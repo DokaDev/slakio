@@ -8,12 +8,12 @@ use slakio_core::i18n::{Label, Msg};
 use slakio_core::sanitize::Remote;
 
 /// The words for a sign-in Slack did not accept, or could not be asked about.
-pub(crate) fn check_label(e: &slakio_slack::SlackError) -> Label {
-    use slakio_slack::SlackError;
-    match e {
-        SlackError::Auth { .. } => Label::SigninRefused,
-        SlackError::Network { .. } => Label::SigninNetwork,
-        SlackError::Offline { .. } => Label::SigninOffline,
+pub(crate) fn check_label(kind: &slakio_core::backend::FailKind) -> Label {
+    use slakio_core::backend::FailKind;
+    match kind {
+        FailKind::Auth => Label::SigninRefused,
+        FailKind::Network => Label::SigninNetwork,
+        FailKind::Offline => Label::SigninOffline,
         _ => Label::SigninFailed,
     }
 }
