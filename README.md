@@ -28,10 +28,13 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.11, reconnects right after the computer wakes from sleep, reads the unread
-counts again and catches up the threads that are open after a reconnect, and has `:net off` and
-`:net on` to stop or resume all network while it runs (`:net on` cannot turn the network on in a run
-that started offline). It is still read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack. 0.0.10 showed
+([Install](#install)); the latest release, 0.0.12, handles Slack signing a workspace out while slakio runs: that workspace stops sending
+and shows `signed out, :login`, and `:login` signs it in again without quitting, keeping your tabs, panes and
+drafts (when another user signs in, the old view is cleared). The refusals of `:net on` are clearer. It is still
+read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack.
+0.0.11 reconnected right after the computer woke from sleep, read the unread counts again and caught up the threads
+that were open after a reconnect, and had `:net off` and `:net on` to stop or resume all network while it ran
+(`:net on` could not turn the network on in a run that started offline). 0.0.10 showed
 messages as they happen: new, edited and deleted messages, unread
 counts and thread reply counts followed live, over a connection per workspace that only receives. When
 the connection dropped the status line showed a `live off` marker, and after it came back the
