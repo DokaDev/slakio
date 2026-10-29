@@ -19,6 +19,10 @@ tokio = { workspace = true, features = ["sync"] }
 toml_edit.workspace = true
 zeroize.workspace = true
 
+# The error log opened without following a symbolic link (`O_NOFOLLOW`, Unix).
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 # build.rs: checks the locale catalogs and generates the typed message API.
 [build-dependencies]
 toml.workspace = true

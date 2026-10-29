@@ -2240,6 +2240,7 @@ dependencies = [
 name = "slakio-core"
 version = "0.0.12"
 dependencies = [
+ "libc",
  "proptest",
  "tokio",
  "toml",

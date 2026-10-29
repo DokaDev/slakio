@@ -54,6 +54,11 @@ fn no_token_cookie_address_past_its_host_or_quoted_text_reaches_the_log() {
         "unexpected `hello there` near 'private words".to_string(),
         "d=abc123; session=s3cr3tvalue".to_string(),
         format!("an opaque {} value", "Zq8".repeat(16)),
+        "GET /api/x?password=hunter2&channel=C1 failed".to_string(),
+        "GET /api/x?a=1;session=k3ys3cr3t".to_string(),
+        "blob QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo0MTIzNDU2Nzg5==".to_string(),
+        "blob QUJDREVGR0hJSktMTU5P/UFFSU1RVVldYWVo0MTIz+NDU2Nzg5".to_string(),
+        "jar session=abc123;next=https://example.test/back?x=1".to_string(),
     ];
     for d in &details {
         let r = redact::redact(d);
@@ -73,6 +78,11 @@ fn no_token_cookie_address_past_its_host_or_quoted_text_reaches_the_log() {
             "abc123",
             "s3cr3t",
             "Zq8Zq8",
+            "hunter2",
+            "k3ys3cr3t",
+            "QUJD",
+            "UFFS",
+            "back?x",
         ] {
             assert!(!r.contains(leak), "{leak:?} in {r:?} (from {d:?})");
         }
@@ -82,9 +92,11 @@ fn no_token_cookie_address_past_its_host_or_quoted_text_reaches_the_log() {
         "connect https://a-team.slack.com/… failed"
     );
     assert_eq!(redact::redact("token=abc&channel=C1"), "token=[secret]&channel=C1");
+    assert_eq!(redact::redact("GET /api/x?password=hunter2&channel=C1"), "GET /api/x?password=[secret]&channel=C1");
     // What says why stays.
     for kept in [
         "/x/workspace.toml: Permission denied (os error 13)",
+        "cache: /Users/someone/Library/Caches/slakio/slakio-store/part-of-a-team",
         "invalid_auth",
         "HTTP 503",
         "don't panic",
@@ -128,6 +140,17 @@ fn the_log_is_private_capped_and_rotated() {
         std::os::unix::fs::symlink(&target, &link).unwrap();
         ErrorLog::new(Some(link)).record("linked", &Fault::other("x"));
         assert_eq!(std::fs::read_to_string(&target).unwrap(), "");
+        // A readable old file already past the cap: private before it moves, and after.
+        std::fs::write(&path, "y".repeat(990)).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::set_permissions(&old, std::fs::Permissions::from_mode(0o644)).unwrap();
+        append(&path, b"0123456789abcdef\n", 1000).unwrap();
+        assert_eq!(std::fs::read_to_string(&old).unwrap().len(), 990, "rotated");
+        assert_eq!((mode(&old), mode(&path)), (0o600, 0o600));
+        // A state directory made looser before is made private again.
+        std::fs::set_permissions(dir.join("state"), std::fs::Permissions::from_mode(0o755)).unwrap();
+        ErrorLog::new(Some(path.clone())).record("again", &Fault::other("x"));
+        assert_eq!(mode(&dir.join("state")), 0o700);
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

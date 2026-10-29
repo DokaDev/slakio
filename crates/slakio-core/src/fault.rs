@@ -9,6 +9,9 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 /// The kind of a failure, as far as the UI needs to tell it apart.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FaultKind {
@@ -130,6 +133,12 @@ fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
         #[cfg(unix)]
         std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
         b.create(dir)?;
+        // One made looser before (or by hand) is made private too, when it is the user's (only
+        // its owner may change its mode; otherwise it stays as it is).
+        #[cfg(unix)]
+        if std::fs::metadata(dir).is_ok_and(|m| m.permissions().mode() & 0o077 != 0) {
+            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+        }
     }
     match std::fs::symlink_metadata(path) {
         // A link (or anything but a file) is not written through.
@@ -137,27 +146,39 @@ fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
         Ok(m) if m.len() + bytes.len() as u64 > max => {
             let mut old = path.as_os_str().to_owned();
             old.push(".1");
-            std::fs::rename(path, PathBuf::from(old))?;
+            let old = PathBuf::from(old);
+            // An older version's file may be readable by others: private before it moves, and
+            // after (nothing else may have made it looser meanwhile).
+            make_private(path)?;
+            std::fs::rename(path, &old)?;
+            make_private(&old)?;
         }
         _ => {}
     }
     let mut opts = std::fs::OpenOptions::new();
     opts.create(true).append(true);
+    // Never through a link, not even one put there after the check above.
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
+        opts.mode(0o600).custom_flags(libc::O_NOFOLLOW);
     }
     let mut f = opts.open(path)?;
     // A file made by an older version may be readable by others: no longer.
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if f.metadata()?.permissions().mode() & 0o077 != 0 {
-            f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        }
+    if f.metadata()?.permissions().mode() & 0o077 != 0 {
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
     }
     f.write_all(bytes)
+}
+
+/// `path` readable and writable by its owner only (Unix; elsewhere nothing changes).
+fn make_private(path: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
 }
 
 pub mod redact;

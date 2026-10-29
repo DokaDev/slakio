@@ -46,6 +46,14 @@ fn redact_word(word: &str) -> String {
     if let Some(at) = lower.find("://") {
         return address(word, at);
     }
+    // A long run of base64 or percent-encoded characters (`=` padding and `/` too) is opaque,
+    // whatever it holds; a path (it starts with `/` or `~`) is not.
+    let bare = word.trim_matches(|c: char| matches!(c, '(' | ')' | '[' | ']' | ',' | '.' | ':' | '<' | '>'));
+    let body = bare.trim_end_matches('=');
+    let opaque = body.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/_-%".contains(&b));
+    if opaque && body.len() >= OPAQUE_MIN && !bare.starts_with(['/', '~']) {
+        return "[secret]".to_string();
+    }
     // `name=value` pairs (also `a=1;d=…` and `name=value&…`): a secret name's value goes.
     if word.contains('=') {
         let pairs: Vec<String> = word.split(['&', ';', ',']).map(pair).collect();
@@ -69,7 +77,9 @@ fn redact_word(word: &str) -> String {
 /// `name=value`, the value left out when the name is a secret's (or the value looks like one).
 fn pair(p: &str) -> String {
     let Some((name, value)) = p.split_once('=') else { return p.to_string() };
-    let key = name.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '-').to_ascii_lowercase();
+    // The name after a path or another pair (`/api/x?password=…`).
+    let name_only = name.rsplit(['?', '/', '&', ';']).next().unwrap_or(name);
+    let key = name_only.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '-').to_ascii_lowercase();
     if SECRET_NAMES.contains(&key.as_str()) || is_token(&value.to_ascii_lowercase()) {
         return format!("{name}=[secret]");
     }
@@ -92,6 +102,11 @@ fn is_token(lower: &str) -> bool {
 /// sign-in in it) left out.
 fn address(word: &str, at: usize) -> String {
     let (head, rest) = word.split_at(at + 3);
+    // What comes before the scheme in the same word (`session=…;next=https://…`) is a word too.
+    let scheme_at =
+        head[..at].rfind(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))).map_or(0, |i| i + 1);
+    let before = &head[..scheme_at];
+    let head = format!("{}{}", if before.is_empty() { String::new() } else { redact_word(before) }, &head[scheme_at..]);
     let end = rest.find(['/', '?', '#', '\'', '"']).unwrap_or(rest.len());
     let host = &rest[..end];
     // `user:password@host`: only the host.
