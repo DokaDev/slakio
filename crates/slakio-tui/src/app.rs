@@ -220,41 +220,6 @@ impl App {
         }
     }
 
-    /// Where the keyboard is: the top popup, else the screen.
-    pub fn key_context(&self) -> Ctx {
-        match self.overlay() {
-            Some(Overlay::Dialog(_)) => Ctx::Dialog,
-            Some(Overlay::Help) if self.help.as_ref().is_some_and(|h| h.typing) => Ctx::HelpFilter,
-            Some(Overlay::Help) => Ctx::Help,
-            Some(Overlay::Palette) => Ctx::CommandLine,
-            Some(Overlay::Switcher) => Ctx::Switcher,
-            None => self.region_context(),
-        }
-    }
-
-    /// Where the keyboard is on the screen under any popup.
-    pub fn screen_context(&self) -> Ctx {
-        if self.cmdline.is_open() {
-            return Ctx::CommandLine;
-        }
-        self.region_context()
-    }
-
-    /// Where the keyboard is in the regions of the screen, under the command line too (the keys
-    /// the palette shows are those of this context).
-    pub fn region_context(&self) -> Ctx {
-        if self.backend.is_none() || self.sign_in.state.is_some() {
-            return if self.picking() || self.backend.is_some() { Ctx::SignIn } else { Ctx::Root };
-        }
-        match self.focus() {
-            Focus::ViewSwitcher => Ctx::ViewSwitcher,
-            Focus::List => Ctx::List,
-            Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
-            Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
-            Focus::Pane(_) | Focus::Work => Ctx::PaneNormal,
-        }
-    }
-
     /// Rows the list panel shows (or would show, while it is hidden).
     fn list_height(&self) -> usize {
         let a = self.areas();

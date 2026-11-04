@@ -5,10 +5,11 @@
 //! name a pane that is closed. The shell and the work area never move the focus: they hand back
 //! where it should go.
 
-use super::App;
 use super::query::{Focus, PaneHandle};
 use super::shell::Region;
+use super::{App, Overlay};
 use crate::action::{PaneAction, ShellAction};
+use crate::keymap::Ctx;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
 use std::time::Instant;
@@ -26,6 +27,41 @@ impl Focus {
 }
 
 impl App {
+    /// Where the keyboard is: the top popup, else the screen.
+    pub fn key_context(&self) -> Ctx {
+        match self.overlay() {
+            Some(Overlay::Dialog(_)) => Ctx::Dialog,
+            Some(Overlay::Help) if self.help.as_ref().is_some_and(|h| h.typing) => Ctx::HelpFilter,
+            Some(Overlay::Help) => Ctx::Help,
+            Some(Overlay::Palette) => Ctx::CommandLine,
+            Some(Overlay::Switcher) => Ctx::Switcher,
+            None => self.region_context(),
+        }
+    }
+
+    /// Where the keyboard is on the screen under any popup.
+    pub fn screen_context(&self) -> Ctx {
+        if self.cmdline.is_open() {
+            return Ctx::CommandLine;
+        }
+        self.region_context()
+    }
+
+    /// Where the keyboard is in the regions of the screen, under the command line too (the keys
+    /// the palette shows are those of this context).
+    pub fn region_context(&self) -> Ctx {
+        if self.backend.is_none() || self.sign_in.state.is_some() {
+            return if self.picking() || self.backend.is_some() { Ctx::SignIn } else { Ctx::Root };
+        }
+        match self.focus() {
+            Focus::ViewSwitcher => Ctx::ViewSwitcher,
+            Focus::List => Ctx::List,
+            Focus::Pane(_) if self.work.insert() => Ctx::ComposerInsert,
+            Focus::Pane(_) if self.work.focused().is_some_and(|p| p.visual.is_some()) => Ctx::PaneVisual,
+            Focus::Pane(_) | Focus::Work => Ctx::PaneNormal,
+        }
+    }
+
     /// Where the keyboard is, under any popup: in the work area, its active pane (or the work
     /// area itself, with no pane open).
     pub fn focus(&self) -> Focus {
