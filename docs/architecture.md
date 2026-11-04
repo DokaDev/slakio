@@ -183,9 +183,12 @@ comes back); people and channels are named from the read model when drawn
   system's opener (`/usr/bin/open`, `xdg-open` on `PATH`, `%SystemRoot%\System32\rundll32.exe
   url.dll,FileProtocolHandler`; no shell). A link whose text names another host is asked about
   first (`dialog::Question::Open`), the real host first and cut from its start, so its end
-  shows. `o` with several links that open (`app::links::Picker`) draws letters on each, where
-  drawing last placed them (`Pane::links`, also what a click hits), or lists them when one was
-  not drawn; a pick opens only while the message reads as it did when picking began. Tests
+  shows. `o` with several links that open (`app::picker::Picker`) draws letters over the first
+  cells of each, where drawing last placed them (`Pane::links`, also what a click hits; drawn
+  over, so nothing moves), or lists them when one was not drawn; its keys are the modal
+  `links` context of the key map. A pick opens only while the message reads as it did when
+  picking began; a click opens only the address drawn there, and not just after the pane's
+  links moved (`Pane::links_moved`). Tests
   stand in for the opener (`SLAKIO_TEST_OPENER`, debug
   builds only) and never start a browser.
 

@@ -10,7 +10,10 @@ use crate::action::ShellAction;
 use crate::screen;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// How long after a pane's links moved a click on one only selects its message.
+pub const LINK_SETTLE: Duration = Duration::from_millis(400);
 
 impl App {
     /// The mouse: a click on a view shows it, on the workspace chip opens the switcher, on a list row
@@ -24,9 +27,17 @@ impl App {
             Some(Overlay::Switcher) => return self.switcher_mouse(m),
             _ => {}
         }
-        if self.pick_mouse(m.kind, Position { x: m.column, y: m.row }, now) {
-            return true;
+        let picking = self.picker.is_some();
+        if let Some(redraw) = self.pick_mouse(m.kind, Position { x: m.column, y: m.row }, now) {
+            return redraw;
         }
+        // Letters stopped by a press or the wheel are drawn away, whatever else it did.
+        let stopped = picking && self.picker.is_none();
+        self.mouse_screen(m, now) || stopped
+    }
+
+    /// The mouse over the main screen, no popup taking it.
+    fn mouse_screen(&mut self, m: MouseEvent, now: Instant) -> bool {
         // The sign-in screen over the app (`:login`) takes no click.
         if self.backend.is_none() || self.sign_in.state.is_some() || screen::too_small(self.size) {
             return false;
@@ -106,24 +117,29 @@ impl App {
     }
 
     /// A click in the work area at `at` (`double`: the second of a double click); on a link of a
-    /// message, it is selected and the link opened.
+    /// message, it is selected and the link opened once (not again by a double click, and not
+    /// within [`LINK_SETTLE`] of the pane's links moving: then it only selects).
     fn click_work(&mut self, at: Position, double: bool, now: Instant) {
         let Some(&layout) = self.frame().pane_at(at) else { return };
         self.set_focus(Focus::on(layout.id));
         let Some(pane) = self.work.focused() else { return };
         let parts = layout.parts;
         let hit = pane.hit(at.y).filter(|_| parts.messages.contains(at));
-        let link = pane.links.borrow().iter().find(|l| l.y == at.y && (l.x0..l.x1).contains(&at.x)).copied();
+        let link = pane.links.borrow().iter().find(|l| l.y == at.y && (l.x0..l.x1).contains(&at.x)).cloned();
+        // Just after the links moved, what is under the pointer may not be what was aimed at.
+        let settled = pane.links_moved.get().is_none_or(|t| now.duration_since(t) >= LINK_SETTLE);
         self.work.set_insert(parts.input.contains(at));
         let Some(hit) = hit else { return };
         self.work.with_pane(|p, tl| {
             p.select_index(hit.message, tl);
             p.visual = None;
         });
-        if let Some(l) = link {
-            self.open_clicked(layout.id, l.ts, l.link, now);
-        } else if hit.link || double {
-            self.open_thread();
+        match link {
+            // The second press of a double click opened it already.
+            Some(l) if settled && !double => self.open_clicked(layout.id, &l, now),
+            Some(_) => {}
+            None if hit.link || double => self.open_thread(),
+            None => {}
         }
     }
 }

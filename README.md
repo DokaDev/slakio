@@ -28,7 +28,7 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.13, opens a message's web link in the browser: `o` or `:open [N|address]`
+([Install](#install)); the latest release, 0.0.13, opens a message's web link in the browser: `o` or `:open [address]`
 (http and https only; it asks first when the link's text names another host, and then shows the real host first).
 The error log is redacted, private and size-capped, and the sign-out notice keeps `:login` visible. It is still
 read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack.
@@ -161,9 +161,12 @@ images, and settings. This README only lists what works; it will grow with each 
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
   colors.
 - Links: `o` on a selected message opens its link in your browser. With several links, each
-  one that opens gets a letter or two drawn on it (`a`, `s`, `d` …): type them to open that one,
-  `Esc` to stop; when one of them is off screen, a list of them shows instead (`j`/`k`,
-  `Enter`). A click on a link opens it too, and `:open <address>` opens one you type. Only
+  one that opens gets a letter or two drawn over its start (`a`, `s`, `d` …, never `j`, `k` or
+  `o`): type them to open that one (any case; `Backspace` takes a letter back), `Esc` to stop.
+  `o`, `j` or `k` show them as a list (host first; `j`/`k` move, `Enter` opens, the letters
+  work there too), which also shows at once when one of them is off screen. A click on a link
+  opens it too (a click just after the messages moved only selects), and `:open <address>`
+  opens one you type. Only
   `http` and `https` addresses open (other links get no letter and are not drawn as links);
   when a link's text names another host than the one it goes to, slakio shows the real host
   and asks first.

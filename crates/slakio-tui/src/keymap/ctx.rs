@@ -35,6 +35,8 @@ pub enum Ctx {
     Dialog,
     /// The workspace switcher (modal).
     Switcher,
+    /// Picking a message's link: letters on the links, or their list (modal).
+    Links,
 }
 
 impl Ctx {
@@ -54,6 +56,7 @@ impl Ctx {
         Ctx::HelpFilter,
         Ctx::Dialog,
         Ctx::Switcher,
+        Ctx::Links,
     ];
 
     /// The id config files and the docs use.
@@ -73,6 +76,7 @@ impl Ctx {
             Ctx::HelpFilter => "help.filter",
             Ctx::Dialog => "dialog",
             Ctx::Switcher => "switcher",
+            Ctx::Links => "links",
         }
     }
 
@@ -92,6 +96,7 @@ impl Ctx {
             Ctx::HelpFilter => Label::CtxHelpFilter,
             Ctx::Dialog => Label::CtxDialog,
             Ctx::Switcher => Label::CtxSwitcher,
+            Ctx::Links => Label::CtxLinks,
         }
     }
 
@@ -106,7 +111,8 @@ impl Ctx {
             | Ctx::Help
             | Ctx::HelpFilter
             | Ctx::Dialog
-            | Ctx::Switcher => None,
+            | Ctx::Switcher
+            | Ctx::Links => None,
             Ctx::Shell | Ctx::SignIn => Some(Ctx::Root),
             Ctx::ViewSwitcher | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
             Ctx::PaneVisual => Some(Ctx::PaneNormal),
@@ -125,6 +131,6 @@ impl Ctx {
 
     /// Only its own keys (and the global ones) work here.
     pub fn is_modal(self) -> bool {
-        matches!(self, Ctx::Help | Ctx::Dialog | Ctx::Switcher)
+        matches!(self, Ctx::Help | Ctx::Dialog | Ctx::Switcher | Ctx::Links)
     }
 }

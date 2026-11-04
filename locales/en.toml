@@ -219,6 +219,12 @@
 "action.signin.mark" = "Mark this workspace to sign in to it too (again: unmark it)"
 "action.signin.paste" = "Paste a browser request instead"
 "action.signin.cancel" = "Back to the app, signed in as before"
+"action.links.list" = "Show the links as a list"
+"action.links.down" = "Next link in the list (letters on the links: show the list)"
+"action.links.up" = "Previous link in the list (letters on the links: show the list)"
+"action.links.open" = "Open the link under the list's cursor"
+"action.links.back" = "Take the last letter typed back"
+"action.links.cancel" = "Stop picking, open nothing"
 "action.signin.again" = "Sign in again: a workspace Slack signed out, or another"
 
 # Key contexts (key help and docs/keybindings.md).
@@ -266,7 +272,6 @@
 "hint.close" = "close"
 "hint.extend" = "extend"
 "hint.cancel" = "cancel"
-"hint.pick_link" = "pick a link"
 "hint.send" = "send"
 "hint.newline" = "newline"
 "hint.stop" = "stop typing"
@@ -338,6 +343,7 @@
 "action.switcher.choose" = "Switch to the workspace"
 "action.switcher.close" = "Close the workspace switcher"
 "ctx.switcher" = "Workspace switcher"
+"ctx.links" = "Picking a link (o): the letters on a link open it"
 "ctx.signin" = "Sign-in: Slack desktop app workspaces"
 "switcher.title" = "Workspaces"
 "switcher.keys" = "Enter switch · Esc close"

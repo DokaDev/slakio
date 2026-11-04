@@ -7,16 +7,17 @@
 //! underlined; every other one (`javascript:`, `mailto:`, `file:` …) is plain text. Where a
 //! link's label reads as another address than its own, the real target follows it in a faint
 //! span of its own (`→ host`), a style no sender's markup gives. While a link is being picked
-//! (`o`), the letters that pick it come before it in the hint style. Inline code is tinted, or keeps
+//! (`o`), the letters still to type for it are drawn over its first cells in the hint style. Inline code is tinted, or keeps
 //! its backticks where nothing can tint it; a code block's lines are tinted, or marked by a bar.
 
 use crate::app::App;
 use crate::app::pane::Shown;
 use crate::mrkdwn::{Block, Marks, Piece, plain, real_target};
-use crate::text::{Spot, clip, wrap_tagged};
+use crate::text::{Spot, clip, grapheme_width, width, wrap_tagged};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use slakio_core::model::WorkspaceId;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The bar before a quoted line, and the blank after it.
 const QUOTE: &str = "▎ ";
@@ -29,13 +30,14 @@ const CODE: &str = "│ ";
 pub type Rows = (Vec<Vec<Span<'static>>>, Vec<Vec<Spot>>);
 
 /// The rows of `m`'s text in a pane of workspace `ws`, `w` cells wide, at most `max` of them;
-/// whether text was left out. `hints`: the letters that pick each link, by its number, while
-/// one is being picked (else empty).
+/// whether text was left out. `hints`: the letters still to type for each link, by its number,
+/// while one is being picked (else empty).
 pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints: &[Option<String>]) -> (Rows, bool) {
     let t = &app.theme;
     let mut out: Vec<Vec<Span<'static>>> = Vec::new();
     let mut spots: Vec<Vec<Spot>> = Vec::new();
     let mut link = 0;
+    let mut placed = std::collections::HashSet::new();
     for (k, block) in m.body.iter().enumerate() {
         let room = max.saturating_sub(out.len());
         if room == 0 {
@@ -52,10 +54,6 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints:
                 let (mut runs, mut tags) = (Vec::new(), Vec::new());
                 for p in pieces {
                     let of_link = matches!(p, Piece::Link { .. }).then_some(link);
-                    if let Some(hint) = of_link.and_then(|i| hints.get(i).cloned().flatten()) {
-                        runs.push((hint, t.hint()));
-                        tags.push(of_link);
-                    }
                     for r in runs_of(app, ws, p) {
                         runs.push(r);
                         tags.push(of_link);
@@ -65,6 +63,12 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints:
                 let inner = if *quote { w.saturating_sub(2) } else { w };
                 let (lines, on, more) = wrap_tagged(&runs, &tags, inner, room, t.text());
                 for (mut line, mut on) in lines.into_iter().zip(on) {
+                    // The letters go over a link's first cells: nothing moves or wraps again.
+                    for &(a, _, i) in &on {
+                        if let Some(hint) = hints.get(i).and_then(Option::as_deref).filter(|_| placed.insert(i)) {
+                            line = over(line, a, hint, t.hint());
+                        }
+                    }
                     if *quote {
                         line.insert(0, Span::styled(QUOTE, t.faint()));
                         on.iter_mut().for_each(|s| (s.0, s.1) = (s.0 + 2, s.1 + 2));
@@ -83,6 +87,42 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints:
         }
     }
     ((out, spots), false)
+}
+
+/// `line` with `text` drawn in `style` over its cells from `at` on (a wide character it covers
+/// in part leaves blanks): the line keeps its width. Past the line's end the text goes after it.
+fn over(line: Vec<Span<'static>>, at: usize, text: &str, style: Style) -> Vec<Span<'static>> {
+    let end = at + width(text);
+    let mut out: Vec<Span<'static>> = Vec::new();
+    let put = |out: &mut Vec<Span<'static>>, s: &str, st: Style| match out.last_mut() {
+        Some(last) if last.style == st => last.content.to_mut().push_str(s),
+        _ => out.push(Span::styled(s.to_string(), st)),
+    };
+    let (mut col, mut done) = (0, false);
+    for span in &line {
+        for g in span.content.graphemes(true) {
+            let gw = grapheme_width(g);
+            if col + gw <= at || col >= end {
+                put(&mut out, g, span.style);
+            } else {
+                if col < at {
+                    put(&mut out, &" ".repeat(at - col), span.style);
+                }
+                if !std::mem::replace(&mut done, true) {
+                    put(&mut out, text, style);
+                }
+                if col + gw > end {
+                    put(&mut out, &" ".repeat(col + gw - end), span.style);
+                }
+            }
+            col += gw;
+        }
+    }
+    if !done {
+        put(&mut out, &" ".repeat(at.saturating_sub(col)), Style::default());
+        put(&mut out, text, style);
+    }
+    out
 }
 
 /// Piece `p` as text in its styles: most pieces one run; a link whose label hides where it

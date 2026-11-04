@@ -110,6 +110,10 @@ fn every_action_is_registered() {
         use SignInAction::*;
         [Down, Up, Pick, Mark, Paste, Cancel].map(Action::SignIn)
     };
+    let links = {
+        use LinksAction::*;
+        [List, Down, Up, Open, Back, Cancel].map(Action::Links)
+    };
     let app = {
         use AppAction::*;
         [
@@ -144,7 +148,8 @@ fn every_action_is_registered() {
         .chain(composer)
         .chain(help)
         .chain(dialog)
-        .chain(sign_in);
+        .chain(sign_in)
+        .chain(links);
     let mut n = 0;
     for a in all {
         assert_eq!(spec(a).action, a);

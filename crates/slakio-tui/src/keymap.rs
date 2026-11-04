@@ -17,6 +17,7 @@
 //! help             [modal] (the keyboard help)
 //! help.filter      [text]  (typing the help's search)
 //! dialog           [modal] (a question with two answers)
+//! links            [modal] (picking a message's link: letters on the links, or their list)
 //! ```
 //!
 //! * [`Ctx`] — the contexts and their parents.
@@ -41,8 +42,8 @@ pub use ctx::Ctx;
 pub use keys::{KeyChord, KeyError, parse_keys};
 
 use crate::action::{
-    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, PaneAction, ShellAction,
-    SignInAction, TabAction,
+    Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, LinksAction, PaneAction,
+    ShellAction, SignInAction, TabAction,
 };
 use crate::app::shell::View;
 /// The leader key of the non-text contexts: an unfinished `Space …` sequence is dropped.
@@ -89,6 +90,10 @@ const fn help(ctx: Ctx, keys: &'static str, action: HelpAction) -> Binding {
 
 const fn dialog(keys: &'static str, action: DialogAction) -> Binding {
     bind(Ctx::Dialog, keys, Action::Dialog(action))
+}
+
+const fn links(keys: &'static str, action: LinksAction) -> Binding {
+    bind(Ctx::Links, keys, Action::Links(action))
 }
 
 const fn cmdline(ctx: Ctx, keys: &'static str, action: CommandLineAction) -> Binding {
@@ -320,6 +325,17 @@ pub const DEFAULTS: &[Binding] = &[
     dialog("right", DialogAction::Toggle),
     dialog("h", DialogAction::Toggle),
     dialog("l", DialogAction::Toggle),
+    // Picking a link: its letters (home-row keys, never these) open it; `j`, `k` and `o` are
+    // the list's.
+    links("o", LinksAction::List),
+    links("j", LinksAction::Down),
+    links("down", LinksAction::Down),
+    links("k", LinksAction::Up),
+    links("up", LinksAction::Up),
+    links("enter", LinksAction::Open),
+    links("backspace", LinksAction::Back),
+    links("esc", LinksAction::Cancel),
+    links("ctrl+c", LinksAction::Cancel),
 ];
 
 /// A binding in effect, parsed.

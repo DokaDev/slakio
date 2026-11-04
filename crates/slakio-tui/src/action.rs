@@ -21,6 +21,7 @@ pub enum Action {
     Help(HelpAction),
     Dialog(DialogAction),
     SignIn(SignInAction),
+    Links(LinksAction),
 }
 
 impl Action {
@@ -240,6 +241,24 @@ pub enum DialogAction {
     Toggle,
 }
 
+/// Actions while a message's link is picked (`o` on one with several links that open). The
+/// letters drawn on the links are not actions: each one is the link it is drawn on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum LinksAction {
+    /// Show the links as a list.
+    List,
+    /// The list's next link (with letters on the links: show the list).
+    Down,
+    /// The list's previous link (with letters on the links: show the list).
+    Up,
+    /// Open the link under the list's cursor.
+    Open,
+    /// Take the last letter typed back.
+    Back,
+    /// Stop picking.
+    Cancel,
+}
+
 /// Actions of the sign-in screen's picker of the Slack desktop app's workspaces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SignInAction {
@@ -428,6 +447,12 @@ pub const REGISTRY: &[ActionSpec] = &[
     spec_of(Action::SignIn(SignInAction::Mark), "signin.mark", Label::ActionSigninMark, &[]),
     spec_of(Action::SignIn(SignInAction::Paste), "signin.paste", Label::ActionSigninPaste, &[]),
     spec_of(Action::SignIn(SignInAction::Cancel), "signin.cancel", Label::ActionSigninCancel, &[]),
+    spec_of(Action::Links(LinksAction::List), "links.list", Label::ActionLinksList, &[]),
+    spec_of(Action::Links(LinksAction::Down), "links.down", Label::ActionLinksDown, &[]),
+    spec_of(Action::Links(LinksAction::Up), "links.up", Label::ActionLinksUp, &[]),
+    spec_of(Action::Links(LinksAction::Open), "links.open", Label::ActionLinksOpen, &[]),
+    spec_of(Action::Links(LinksAction::Back), "links.back", Label::ActionLinksBack, &[]),
+    spec_of(Action::Links(LinksAction::Cancel), "links.cancel", Label::ActionLinksCancel, &[]),
 ];
 
 /// The registry entry of `action` (every action has one; a test checks it).

@@ -269,6 +269,20 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `q` | Close the workspace switcher | `switcher.close` |
 | `Ctrl+C` | Close the workspace switcher | `switcher.close` |
 
+## Picking a link (o): the letters on a link open it (`links`) **[modal]**
+
+| Keys | Action | Id |
+|---|---|---|
+| `o` | Show the links as a list | `links.list` |
+| `j` | Next link in the list (letters on the links: show the list) | `links.down` |
+| `Down` | Next link in the list (letters on the links: show the list) | `links.down` |
+| `k` | Previous link in the list (letters on the links: show the list) | `links.up` |
+| `Up` | Previous link in the list (letters on the links: show the list) | `links.up` |
+| `Enter` | Open the link under the list's cursor | `links.open` |
+| `Backspace` | Take the last letter typed back | `links.back` |
+| `Esc` | Stop picking, open nothing | `links.cancel` |
+| `Ctrl+C` | Stop picking, open nothing | `links.cancel` |
+
 ## Commands
 
 Type `:` and the command, then `Enter`.

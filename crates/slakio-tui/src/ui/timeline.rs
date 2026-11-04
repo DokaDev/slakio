@@ -180,6 +180,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     for (i, rows) in shown {
         let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i)) && picking != Some(tl.items[i].ts);
         let mut seen = std::collections::HashSet::new();
+        let mut urls = None;
         for (line, kind, spots) in rows {
             // Where a link starts, counted on the rows cut off too.
             let firsts: Vec<bool> = spots.iter().map(|s| seen.insert(s.2)).collect();
@@ -204,7 +205,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             let x = text_area(row).x;
             for ((a, b, link), first) in spots.into_iter().zip(firsts) {
                 let (x0, x1) = (x.saturating_add(a as u16), x.saturating_add(b as u16).min(row.right()));
-                links.push(LinkSpot { y, x0, x1, ts: tl.items[i].ts, link, first });
+                let urls = urls.get_or_insert_with(|| crate::app::links::links_of(&tl.items[i].body));
+                let url = urls.get(link).map(|u| u.0.clone()).unwrap_or_default();
+                links.push(LinkSpot { y, x0, x1, ts: tl.items[i].ts, link, first, url });
             }
             y += 1;
         }

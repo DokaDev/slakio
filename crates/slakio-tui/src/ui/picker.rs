@@ -1,6 +1,7 @@
 //! The list of a message's links to pick (`o`, when one of them is not on screen): each row its
-//! letters, the host it goes to (its end kept when cut) and its text after it; the cursor row
-//! drawn as the selection.
+//! letters (faint once the letters typed do not start them), the host it goes to (its end kept
+//! when cut) and its text after it; the cursor row drawn as the selection. It scrolls with its
+//! cursor; when it has more rows than it shows, its title says where the cursor is (`3/30`).
 //!
 //! ```text
 //! ╭ Open which link? ─────────────────────────────╮
@@ -11,7 +12,7 @@
 
 use super::modal;
 use crate::app::App;
-use crate::app::links::list_rect;
+use crate::app::picker::list_rect;
 use crate::opener::host_tail;
 use crate::text::{clip, width};
 use crate::theme::Selection;
@@ -32,17 +33,27 @@ pub(super) fn draw(f: &mut Frame, app: &App, body: Rect) {
     let label = |l: Label| app.i18n.label(l).to_string();
     let footer =
         format!("j/k {} · Enter {} · Esc {}", label(Label::HintMove), label(Label::HintOpen), label(Label::HintCancel));
-    let inner = modal(f, app, rect, &label(Label::OpenListTitle), &footer);
+    // Rows past the box: where the cursor is among them all.
+    let rows = usize::from(crate::screen::inner(rect).height);
+    let mut title = label(Label::OpenListTitle);
+    if p.picks.len() > rows {
+        title = format!("{title} {}/{}", cursor + 1, p.picks.len());
+    }
+    let inner = modal(f, app, rect, &title, &footer);
     let w = usize::from(inner.width);
-    for (i, k) in p.picks.iter().enumerate().take(usize::from(inner.height)) {
-        let row = Rect { y: inner.y + i as u16, height: 1, ..inner };
-        let hint = format!(" {} ", k.hint);
-        let lead = width(&hint) as u16;
-        let host = host_tail(&k.host, HOST_MAX.min(w.saturating_sub(width(&hint) + 2)));
-        let room = w.saturating_sub(width(&hint) + 1 + width(&host) + 2);
+    let top = p.list_top(rows);
+    let lead_w = p.picks.iter().map(|k| width(&k.hint)).max().unwrap_or(0) + 2;
+    for (r, (i, k)) in p.picks.iter().enumerate().skip(top).take(rows).enumerate() {
+        let row = Rect { y: inner.y + r as u16, height: 1, ..inner };
+        let hint = format!(" {:<w$} ", k.hint, w = lead_w - 2);
+        // Labels the letters typed do not start are faint.
+        let on = !k.hint.is_empty() && k.hint.starts_with(&p.typed);
+        let lead = lead_w as u16;
+        let host = host_tail(&k.host, HOST_MAX.min(w.saturating_sub(lead_w + 2)));
+        let room = w.saturating_sub(lead_w + 1 + width(&host) + 2);
         let said = k.label.as_deref().map(|l| clip(l, room)).unwrap_or_default();
         let line = Line::from(vec![
-            Span::styled(hint, t.hint()),
+            Span::styled(hint, if on { t.hint() } else { t.faint() }),
             Span::raw(" "),
             Span::styled(host, t.bold()),
             Span::raw("  "),

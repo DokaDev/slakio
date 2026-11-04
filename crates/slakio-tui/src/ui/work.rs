@@ -29,8 +29,9 @@ use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
 use slakio_core::model::{ConversationKind, Presence, Ts};
+use std::time::Instant;
 
-pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)]) {
+pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)], now: Instant) {
     if app.work.ids().is_empty() {
         let area = layout.areas.work;
         f.render_widget(frame(app, Region::Work, ""), area);
@@ -41,13 +42,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Pan
         let Some(pane) = app.work.pane(id) else { continue };
         let view = views.iter().find(|(v, _)| *v == id).map(|(_, v)| v);
         match (layout.pane(id), view) {
-            (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view)),
+            (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view), now),
             _ => pane.hits.borrow_mut().clear(),
         }
     }
 }
 
-fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View)) {
+fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View), now: Instant) {
     let area = layout.rect;
     let t = &app.theme;
     let focused = app.focus() == Focus::Pane(PaneHandle::of(layout.id));
@@ -84,7 +85,11 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     let title = Line::from(spans);
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && pane.insert;
+    let before = pane.links.borrow().clone();
     timeline::draw(f, app, pane, layout.parts.messages, focused);
+    if *pane.links.borrow() != before {
+        pane.links_moved.set(Some(now));
+    }
     if !draw_divider(f, app, pane, (area, layout.parts.divider), (name, focused)) {
         return;
     }

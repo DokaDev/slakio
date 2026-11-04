@@ -67,7 +67,7 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
             list::draw(f, app, l);
             navbar::draw(f, app, l);
         }
-        work::draw(f, app, &layout, &views);
+        work::draw(f, app, &layout, &views, now);
         if let Some(bar) = app.tab_bar() {
             tabbar::draw(f, app, &bar);
         }

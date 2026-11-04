@@ -103,6 +103,7 @@ fn offered(a: Action, backend: bool) -> bool {
         | Action::Pane(_)
         | Action::Tab(_) => backend,
         Action::Help(h) => h == HelpAction::Open,
+        Action::Links(_) => false,
         Action::App(_) | Action::CommandLine(_) | Action::Composer(_) | Action::Dialog(_) | Action::SignIn(_) => false,
     }
 }

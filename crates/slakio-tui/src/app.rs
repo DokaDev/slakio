@@ -42,6 +42,7 @@ mod nav;
 mod overlay;
 pub mod palette;
 pub mod pane;
+pub mod picker;
 pub mod query;
 pub(crate) mod requests;
 pub mod shell;
@@ -142,7 +143,7 @@ pub struct App {
     pub(crate) dialog: Option<Dialog>,
     opening: Option<links::Opening>,
     /// The links of a message being picked (`o`), while they are.
-    picker: Option<links::Picker>,
+    picker: Option<picker::Picker>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: signin::Offer,
@@ -383,6 +384,7 @@ impl App {
             Action::Help(a) => self.help(a, now),
             Action::Dialog(a) => self.answer(a, now),
             Action::SignIn(a) => self.sign_in_action(a),
+            Action::Links(a) => self.links_action(a, now),
         }
     }
 

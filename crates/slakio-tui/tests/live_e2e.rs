@@ -282,21 +282,24 @@ fn several_links_are_picked_by_their_letters_and_clicked_and_refused_ones_get_no
         // A wide character is drawn with a blank after it here: blanks are left out to compare.
         let has = |t: &str, w: &str| t.replace(' ', "").contains(&w.replace(' ', ""));
         let i18n = slakio_core::i18n::I18n::new(if lang == "ko" { Lang::Ko } else { Lang::En });
-        let pick = format!("o {}", i18n.label(Label::HintPickLink));
-        run.wait_for("the letters", |t| t.contains("afirst") && t.contains("ssecond") && has(t, &pick));
+        let pick = format!("a/s/d {}", i18n.label(Label::HintOpen));
+        // The letters are drawn over the links' first cells (`s` over `second` reads the same).
+        run.wait_for("the letters", |t| t.contains("airst") && t.contains("dhird") && has(t, &pick));
         let screen = run.output();
         // The refused links get no letters.
         let before = |w: &str| screen.find(w).and_then(|i| screen[..i].chars().next_back());
-        assert!(screen.contains("dthird") && before("click") == Some(' '), "{lang} {size:?}: {screen}");
+        assert!(screen.contains("second") && before("click") == Some(' '), "{lang} {size:?}: {screen}");
         run.type_bytes(b"s");
         wait_until("the second opened", || recorded(&record).len() == 1);
         assert_eq!(recorded(&record), ["https://two.example.net/2"], "{lang} {size:?}");
-        run.wait_for("the letters gone", |t| !t.contains("ssecond") && t.contains("second"));
+        run.wait_for("the letters gone", |t| !t.contains("airst") && t.contains("first"));
         // Esc stops picking: nothing more opens.
         run.type_bytes(b"o");
-        run.wait_for("picking", |t| t.contains("afirst"));
+        run.wait_for("picking", |t| t.contains("airst"));
         run.type_bytes(b"\x1b");
-        run.wait_for("stopped", |t| !t.contains("afirst"));
+        run.wait_for("stopped", |t| !t.contains("airst"));
+        // A click just after the links moved only selects: wait that out.
+        std::thread::sleep(Duration::from_millis(500));
         // A click on a link opens it; on a refused one it says why.
         click(&mut run, "third");
         wait_until("the third opened", || recorded(&record).len() == 2);
