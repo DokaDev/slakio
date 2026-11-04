@@ -28,10 +28,14 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.13, opens a message's web link in the browser: `o` or `:open [address]`
-(http and https only; it asks first when the link's text names another host, and then shows the real host first).
-The error log is redacted, private and size-capped, and the sign-out notice keeps `:login` visible. It is still
+([Install](#install)); the latest release, 0.0.14, lets you pick a message's link: `o` opens the message's only link, or draws letters on
+each web link of the message to pick one (like tmux or vimium; a list when the links are off screen), and a mouse
+click opens a link. `:open N` is removed (`:open <address>` stays), and links still ask first when the text names
+another host. It is still
 read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack.
+0.0.13 opened a message's web link in the browser: `o` or `:open [N|address]`
+(http and https only; it asked first when the link's text named another host, and then showed the real host first).
+The error log became redacted, private and size-capped, and the sign-out notice kept `:login` visible.
 0.0.12 handled Slack signing a workspace out while slakio ran: that workspace stopped sending
 and showed `signed out, :login`, and `:login` signed it in again without quitting, keeping your tabs, panes and
 drafts (when another user signed in, the old view was cleared), and the refusals of `:net on` became clearer.
