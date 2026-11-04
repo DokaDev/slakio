@@ -68,8 +68,9 @@ pub enum Kind {
     Gap,
 }
 
-/// A row laid out.
-pub type Laid = (Line<'static>, Kind);
+/// A row laid out, and where the message's links are on it ([`crate::text::Spot`]: cells from
+/// the row's text start, the link's number).
+pub type Laid = (Line<'static>, Kind, Vec<crate::text::Spot>);
 
 /// Message `i` follows one of the same sender closely: no picture, no name.
 pub fn grouped(pane: &Pane, tl: &Timeline, i: usize) -> bool {
@@ -93,10 +94,10 @@ fn above(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid>
     let after_reactions = i > 0 && !tl.items[i - 1].reactions.is_empty();
     let after_divider = pane.root(tl) == Some(i.wrapping_sub(1));
     if i > 0 && !after_divider && (new_day || after_reactions || !grouped(pane, tl, i)) {
-        out.push((Line::raw(""), Kind::Gap));
+        out.push((Line::raw(""), Kind::Gap, Vec::new()));
     }
     if new_day {
-        out.push((rule(&time::date(m.ts), w, app.theme.faint()), Kind::Rule));
+        out.push((rule(&time::date(m.ts), w, app.theme.faint()), Kind::Rule, Vec::new()));
     }
     out
 }
@@ -114,7 +115,7 @@ pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected:
     out.extend(footer(app, pane, tl, i, w));
     // A thread read only in part says so after the last reply read.
     if tl.cut && i + 1 == tl.items.len() {
-        out.push((Line::raw(""), Kind::Gap));
+        out.push((Line::raw(""), Kind::Gap, Vec::new()));
         out.extend(notice(&app.i18n.label(Label::PaneThreadCut).to_string(), w, app.theme.faint()));
     }
     out
@@ -142,14 +143,14 @@ fn start(app: &App, pane: &Pane, tl: &Timeline, w: usize) -> Vec<Laid> {
         return Vec::new();
     };
     let mut out = notice(&text, w, faint);
-    out.push((Line::raw(""), Kind::Gap));
+    out.push((Line::raw(""), Kind::Gap, Vec::new()));
     out
 }
 
 /// A notice `text` in `style`, wrapped at blanks to `w` cells (a few rows at most).
 fn notice(text: &str, w: usize, style: Style) -> Vec<Laid> {
     let (lines, _) = crate::text::wrap(text, w.max(1), 3);
-    lines.into_iter().map(|l| (Line::from(Span::styled(l, style)), Kind::Gap)).collect()
+    lines.into_iter().map(|l| (Line::from(Span::styled(l, style)), Kind::Gap, Vec::new())).collect()
 }
 
 /// The picture slot a pane `w` cells wide gives a message (none with avatars off).
@@ -163,10 +164,12 @@ fn slot_for(app: &App, w: usize) -> Option<Slot> {
 }
 
 /// The text of `m` wrapped at `text_w`, emoji drawn, the edited marker on its last line when it
-/// fits (else on a row of its own); whether text was left out.
-fn text_lines(app: &App, pane: &Pane, m: &Shown, text_w: usize) -> (Vec<Vec<Span<'static>>>, bool) {
+/// fits (else on a row of its own), with where its links are on each row; whether text was left
+/// out.
+fn text_lines(app: &App, pane: &Pane, m: &Shown, text_w: usize) -> (body::Rows, bool) {
     let t = &app.theme;
-    let (mut out, more) = body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS);
+    let hints = app.link_hints(pane, m);
+    let ((mut out, mut spots), more) = body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS, &hints);
     if m.edited {
         let edited = app.i18n.label(Label::MessageEdited).to_string();
         let last_w: usize = out.last().map_or(0, |l| l.iter().map(Span::width).sum());
@@ -176,9 +179,15 @@ fn text_lines(app: &App, pane: &Pane, m: &Shown, text_w: usize) -> (Vec<Vec<Span
             }
         } else {
             out.push(vec![Span::styled(edited, t.muted())]);
+            spots.push(Vec::new());
         }
     }
-    (out, more)
+    ((out, spots), more)
+}
+
+/// `spots` moved `by` cells right (the text starts there on its row).
+fn shifted(spots: Vec<crate::text::Spot>, by: usize) -> Vec<crate::text::Spot> {
+    spots.into_iter().map(|(a, b, i)| (a + by, b + by, i)).collect()
 }
 
 /// The comfortable rows of message `i`: header and text beside the picture slot.
@@ -190,16 +199,16 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     let indent = slot.map_or(0, |s| s.cols + 2);
     let text_w = w.saturating_sub(indent).max(4);
     let group = grouped(pane, tl, i);
-    let (lines, _) = text_lines(app, pane, m, text_w);
+    let ((lines, spots), _) = text_lines(app, pane, m, text_w);
     let mut out: Vec<Laid> = Vec::new();
     if group {
-        for (k, mut spans) in lines.into_iter().enumerate() {
+        for (k, (mut spans, on)) in lines.into_iter().zip(spots).enumerate() {
             let lead = match (k, selected && indent >= TIME_WIDTH) {
                 (0, true) => Span::styled(format!("{:<indent$}", time::hm(m.ts)), t.faint()),
                 _ => Span::raw(" ".repeat(indent)),
             };
             spans.insert(0, lead);
-            out.push((Line::from(spans), Kind::Content));
+            out.push((Line::from(spans), Kind::Content, shifted(on, indent)));
         }
         return out;
     }
@@ -223,14 +232,15 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
         header.push(Span::styled(tag, tag_style(app)));
     }
     header.extend([Span::raw("  "), Span::styled(time_text, t.faint())]);
-    out.push((Line::from(header), Kind::Content));
+    out.push((Line::from(header), Kind::Content, Vec::new()));
     // The slot is as high as it is however short the text: a message without text keeps it.
     let rows = lines.len().max(slot.map_or(1, |s| s.rows) - 1);
-    let mut lines = lines.into_iter();
+    let mut lines = lines.into_iter().zip(spots);
     for k in 0..rows {
         let mut spans = picture(k + 1);
-        spans.extend(lines.next().unwrap_or_default());
-        out.push((Line::from(spans), Kind::Content));
+        let (line, on) = lines.next().unwrap_or_default();
+        spans.extend(line);
+        out.push((Line::from(spans), Kind::Content, shifted(on, indent)));
     }
     out
 }
@@ -270,10 +280,10 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             Span::styled(" · ", t.faint()),
             Span::styled(time::hm(m.ts), t.faint()),
         ]);
-        out.push((Line::from(spans), Kind::Content));
+        out.push((Line::from(spans), Kind::Content, Vec::new()));
     }
-    let (lines, _) = text_lines(app, pane, m, text_w);
-    for (k, line) in lines.into_iter().enumerate() {
+    let ((lines, spots), _) = text_lines(app, pane, m, text_w);
+    for (k, (line, on)) in lines.into_iter().zip(spots).enumerate() {
         let mut spans: Vec<Span<'static>> = Vec::new();
         if k == 0 && !stacked && !group {
             let mut name_w = indent_w;
@@ -304,7 +314,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             spans.push(Span::raw(" ".repeat(text_w.saturating_sub(used) + 1)));
             spans.push(Span::styled(time::hm(m.ts), t.faint()));
         }
-        out.push((Line::from(spans), Kind::Content));
+        out.push((Line::from(spans), Kind::Content, shifted(on, indent_w)));
     }
     out
 }
@@ -355,31 +365,35 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
     let indent = " ".repeat(indent_w);
     let mut out = Vec::new();
     let text_w = w.saturating_sub(indent_w).max(4);
-    if body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS).1 {
+    if body::rows(app, pane.target.workspace(), m, text_w, MAX_TEXT_ROWS, &app.link_hints(pane, m)).1 {
         let label = app.i18n.label(Label::MessageMore).to_string();
-        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(label, t.muted())]), Kind::Content));
+        out.push((
+            Line::from(vec![Span::raw(indent.clone()), Span::styled(label, t.muted())]),
+            Kind::Content,
+            Vec::new(),
+        ));
     }
     if let Some(th) = m.thread.filter(|_| !pane.is_thread()) {
         let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply) };
         let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));
-        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(text, t.link())]), Kind::Link));
+        out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(text, t.link())]), Kind::Link, Vec::new()));
     }
     // A chip's first cell is its pad: it sits in the gap, so the emoji lines up with the text.
     let chip_indent = " ".repeat(indent_w.saturating_sub(1));
     for line in chips(app, m, text_w) {
         let mut spans = vec![Span::raw(chip_indent.clone())];
         spans.extend(line);
-        out.push((Line::from(spans), Kind::Content));
+        out.push((Line::from(spans), Kind::Content, Vec::new()));
     }
     if pane.root(tl) == Some(i) {
         let replies = m.thread.map_or(tl.items.len().saturating_sub(1), |t| t.replies as usize);
         if replies > 0 {
             let label = app.i18n.msg(&Msg::ThreadReplies { count: replies as u64 }).to_string();
-            out.push((rule(&label, w, t.faint()), Kind::Rule));
+            out.push((rule(&label, w, t.faint()), Kind::Rule, Vec::new()));
         } else if tl.complete {
             // A blank row apart from the message, as between blocks.
-            out.push((Line::raw(""), Kind::Gap));
-            out.push((Line::styled(no_replies(app), t.faint()), Kind::Rule));
+            out.push((Line::raw(""), Kind::Gap, Vec::new()));
+            out.push((Line::styled(no_replies(app), t.faint()), Kind::Rule, Vec::new()));
         }
     }
     out

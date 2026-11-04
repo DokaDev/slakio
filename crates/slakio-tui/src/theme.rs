@@ -375,6 +375,13 @@ impl Theme {
         self.link().add_modifier(Modifier::UNDERLINED)
     }
 
+    /// The letters that pick a link (`o` on a message with several): bold on the warning
+    /// color, as a mode badge is drawn (reversed without color), so they stand out from the
+    /// link they sit on and from the text.
+    pub fn hint(&self) -> Style {
+        self.mode(self.warning)
+    }
+
     /// A reaction chip: a pill on the raised background (the cursor line's color on a dark
     /// theme, [`Self::raised`]), never darker than the background there; body text on it.
     pub fn reaction(&self) -> Style {

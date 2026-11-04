@@ -16,6 +16,7 @@ mod pty;
 
 use pty::{COOKIE, Run, TOKEN};
 use serde_json::json;
+use slakio_core::i18n::{Label, Lang};
 use slakio_fake::FakeSlack;
 use slakio_world::World;
 use std::path::PathBuf;
@@ -223,8 +224,8 @@ fn a_link_opens_through_the_opener_with_its_address_as_one_argument_and_nothing_
     run.wait_for("said", |t| t.contains("Opening docs.example.com"));
     wait_until("the opener ran", || std::fs::read_to_string(&record).is_ok_and(|r| r.lines().count() == 1));
     assert_eq!(std::fs::read_to_string(&record).unwrap(), "https://docs.example.com/run?a=1&b=$(id)\n");
-    // Its second link runs code: refused, the opener not run.
-    run.type_bytes(b":open 2\r");
+    // An address typed that runs code: refused, the opener not run.
+    run.type_bytes(b":open javascript:alert(2)\r");
     run.wait_for("refused", |t| t.contains("Not opened: only web links open"));
     // A link whose text names another host: asked first, the real host shown, then opened.
     let text = "<https://login.evil.test/x|https://docs.example.com/login>";
@@ -240,4 +241,72 @@ fn a_link_opens_through_the_opener_with_its_address_as_one_argument_and_nothing_
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(m.fake.log().len(), asked, "nothing went to Slack: {:?}", m.fake.methods());
     run.quit();
+}
+
+/// A stand-in for the system's opener in `m`'s directory that records each argument it is
+/// handed, one per line, and where it records them.
+fn recorder(m: &Machine) -> (String, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let (opener, record) = (m.dir.join("opener.sh"), m.dir.join("opened.txt"));
+    let script = format!("#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n", record.display());
+    std::fs::write(&opener, script).unwrap();
+    std::fs::set_permissions(&opener, std::fs::Permissions::from_mode(0o700)).unwrap();
+    (opener.to_string_lossy().into_owned(), record)
+}
+
+fn recorded(record: &std::path::Path) -> Vec<String> {
+    std::fs::read_to_string(record).unwrap_or_default().lines().map(str::to_string).collect()
+}
+
+#[test]
+fn several_links_are_picked_by_their_letters_and_clicked_and_refused_ones_get_none() {
+    for (size, lang) in [((120, 40), "en"), ((80, 24), "en"), ((120, 40), "ko"), ((80, 24), "ko")] {
+        let m = Machine::new(&format!("pick-{}-{lang}", size.0));
+        std::fs::write(m.dir.join("config.toml"), format!("icons = \"off\"\ncache = \"off\"\nlanguage = \"{lang}\"\n"))
+            .unwrap();
+        let (opener, record) = recorder(&m);
+        let Some(mut run) = m.start(size, &[("SLAKIO_TEST_OPENER", &opener)]) else { return };
+        run.wait_for("the list", |t| t.contains("deploys"));
+        click(&mut run, "deploys");
+        wait_until("the channel opened", || m.calls("conversations.view") >= 1);
+        std::thread::sleep(Duration::from_millis(800));
+        let (c, who) = (m.channel("deploys"), m.other());
+        let text = "a <javascript:alert(1)|click> b <https://one.example.org/1|first> c <file:///etc/x|f> \
+                    d <https://two.example.net/2|second> e <https://three.example.com/3|third>";
+        m.fake.push(&json!({"type": "message", "channel": c, "user": who, "text": text, "ts": "1900000000.000100"}));
+        run.wait_for("the message", |t| t.contains("second"));
+        let asked = m.fake.log().len();
+        run.type_bytes(b"\x0c");
+        run.type_bytes(b"G");
+        run.type_bytes(b"o");
+        // A wide character is drawn with a blank after it here: blanks are left out to compare.
+        let has = |t: &str, w: &str| t.replace(' ', "").contains(&w.replace(' ', ""));
+        let i18n = slakio_core::i18n::I18n::new(if lang == "ko" { Lang::Ko } else { Lang::En });
+        let pick = format!("o {}", i18n.label(Label::HintPickLink));
+        run.wait_for("the letters", |t| t.contains("afirst") && t.contains("ssecond") && has(t, &pick));
+        let screen = run.output();
+        // The refused links get no letters.
+        let before = |w: &str| screen.find(w).and_then(|i| screen[..i].chars().next_back());
+        assert!(screen.contains("dthird") && before("click") == Some(' '), "{lang} {size:?}: {screen}");
+        run.type_bytes(b"s");
+        wait_until("the second opened", || recorded(&record).len() == 1);
+        assert_eq!(recorded(&record), ["https://two.example.net/2"], "{lang} {size:?}");
+        run.wait_for("the letters gone", |t| !t.contains("ssecond") && t.contains("second"));
+        // Esc stops picking: nothing more opens.
+        run.type_bytes(b"o");
+        run.wait_for("picking", |t| t.contains("afirst"));
+        run.type_bytes(b"\x1b");
+        run.wait_for("stopped", |t| !t.contains("afirst"));
+        // A click on a link opens it; on a refused one it says why.
+        click(&mut run, "third");
+        wait_until("the third opened", || recorded(&record).len() == 2);
+        assert_eq!(recorded(&record)[1], "https://three.example.com/3", "{lang} {size:?}");
+        click(&mut run, "click");
+        let refused = i18n.label(Label::OpenRefused).to_string();
+        run.wait_for("refused", |t| has(t, &refused));
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(recorded(&record).len(), 2, "{lang} {size:?}");
+        assert_eq!(m.fake.log().len(), asked, "nothing went to Slack: {:?}", m.fake.methods());
+        run.quit();
+    }
 }

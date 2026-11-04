@@ -2,7 +2,8 @@
 //! ([`App::key_context`]) and the mouse, and drawing paints them bottom up, so what is drawn on
 //! top is always what the keys and the mouse go to.
 //!
-//! From the top: a question ([`super::dialog`]), the keyboard help, the command palette, the
+//! From the top: a question ([`super::dialog`]), the list of links to pick ([`super::links`],
+//! which takes its keys before any context), the keyboard help, the command palette, the
 //! workspace switcher ([`super::nav`]), the which-key popup. The palette and the which-key popup are drawn only on top; the help stays
 //! visible under a question.
 
@@ -14,6 +15,7 @@ use std::time::Instant;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Layer {
     Dialog,
+    Links,
     Help,
     Palette,
     Switcher,
@@ -26,6 +28,7 @@ impl App {
     pub(crate) fn layers(&self, now: Option<Instant>) -> Vec<Layer> {
         let up = [
             (Layer::Dialog, self.dialog.is_some()),
+            (Layer::Links, self.picker.as_ref().is_some_and(|p| p.list.is_some())),
             (Layer::Help, self.help.is_some()),
             (Layer::Palette, self.cmdline.is_open()),
             (Layer::Switcher, self.switcher.is_some()),
@@ -41,7 +44,7 @@ impl App {
             Layer::Help => Some(Overlay::Help),
             Layer::Palette => Some(Overlay::Palette),
             Layer::Switcher => Some(Overlay::Switcher),
-            Layer::WhichKey => None,
+            Layer::Links | Layer::WhichKey => None,
         }
     }
 }

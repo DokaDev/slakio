@@ -17,7 +17,7 @@ pub mod message;
 use super::highlight;
 use crate::action::{Action, PaneAction};
 use crate::app::App;
-use crate::app::pane::{Hit, Pane};
+use crate::app::pane::{Hit, LinkSpot, Pane};
 use crate::keymap::Ctx;
 use crate::theme::Selection;
 use message::{Kind, Laid};
@@ -48,6 +48,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let tl = app.work.timeline(pane);
     let t = &app.theme;
     pane.hits.borrow_mut().clear();
+    pane.links.borrow_mut().clear();
     if area.height == 0 || area.width < 3 {
         return;
     }
@@ -172,10 +173,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut skip = if from_top { 0 } else { total.saturating_sub(reach) };
     let mut y = if from_top { area.y } else { area.y + h.saturating_sub(total) as u16 };
     let mut hits = pane.hits.borrow_mut();
+    let mut links = pane.links.borrow_mut();
     let mut sel_last = None;
+    // The message whose links are being picked shows its letters, not the selection.
+    let picking = app.picking_in(pane);
     for (i, rows) in shown {
-        let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i));
-        for (line, kind) in rows {
+        let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i)) && picking != Some(tl.items[i].ts);
+        let mut seen = std::collections::HashSet::new();
+        for (line, kind, spots) in rows {
+            // Where a link starts, counted on the rows cut off too.
+            let firsts: Vec<bool> = spots.iter().map(|s| seen.insert(s.2)).collect();
             if skip > 0 {
                 skip -= 1;
                 continue;
@@ -193,6 +200,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
             if kind != Kind::Gap {
                 hits.push(Hit { y, message: i, link: kind == Kind::Link });
+            }
+            let x = text_area(row).x;
+            for ((a, b, link), first) in spots.into_iter().zip(firsts) {
+                let (x0, x1) = (x.saturating_add(a as u16), x.saturating_add(b as u16).min(row.right()));
+                links.push(LinkSpot { y, x0, x1, ts: tl.items[i].ts, link, first });
             }
             y += 1;
         }

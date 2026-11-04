@@ -3,15 +3,17 @@
 //! never wrapped, it is cut with `…`. People and channels are named from the read model when it
 //! knows them (their names may come after the message), else by the label Slack wrote, else by
 //! their id. The user named, and everyone (`@here`), stand out as GUI Slack marks a mention; an
-//! app named is marked. Links are underlined; where a link's label reads as another address
-//! than its own, the real target follows it in a faint span of its own (`→ host`), a style no
-//! sender's markup gives. A link that runs code is plain text. Inline code is tinted, or keeps
+//! app named is marked. A link that opens (a web address, [`crate::opener::check`]) is
+//! underlined; every other one (`javascript:`, `mailto:`, `file:` …) is plain text. Where a
+//! link's label reads as another address than its own, the real target follows it in a faint
+//! span of its own (`→ host`), a style no sender's markup gives. While a link is being picked
+//! (`o`), the letters that pick it come before it in the hint style. Inline code is tinted, or keeps
 //! its backticks where nothing can tint it; a code block's lines are tinted, or marked by a bar.
 
 use crate::app::App;
 use crate::app::pane::Shown;
-use crate::mrkdwn::{Block, Marks, Piece, plain, real_target, runs_code};
-use crate::text::{clip, wrap_styled};
+use crate::mrkdwn::{Block, Marks, Piece, plain, real_target};
+use crate::text::{Spot, clip, wrap_tagged};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use slakio_core::model::WorkspaceId;
@@ -22,16 +24,24 @@ const QUOTE: &str = "▎ ";
 /// The bar before a code block's line where nothing tints it (no color), and the blank after it.
 const CODE: &str = "│ ";
 
+/// The rows of a message's text, and on each where its links are ([`Spot`]: cells from the
+/// row's start, the link's number among the message's links, from 0).
+pub type Rows = (Vec<Vec<Span<'static>>>, Vec<Vec<Spot>>);
+
 /// The rows of `m`'s text in a pane of workspace `ws`, `w` cells wide, at most `max` of them;
-/// whether text was left out.
-pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Vec<Vec<Span<'static>>>, bool) {
+/// whether text was left out. `hints`: the letters that pick each link, by its number, while
+/// one is being picked (else empty).
+pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints: &[Option<String>]) -> (Rows, bool) {
     let t = &app.theme;
     let mut out: Vec<Vec<Span<'static>>> = Vec::new();
+    let mut spots: Vec<Vec<Spot>> = Vec::new();
+    let mut link = 0;
     for (k, block) in m.body.iter().enumerate() {
         let room = max.saturating_sub(out.len());
         if room == 0 {
-            return (out, true);
+            return ((out, spots), true);
         }
+        spots.resize(out.len(), Vec::new());
         match block {
             // Without color nothing tints a code block: a bar marks its lines.
             Block::Code(line) if t.kind == crate::theme::Kind::NoColor => {
@@ -39,30 +49,45 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize) -> (Ve
             }
             Block::Code(line) => out.push(vec![Span::styled(clip(line, w), t.code())]),
             Block::Line { quote, pieces } => {
-                let runs: Vec<(String, Style)> = pieces.iter().flat_map(|p| runs(app, ws, p)).collect();
+                let (mut runs, mut tags) = (Vec::new(), Vec::new());
+                for p in pieces {
+                    let of_link = matches!(p, Piece::Link { .. }).then_some(link);
+                    if let Some(hint) = of_link.and_then(|i| hints.get(i).cloned().flatten()) {
+                        runs.push((hint, t.hint()));
+                        tags.push(of_link);
+                    }
+                    for r in runs_of(app, ws, p) {
+                        runs.push(r);
+                        tags.push(of_link);
+                    }
+                    link += usize::from(of_link.is_some());
+                }
                 let inner = if *quote { w.saturating_sub(2) } else { w };
-                let (lines, more) = wrap_styled(&runs, inner, room, t.text());
-                for mut line in lines {
+                let (lines, on, more) = wrap_tagged(&runs, &tags, inner, room, t.text());
+                for (mut line, mut on) in lines.into_iter().zip(on) {
                     if *quote {
                         line.insert(0, Span::styled(QUOTE, t.faint()));
+                        on.iter_mut().for_each(|s| (s.0, s.1) = (s.0 + 2, s.1 + 2));
                     }
                     out.push(line);
+                    spots.push(on);
                 }
                 if more {
-                    return (out, true);
+                    return ((out, spots), true);
                 }
             }
         }
+        spots.resize(out.len(), Vec::new());
         if out.len() >= max && k + 1 < m.body.len() {
-            return (out, true);
+            return ((out, spots), true);
         }
     }
-    (out, false)
+    ((out, spots), false)
 }
 
 /// Piece `p` as text in its styles: most pieces one run; a link whose label hides where it
 /// goes, and an app named, a faint run after it.
-fn runs(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
+fn runs_of(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
     let t = &app.theme;
     let text = plain(p, &|p| app.model.named(ws, p));
     match p {
@@ -81,11 +106,12 @@ fn runs(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
         Piece::Channel { marks, .. } => vec![(text, marked(t.mention(false), *marks))],
         Piece::Broadcast(_) => vec![(text, t.mention(true))],
         Piece::Group(_) => vec![(text, t.mention(false))],
-        Piece::Link { url, marks, .. } if runs_code(url) => vec![(text, marked(t.text(), *marks))],
+        // Only a link that opens looks like one; a link that runs code says nowhere it goes.
         Piece::Link { url, label, marks } => {
             let real = label.as_deref().and_then(|l| real_target(url, l));
             let shown = label.clone().filter(|_| real.is_some()).unwrap_or(text);
-            let mut out = vec![(shown, marked(t.markup_link(), *marks))];
+            let style = if crate::opener::check(url).is_some() { t.markup_link() } else { t.text() };
+            let mut out = vec![(shown, marked(style, *marks))];
             out.extend(real.map(|r| (format!(" → {r}"), t.faint())));
             out
         }

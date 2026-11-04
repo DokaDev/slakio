@@ -58,7 +58,7 @@ pub enum Item {
     Avatars(usize),
     /// `:rename <name>`: name the tab shown that (nothing: after what it shows).
     Rename,
-    /// `:open <link number or address>`.
+    /// `:open <address>`: the address typed.
     Open,
     /// A value for `:icons <value>` (index into [`ICON_VALUES`]).
     Icons(usize),
@@ -135,11 +135,12 @@ fn theme_label(name: &str) -> Label {
     }
 }
 
-/// The name of `:rename <name>` (empty: `:rename ` with nothing after it).
+/// The address of `:open <address>` (empty: `:open ` with nothing after it).
 fn open_arg(line: &str) -> Option<&str> {
     line.trim_start().strip_prefix("open").filter(|r| r.starts_with(char::is_whitespace)).map(str::trim)
 }
 
+/// The name of `:rename <name>` (empty: `:rename ` with nothing after it).
 fn rename_arg(line: &str) -> Option<&str> {
     let rest = line.trim_start().strip_prefix("rename")?;
     rest.starts_with(char::is_whitespace).then(|| rest.trim())

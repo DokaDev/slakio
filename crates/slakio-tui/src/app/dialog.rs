@@ -41,7 +41,7 @@ impl App {
     }
 
     /// An answer to the question asked (`Tab` moves the focus between the answers).
-    pub(super) fn answer(&mut self, a: DialogAction) {
+    pub(super) fn answer(&mut self, a: DialogAction, now: std::time::Instant) {
         let Some(mut d) = self.dialog else { return };
         let yes = match a {
             DialogAction::Yes => true,
@@ -61,7 +61,7 @@ impl App {
         match d.question {
             Question::Quit | Question::QuitConfirm => self.quit = yes,
             Question::Clear => self.answer_clear(yes),
-            Question::Open => self.answer_open(yes),
+            Question::Open => self.answer_open(yes, now),
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });

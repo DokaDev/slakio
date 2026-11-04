@@ -123,6 +123,19 @@ pub struct Hit {
     pub link: bool,
 }
 
+/// A link of a message as last drawn, for the mouse and for `o`: its row, its cells `[x0, x1)`,
+/// its message and its number among that message's links; `first`: where the link starts (the
+/// letters that pick it are drawn there).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LinkSpot {
+    pub y: u16,
+    pub x0: u16,
+    pub x1: u16,
+    pub ts: Ts,
+    pub link: usize,
+    pub first: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct Pane {
     pub target: Target,
@@ -158,6 +171,8 @@ pub struct Pane {
     pub history: History,
     /// The rows drawn last, by drawing (only it knows the rows' heights).
     pub hits: RefCell<Vec<Hit>>,
+    /// The links drawn last, by drawing.
+    pub links: RefCell<Vec<LinkSpot>>,
 }
 
 impl Pane {
@@ -177,6 +192,7 @@ impl Pane {
             thread: None,
             history: History::default(),
             hits: RefCell::new(Vec::new()),
+            links: RefCell::new(Vec::new()),
         }
     }
 

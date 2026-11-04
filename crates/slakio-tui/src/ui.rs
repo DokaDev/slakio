@@ -22,6 +22,7 @@ mod help;
 mod list;
 mod navbar;
 mod palette;
+mod picker;
 mod signin;
 mod statusline;
 mod switcher;
@@ -97,6 +98,10 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
                 dialog::draw(f, app, body);
             }
             Layer::Switcher if !screen::too_small(area) => switcher::draw(f, app),
+            Layer::Links => {
+                app.theme.dim_area(f.buffer_mut(), body);
+                picker::draw(f, app, body);
+            }
             Layer::WhichKey | Layer::Palette | Layer::Switcher => {}
         }
     }

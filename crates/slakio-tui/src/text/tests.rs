@@ -153,3 +153,19 @@ fn an_arrow_and_a_long_hyphenated_host_stay_on_one_row_whenever_they_fit() {
     assert!(lines.iter().any(|l| l.contains("attacker.example:8443")), "{lines:?}");
     assert!(lines.iter().all(|l| !l.trim_end().ends_with('→')), "{lines:?}");
 }
+
+#[test]
+fn wrap_tagged_says_where_each_tagged_run_is_on_its_lines() {
+    let runs = vec![
+        ("see ".to_string(), Style::new()),
+        ("the runbook".to_string(), Style::new()),
+        (" or ".to_string(), Style::new()),
+        ("\u{D55C}\u{AE00} link".to_string(), Style::new()),
+    ];
+    let (lines, spots, more) = wrap_tagged(&runs, &[None, Some(0), None, Some(1)], 12, 10, Style::new());
+    assert!(!more);
+    assert_eq!(lines.len(), spots.len());
+    // `see the` / `runbook or` / the Hangul and `link`: a run wrapped is on two lines (the
+    // blank that ends the first is the run's).
+    assert_eq!(spots, [vec![(4, 8, 0)], vec![(0, 7, 0)], vec![(0, 9, 1)]]);
+}

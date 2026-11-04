@@ -167,6 +167,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     {
         resolved.insert(0, (k, Label::HintRetry));
     }
+    // Picking a link (`o`): only its keys.
+    if let Some(keys) = app.picker_hints() {
+        resolved = keys;
+    }
     let all_hints: Vec<(String, String)> =
         resolved.iter().map(|(k, l)| (k.clone(), app.i18n.label(*l).to_string())).collect();
     let hint_spans = |hints: &[(String, String)]| -> Spans {

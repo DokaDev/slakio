@@ -141,6 +141,8 @@ pub struct App {
     /// A question, while asked; the link it asks about, if it does.
     pub(crate) dialog: Option<Dialog>,
     opening: Option<links::Opening>,
+    /// The links of a message being picked (`o`), while they are.
+    picker: Option<links::Picker>,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: signin::Offer,
@@ -179,6 +181,7 @@ impl App {
             help: None,
             dialog: None,
             opening: None,
+            picker: None,
             backend: None,
             sign_in: signin::Offer::default(),
             boots: Vec::new(),
@@ -317,6 +320,9 @@ impl App {
 
     /// Resolve one key in the current context.
     fn feed(&mut self, key: KeyChord, now: Instant) {
+        if self.picker.is_some() {
+            return self.pick_key(key, now);
+        }
         let ctx = self.key_context();
         // While a sequence waits, `Backspace` takes its last key back (the popup goes up a
         // level); a `?` that ends no sequence shows every key (below).
@@ -410,7 +416,7 @@ impl App {
             Action::Tab(a) => self.tab(a, now),
             Action::Composer(a) => self.composer(a, now),
             Action::Help(a) => self.help(a, now),
-            Action::Dialog(a) => self.answer(a),
+            Action::Dialog(a) => self.answer(a, now),
             Action::SignIn(a) => self.sign_in_action(a),
         }
     }
@@ -510,7 +516,7 @@ impl App {
             }),
             PaneAction::Escape => self.escape(main_target),
             PaneAction::Copy => self.copy(now),
-            PaneAction::OpenLink => self.open_link(1, now),
+            PaneAction::OpenLink => self.open_link(now),
             PaneAction::Insert => self.write(now),
             PaneAction::Left => {
                 if self.focus().is_pane()

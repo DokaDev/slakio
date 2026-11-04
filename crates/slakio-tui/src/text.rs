@@ -119,26 +119,45 @@ pub fn wrap_styled(
     max_lines: usize,
     fallback: Style,
 ) -> (Vec<Vec<Span<'static>>>, bool) {
+    let (lines, _, more) = wrap_tagged(runs, &[], w, max_lines, fallback);
+    (lines, more)
+}
+
+/// Where a tagged run's text is on a line: its cells `[from, to)` and the run's tag.
+pub type Spot = (usize, usize, usize);
+
+/// [`wrap_styled`], each run `i` tagged `tags[i]` (none past the end of `tags`): also, for every
+/// line, where the text of a tagged run is on it ([`Spot`], one a run and a line).
+pub fn wrap_tagged(
+    runs: &[(String, Style)],
+    tags: &[Option<usize>],
+    w: usize,
+    max_lines: usize,
+    fallback: Style,
+) -> (Vec<Vec<Span<'static>>>, Vec<Vec<Spot>>, bool) {
     let plain: String = runs.iter().map(|(s, _)| s.as_str()).collect();
     let (lines, more) = wrap(&plain, w, max_lines);
-    // Where each run starts in `plain`, and its style.
-    let mut starts: Vec<(usize, Style)> = Vec::with_capacity(runs.len());
+    // Where each run starts in `plain`, its style and its tag.
+    let mut starts: Vec<(usize, Style, Option<usize>)> = Vec::with_capacity(runs.len());
     let mut at = 0;
-    for (s, st) in runs {
+    for (i, (s, st)) in runs.iter().enumerate() {
         if !s.is_empty() {
-            starts.push((at, *st));
+            starts.push((at, *st, tags.get(i).copied().flatten()));
         }
         at += s.len();
     }
-    let style_at = |byte: usize| match starts.partition_point(|(b, _)| *b <= byte) {
-        0 => fallback,
-        n => starts[n - 1].1,
+    let run_at = |byte: usize| match starts.partition_point(|(b, ..)| *b <= byte) {
+        0 => (fallback, None),
+        n => (starts[n - 1].1, starts[n - 1].2),
     };
     let mut cursor = 0;
+    let mut spots = Vec::with_capacity(lines.len());
     let out = lines
         .iter()
         .map(|line| {
             let mut spans: Vec<Span<'static>> = Vec::new();
+            let mut on: Vec<Spot> = Vec::new();
+            let mut col = 0;
             for g in line.graphemes(true) {
                 // Pass over the blanks and breaks the wrap left out.
                 while !plain[cursor..].starts_with(g)
@@ -146,22 +165,30 @@ pub fn wrap_styled(
                 {
                     cursor += c.len_utf8();
                 }
-                let style = if plain[cursor..].starts_with(g) {
-                    let style = style_at(cursor);
+                let (style, tag) = if plain[cursor..].starts_with(g) {
+                    let run = run_at(cursor);
                     cursor += g.len();
-                    style
+                    run
                 } else {
-                    fallback
+                    (fallback, None)
                 };
+                let gw = grapheme_width(g);
+                match (tag, on.last_mut()) {
+                    (Some(t), Some(last)) if last.2 == t && last.1 == col => last.1 += gw,
+                    (Some(t), _) => on.push((col, col + gw, t)),
+                    (None, _) => {}
+                }
+                col += gw;
                 match spans.last_mut() {
                     Some(last) if last.style == style => last.content.to_mut().push_str(g),
                     _ => spans.push(Span::styled(g.to_string(), style)),
                 }
             }
+            spots.push(on);
             spans
         })
         .collect();
-    (out, more)
+    (out, spots, more)
 }
 
 /// `s` as runs of non-blanks and runs of blanks (a word keeps the punctuation written against

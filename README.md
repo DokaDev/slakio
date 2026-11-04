@@ -160,9 +160,13 @@ images, and settings. This README only lists what works; it will grow with each 
   `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
   colors.
-- Links: `o` on a selected message opens its first link in your browser (`:open 2` its second,
-  `:open <address>` one you type). Only `http` and `https` addresses open; when a link's text
-  names another host than the one it goes to, slakio shows the real host and asks first.
+- Links: `o` on a selected message opens its link in your browser. With several links, each
+  one that opens gets a letter or two drawn on it (`a`, `s`, `d` …): type them to open that one,
+  `Esc` to stop; when one of them is off screen, a list of them shows instead (`j`/`k`,
+  `Enter`). A click on a link opens it too, and `:open <address>` opens one you type. Only
+  `http` and `https` addresses open (other links get no letter and are not drawn as links);
+  when a link's text names another host than the one it goes to, slakio shows the real host
+  and asks first.
   Nothing is sent to Slack for it, so it works in read-only mode too.
 - Failures are written to `errors.log` in the state directory (`$SLAKIO_STATE_DIR`, else
   `$XDG_STATE_HOME/slakio`, or the platform's equivalent), readable by you only. It never holds

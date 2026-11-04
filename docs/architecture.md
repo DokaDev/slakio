@@ -183,7 +183,10 @@ comes back); people and channels are named from the read model when drawn
   system's opener (`/usr/bin/open`, `xdg-open` on `PATH`, `%SystemRoot%\System32\rundll32.exe
   url.dll,FileProtocolHandler`; no shell). A link whose text names another host is asked about
   first (`dialog::Question::Open`), the real host first and cut from its start, so its end
-  shows. Tests stand in for the opener (`SLAKIO_TEST_OPENER`, debug
+  shows. `o` with several links that open (`app::links::Picker`) draws letters on each, where
+  drawing last placed them (`Pane::links`, also what a click hits), or lists them when one was
+  not drawn; a pick opens only while the message reads as it did when picking began. Tests
+  stand in for the opener (`SLAKIO_TEST_OPENER`, debug
   builds only) and never start a browser.
 
 ## The Slack transport
