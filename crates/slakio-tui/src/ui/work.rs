@@ -1,9 +1,9 @@
-//! The work area: the main pane with the conversation the list opened and, beside it, the auto
-//! thread panel. Each pane is titled with the workspace stripe and the conversation's name,
-//! shows its messages ([`super::timeline`]) and, below a divider joined to its border, its own
-//! composer: a prompt and the text, no box of its own. A pane that holds its view while
-//! messages come live below it says how many at its bottom edge (`↓ 3 new`), until the view
-//! reaches the newest.
+//! The work area: the panes of the tab shown — the conversation the list opened, the auto
+//! thread panel beside it, the panes split off. Each pane is titled with the workspace stripe
+//! and the conversation's name (a zoomed tab's one pane says `[zoomed]`), shows its messages
+//! ([`super::timeline`]) and, below a divider joined to its border, its own composer: a prompt
+//! and the text, no box of its own. A pane that holds its view while messages come live below
+//! it says how many at its bottom edge (`↓ 3 new`), until the view reaches the newest.
 //!
 //! ```text
 //! ╭ ▌#backend ─────────────────────╮╭ ▌⤷ Thread · #backend ──╮   a DM: ▌MK @Minsu Kim ● active
@@ -72,6 +72,10 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         spans.extend([chip, Span::raw(" ")]);
     }
     spans.push(Span::styled(text, t.title(focused)));
+    // A zoomed tab shows its active pane alone, and says so.
+    if app.work.zoomed() {
+        spans.push(Span::styled(format!("[{}] ", app.i18n.label(Label::PaneZoomed)), t.accent()));
+    }
     // A DM's title says whether its peer is around: `@Minsu Kim ● active`.
     if let Some((mark, p)) = peer.and_then(|u| presence_mark(u.presence)) {
         let label = match p {

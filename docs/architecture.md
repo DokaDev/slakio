@@ -62,8 +62,11 @@ that owns its data and its update: the command line (`app/cmdline.rs`), the stat
 notices (`app/status.rs`), the shell — focus between the view switcher, the list panel and the work
 area, the view switcher's and the list's cursors, folded sections (`app/shell.rs`) —, the work area — its panes by id, placed by
 tabs of `slakio-core` (`layout/tabs.rs`: tabs in the user's order, never reordered by the app,
-each a layout tree of `layout.rs` — the conversation, or split with the auto thread panel — and
-its active pane), the tabs closed to open again
+each a layout tree of `layout.rs` — panes split beside or under each other, a pane and the
+auto thread panel it opened split as one — its active pane and whether it is zoomed on it), the
+user's splits, zoom and even room (`app/work/splits.rs`; what a split opens, the room it needs
+and the keyboard moving to the pane on a side, by place, in `app/splits.rs`), the tabs closed
+to open again
 (`app/work.rs`, `app/work/tabs.rs`; the app's side of tabs, their titles and the tab bar's mouse
 in `app/tabs.rs`, the bar's geometry in `tabbar.rs`), the list panel's workspace chip, its view switcher and the workspace switcher
 (`app/nav.rs`; their geometry in `navbar.rs`, where a Nerd Font glyph always takes two cells) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
@@ -73,8 +76,7 @@ back/forward history), the messages of each target a pane shows, held once howev
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), To-dos' filter and
 order and the changes to saved items it waits for (`app/todos.rs`), the
-keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`); splits of a
-tab join as they are built. Where the keyboard is is one field of the app — the view switcher, the list panel or the work area,
+keyboard help (`app/help.rs`) and a question with two answers (`app/dialog.rs`). Where the keyboard is is one field of the app — the view switcher, the list panel or the work area,
 whose active pane has it (`app/focus.rs`; the pane is never kept twice, so the focus cannot name
 a closed pane; the shell and the work area hand back where it should go) — and the
 popups come in one order (`app/overlay.rs`); the key map, the mouse and drawing all read

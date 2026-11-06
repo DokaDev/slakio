@@ -78,7 +78,7 @@ pub enum CommandLineAction {
 pub enum ShellAction {
     FocusLeft,
     FocusRight,
-    /// No panel is above or below another yet (splits come later): says so.
+    /// The pane above (below) the one with the keyboard; with none, says so.
     FocusUp,
     FocusDown,
     /// The next panel: the views, the list, main pane, thread panel, round again.
@@ -167,10 +167,19 @@ pub enum PaneAction {
     Insert,
     /// Close the focused pane: the thread panel, else the conversation.
     Close,
-    /// The panel to the left (the main pane from the thread panel, else the list).
+    /// The pane to the left, by place (from the leftmost, the list).
     Left,
-    /// The thread panel from the main pane.
+    /// The pane to the right, by place.
     Right,
+    /// Split the pane: the selected message's thread (else what it shows) beside it, or under
+    /// it; the thread panel splits off as a pane of its own. From the list, what is under its
+    /// cursor.
+    SplitRight,
+    SplitBelow,
+    /// The active pane takes the whole tab, or every pane shows again.
+    Zoom,
+    /// The panes of the tab shown share its room evenly.
+    Equalize,
     /// What the pane showed before (each pane has its own back/forward history).
     Back,
     Forward,
@@ -397,6 +406,10 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Escape, "pane.escape", Label::ActionPaneEscape, &[]),
     pane(PaneAction::Left, "pane.left", Label::ActionPaneLeft, &[]),
     pane(PaneAction::Right, "pane.right", Label::ActionPaneRight, &[]),
+    pane(PaneAction::SplitRight, "pane.split_right", Label::ActionPaneSplitRight, &["vsplit", "vs"]),
+    pane(PaneAction::SplitBelow, "pane.split_below", Label::ActionPaneSplitBelow, &["split", "sp"]),
+    pane(PaneAction::Zoom, "pane.zoom", Label::ActionPaneZoom, &["zoom"]),
+    pane(PaneAction::Equalize, "pane.equalize", Label::ActionPaneEqualize, &["equalize", "equalise"]),
     // `:q` closes as in vim (the pane, then its tab), never the app: that is `:qa`.
     pane(PaneAction::Close, "pane.close", Label::ActionPaneClose, &["q", "quit", "close"]),
     pane(PaneAction::Back, "history.back", Label::ActionHistoryBack, &["back"]),

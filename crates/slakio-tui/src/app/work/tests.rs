@@ -112,7 +112,7 @@ fn enter_opens_the_thread_panel_and_another_thread_replaces_it() {
     let thread = thread_pane(&w).unwrap();
     assert!(thread.is_thread() && w.timeline(thread).items.len() >= 200);
     let first = thread.target.clone();
-    let main = w.beside(-1).unwrap();
+    let main = w.owner(w.active().unwrap()).unwrap();
     assert_eq!(Some(main), main_id(&w));
     w.activate(main);
     w.with_pane(|p, tl| p.select_index(1, tl));

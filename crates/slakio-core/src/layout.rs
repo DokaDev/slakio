@@ -103,6 +103,53 @@ impl Node {
         }
     }
 
+    /// The smallest part of the tree that holds every pane of `ids` (none: `None`).
+    pub fn around(&self, ids: &[PaneId]) -> Option<&Node> {
+        if ids.is_empty() || !ids.iter().all(|id| self.contains(*id)) {
+            return None;
+        }
+        match self {
+            Self::Split { first, second, .. } => first.around(ids).or_else(|| second.around(ids)).or(Some(self)),
+            Self::Leaf(_) => Some(self),
+        }
+    }
+
+    /// The tree with its part `old` (as [`Node::around`] found it) replaced by `with`.
+    pub fn replace_part(&self, old: &Node, with: &Node) -> Node {
+        match self {
+            _ if self == old => with.clone(),
+            Self::Leaf(_) => self.clone(),
+            Self::Split { dir, share, first, second } => {
+                Self::split(*dir, *share, first.replace_part(old, with), second.replace_part(old, with))
+            }
+        }
+    }
+
+    /// The tree with each split sharing its length evenly: a run of splits the same way gives
+    /// each of its parts the same room. A split whose share `keep` holds stays as it is, and
+    /// counts as one part. `share(dir, first, second)` is the share of a split whose two sides
+    /// hold `first` and `second` such parts.
+    pub fn equalized(&self, keep: &impl Fn(&Share) -> bool, share: &impl Fn(Dir, u16, u16) -> Share) -> Node {
+        match self {
+            Self::Leaf(_) => self.clone(),
+            Self::Split { dir, share: s, first, second } => {
+                let s = if keep(s) { *s } else { share(*dir, first.parts(*dir, keep), second.parts(*dir, keep)) };
+                Self::split(*dir, s, first.equalized(keep, share), second.equalized(keep, share))
+            }
+        }
+    }
+
+    /// The parts this side of a split along `dir` holds: a split the same way (that `keep`
+    /// does not hold) counts the parts of both its sides; anything else is one.
+    fn parts(&self, dir: Dir, keep: &impl Fn(&Share) -> bool) -> u16 {
+        match self {
+            Self::Split { dir: d, share, first, second } if *d == dir && !keep(share) => {
+                first.parts(dir, keep).saturating_add(second.parts(dir, keep))
+            }
+            _ => 1,
+        }
+    }
+
     /// Where each pane shown is, in `area`; `focused` decides which one stays where two do not
     /// fit.
     pub fn solve(&self, area: Area, focused: Option<PaneId>) -> Vec<(PaneId, Area)> {
@@ -139,6 +186,43 @@ impl Node {
             }
         }
     }
+}
+
+/// A way to go from a pane to the one beside it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Toward {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+/// The pane next to `from` going `toward`, among the panes laid out at `areas` ([`Node::solve`]):
+/// of those whose side touches or faces that side of `from` and that share some of its rows
+/// (columns), the nearest; then the one sharing the most; then the first (top, left). `None`
+/// when there is none that way, or `from` is not laid out.
+pub fn toward(areas: &[(PaneId, Area)], from: PaneId, toward: Toward) -> Option<PaneId> {
+    let (_, f) = areas.iter().find(|(id, _)| *id == from)?;
+    let span = |a: &Area, rows: bool| {
+        if rows { (a.y, a.y + a.height) } else { (a.x, a.x + a.width) }
+    };
+    let overlap = |a: (u16, u16), b: (u16, u16)| a.1.min(b.1).saturating_sub(a.0.max(b.0));
+    areas
+        .iter()
+        .filter(|(id, _)| *id != from)
+        .filter_map(|(id, a)| {
+            let gap = match toward {
+                Toward::Left => f.x.checked_sub(a.x + a.width)?,
+                Toward::Right => a.x.checked_sub(f.x + f.width)?,
+                Toward::Up => f.y.checked_sub(a.y + a.height)?,
+                Toward::Down => a.y.checked_sub(f.y + f.height)?,
+            };
+            let rows = matches!(toward, Toward::Left | Toward::Right);
+            let shared = overlap(span(a, rows), span(f, rows));
+            (shared > 0).then_some((gap, std::cmp::Reverse(shared), span(a, rows).0, *id))
+        })
+        .min()
+        .map(|(.., id)| id)
 }
 
 pub mod tabs;

@@ -108,3 +108,109 @@ proptest! {
         }
     }
 }
+
+const HALF: Share = Share { num: 1, den: 2, min: 1, max: 400, keep: 1 };
+
+/// `1 | (2 / 3)`: 1 on the left, 2 above 3 on the right.
+fn three() -> Node {
+    let right = Node::split(Dir::Column, HALF, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3)));
+    Node::split(Dir::Row, HALF, Node::Leaf(PaneId(1)), right)
+}
+
+#[test]
+fn the_part_around_panes_is_the_smallest_that_holds_them_all() {
+    let t = three();
+    assert_eq!(t.around(&[PaneId(2)]), Some(&Node::Leaf(PaneId(2))));
+    assert_eq!(t.around(&[PaneId(2), PaneId(3)]).map(Node::leaves), Some(vec![PaneId(2), PaneId(3)]));
+    assert_eq!(t.around(&[PaneId(1), PaneId(3)]), Some(&t));
+    assert_eq!(t.around(&[PaneId(9)]), None);
+    assert_eq!(t.around(&[]), None);
+    let part = t.around(&[PaneId(2), PaneId(3)]).unwrap().clone();
+    let got = t.replace_part(&part, &Node::split(Dir::Row, HALF, part.clone(), Node::Leaf(PaneId(4))));
+    assert_eq!(got.leaves(), vec![PaneId(1), PaneId(2), PaneId(3), PaneId(4)]);
+    assert_eq!(got.without(PaneId(4)), Some(t));
+}
+
+#[test]
+fn equalized_a_run_of_splits_the_same_way_gives_each_part_the_same_room() {
+    let share = |_: Dir, a: u16, b: u16| Share { num: b, den: a + b, min: 1, max: 400, keep: 1 };
+    let none = |_: &Share| false;
+    // 1 | (2 | 3): three columns of a third each.
+    let lopsided = Share { num: 9, den: 10, min: 1, max: 400, keep: 1 };
+    let row = Node::split(
+        Dir::Row,
+        lopsided,
+        Node::Leaf(PaneId(1)),
+        Node::split(Dir::Row, lopsided, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3))),
+    );
+    let got = row.equalized(&none, &share).solve(area(90, 10), None);
+    assert_eq!(got.iter().map(|(_, a)| a.width).collect::<Vec<_>>(), vec![30, 30, 30]);
+    // A split the other way counts as one part; a share kept stays and counts as one.
+    let got = three().equalized(&none, &share).solve(area(90, 10), None);
+    assert_eq!(got.iter().map(|(_, a)| (a.width, a.height)).collect::<Vec<_>>(), vec![(45, 10), (45, 5), (45, 5)]);
+    let kept = Node::split(
+        Dir::Row,
+        HALF,
+        Node::Leaf(PaneId(1)),
+        Node::split(Dir::Row, THREAD, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3))),
+    );
+    let got = kept.equalized(&|s: &Share| *s == THREAD, &share);
+    let Node::Split { share: outer, second, .. } = &got else { panic!("a split") };
+    assert_eq!((outer.num, outer.den), (1, 2));
+    assert!(matches!(**second, Node::Split { share, .. } if share == THREAD));
+}
+
+#[test]
+fn toward_finds_the_pane_beside_by_place() {
+    let laid = three().solve(area(80, 20), None);
+    let go = |from: u64, t: Toward| toward(&laid, PaneId(from), t).map(|p| p.0);
+    assert_eq!(go(1, Toward::Right), Some(2), "of 2 and 3, the first (top)");
+    assert_eq!(go(3, Toward::Left), Some(1));
+    assert_eq!(go(2, Toward::Down), Some(3));
+    assert_eq!(go(3, Toward::Up), Some(2));
+    assert_eq!(go(1, Toward::Left), None);
+    assert_eq!(go(1, Toward::Up), None);
+    assert_eq!(go(2, Toward::Right), None);
+    assert_eq!(go(9, Toward::Right), None, "a pane not laid out");
+}
+
+/// A tree of panes `1..=n` made by splitting one of them at a time, either way.
+fn grown() -> impl Strategy<Value = Node> {
+    prop::collection::vec((0usize..8, any::<bool>()), 0..8).prop_map(|steps| {
+        let mut t = Node::Leaf(PaneId(1));
+        for (k, (at, row)) in steps.into_iter().enumerate() {
+            let leaves = t.leaves();
+            let id = leaves[at % leaves.len()];
+            let dir = if row { Dir::Row } else { Dir::Column };
+            t = t.replace(id, &Node::split(dir, HALF, Node::Leaf(id), Node::Leaf(PaneId(k as u64 + 2))));
+        }
+        t
+    })
+}
+
+proptest! {
+    /// Going a way and back comes back to a pane on the side started from, and every pane
+    /// laid out is reached from any other by going toward it.
+    #[test]
+    fn toward_moves_between_panes_that_touch(t in grown(), w in 20u16..300, h in 10u16..120) {
+        let laid = t.solve(area(w, h), None);
+        for (id, _) in &laid {
+            for (there, back) in [(Toward::Left, Toward::Right), (Toward::Right, Toward::Left), (Toward::Up, Toward::Down), (Toward::Down, Toward::Up)] {
+                if let Some(to) = toward(&laid, *id, there) {
+                    prop_assert_ne!(to, *id);
+                    prop_assert!(toward(&laid, to, back).is_some(), "{:?} back from {:?}", back, to);
+                }
+            }
+        }
+    }
+
+    /// Equalized, a tree keeps its panes and their order, and still tiles the area.
+    #[test]
+    fn equalized_keeps_the_panes(t in grown(), w in 0u16..300, h in 0u16..120) {
+        let share = |_: Dir, a: u16, b: u16| Share { num: b, den: a + b, min: 1, max: u16::MAX, keep: 1 };
+        let e = t.equalized(&|_: &Share| false, &share);
+        prop_assert_eq!(e.leaves(), t.leaves());
+        let cells: u64 = e.solve(area(w, h), None).iter().map(|(_, r)| u64::from(r.width) * u64::from(r.height)).sum();
+        prop_assert_eq!(cells, u64::from(w) * u64::from(h));
+    }
+}

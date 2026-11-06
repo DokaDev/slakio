@@ -11,7 +11,7 @@ impl App {
     fn shape(&self) -> screen::Shape {
         screen::Shape {
             list_hidden: self.shell.list_hidden,
-            thread: self.work.has_panel(),
+            thread: self.work.has_panel() && !self.work.zoomed(),
             list_focused: matches!(self.focus(), Focus::List | Focus::ViewSwitcher),
             tabs: self.work.tabs().len() > 1,
         }
@@ -28,12 +28,12 @@ impl App {
     }
 
     /// The frame, and the view of the composer of each pane laid out (wrapped at its width).
-    /// The panes go where the work area's layout puts them; on a screen too narrow for two, the
-    /// active pane is the one shown.
+    /// The panes go where the work area's layout puts them; on a screen too narrow for two, and
+    /// in a zoomed tab, the active pane is the one shown.
     pub(crate) fn frame_with_views(&self) -> (FrameLayout, Vec<(PaneId, View)>) {
         let mut views = Vec::new();
-        let (tree, active) = (self.work.layout(), self.work.active());
-        let layout = screen::frame(self.size, self.shape(), tree, active, |id, width| {
+        let (tree, active) = (self.work.shown_layout(), self.work.active());
+        let layout = screen::frame(self.size, self.shape(), tree.as_deref(), active, |id, width| {
             let Some(pane) = self.work.pane(id) else { return 1 };
             let view = self.work.draft(pane).view(width);
             let lines = view.lines.len();

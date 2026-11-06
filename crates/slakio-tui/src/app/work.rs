@@ -1,5 +1,5 @@
-//! The work area: tabs ([`slakio_core::layout::tabs`]), each a layout of panes; the one shown
-//! is the default GUI Slack mode while it is the only one — the conversation open in the main
+//! The work area: tabs ([`slakio_core::layout::tabs`]), each a layout of panes the user may
+//! split ([`splits`]); the one shown is the default GUI Slack mode while it is the only one — the conversation open in the main
 //! pane, the auto thread panel beside it, which of the two has the keyboard and whether its
 //! composer is being written in. Each pane keeps its own back/forward history. Closed tabs are
 //! kept (the last [`tabs::REOPEN`]) to be opened again where they were ([`tabs`]), so `Ctrl+O` in an
@@ -177,7 +177,8 @@ impl Work {
         let Some(i) = self.tabs.find(id) else { return };
         self.show_tab(i);
         if let Some(t) = self.tabs.current_tab_mut() {
-            t.active = id;
+            // Another pane of a zoomed tab shows the layout again.
+            (t.zoomed, t.active) = (t.zoomed && t.active == id, id);
         }
     }
 
@@ -360,7 +361,7 @@ impl Work {
         let beside = Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(owner), Node::Leaf(id));
         let tab = self.tabs.current_tab_mut()?;
         tab.root = tab.root.replace(owner, &beside);
-        tab.active = id;
+        (tab.active, tab.zoomed) = (id, false);
         if let Some(p) = self.panes.get_mut(&owner) {
             p.thread = Some(id);
         }
@@ -407,7 +408,7 @@ impl Work {
 
     /// Take pane `id` and the thread panel it opened out (a tab left empty closes, unrecorded).
     fn close_pane(&mut self, id: PaneId) -> Option<Pane> {
-        let pane = self.remove(id, None)?;
+        let pane = self.remove(id, self.near(id))?;
         if let Some(panel) = pane.thread {
             self.remove(panel, None);
         }
@@ -420,15 +421,6 @@ impl Work {
     /// Any draft holds text that was not sent, open in a pane or not.
     pub fn unsent(&self) -> bool {
         self.drafts.unsent()
-    }
-
-    /// The pane on the left (`-1`) or right (`1`) of the active one; `None` when there is none
-    /// that way (the shell moves the focus out of the work area then).
-    pub fn beside(&self, step: i8) -> Option<PaneId> {
-        let ids = self.ids();
-        let at = ids.iter().position(|id| Some(*id) == self.active())?;
-        let to = at.checked_add_signed(isize::from(step))?;
-        ids.get(to).copied()
     }
 
     /// A page of messages arrived. `true` when a timeline took it; an answer to an older
@@ -590,6 +582,7 @@ impl Work {
 
 pub(crate) mod live;
 mod older;
+mod splits;
 mod tabs;
 use tabs::ClosedTab;
 

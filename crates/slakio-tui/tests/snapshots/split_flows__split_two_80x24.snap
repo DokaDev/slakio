@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────╮╭ ▌#incidents ──────────╮
+│▎Home                   @24 ││ Kate Nam  06:51       ││ latency rollback      │
+│ DMs                    ●11 ││ Production roadmap    ││ rollback retry sprint │
+│ Activity               @36 ││ customer build alert  ││ draft maybe lunch     │
+│ Files                      ││ now latency fine      ││ waiting the budget    │
+│ To-dos                   6 ││ review latency        ││                       │
+├─▾──────────────────────────┤│ roadmap broken should ││ Dana Yoon  02:38      │
+│ ▾ Favorites                ││ for                   ││ Tomorrow ticket       │
+│   # backend                ││                       ││ should merge waiting  │
+│▎  # incidents           3  ││ ＊＊＊  06:59         ││                       │
+│                            ││ Confirmed             ││ Minsu Kim  02:52      │
+│ ▾ Ops                      ││                       ││ After check fine      │
+│   # deploys                ││ Kate Nam  07:05       ││ check branch metrics  │
+│   # alerts                 ││ Ticket review pager   ││ latency check         │
+│   # partner-shared ext     ││ pager production on   ││                       │
+│   # hostile-strings        ││ build alert the on    ││ Mia Jang  03:33       │
+│   # big-history            ││ draft                 ││ Budget invoice on is  │
+│   # long-threads           ││                       ││ schema can on deploy  │
+│                            ││ Sam Rivera  07:14     ││ check now release     │
+│ ▾ Channels                 ││ Meeting moved to 3pm  ││ tracing on invoice    │
+│   # announcements          │├─ Message #backend ────┤├─ Message #incidents ──┤
+│   # design-review          ││ › Press i to write    ││ › Press i to write    │
+╰────────────────────────────╯╰───────────────────────╯╰───────────────────────╯
+ NORMAL  ▌A company › #incidents         │ i write · ? help · Space more │ demo

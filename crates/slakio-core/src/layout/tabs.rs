@@ -10,7 +10,8 @@
 //! No tab is ever empty: closing the last pane of a tab closes the tab, and closing the last
 //! tab leaves none (the work area is empty; nothing quits). A pane is in one tab at most.
 
-use super::{Node, PaneId};
+use super::{Dir, Node, PaneId, Share};
+use std::borrow::Cow;
 
 /// A tab: its panes' layout, the pane of it the keyboard goes to, and a name.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,12 +21,19 @@ pub struct Tab {
     pub active: PaneId,
     /// The name the user gave it; `None`: it is named after its active pane.
     pub name: Option<String>,
+    /// Its active pane takes the whole tab for now; the layout is kept as it was.
+    pub zoomed: bool,
 }
 
 impl Tab {
     /// A tab of one pane.
     pub fn new(pane: PaneId) -> Self {
-        Self { root: Node::Leaf(pane), active: pane, name: None }
+        Self { root: Node::Leaf(pane), active: pane, name: None, zoomed: false }
+    }
+
+    /// The layout as shown: the active pane alone while the tab is zoomed.
+    pub fn shown(&self) -> Cow<'_, Node> {
+        if self.zoomed { Cow::Owned(Node::Leaf(self.active)) } else { Cow::Borrowed(&self.root) }
     }
 }
 
@@ -161,6 +169,7 @@ impl Tabs {
     pub fn close_pane(&mut self, pane: PaneId, next: Option<PaneId>) -> Closed {
         let Some(i) = self.find(pane) else { return Closed::Nothing };
         let tab = &mut self.tabs[i];
+        tab.zoomed = false;
         match tab.root.without(pane) {
             Some(root) => {
                 if tab.active == pane {
@@ -176,19 +185,45 @@ impl Tabs {
         }
     }
 
+    /// Split the part of a tab that holds the panes `at` (one, or a pane and what goes with it)
+    /// along `dir`: `new`, a pane in no tab yet, goes after it, sized by `share`, and is the tab's
+    /// active pane; the tab is zoomed no more. `false` when `at` is in no tab, its panes are
+    /// not all in one, or `new` is in a tab already.
+    pub fn split(&mut self, at: &[PaneId], dir: Dir, share: Share, new: PaneId) -> bool {
+        let Some(i) = at.first().and_then(|id| self.find(*id)) else { return false };
+        if self.find(new).is_some() {
+            return false;
+        }
+        let tab = &mut self.tabs[i];
+        let Some(part) = tab.root.around(at).cloned() else { return false };
+        tab.root = tab.root.replace_part(&part, &Node::split(dir, share, part.clone(), Node::Leaf(new)));
+        tab.active = new;
+        tab.zoomed = false;
+        true
+    }
+
+    /// Zoom the tab shown on its active pane, or show its layout again. Whether it is zoomed
+    /// now; `None` when there is no tab, or it has one pane only (nothing to zoom out of).
+    pub fn toggle_zoom(&mut self) -> Option<bool> {
+        let tab = self.tabs.get_mut(self.current).filter(|t| matches!(t.root, Node::Split { .. }))?;
+        tab.zoomed = !tab.zoomed;
+        Some(tab.zoomed)
+    }
+
     /// Every pane of every tab.
     pub fn panes(&self) -> Vec<PaneId> {
         self.tabs.iter().flat_map(|t| t.root.leaves()).collect()
     }
 
     /// What always holds (for tests and debug checks): every tab's active pane is one of its
-    /// panes, a pane is in one tab only, and a tab is shown while there is one.
+    /// panes, a pane is in one tab only, a tab is shown while there is one, and only a tab of
+    /// several panes is zoomed.
     pub fn holds(&self) -> bool {
         let panes = self.panes();
         let mut unique = panes.clone();
         unique.sort();
         unique.dedup();
-        self.tabs.iter().all(|t| t.root.contains(t.active))
+        self.tabs.iter().all(|t| t.root.contains(t.active) && (!t.zoomed || matches!(t.root, Node::Split { .. })))
             && unique.len() == panes.len()
             && (self.tabs.is_empty() || self.current < self.tabs.len())
     }

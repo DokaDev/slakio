@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────────────────────────╮╭ ▌#incidents ──────────────────────────────╮
+│▎Home                   @24 ││     can staging should                    ││ ────────────── 2026-01-05 ─────────────── │
+│ DMs                    ●11 ││                                           ││▎TK  Tom Ko  13:14                         │
+│ Activity               @36 ││ KN  Kate Nam  06:51                       ││▎    On can meeting today please we still  │
+│ Files                      ││     Production roadmap customer build     ││▎    design review retry tomorrow a        │
+│ To-dos                   6 ││     alert now latency fine review latency ││▎    rollback                              │
+├─▾──────────────────────────┤│     roadmap broken should for             ││                                           │
+│ ▾ Favorites                ││                                           ││ G   Grafana app  13:51                    │
+│   # backend                ││ ＊  ＊＊＊  06:59                         ││     Deploy please budget                  │
+│   # incidents           3  ││     Confirmed                             ││                                           │
+│                            ││                                           ││ TK  Taylor Kim  14:22                     │
+│ ▾ Ops                      ││ KN  Kate Nam  07:05                       ││     Maybe pager staging                   │
+│▎  # deploys                ││     Ticket review pager pager production  ││                                           │
+│   # alerts                 ││     on build alert the on draft           ││ OH  Owen Hwang  15:06                     │
+│   # partner-shared ext     ││                                           ││     Can someone review this?              │
+│   # hostile-strings        ││ SR  Sam Rivera  07:14                     ││                                           │
+│   # big-history            ││     Meeting moved to 3pm                  ││ LK  Leo Kang  15:35                       │
+│   # long-threads           │├─ Message #backend ────────────────────────┤├─ Message #incidents ──────────────────────┤
+│                            ││ › Press i to write                        ││ › Press i to write                        │
+│ ▾ Channels                 │╰───────────────────────────────────────────╯╰───────────────────────────────────────────╯
+│   # announcements          │╭ ▌#deploys ────────────────────────────────╮╭ ▌⤷ Thread · #incidents ───────────────────╮
+│   # design-review          ││                                           ││ ────────────── 2026-01-05 ─────────────── │
+│   # feed-alert-134         ││ AM  Alex Morgan  06:10                    ││ TK  Tom Ko  13:14                         │
+│   # feed-alert-8           ││     Review looks rollback production the  ││     On can meeting today please we still  │
+│   # feed-budget-162        ││     please broken retry done              ││     design review retry tomorrow a        │
+│   # feed-budget-33         ││                                           ││     rollback                              │
+│   # feed-build-50          ││ SR  Sam Rivera  06:49                     ││                                           │
+│   # feed-cache-119         ││     Sprint a check for on branch invoice  ││ No replies yet · i reply                  │
+│   # feed-customer-161      ││     draft production                      ││                                           │
+│   # feed-customer-167   1  ││     ⤷ 7 replies · last 06:56              ││                                           │
+│   # feed-dashboard-22      ││                                           ││                                           │
+│   # feed-dashboard-41      ││ AS  Ava Shin  07:37                       ││                                           │
+│   # feed-design-34         ││     The ticket merge                      ││                                           │
+│   # feed-design-83         ││                                           ││                                           │
+│   # feed-draft-142         ││ DB  Deploy Bot app  07:50                 ││                                           │
+│   # feed-draft-58          ││     Again is after broken index           ││                                           │
+│   # feed-draft-84          │├─ Message #deploys ────────────────────────┤├─ Reply ───────────────────────────────────┤
+│   # feed-index-199      2  ││ › Press i to write                        ││ › Press i to reply                        │
+╰────────────────────────────╯╰───────────────────────────────────────────╯╰───────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys            │ i write · k messages · Esc list · Ctrl+R views · ? help · Space more │ demo

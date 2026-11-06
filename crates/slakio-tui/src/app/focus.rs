@@ -10,7 +10,6 @@ use super::shell::Region;
 use super::{App, Overlay};
 use crate::action::{PaneAction, ShellAction};
 use crate::keymap::Ctx;
-use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
 use std::time::Instant;
 
@@ -113,7 +112,7 @@ impl App {
     }
 
     /// Move the focus to the next (`1`) or previous (`-1`) panel: the views, the list, the panes
-    /// in reading order (the conversation, the thread panel beside it), round again. A hidden
+    /// in reading order (left to right, top to bottom; a thread panel after its pane), round again. A hidden
     /// list (and its views) or a closed pane is skipped.
     pub(super) fn cycle(&mut self, step: isize) {
         let mut stops = Vec::new();
@@ -172,8 +171,9 @@ impl App {
         match a {
             ShellAction::FocusNext => return self.cycle(1),
             ShellAction::FocusPrev => return self.cycle(-1),
-            ShellAction::FocusUp => return self.info(Msg::Label(Label::StatusNoPaneAbove), now),
-            ShellAction::FocusDown => return self.info(Msg::Label(Label::StatusNoPaneBelow), now),
+            ShellAction::FocusUp | ShellAction::FocusDown => {
+                return self.focus_vertical(a == ShellAction::FocusUp, now);
+            }
             ShellAction::FocusLeft if self.focus().is_pane() => return self.pane(PaneAction::Left, now),
             // Never onto an empty work area: nothing there takes a key.
             ShellAction::FocusRight if self.focus() == Focus::List && self.work.ids().is_empty() => return,

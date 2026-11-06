@@ -85,6 +85,7 @@ enum Op {
     Close(usize),
     ClosePane(u64),
     Split(usize),
+    Zoom,
     Select(usize),
     Step(isize),
     Shift(isize),
@@ -98,6 +99,7 @@ fn op() -> impl Strategy<Value = Op> {
         (0usize..6).prop_map(Op::Close),
         (1u64..30).prop_map(Op::ClosePane),
         (0usize..6).prop_map(Op::Split),
+        Just(Op::Zoom),
         (0usize..6).prop_map(Op::Select),
         (-3isize..4).prop_map(Op::Step),
         (-2isize..3).prop_map(Op::Shift),
@@ -128,15 +130,38 @@ proptest! {
                     }
                 }
                 Op::ClosePane(p) => {
-                    if let Closed::Tab(i, c) = t.close_pane(PaneId(p), None) {
+                    let tab = t.find(PaneId(p));
+                    let gone = t.close_pane(PaneId(p), None);
+                    if let Closed::Pane(i) = gone {
+                        prop_assert_eq!(Some(i), tab);
+                        prop_assert!(!t.all()[i].zoomed, "closing a pane shows the layout again");
+                    }
+                    if let Closed::Tab(i, c) = gone {
                         prop_assert!(!c.root.contains(PaneId(p)) || c.root.leaves() == vec![PaneId(p)]);
                         closed.push((i, c));
                     }
                 }
                 Op::Split(i) => {
-                    if let Some(tb) = t.get_mut(i) {
-                        tb.root = Node::split(Dir::Row, HALF, tb.root.clone(), Node::Leaf(PaneId(next)));
+                    if let Some(at) = t.all().get(i).map(|tb| tb.active) {
+                        let dir = if next.is_multiple_of(2) { Dir::Row } else { Dir::Column };
+                        prop_assert!(t.split(&[at], dir, HALF, PaneId(next)));
+                        prop_assert!(!t.split(&[at], dir, HALF, PaneId(next)), "a pane in a tab is not added twice");
+                        let tb = &t.all()[i];
+                        prop_assert!(tb.active == PaneId(next) && !tb.zoomed, "the new pane is active, unzoomed");
                         next += 1;
+                    }
+                }
+                Op::Zoom => {
+                    let before = t.current_tab().cloned();
+                    match (t.toggle_zoom(), before) {
+                        (Some(z), Some(b)) => {
+                            let now = t.current_tab().unwrap();
+                            prop_assert!(z != b.zoomed && now.zoomed == z && now.root == b.root, "the layout is kept");
+                            let shown = now.shown().leaves();
+                            prop_assert_eq!(shown, if z { vec![now.active] } else { now.root.leaves() });
+                        }
+                        (None, b) => prop_assert!(b.is_none_or(|b| b.root.leaves().len() == 1)),
+                        (Some(_), None) => prop_assert!(false, "no tab, nothing zoomed"),
                     }
                 }
                 Op::Select(i) => {

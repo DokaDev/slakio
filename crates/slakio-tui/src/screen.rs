@@ -25,7 +25,7 @@
 //! and composer — and drawing and the mouse both read that one [`FrameLayout`].
 
 use ratatui::layout::{Constraint, Layout, Margin, Position, Rect};
-use slakio_core::layout::{Area, Node, PaneId, Share};
+use slakio_core::layout::{Area, Dir, Node, PaneId, Share};
 
 /// Below this the screen shows only how much room it needs.
 pub const MIN_WIDTH: u16 = 50;
@@ -113,6 +113,20 @@ pub const COMPOSER_MAX_LINES: u16 = 5;
 /// cells, while the conversation keeps [`MAIN_MIN`]; where both do not fit, the pane with the
 /// keyboard takes the whole area.
 pub const THREAD_SHARE: Share = Share { num: 2, den: 5, min: 34, max: 60, keep: MAIN_MIN };
+
+/// The least room a pane split off another keeps: its border, a few messages and its composer.
+pub const PANE_MIN_WIDTH: u16 = 24;
+pub const PANE_MIN_HEIGHT: u16 = 8;
+
+/// How the user's splits share their room: a split along `dir` whose sides hold `first` and
+/// `second` panes that way gives each pane the same room, never under the least a pane keeps;
+/// where they do not fit (the screen shrank), the side with the keyboard takes the split.
+pub fn split_share(dir: Dir, first: u16, second: u16) -> Share {
+    let least = if dir == Dir::Row { PANE_MIN_WIDTH } else { PANE_MIN_HEIGHT };
+    let (first, second) = (first.max(1), second.max(1));
+    let (min, keep) = (least.saturating_mul(second), least.saturating_mul(first));
+    Share { num: second, den: first.saturating_add(second), min, max: u16::MAX, keep }
+}
 
 /// The panes of `tree` shown in `work`, and where (`focused` stays where two do not fit).
 pub fn work_panes(work: Rect, tree: &Node, focused: Option<PaneId>) -> Vec<(PaneId, Rect)> {

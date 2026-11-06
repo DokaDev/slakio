@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/keys_flows.rs
-assertion_line: 307
 expression: s
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
@@ -35,11 +34,11 @@ expression: s
 │   # feed-customer-167   1  ││                                                                                        │
 │   # feed-dashboard-22      ││                                                                                        │
 │   # feed-dashboard-41      ││                                                                                        │
-│   # feed-design-34         ││                                                                                        │
-│   # feed-design-83         ││                                                                                        │
-│   # feed-draft-142         ││                                                                                        │
 ╭ Space w — Window ────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ h  Move the focus left                 k  Move the focus up                   c  Close the pane, then its tab        │
-│ j  Move the focus down                 l  Move the focus right                                                       │
+│ h  Move the focus left                                     v  Split right (the thread selected, or the same)         │
+│ j  Move the focus down                                     s  Split below (the thread selected, or the same)         │
+│ k  Move the focus up                                       z  Zoom the pane, or show every pane again                │
+│ l  Move the focus right                                    =  Even room for the panes                                │
+│ c  Close the pane, then its tab                                                                                      │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

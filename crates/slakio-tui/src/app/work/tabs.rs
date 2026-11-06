@@ -130,7 +130,7 @@ impl Work {
         }
         let root = root.map(&|old| new(old).unwrap_or(old));
         let active = new(c.active).unwrap_or_else(|| root.leaves()[0]);
-        self.tabs.insert(c.index, Tab { root, active, name: c.name });
+        self.tabs.insert(c.index, Tab { root, active, name: c.name, zoomed: false });
         self.prune();
         self.fill();
         self.check();

@@ -53,6 +53,10 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space w k` | Move the focus up | `focus.up` |
 | `Space w l` | Move the focus right | `focus.right` |
 | `Space w c` | Close the pane, then its tab | `pane.close` |
+| `Space w v` | Split right (the thread selected, or the same) | `pane.split_right` |
+| `Space w s` | Split below (the thread selected, or the same) | `pane.split_below` |
+| `Space w z` | Zoom the pane, or show every pane again | `pane.zoom` |
+| `Space w =` | Even room for the panes | `pane.equalize` |
 | `Space h` | Show Home | `view.home` |
 | `Space d` | Show DMs | `view.dms` |
 | `Space a` | Show Activity | `view.activity` |
@@ -142,6 +146,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `[` | Show the previous view | `view.prev` |
 | `]` | Show the next view | `view.next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
+| `v` | Split right (the thread selected, or the same) | `pane.split_right` |
 | `x` | Complete the to-do, or reopen it | `todo.toggle` |
 | `m` | Move the item to Saved, or back to To-dos | `todo.move` |
 | `d` | Clear the saved item (asks first) | `todo.clear` |
@@ -171,11 +176,14 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `o` | Open a message's link (or :open &lt;url&gt;) | `pane.open_link` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
+| `v` | Split right (the thread selected, or the same) | `pane.split_right` |
+| `s` | Split below (the thread selected, or the same) | `pane.split_below` |
+| `z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Esc` | One step out (VISUAL, selection, thread, list) | `pane.escape` |
 | `h` | The panel to the left | `pane.left` |
 | `Left` | The panel to the left | `pane.left` |
-| `l` | The thread panel | `pane.right` |
-| `Right` | The thread panel | `pane.right` |
+| `l` | The panel to the right | `pane.right` |
+| `Right` | The panel to the right | `pane.right` |
 | `Ctrl+W` | Close the pane, then its tab | `pane.close` |
 
 ## Command line (`cmdline`) **[text]**
@@ -309,6 +317,10 @@ Type `:` and the command, then `Enter`.
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
 | `:open` |  | Open a message's link (or :open &lt;url&gt;) |
+| `:vsplit` | `:vs` | Split right (the thread selected, or the same) |
+| `:split` | `:sp` | Split below (the thread selected, or the same) |
+| `:zoom` |  | Zoom the pane, or show every pane again |
+| `:equalize` | `:equalise` | Even room for the panes |
 | `:q` | `:quit` `:close` | Close the pane, then its tab |
 | `:back` |  | Back to the conversation before |
 | `:forward` |  | Forward again |

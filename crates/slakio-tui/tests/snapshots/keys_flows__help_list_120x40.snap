@@ -23,7 +23,8 @@ expression: s
 │         │   Show the previous view                                                                       [ │         │
 │ ▾ Channe│   Show the next view                                                                           ] │         │
 │   # anno│   Open in a new tab (a message: its thread)                                                    t │         │
-│   # desi│   Complete the to-do, or reopen it                                                             x │         │
+│   # desi│   Split right (the thread selected, or the same)                                               v │         │
+│   # feed│   Complete the to-do, or reopen it                                                             x │         │
 │   # feed│   Move the item to Saved, or back to To-dos                                                    m │         │
 │   # feed│   Clear the saved item (asks first)                                                            d │         │
 │   # feed│   Filter To-dos by state or reminder                                                           f │         │
@@ -37,8 +38,7 @@ expression: s
 │   # feed│   Move the focus up                                                           Ctrl+K / Space w k │         │
 │   # feed│   Move the focus right                                                        Ctrl+L / Space w l │         │
 │   # feed│   Close the pane, then its tab                                                         Space w c │         │
-│   # feed│   Show Home                                                                              Space h │         │
-│   # feed│   Show DMs                                                                               Space d │         │
+│   # feed│   Split right (the thread selected, or the same)                                       Space w v │         │
 │   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                                       │ demo

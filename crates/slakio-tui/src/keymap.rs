@@ -120,7 +120,8 @@ pub const DEFAULTS: &[Binding] = &[
     bind(Ctx::SignIn, "up", Action::SignIn(SignInAction::Up)),
     bind(Ctx::SignIn, "p", Action::SignIn(SignInAction::Paste)),
     bind(Ctx::SignIn, "esc", Action::SignIn(SignInAction::Cancel)),
-    // Between the panels. `Tab` goes round the view switcher, list, main pane and thread panel.
+    // Between the panels. `Tab` goes round the view switcher, list and the panes in reading
+    // order; `Ctrl+H/J/K/L` go to the pane on that side.
     // `Ctrl+R` and `Space r` go straight to the view switcher (on the view shown) and `Ctrl+R`
     // back. `Ctrl+H` needs the kitty keyboard protocol on terminals that send
     // `Backspace` as `^H`; `Space w h` works everywhere.
@@ -139,6 +140,11 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::Shell, "space w k", ShellAction::FocusUp),
     shell(Ctx::Shell, "space w l", ShellAction::FocusRight),
     pane(Ctx::Shell, "space w c", PaneAction::Close),
+    // Splits (`v` beside, `s` under, as in vim), zoom and even room, also from the list.
+    pane(Ctx::Shell, "space w v", PaneAction::SplitRight),
+    pane(Ctx::Shell, "space w s", PaneAction::SplitBelow),
+    pane(Ctx::Shell, "space w z", PaneAction::Zoom),
+    pane(Ctx::Shell, "space w =", PaneAction::Equalize),
     // The views, by key.
     shell(Ctx::Shell, "space h", ShellAction::Show(View::Home)),
     shell(Ctx::Shell, "space d", ShellAction::Show(View::Dms)),
@@ -235,6 +241,8 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::List, "[", ShellAction::ViewPrev),
     shell(Ctx::List, "]", ShellAction::ViewNext),
     tab(Ctx::List, "t", TabAction::Open),
+    // `s` sorts To-dos here: `Space w s` splits below from the list.
+    pane(Ctx::List, "v", PaneAction::SplitRight),
     // On a to-do or a saved message (To-dos, Home's Saved).
     shell(Ctx::List, "x", ShellAction::TodoToggle),
     shell(Ctx::List, "m", ShellAction::TodoMove),
@@ -260,6 +268,9 @@ pub const DEFAULTS: &[Binding] = &[
     pane(Ctx::PaneNormal, "o", PaneAction::OpenLink),
     pane(Ctx::PaneNormal, "V", PaneAction::Visual),
     tab(Ctx::PaneNormal, "t", TabAction::Open),
+    pane(Ctx::PaneNormal, "v", PaneAction::SplitRight),
+    pane(Ctx::PaneNormal, "s", PaneAction::SplitBelow),
+    pane(Ctx::PaneNormal, "z", PaneAction::Zoom),
     // VISUAL, the selection, the thread panel and the main pane are left one `Esc` at a time;
     // nothing is closed by it (only `Ctrl+W` closes).
     pane(Ctx::PaneNormal, "esc", PaneAction::Escape),

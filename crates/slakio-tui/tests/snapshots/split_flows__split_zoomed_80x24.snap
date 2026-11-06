@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys [zoomed] ────────────────────────────╮
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││ NH  Noah Han  05:34                            │
+│ Activity               @36 ││     Ticket rollback invoice staging index for  │
+│ Files                      ││     dashboard can looks waiting                │
+│ To-dos                   6 ││                                                │
+├─▾──────────────────────────┤│ AM  Alex Morgan  06:10                         │
+│ ▾ Favorites                ││     Review looks rollback production the       │
+│   # backend                ││     please broken retry done                   │
+│   # incidents           3  ││                                                │
+│                            ││ SR  Sam Rivera  06:49                          │
+│ ▾ Ops                      ││     Sprint a check for on branch invoice draft │
+│▎  # deploys                ││     production                                 │
+│   # alerts                 ││     ⤷ 7 replies · last 06:56                   │
+│   # partner-shared ext     ││                                                │
+│   # hostile-strings        ││ AS  Ava Shin  07:37                            │
+│   # big-history            ││     The ticket merge                           │
+│   # long-threads           ││                                                │
+│                            ││ DB  Deploy Bot app  07:50                      │
+│ ▾ Channels                 ││     Again is after broken index                │
+│   # announcements          │├─ Message #deploys ─────────────────────────────┤
+│   # design-review          ││ › Press i to write                             │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys │ Zoomed: z shows every pane again        │ demo

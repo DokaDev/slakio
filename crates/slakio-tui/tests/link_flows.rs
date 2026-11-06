@@ -314,7 +314,8 @@ fn esc_or_a_key_that_picks_nothing_stops_picking_and_opens_nothing() {
     press(&mut s, "esc");
     assert!(s.d.app.picker().is_none() && opened(&mut s).is_empty());
     press(&mut s, "s");
-    assert!(opened(&mut s).is_empty(), "no longer picking");
+    assert!(opened(&mut s).is_empty(), "no longer picking: `s` splits the pane");
+    press(&mut s, "ctrl+w");
     press(&mut s, "o");
     press(&mut s, "z");
     assert!(s.d.app.picker().is_none() && opened(&mut s).is_empty());
