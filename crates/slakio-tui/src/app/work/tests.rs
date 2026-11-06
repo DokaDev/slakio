@@ -1,6 +1,6 @@
 use super::*;
 use crate::app::model::Model;
-use slakio_core::backend::Event;
+use slakio_core::backend::{Event, Generation, Page};
 use slakio_core::model::{ConversationId, WorkspaceId};
 use slakio_world::World;
 

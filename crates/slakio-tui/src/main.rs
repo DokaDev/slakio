@@ -2,6 +2,7 @@
 
 mod cli;
 mod inapp;
+mod saving;
 mod signin;
 mod stats;
 mod store;
@@ -13,6 +14,7 @@ use futures::StreamExt;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::EventStream;
+use saving::Saved;
 use slakio_auth::{Account, account};
 use slakio_core::backend::{Backend, BackendHandle};
 use slakio_core::config;
@@ -448,53 +450,6 @@ impl Wiring {
 
 /// The event loop: draw when something changed, then sleep until the next input event, signal,
 /// backend event or deadline of the app. With nothing to do it never wakes up.
-/// Where the loop saves what the app asks it to: the config file, and the error log for a save
-/// that fails.
-struct Saved {
-    config: Option<std::path::PathBuf>,
-    errors: Option<std::path::PathBuf>,
-    /// The tabs and panes, kept for the next run.
-    layout: LayoutFile,
-}
-
-impl Saved {
-    /// Keep the layout as it is now (`end`: the run ends, so whatever waits is written).
-    fn keep_layout(&mut self, app: &App, end: bool) {
-        let now = Instant::now();
-        let mut result = self.layout.offer(app.layout_to_save().as_ref(), now);
-        if end || self.layout.deadline().is_some_and(|at| at <= now) {
-            result = result.and(self.layout.flush(now));
-        }
-        if let Err(fault) = result {
-            ErrorLog::new(self.errors.clone()).record("layout", &fault);
-        }
-    }
-}
-
-impl Saved {
-    /// Open `url` in the browser; a failure is said and goes to the error log.
-    fn open(&self, url: &str, app: &mut App) {
-        if let Err(e) = slakio_tui::opener::open(url) {
-            ErrorLog::new(self.errors.clone()).record("open", &slakio_core::fault::Fault::io(&e));
-            app.warn(Msg::Label(Label::OpenFailed), Instant::now());
-        }
-    }
-}
-
-impl Saved {
-    /// Save setting `key` as `value` in the config file; `true` when that failed (the app says so).
-    fn save(&self, key: &str, value: &str, app: &mut App) -> bool {
-        let result = match &self.config {
-            Some(path) => config::set(path, key, value),
-            None => Err(slakio_core::fault::Fault::other("no config directory")),
-        };
-        let Err(fault) = result else { return false };
-        ErrorLog::new(self.errors.clone()).record("config", &fault);
-        app.warn(Msg::Label(Label::ConfigSaveFailed), Instant::now());
-        true
-    }
-}
-
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     mut app: App,
