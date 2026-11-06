@@ -15,10 +15,10 @@
 //! no way on, is read only in part ("cut"): its "newest" page is the last one read, not the
 //! thread's last, and its pages say so.
 
-use crate::adapter::{Bots, read};
 use crate::client::Client;
 use crate::error::SlackError;
 use crate::governor::Priority;
+use crate::messages::{Bots, read};
 use crate::method::Method;
 use crate::request::Call;
 use crate::wire;

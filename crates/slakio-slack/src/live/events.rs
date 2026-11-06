@@ -7,7 +7,7 @@
 //! Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the event names, which
 //! message subtypes are a new message, an edit or a deletion, and the `*_marked` fields.
 
-use crate::adapter::{Bots, read};
+use crate::messages::{Bots, read};
 use crate::wire;
 use serde_json::Value;
 use slakio_core::model::{Message, Ts, UserId};

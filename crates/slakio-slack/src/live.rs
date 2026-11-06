@@ -26,9 +26,10 @@
 pub(crate) mod events;
 pub(crate) mod socket;
 
-use crate::adapter::{Session, bot};
+use crate::adapter::Session;
 use crate::client::Client;
 use crate::governor::Priority;
+use crate::messages::bot;
 use crate::request::{Ids, RandomIds};
 use events::Frame;
 use slakio_core::backend::{Connection, Envelope, Event, Generation, Live};

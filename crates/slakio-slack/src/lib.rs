@@ -41,6 +41,7 @@ pub mod governor;
 pub(crate) mod http;
 pub mod live;
 pub mod login;
+pub(crate) mod messages;
 pub mod method;
 pub(crate) mod people;
 pub mod request;
