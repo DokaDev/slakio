@@ -28,7 +28,7 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); 0.0.16 resizes panes (`Space w >` / `<` / `+` / `-`, or a border
+([Install](#install)); 0.0.17 opens Slack message, reply and channel links inside slakio (it jumps to the message, reads around it if needed, and shows the thread beside it for replies; links for other workspaces offer the browser), and fixes a restored split so that it loads every pane (0.0.16 loaded only the last one). 0.0.16 resized panes (`Space w >` / `<` / `+` / `-`, or a border
 dragged with the mouse); neighbouring panes share one border, and the layout (tabs, splits, what each pane shows, zoom,
 focus) comes back after a restart (`restore = "off"` stops that). 0.0.15 split the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
 panes, `z` zooms one pane, `Space w =` gives them even room, and Ctrl+W closes one. A thread panel splits off into its own
