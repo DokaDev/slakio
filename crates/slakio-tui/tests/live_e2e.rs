@@ -16,7 +16,7 @@ mod pty;
 
 use pty::{COOKIE, Run, TOKEN};
 use serde_json::json;
-use slakio_core::i18n::{Label, Lang};
+use slakio_core::i18n::{Label, Lang, Msg};
 use slakio_fake::FakeSlack;
 use slakio_world::World;
 use std::path::PathBuf;
@@ -88,6 +88,19 @@ fn wait_until(what: &str, done: impl Fn() -> bool) {
     }
 }
 
+/// Wait until the conversation opened has its first page in, drawn in `lang`. A message posted
+/// live before it is not added (the page carries it, coming from Slack; the fake's does not), so
+/// a message is posted only after.
+fn page_in(run: &Run, lang: Lang) {
+    let i18n = slakio_core::i18n::I18n::new(lang);
+    let composer = i18n.msg(&Msg::ComposerMessage { name: "#deploys".into() }).replace(' ', "");
+    let loading = i18n.label(Label::PaneLoading).replace(' ', "");
+    run.wait_for("its first page", |t| {
+        let t = t.replace(' ', "");
+        t.contains(&composer) && !t.contains(&loading)
+    });
+}
+
 /// Click the list row that shows `name`.
 fn click(run: &mut Run, name: &str) {
     let screen = run.output();
@@ -107,7 +120,7 @@ fn messages_arrive_live_and_a_dropped_socket_comes_back_and_catches_up() {
         assert_eq!(m.fake.upgrades().len(), 1);
         click(&mut run, "deploys");
         wait_until("the channel opened", || m.calls("conversations.view") >= 1);
-        run.wait_for("its messages", |t| t.contains("Message #deploys"));
+        page_in(&run, Lang::En);
         let (c, who) = (m.channel("deploys"), m.other());
         m.fake.push(
             &json!({"type": "message", "channel": c, "user": who, "text": "live hello", "ts": "1900000000.000100"}),
@@ -209,9 +222,7 @@ fn a_link_opens_through_the_opener_with_its_address_as_one_argument_and_nothing_
     run.wait_for("live updates on", |t| t.contains("Live updates on"));
     click(&mut run, "deploys");
     wait_until("the channel opened", || m.calls("conversations.view") >= 1);
-    run.wait_for("its messages", |t| t.contains("Message #deploys"));
-    // Its page is in before anything is posted live (a page that came later would replace it).
-    std::thread::sleep(Duration::from_millis(500));
+    page_in(&run, Lang::En);
     let (c, who) = (m.channel("deploys"), m.other());
     let text = "read <https://docs.example.com/run?a=1&b=$(id)|the runbook> or <javascript:alert(1)|that>";
     m.fake.push(&json!({"type": "message", "channel": c, "user": who, "text": text, "ts": "1900000000.000100"}));
@@ -269,7 +280,7 @@ fn several_links_are_picked_by_their_letters_and_clicked_and_refused_ones_get_no
         run.wait_for("the list", |t| t.contains("deploys"));
         click(&mut run, "deploys");
         wait_until("the channel opened", || m.calls("conversations.view") >= 1);
-        std::thread::sleep(Duration::from_millis(800));
+        page_in(&run, if lang == "ko" { Lang::Ko } else { Lang::En });
         let (c, who) = (m.channel("deploys"), m.other());
         let text = "a <javascript:alert(1)|click> b <https://one.example.org/1|first> c <file:///etc/x|f> \
                     d <https://two.example.net/2|second> e <https://three.example.com/3|third>";
