@@ -149,15 +149,19 @@ images, and settings. This README only lists what works; it will grow with each 
     back (it stays zoomed while that pane has the keyboard; moving to another pane, a split
     or closing it shows every pane), `Space w >` / `<` / `+` / `-` make the pane wider,
     narrower, taller or shorter (`:resize >N`, `<N`, `+N`, `-N` by N cells), a border
-    dragged with the mouse moves, `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the
+    dragged with the mouse moves (pressed where two borders meet, the one that runs across
+    moves), `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the
     pane (the keyboard goes to the pane that takes its room). Panes side by side share one
     border. Each pane keeps its own selection and history;
   - the tabs (their order, names and the one shown), each tab's splits and sizes, what each
     pane shows, zoom and the pane with the keyboard are saved in the state directory, one file
-    per set of signed-in workspaces (private to you), and opened again at the next start
-    (`restore = "off"` in the config turns this off). A pane whose conversation is gone is left
-    out, and a file that cannot be read is not used; either is said once. Drafts are not saved:
-    what you were writing is not there after a restart;
+    per set of signed-in workspaces and users (private to you), and opened again at the next
+    start (`restore = "off"` in the config turns this off), once the workspaces have answered:
+    a start that fails (offline) keeps them waiting and the file as it was, and tabs you open
+    meanwhile stay, the saved ones after them. A pane whose conversation Slack no longer lists
+    is left out, and a file that cannot be read is not used (it is kept as `<name>.bak` when
+    the layout is next saved); either is said once. Drafts are not saved: what you were
+    writing is not there after a restart;
   - `V` selects a range of messages and `y` copies it (or the selected message) to the
     clipboard through the terminal (OSC 52);
   - `i` writes in the pane's composer (multiline: `Ctrl+J` or `Alt+Enter` for a new line,

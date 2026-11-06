@@ -7,6 +7,9 @@
 
 #[path = "support/demo.rs"]
 mod demo;
+#[path = "support/scripted.rs"]
+#[expect(dead_code, reason = "this file uses a part of the harness")]
+mod scripted;
 
 use demo::Demo;
 use ratatui::crossterm::event::{MouseButton, MouseEventKind};
@@ -241,4 +244,43 @@ fn two_thread_panes_of_one_conversation_say_whose_thread() {
     assert!(threads >= 2, "{s}");
     assert!(!s.contains("⤷ Thread · #long-threads"), "each says whose thread: {titles:?}");
     insta::assert_snapshot!("resize_two_threads_160x40", d.snap());
+}
+
+#[test]
+fn a_press_where_borders_meet_drags_the_border_that_runs_across() {
+    // One pane over two: the `┬` where the lower ones' border meets the one across.
+    let mut d = Demo::new(120, 40);
+    d.open("backend");
+    d.keys("space w s");
+    d.keys("space w v");
+    let [(_, top), (_, left), (_, right)] = panes(&d)[..] else { panic!("three panes") };
+    let (x, y) = (left.right() - 1, top.bottom() - 1);
+    assert_eq!(d.screen().lines().nth(usize::from(y)).unwrap().chars().nth(usize::from(x)), Some('┬'));
+    d.mouse(MouseEventKind::Down(MouseButton::Left), x, y);
+    d.mouse(MouseEventKind::Drag(MouseButton::Left), x - 6, y + 4);
+    d.mouse(MouseEventKind::Up(MouseButton::Left), x - 6, y + 4);
+    let [(_, top2), (_, left2), (_, right2)] = panes(&d)[..] else { panic!("three panes") };
+    assert_eq!(top2.height, top.height + 4, "the border across moved");
+    assert_eq!((left2.width, right2.width), (left.width, right.width), "the one it meets stayed");
+}
+
+#[test]
+fn zooms_notice_goes_when_the_backend_ends_the_zoom() {
+    use slakio_core::backend::{Envelope, Event};
+    let mut s = scripted::Scripted::booted(false, None);
+    s.d.list_cursor_on("backend");
+    s.keys("enter");
+    s.d.list_cursor_on("incidents");
+    s.keys("v");
+    s.keys("z");
+    let zoomed = |s: &scripted::Scripted| s.d.status_line().contains("Zoomed");
+    assert!(zoomed(&s), "{}", s.d.status_line());
+    // The backend's list no longer has `backend`: its pane closes, one is left, no zoom.
+    let mut snapshot = slakio_world::World::demo().snapshot().clone();
+    snapshot.conversations.retain(|c| c.name.unsanitized() != "backend");
+    let id = s.b.log[0].id;
+    s.b.push(Envelope { generation: id, event: Event::Booted(Box::new(snapshot)) });
+    s.pump();
+    assert_eq!(panes(&s.d).len(), 1);
+    assert!(!zoomed(&s), "{}", s.d.status_line());
 }

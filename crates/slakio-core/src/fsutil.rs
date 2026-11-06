@@ -32,7 +32,14 @@ fn write_atomically(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> 
         Some(d) => d.to_path_buf(),
         None => PathBuf::from("."),
     };
-    fs::create_dir_all(&dir)?;
+    // A folder made for a private file is private too.
+    let mut b = fs::DirBuilder::new();
+    b.recursive(true);
+    #[cfg(unix)]
+    if private {
+        std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+    }
+    b.create(&dir)?;
     let name = target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let tmp = dir.join(format!(".{name}.tmp-{}", std::process::id()));
     let result = write_then_rename(&tmp, &target, bytes, private);
@@ -45,14 +52,22 @@ fn write_atomically(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> 
 }
 
 fn write_then_rename(tmp: &Path, target: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
+    // Made new, never through what is already there (a link put in its place is not
+    // followed); one left by an earlier run of the same id is removed first.
     let mut opts = fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
+    opts.write(true).create_new(true);
     // A private file is never readable by others, not even for a moment.
     #[cfg(unix)]
     if private {
         std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
     }
-    let mut f = opts.open(tmp)?;
+    let mut f = match opts.open(tmp) {
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            fs::remove_file(tmp)?;
+            opts.open(tmp)?
+        }
+        opened => opened?,
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -172,6 +187,46 @@ pub fn free_backup(path: &Path) -> PathBuf {
     }
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     (2..).map(|n| path.with_file_name(format!("{name}.{n}"))).find(|p| !taken(p)).unwrap_or_default()
+}
+
+/// Make `dir` (and the folders above it that are missing) a folder only its owner may enter
+/// (0700 on Unix); one there already that others may enter is made private too, when it is the
+/// user's (only its owner may change its mode; otherwise it stays as it is).
+pub fn private_dir(dir: &Path) -> io::Result<()> {
+    let mut b = fs::DirBuilder::new();
+    b.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+    b.create(dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if fs::metadata(dir).is_ok_and(|m| m.permissions().mode() & 0o077 != 0) {
+            let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o700));
+        }
+    }
+    Ok(())
+}
+
+/// The bytes of the plain file at `path`, at most `max` of them. A symbolic link, a pipe or
+/// anything but a plain file is refused without waiting on it (it is opened without following
+/// a link and without blocking, then looked at as opened), and so is a file longer than `max`.
+pub fn read_plain(path: &Path, max: u64) -> io::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut opts = fs::OpenOptions::new();
+    opts.read(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut opts, libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    let f = opts.open(path)?;
+    if !f.metadata()?.is_file() {
+        return Err(io::Error::other("not a plain file"));
+    }
+    let mut bytes = Vec::new();
+    f.take(max.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > max {
+        return Err(io::Error::other(format!("over {max} bytes")));
+    }
+    Ok(bytes)
 }
 
 /// Make a rename in `dir` durable (Unix). Best effort: some file systems refuse it, and the

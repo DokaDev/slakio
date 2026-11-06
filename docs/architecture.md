@@ -69,7 +69,9 @@ it needs, the keyboard moving to the pane on a side, by place, keys and a dragge
 resizing a pane, in `app/splits.rs`; the core's `Node::fitted` gives every split the room its
 sides need, so a smaller screen shrinks every pane alike), the tabs saved for the next run and
 opened again (`app/work/restore.rs`, `app/restore.rs`; the file's form is the core's
-`layout/saved.rs`, the file itself `layout_file.rs`, read and written by the binary only), the
+`layout/saved.rs`, the file itself `layout_file.rs`, read and written by the binary only, and
+only when the work area's change count moved; a saved pane is left out only on the backend's own
+boot answer, never on the cache's or a failed one), the
 tabs closed to open again
 (`app/work.rs`, `app/work/tabs.rs`; the app's side of tabs, their titles and the tab bar's mouse
 in `app/tabs.rs`, the bar's geometry in `tabbar.rs`), the list panel's workspace chip, its view switcher and the workspace switcher

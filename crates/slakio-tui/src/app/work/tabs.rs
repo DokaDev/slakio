@@ -67,19 +67,20 @@ impl Work {
 
     /// Move the tab shown `by` places (no wrapping); `false` when it cannot go further.
     pub fn shift_tab(&mut self, by: isize) -> bool {
-        self.tabs.shift(by)
+        self.tabs_mut().shift(by)
     }
 
     /// Move tab `from` to index `to` (dragged there).
     pub fn move_tab(&mut self, from: usize, to: usize) -> bool {
-        self.tabs.move_tab(from, to)
+        self.tabs_mut().move_tab(from, to)
     }
 
-    /// Name the tab shown `name`; empty: named after its active pane again. `false` with no tab.
+    /// Name the tab shown `name`, kept as it is saved between runs (no control characters, at
+    /// most [`slakio_core::layout::saved::MAX_NAME`] characters); empty: named after its active
+    /// pane again. `false` with no tab.
     pub fn rename(&mut self, name: &str) -> bool {
-        let Some(tab) = self.tabs.current_tab_mut() else { return false };
-        let name = name.trim();
-        tab.name = (!name.is_empty()).then(|| name.to_string());
+        let Some(tab) = self.tabs_mut().current_tab_mut() else { return false };
+        tab.name = slakio_core::layout::saved::tab_name(name);
         true
     }
 
@@ -87,7 +88,7 @@ impl Work {
     /// the new last one. The target of its active pane (for the list, when none is left).
     pub fn close_tab(&mut self, i: usize) -> Option<Target> {
         self.set_insert(false);
-        let tab = self.tabs.close(i)?;
+        let tab = self.tabs_mut().close(i)?;
         let panes = tab
             .root
             .leaves()
@@ -130,7 +131,7 @@ impl Work {
         }
         let root = root.map(&|old| new(old).unwrap_or(old));
         let active = new(c.active).unwrap_or_else(|| root.leaves()[0]);
-        self.tabs.insert(c.index, Tab { root, active, name: c.name, zoomed: false });
+        self.tabs_mut().insert(c.index, Tab { root, active, name: c.name, zoomed: false });
         self.prune();
         self.fill();
         self.check();

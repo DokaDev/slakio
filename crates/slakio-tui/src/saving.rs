@@ -18,11 +18,8 @@ pub(crate) struct Saved {
 impl Saved {
     /// Keep the layout as it is now (`end`: the run ends, so whatever waits is written).
     pub fn keep_layout(&mut self, app: &App, end: bool) {
-        let now = Instant::now();
-        let mut result = self.layout.offer(app.layout_to_save().as_ref(), now);
-        if end || self.layout.deadline().is_some_and(|at| at <= now) {
-            result = result.and(self.layout.flush(now));
-        }
+        // Looked at only when the layout may have changed (not on every wake of the loop).
+        let result = self.layout.keep(app.layout_stamp(), || app.layout_to_save(), Instant::now(), end);
         if let Err(fault) = result {
             ErrorLog::new(self.errors.clone()).record("layout", &fault);
         }

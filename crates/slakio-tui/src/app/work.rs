@@ -65,6 +65,8 @@ pub struct Work {
     pub requests: Requests,
     /// When the last older page was asked for (they are paced).
     older_at: Option<Instant>,
+    /// Bumped by every change to the tabs (what is saved between runs).
+    edits: u64,
 }
 
 /// The draft of a target that has none yet.
@@ -104,6 +106,18 @@ impl Work {
     /// The tabs.
     pub fn tabs(&self) -> &Tabs {
         &self.tabs
+    }
+
+    /// How many times the tabs were changed (or may have been): the layout saved between runs
+    /// is the same while this is.
+    pub fn edits(&self) -> u64 {
+        self.edits
+    }
+
+    /// The tabs, to change: every change goes through here, so [`Self::edits`] counts it.
+    fn tabs_mut(&mut self) -> &mut Tabs {
+        self.edits += 1;
+        &mut self.tabs
     }
 
     /// The panes of the tab shown, in reading order.
@@ -168,7 +182,7 @@ impl Work {
     fn point(&mut self, id: PaneId) {
         let Some(i) = self.tabs.find(id) else { return };
         self.show_tab(i);
-        if let Some(t) = self.tabs.current_tab_mut() {
+        if let Some(t) = self.tabs_mut().current_tab_mut() {
             // Another pane of a zoomed tab shows the layout again.
             (t.zoomed, t.active) = (t.zoomed && t.active == id, id);
         }
@@ -180,7 +194,7 @@ impl Work {
 
     /// Show tab `i` (its panes ask for the pages they want).
     fn show_tab(&mut self, i: usize) {
-        if self.tabs.current() != Some(i) && self.tabs.select(i) {
+        if self.tabs.current() != Some(i) && self.tabs_mut().select(i) {
             self.set_insert(false);
             self.fill();
         }
@@ -250,7 +264,7 @@ impl Work {
     /// Take pane `id` out of the registry and its tab (a tab left empty closes, unrecorded);
     /// where it was its tab's active pane, `next` is (or the tab's first pane).
     fn remove(&mut self, id: PaneId, next: Option<PaneId>) -> Option<Pane> {
-        self.tabs.close_pane(id, next);
+        self.tabs_mut().close_pane(id, next);
         self.fit();
         self.panes.remove(&id)
     }
@@ -283,7 +297,7 @@ impl Work {
     fn new_tab(&mut self, target: Target, history: History) -> PaneId {
         self.set_insert(false);
         let id = self.add(Pane { history, ..Pane::new(target) });
-        self.tabs.open(Tab::new(id));
+        self.tabs_mut().open(Tab::new(id));
         self.prune();
         self.fill();
         self.check();
@@ -356,7 +370,7 @@ impl Work {
         self.prune();
         let id = self.add(Pane { insert, ..Pane::new(target) });
         let beside = Node::split(Dir::Row, THREAD_SHARE, Node::Leaf(owner), Node::Leaf(id));
-        let tab = self.tabs.current_tab_mut()?;
+        let tab = self.tabs_mut().current_tab_mut()?;
         tab.root = tab.root.replace(owner, &beside);
         (tab.active, tab.zoomed) = (id, false);
         if let Some(p) = self.panes.get_mut(&owner) {

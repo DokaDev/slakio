@@ -12,7 +12,9 @@ use slakio_core::layout::{Node, PaneId};
 use slakio_core::model::Target;
 
 impl Work {
-    /// The tabs as they are now, to save.
+    /// The tabs as they are now, to save. A tab whose layout places a pane that is not open
+    /// (never, while the work area holds) is left out rather than saved in a form the next run
+    /// could not read.
     pub fn saved(&self) -> Saved {
         let tabs = self
             .tabs
@@ -23,25 +25,30 @@ impl Work {
                 let index = |id: PaneId| PaneId(ids.iter().position(|p| *p == id).unwrap_or(0) as u64);
                 let panes = ids
                     .iter()
-                    .filter_map(|id| self.panes.get(id))
-                    .map(|p| SavedPane { target: p.target.clone(), panel: p.thread.map(index) })
-                    .collect();
-                SavedTab {
+                    .map(|id| self.panes.get(id))
+                    .map(|p| p.map(|p| SavedPane { target: p.target.clone(), panel: p.thread.map(index) }))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(SavedTab {
                     name: t.name.clone(),
                     root: t.root.map(&index),
                     active: index(t.active),
                     zoomed: t.zoomed,
                     panes,
-                }
+                })
             })
-            .collect();
-        Saved { tabs, current: self.tabs.current().unwrap_or(0) }
+            .collect::<Vec<_>>();
+        // The tab shown, counted among those saved.
+        let current = self.tabs.current().map_or(0, |c| tabs[..c.min(tabs.len())].iter().flatten().count());
+        let tabs: Vec<SavedTab> = tabs.into_iter().flatten().collect();
+        Saved { current: if current < tabs.len() { current } else { 0 }, tabs }
     }
 
-    /// Open the tabs `saved` after those open (none, at the start), leaving out the panes whose
-    /// target `keep` refuses (a tab left with none is left out); the tab saved as shown is
-    /// shown, on its active pane. How many panes were left out.
+    /// Open the tabs `saved` after those open, leaving out the panes whose target `keep`
+    /// refuses (a tab left with none is left out). Into an empty work area, the tab saved as
+    /// shown is shown, on its active pane; otherwise the tab shown stays. How many panes were
+    /// left out.
     pub fn restore(&mut self, saved: &Saved, keep: impl Fn(&Target) -> bool) -> usize {
+        let (empty, before) = (self.tabs.is_empty(), self.tabs.current());
         let (mut dropped, mut shown) = (0, None);
         for (i, t) in saved.tabs.iter().enumerate() {
             let gone: Vec<PaneId> =
@@ -63,15 +70,18 @@ impl Work {
             let root = root.map(&|old| to(old).unwrap_or(old));
             let active = to(t.active).unwrap_or_else(|| root.leaves()[0]);
             let zoomed = t.zoomed && matches!(root, Node::Split { .. });
-            let at = self.tabs.insert(self.tabs.len(), Tab { root, active, name: t.name.clone(), zoomed });
+            let end = self.tabs.len();
+            let at = self.tabs_mut().insert(end, Tab { root, active, name: t.name.clone(), zoomed });
             if i == saved.current || shown.is_none() {
                 shown = Some(at);
             }
         }
         self.fit();
-        // Shown on its active pane, zoomed as it was.
-        if let Some(active) = shown.and_then(|i| self.tabs.all().get(i)).map(|t| t.active) {
+        // Shown on its active pane, zoomed as it was; or the tab the user had shown stays.
+        if let Some(active) = shown.filter(|_| empty).and_then(|i| self.tabs.all().get(i)).map(|t| t.active) {
             self.point(active);
+        } else if let Some(i) = before {
+            self.tabs_mut().select(i);
         }
         self.prune();
         self.fill();

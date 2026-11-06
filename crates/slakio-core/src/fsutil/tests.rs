@@ -117,3 +117,53 @@ fn a_link_is_written_through_never_replaced() {
     assert!(fs::symlink_metadata(dir.join("loop-a")).unwrap().file_type().is_symlink());
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_link_planted_as_the_temporary_file_is_never_followed() {
+    let dir = temp_dir("planted");
+    let path = dir.join("layout.toml");
+    let victim = dir.join("victim");
+    fs::write(&victim, "keep").unwrap();
+    let tmp = dir.join(format!(".layout.toml.tmp-{}", std::process::id()));
+    std::os::unix::fs::symlink(&victim, &tmp).unwrap();
+    atomic_write_private(&path, b"new").unwrap();
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "keep", "the link's target is untouched");
+    assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+    assert!(leftovers(&dir).is_empty());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_private_file_gets_a_private_new_folder_and_private_dir_tightens_one() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_dir("private-dir");
+    let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    atomic_write_private(&dir.join("state").join("a"), b"x").unwrap();
+    assert_eq!(mode(&dir.join("state")), 0o700);
+    let loose = dir.join("loose");
+    fs::create_dir_all(&loose).unwrap();
+    fs::set_permissions(&loose, fs::Permissions::from_mode(0o755)).unwrap();
+    private_dir(&loose).unwrap();
+    assert_eq!(mode(&loose), 0o700);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn read_plain_reads_a_file_up_to_its_cap_and_nothing_else() {
+    let dir = temp_dir("read-plain");
+    let path = dir.join("a");
+    fs::write(&path, b"12345").unwrap();
+    assert_eq!(read_plain(&path, 5).unwrap(), b"12345");
+    assert!(read_plain(&path, 4).is_err(), "longer than the cap");
+    assert!(read_plain(&dir, 5).is_err(), "a folder");
+    assert_eq!(read_plain(&dir.join("none"), 5).unwrap_err().kind(), io::ErrorKind::NotFound);
+    #[cfg(unix)]
+    {
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(read_plain(&link, 5).is_err(), "a link is not followed");
+    }
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -56,7 +56,7 @@ impl Work {
             None => (self.unit(at), split_share(dir, 1, 1)),
         };
         let id = self.add(Pane::new(target));
-        if !self.tabs.split(&unit, dir, share, id) {
+        if !self.tabs_mut().split(&unit, dir, share, id) {
             self.panes.remove(&id);
             return None;
         }
@@ -73,12 +73,12 @@ impl Work {
         let owner = self.owner(panel)?;
         self.set_insert(false);
         let i = self.tabs.find(panel)?;
-        let tab = self.tabs.get_mut(i)?;
+        let tab = self.tabs_mut().get_mut(i)?;
         let before = (tab.root.clone(), tab.active);
         tab.root = tab.root.without(panel)?;
         tab.active = owner;
-        if !self.tabs.split(&[owner], dir, split_share(dir, 1, 1), panel) {
-            if let Some(tab) = self.tabs.get_mut(i) {
+        if !self.tabs_mut().split(&[owner], dir, split_share(dir, 1, 1), panel) {
+            if let Some(tab) = self.tabs_mut().get_mut(i) {
                 (tab.root, tab.active) = before;
             }
             return None;
@@ -94,7 +94,7 @@ impl Work {
     /// Zoom the tab shown on its active pane, or show every pane again; whether it is zoomed
     /// now. `None` with no tab, or one of one pane.
     pub fn toggle_zoom(&mut self) -> Option<bool> {
-        self.tabs.toggle_zoom()
+        self.tabs_mut().toggle_zoom()
     }
 
     /// The panes of the tab shown share its room evenly (a thread panel gets its first share
@@ -102,7 +102,7 @@ impl Work {
     /// thread panel, or not); `None` with no tab.
     pub fn equalize(&mut self) -> Option<bool> {
         let panes = self.ids().into_iter().filter(|id| self.owner(*id).is_none()).count();
-        let tab = self.tabs.current_tab_mut()?;
+        let tab = self.tabs_mut().current_tab_mut()?;
         if panes < 2 {
             return Some(false);
         }
@@ -115,7 +115,7 @@ impl Work {
     /// takes from every pane alike before a side gives way.
     pub(super) fn fit(&mut self) {
         for i in 0..self.tabs.len() {
-            if let Some(t) = self.tabs.get_mut(i) {
+            if let Some(t) = self.tabs_mut().get_mut(i) {
                 t.root = screen::fitted(&t.root);
             }
         }
@@ -126,7 +126,7 @@ impl Work {
     /// way around it, at the end of its room, or the tab is zoomed).
     pub fn resize(&mut self, work: Rect, dir: Dir, by: i32) -> bool {
         let (Some(active), false) = (self.active(), self.zoomed()) else { return false };
-        let Some(tab) = self.tabs.current_tab_mut() else { return false };
+        let Some(tab) = self.tabs_mut().current_tab_mut() else { return false };
         let Some(root) = tab.root.resize(screen::work_area(work), Some(active), active, dir, by) else { return false };
         tab.root = root;
         true
@@ -145,7 +145,7 @@ impl Work {
         if self.zoomed() {
             return false;
         }
-        let Some(tab) = self.tabs.current_tab_mut() else { return false };
+        let Some(tab) = self.tabs_mut().current_tab_mut() else { return false };
         let Some(root) = tab.root.drag(screen::work_area(work), active, id, at) else { return false };
         tab.root = root;
         true

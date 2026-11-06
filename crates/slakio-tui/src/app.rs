@@ -260,11 +260,15 @@ impl App {
     /// Handle a terminal event at `now`. `true` when the screen may have changed.
     pub fn handle_event(&mut self, ev: Event, now: Instant) -> bool {
         let changed = self.handle(ev, now);
-        // Whatever showed every pane again (or another tab), "Zoomed" is no longer true.
+        self.forget_zoomed(now);
+        changed
+    }
+
+    /// Whatever showed every pane again (or another tab), "Zoomed" is no longer true.
+    fn forget_zoomed(&mut self, now: Instant) {
         if !self.work.zoomed() {
             self.status.forget(now, |m| matches!(m, Msg::StatusZoomed { .. }));
         }
-        changed
     }
 
     fn handle(&mut self, ev: Event, now: Instant) -> bool {

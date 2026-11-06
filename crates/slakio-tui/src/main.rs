@@ -206,8 +206,9 @@ fn main() -> ExitCode {
                 let mut notices = Vec::new();
                 let (handle, signed) = wiring.connect(kept, &mut notices);
                 app.connect_workspaces(handle.capabilities, &signed);
-                let ids: Vec<_> = signed.iter().map(|s| s.id.clone()).collect();
-                layout = LayoutFile::new(paths.state.as_deref(), &layout_file::file_name(Some(&ids)));
+                // One file per workspace and the user signed in to it, as the cache.
+                let owners: Vec<_> = signed.iter().map(|s| (s.id.clone(), s.user.clone())).collect();
+                layout = LayoutFile::new(paths.state.as_deref(), &layout_file::file_name(Some(&owners)));
                 // Queued: a boot that fails at once (offline) does not hide them.
                 for n in notices {
                     app.status.queue(n, Level::Warning, Instant::now());

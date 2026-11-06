@@ -212,8 +212,11 @@ impl App {
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
         };
-        // The tabs of the last run open once every workspace has answered its boot.
-        changed | self.try_restore(now)
+        // The tabs of the last run open once every pane's conversation is known.
+        let changed = changed | self.try_restore(now);
+        // A pane the answer closed may have ended a zoom.
+        self.forget_zoomed(now);
+        changed
     }
 
     /// The answer of boot `b` (the cache's, when `cached`: drawn only while the backend's own

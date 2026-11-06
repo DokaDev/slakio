@@ -110,7 +110,8 @@ impl Saved {
 
     /// The tabs of a file's text; why not when it cannot be read whole.
     pub fn parse(text: &str) -> Result<Saved, String> {
-        let doc = text.parse::<DocumentMut>().map_err(|e| format!("not TOML: {e}"))?;
+        // The parser's words quote the file: only their start is kept.
+        let doc = text.parse::<DocumentMut>().map_err(|e| format!("not TOML: {}", quoted(&e.to_string())))?;
         if doc.get("version").and_then(Item::as_integer) != Some(VERSION) {
             return Err("not version 1".to_string());
         }
@@ -151,7 +152,7 @@ fn decode<'a>(words: &mut impl Iterator<Item = &'a str>, panes: usize, depth: us
     let word = words.next().ok_or("a tree cut short")?;
     let mut parts = word.split(' ');
     let kind = parts.next().unwrap_or_default();
-    let numbers = parts.map(str::parse::<u16>).collect::<Result<Vec<_>, _>>().map_err(|_| format!("`{word}`"))?;
+    let numbers = parts.map(str::parse::<u16>).collect::<Result<Vec<_>, _>>().map_err(|_| quoted(word))?;
     match (kind, numbers.as_slice()) {
         ("pane", &[i]) if usize::from(i) < panes => Ok(Node::Leaf(PaneId(u64::from(i)))),
         ("row" | "column", &[num, den, min, max, keep]) if den > 0 => {
@@ -160,8 +161,25 @@ fn decode<'a>(words: &mut impl Iterator<Item = &'a str>, panes: usize, depth: us
             let second = decode(words, panes, depth + 1)?;
             Ok(Node::split(dir, Share { num, den, min, max, keep }, first, second))
         }
-        _ => Err(format!("`{word}`")),
+        _ => Err(quoted(word)),
     }
+}
+
+/// A tab's name as it is kept (when given, and when read back): the user's own words without
+/// control characters, at most [`MAX_NAME`] characters, without blanks at its ends; `None` when
+/// nothing is left.
+pub fn tab_name(name: &str) -> Option<String> {
+    let name: String = name.chars().filter(|c| !c.is_control()).take(MAX_NAME).collect();
+    Some(name.trim().to_string()).filter(|n| !n.is_empty())
+}
+
+/// `word` of a file, quoted in why it cannot be read (a line of the error log): at most a few
+/// dozen characters of it, control characters as blanks.
+fn quoted(word: &str) -> String {
+    const MOST: usize = 40;
+    let cut: String = word.chars().take(MOST).map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let more = if word.chars().nth(MOST).is_some() { "…" } else { "" };
+    format!("`{cut}{more}`")
 }
 
 /// A tab of the file.
@@ -193,10 +211,7 @@ fn tab(t: &Table) -> Result<SavedTab, String> {
         None => None,
         Some(n) => Some(n.as_str().ok_or("a name that is not text")?),
     };
-    // A name is the user's own words: kept without control characters, and not too long.
-    let name = name
-        .map(|n| n.chars().filter(|c| !c.is_control()).take(MAX_NAME).collect::<String>().trim().to_string())
-        .filter(|n| !n.is_empty());
+    let name = name.and_then(tab_name);
     let mut tab = SavedTab { name, root, active: PaneId(active as u64), zoomed, panes };
     keep_panels(&mut tab);
     Ok(tab)

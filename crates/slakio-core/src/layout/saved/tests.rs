@@ -102,6 +102,29 @@ fn what_is_out_of_place_is_read_as_the_least_it_can_be() {
     assert_eq!(Saved::parse(&own).unwrap().tabs[0].panes[0].panel, None);
 }
 
+#[test]
+fn why_a_file_is_refused_quotes_only_the_start_of_a_long_word() {
+    let long = "x".repeat(10_000);
+    let good = two_tabs().to_text();
+    for bad in [good.replace("column", &format!("column{long}")), format!("{long} = [")] {
+        let why = Saved::parse(&bad).unwrap_err();
+        assert!(why.chars().count() < 120, "{} chars: {}", why.len(), &why[..why.len().min(200)]);
+        assert!(!why.contains('\n'), "one line: {why}");
+    }
+}
+
+#[test]
+fn a_tab_name_kept_is_the_name_read_back() {
+    for given in ["  Incident  ", "a\u{1b}[2Jb", &"y".repeat(300), "\t", "  "] {
+        let kept = tab_name(given);
+        let mut saved = two_tabs();
+        saved.tabs[0].name = kept.clone();
+        assert_eq!(Saved::parse(&saved.to_text()).unwrap().tabs[0].name, kept, "{given:?}");
+    }
+    assert_eq!(tab_name("  Incident "), Some("Incident".to_string()));
+    assert_eq!(tab_name(" \u{7} "), None);
+}
+
 /// The two panes of the first split whose sides are both panes.
 fn two_leaves(n: &Node) -> Option<(PaneId, PaneId)> {
     match n {

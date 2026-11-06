@@ -128,17 +128,8 @@ impl ErrorLog {
 /// Append `bytes` to the private file at `path`, rotating it first when it would grow past `max`.
 fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
     if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
-        let mut b = std::fs::DirBuilder::new();
-        b.recursive(true);
-        #[cfg(unix)]
-        std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
-        b.create(dir)?;
-        // One made looser before (or by hand) is made private too, when it is the user's (only
-        // its owner may change its mode; otherwise it stays as it is).
-        #[cfg(unix)]
-        if std::fs::metadata(dir).is_ok_and(|m| m.permissions().mode() & 0o077 != 0) {
-            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
-        }
+        // One made looser before (or by hand) is made private too.
+        crate::fsutil::private_dir(dir)?;
     }
     match std::fs::symlink_metadata(path) {
         // A link (or anything but a file) is not written through.
