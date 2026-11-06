@@ -28,9 +28,9 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the next release resizes panes (`Space w >` / `<` / `+` / `-`, `:resize`, or a border
-dragged with the mouse), lets neighbouring panes share one border, and opens the tabs and panes of the last run again
-at the start. 0.0.15 split the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
+([Install](#install)); 0.0.16 resizes panes (`Space w >` / `<` / `+` / `-`, or a border
+dragged with the mouse); neighbouring panes share one border, and the layout (tabs, splits, what each pane shows, zoom,
+focus) comes back after a restart (`restore = "off"` stops that). 0.0.15 split the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
 panes, `z` zooms one pane, `Space w =` gives them even room, and Ctrl+W closes one. A thread panel splits off into its own
 pane. The lowercase `v` now splits; the VISUAL selection is `V`. It is still
 read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack.
