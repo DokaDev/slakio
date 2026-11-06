@@ -1,12 +1,14 @@
 //! The list of a message's links to pick (`o`, when one of them is not on screen): each row its
 //! letters (faint once the letters typed do not start them), the host it goes to (its end kept
-//! when cut) and its text after it; the cursor row drawn as the selection. It scrolls with its
+//! when cut) and its text after it; the cursor row drawn as the selection. A Slack link, which
+//! opens inside slakio, is marked `↳` before its host and named when its text is not. It scrolls with its
 //! cursor; when it has more rows than it shows, its title says where the cursor is (`3/30`).
 //!
 //! ```text
 //! ╭ Open which link? ─────────────────────────────╮
 //! │ a  docs.example.com  the runbook              │
 //! │ s  status.example.com                         │
+//! │ d  ↳ acme.slack.com  Slack message            │
 //! ╰──────────────── j/k move · Enter open · Esc cancel ─╯
 //! ```
 
@@ -24,6 +26,9 @@ use slakio_core::i18n::Label;
 
 /// The most cells of a row the host takes, so its text shows too.
 const HOST_MAX: usize = 32;
+
+/// The mark of a Slack link, which opens in slakio rather than the browser.
+pub const INSIDE: &str = "↳ ";
 
 pub(super) fn draw(f: &mut Frame, app: &App, body: Rect) {
     let t = &app.theme;
@@ -49,12 +54,20 @@ pub(super) fn draw(f: &mut Frame, app: &App, body: Rect) {
         // Labels the letters typed do not start are faint.
         let on = !k.hint.is_empty() && k.hint.starts_with(&p.typed);
         let lead = lead_w as u16;
-        let host = host_tail(&k.host, HOST_MAX.min(w.saturating_sub(lead_w + 2)));
-        let room = w.saturating_sub(lead_w + 1 + width(&host) + 2);
-        let said = k.label.as_deref().map(|l| clip(l, room)).unwrap_or_default();
+        // A Slack link opens here, not in the browser: marked, and named when its text is not.
+        let slack = crate::permalink::parse(&k.url);
+        let mark = if slack.is_some() { INSIDE } else { "" };
+        let host = host_tail(&k.host, HOST_MAX.min(w.saturating_sub(lead_w + 2 + width(mark))));
+        let room = w.saturating_sub(lead_w + 1 + width(mark) + width(&host) + 2);
+        let named = slack.map(|l| {
+            let what = if l.message.is_some() { Label::OpenSlackMessage } else { Label::OpenSlackConversation };
+            label(what)
+        });
+        let said = k.label.clone().or(named).map(|l| clip(&l, room)).unwrap_or_default();
         let line = Line::from(vec![
             Span::styled(hint, if on { t.hint() } else { t.faint() }),
             Span::raw(" "),
+            Span::styled(mark, t.accent()),
             Span::styled(host, t.bold()),
             Span::raw("  "),
             Span::styled(said, t.muted()),

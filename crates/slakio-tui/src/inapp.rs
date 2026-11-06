@@ -130,7 +130,7 @@ impl Wiring {
                 let handle = w.local.front(w.serve(k.credentials, k.endpoints, &team), &team, &user, &mut notices);
                 let read_only = handle.capabilities.read_only;
                 if replace.put(&id, handle) {
-                    signed.push(SignedInTo { id, name: k.account.name, read_only, user });
+                    signed.push(SignedInTo { id, name: k.account.name, read_only, host: k.account.host, user });
                 }
             }
             (signed, notices)

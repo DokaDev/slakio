@@ -201,6 +201,20 @@ comes back); people and channels are named from the read model when drawn
   links moved (`Pane::links_moved`). Tests
   stand in for the opener (`SLAKIO_TEST_OPENER`, debug
   builds only) and never start a browser.
+- **Slack links.** Every way of opening a link goes through `App::open_address`; one that
+  `permalink::parse` reads as Slack's own (`https` only, after `opener::check`; a host whose
+  last two labels are `slack.com`, a workspace's or an Enterprise Grid one, or
+  `app.slack.com/client/<team>/<conversation>`; ids and a 16-digit time of Slack's shape) opens
+  inside (`app/jump.rs`). Its workspace is the one signed in on that host (`SignedIn::host`) or
+  with that id, else one signed in to that lists the conversation; none, or one that does not
+  list it, or Slack refusing to read it (its own error), asks before opening it in the browser
+  (`dialog::Question::Browser`, then the web link's own rules). A message loaded already is
+  selected; one that is not is read around (`Command::Around`, `app/work/jump.rs`: what was
+  loaded goes): the backend reads `conversations.history` with `latest` and `inclusive`, then
+  with `oldest`, and keeps the newer ones only when Slack says none is left past them, else the
+  page is `cut` (no gap hidden; nothing comes live after the last message read, there is no
+  catch-up, and `G` reads the newest again). It is not cached. The message is marked in the
+  gutter for two seconds (`Pane::flash`).
 
 ## The Slack transport
 

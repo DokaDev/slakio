@@ -114,10 +114,18 @@ impl App {
         if arg.is_empty() { self.open_link(now) } else { self.open_address(arg, None, now) }
     }
 
-    /// Open `url`, a link's address whose text is `label`: refused unless it is a web address
-    /// ([`opener::check`], handed over in its checked form); asked about first when the text
-    /// names another host; else handed to the binary, the host it goes to said.
+    /// Open `url`, a link's address whose text is `label`: a Slack link opens here
+    /// ([`super::jump`]); any other is opened in the browser ([`Self::open_web`]).
     pub(super) fn open_address(&mut self, url: &str, label: Option<&str>, now: Instant) {
+        if !self.open_slack(url, label, now) {
+            self.open_web(url, label, now);
+        }
+    }
+
+    /// Open `url` in the browser: refused unless it is a web address ([`opener::check`], handed
+    /// over in its checked form); asked about first when its text (`label`) names another host;
+    /// else handed to the binary, the host it goes to said.
+    pub(super) fn open_web(&mut self, url: &str, label: Option<&str>, now: Instant) {
         let Some(checked) = opener::check(url) else { return self.warn(Msg::Label(Label::OpenRefused), now) };
         match label.filter(|l| mrkdwn::real_target(url, l).is_some()) {
             Some(said) => {

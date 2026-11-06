@@ -43,7 +43,9 @@ impl Work {
     /// until retried (by `r`, or by itself when Slack asked to slow down). The workspace of the
     /// page; `None` when nothing waited for it.
     pub fn on_failed(&mut self, id: Generation, kind: FailKind, now: Instant) -> Option<WorkspaceId> {
-        self.timelines.fail(id, kind, now).map(|t| t.workspace().clone())
+        let target = self.timelines.fail(id, kind, now)?;
+        self.forget_jumps(&target);
+        Some(target.workspace().clone())
     }
 
     /// Why the active pane's messages could not be loaded, if they could not.

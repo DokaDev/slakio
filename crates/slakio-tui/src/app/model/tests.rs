@@ -85,7 +85,13 @@ fn part(i: usize) -> (WorkspaceId, Snapshot) {
 fn signed(m: &Model) -> Vec<SignedIn> {
     m.workspaces()
         .iter()
-        .map(|w| SignedIn { id: w.id.clone(), name: "n".into(), read_only: true, user: String::new() })
+        .map(|w| SignedIn {
+            id: w.id.clone(),
+            name: "n".into(),
+            read_only: true,
+            host: String::new(),
+            user: String::new(),
+        })
         .collect()
 }
 
@@ -171,7 +177,13 @@ fn whole_snapshot() -> &'static Snapshot {
 fn a_cached_boot_shows_until_the_backends_own_and_never_after_it() {
     let (a, part_a) = part(0);
     let mut m = Model::default();
-    m.sign_ins(&[SignedIn { id: a.clone(), name: "A".into(), read_only: true, user: String::new() }]);
+    m.sign_ins(&[SignedIn {
+        id: a.clone(),
+        name: "A".into(),
+        read_only: true,
+        host: String::new(),
+        user: String::new(),
+    }]);
     m.merge(&a, &part_a, true);
     assert!(m.is_cached_in(&a) && m.is_loaded_in(&a) && !m.is_fresh(&a));
     m.merge(&a, &part_a, false);
@@ -248,8 +260,8 @@ mod properties {
             let (b, part_b) = part(1);
             let mut m = Model::default();
             m.sign_ins(&[
-                SignedIn { id: a.clone(), name: "A".into(), read_only: true, user: String::new() },
-                SignedIn { id: b.clone(), name: "B".into(), read_only: true, user: String::new() },
+                SignedIn { id: a.clone(), name: "A".into(), read_only: true, host: String::new(), user: String::new() },
+                SignedIn { id: b.clone(), name: "B".into(), read_only: true, host: String::new(), user: String::new() },
             ]);
             let mut first = part_a.clone();
             if drop_first {

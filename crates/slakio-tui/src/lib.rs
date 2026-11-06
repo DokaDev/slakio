@@ -34,6 +34,7 @@ pub mod many;
 pub mod mrkdwn;
 pub mod navbar;
 pub mod opener;
+pub mod permalink;
 pub mod screen;
 pub mod tabbar;
 pub mod terminal;

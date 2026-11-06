@@ -73,6 +73,8 @@ pub struct SignedIn {
     pub name: String,
     /// Nothing can be changed in it.
     pub read_only: bool,
+    /// Its host (`acme.slack.com`; empty when not known): a Slack link to it opens here.
+    pub host: String,
     /// The id of the user signed in to it.
     pub user: String,
 }

@@ -26,6 +26,7 @@ impl Work {
         for id in self.ids() {
             let Some(pane) = self.panes.get_mut(&id) else { continue };
             let tl = self.timelines.entry(&pane.target);
+            pane.land(tl);
             let workspace = Some(pane.target.workspace().clone());
             match pane.wants(tl) {
                 Some(None) => {
@@ -53,13 +54,13 @@ impl Work {
     }
 
     /// When an older page may be asked for next, if one is queued; or a failed page is asked
-    /// for again by itself.
+    /// for again by itself; or a link's message is no longer marked.
     pub fn deadline(&self) -> Option<Instant> {
         let queued = self.timelines.iter().any(|(_, tl)| tl.queued);
         let next = self.older_at.map(|at| at + OLDER_GAP).filter(|_| queued);
         let retry = self.timelines.iter().filter_map(|(_, tl)| tl.retry_at.filter(|_| tl.failed.is_some())).min();
         let recatch = self.timelines.iter().filter_map(|(_, tl)| tl.recatch).min();
-        next.into_iter().chain(retry).chain(recatch).min()
+        next.into_iter().chain(retry).chain(recatch).chain(self.flash_deadline()).min()
     }
 
     /// Ask again for the failed page of every pane that may be asked for again (the network is

@@ -99,8 +99,8 @@ impl Two {
         app.settings = Settings::default();
         app.resize(w, h);
         let signed = [
-            SignedIn { id: ia, name: "A company".into(), read_only: false, user: String::new() },
-            SignedIn { id: ib, name: "B side".into(), read_only: false, user: String::new() },
+            SignedIn { id: ia, name: "A company".into(), read_only: false, host: String::new(), user: String::new() },
+            SignedIn { id: ib, name: "B side".into(), read_only: false, host: String::new(), user: String::new() },
         ];
         app.connect_workspaces(handle.capabilities, &signed);
         d.app = app;
@@ -194,7 +194,8 @@ fn a_workspace_signed_out_while_running_keeps_its_panes_and_drafts_and_alone_sig
             t.d.app.offer_sign_in(None);
             let fresh = revocable(Arc::default(), Arc::clone(&t.asked_a));
             assert!(t.replace.put(&ids().0, fresh));
-            let a = SignedIn { id: ids().0, name: "A company".into(), read_only: false, user: me_a() };
+            let a =
+                SignedIn { id: ids().0, name: "A company".into(), read_only: false, host: String::new(), user: me_a() };
             t.d.app.signed_in_again(&[a], &["A company".to_string()], t.d.now);
             let before = t.asked_a.load(Ordering::SeqCst);
             t.settle().await;
@@ -308,8 +309,8 @@ fn two_with(a: BackendHandle, w: u16, h: u16) -> Two {
     app.settings = Settings::default();
     app.resize(w, h);
     let signed = [
-        SignedIn { id: ia, name: "A company".into(), read_only: false, user: me_a() },
-        SignedIn { id: ib, name: "B side".into(), read_only: false, user: String::new() },
+        SignedIn { id: ia, name: "A company".into(), read_only: false, host: String::new(), user: me_a() },
+        SignedIn { id: ib, name: "B side".into(), read_only: false, host: String::new(), user: String::new() },
     ];
     app.connect_workspaces(handle.capabilities, &signed);
     d.app = app;
@@ -317,7 +318,7 @@ fn two_with(a: BackendHandle, w: u16, h: u16) -> Two {
 }
 
 fn again_as(user: String) -> [SignedIn; 1] {
-    [SignedIn { id: ids().0, name: "A company".into(), read_only: false, user }]
+    [SignedIn { id: ids().0, name: "A company".into(), read_only: false, host: String::new(), user }]
 }
 
 #[test]

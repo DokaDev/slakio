@@ -19,6 +19,8 @@ pub enum Question {
     Clear,
     /// Open a link whose text names another host than the one it goes to?
     Open,
+    /// A Slack link that does not open here: open it in the browser?
+    Browser,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +64,7 @@ impl App {
             Question::Quit | Question::QuitConfirm => self.quit = yes,
             Question::Clear => self.answer_clear(yes),
             Question::Open => self.answer_open(yes, now),
+            Question::Browser => self.answer_browser(yes, now),
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });

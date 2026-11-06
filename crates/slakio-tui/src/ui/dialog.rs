@@ -37,6 +37,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             (Label::DialogClearTitle, Label::DialogClearText, Label::DialogClearNo, Label::DialogClearYes)
         }
         Question::Open => (Label::DialogOpenTitle, Label::DialogOpenTitle, Label::DialogOpenNo, Label::DialogOpenYes),
+        Question::Browser => {
+            (Label::DialogBrowserTitle, Label::DialogBrowserTitle, Label::DialogBrowserNo, Label::DialogBrowserYes)
+        }
     };
     let (no, yes) = (app.i18n.label(no).to_string(), app.i18n.label(yes).to_string());
     let w = area.width.saturating_sub(4).min(60);
@@ -48,7 +51,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             let host = crate::opener::host_tail(&o.host, inner_w.saturating_sub(2));
             app.i18n.msg(&Msg::DialogOpenText { said: o.said.clone(), host }).to_string()
         }
-        None => app.i18n.label(text).to_string(),
+        // A Slack link that does not open here: why not.
+        None => match app.offered().filter(|_| d.question == Question::Browser) {
+            Some(o) => app.i18n.msg(&o.why).to_string(),
+            None => app.i18n.label(text).to_string(),
+        },
     };
     let mut lines: Vec<Line> = wrap(&text, inner_w, 6).0.into_iter().map(|l| Line::styled(l, t.text())).collect();
     if d.question == Question::Icons {

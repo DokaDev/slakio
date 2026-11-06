@@ -366,7 +366,8 @@ impl Wiring {
             let handle = self.local.front(self.serve(k.credentials, k.endpoints, team), team, user, notices);
             let id = slakio_core::model::WorkspaceId::new(team);
             let read_only = handle.capabilities.read_only;
-            signed.push(SignedInTo { id: id.clone(), name: k.account.name.clone(), read_only, user: user.clone() });
+            let (name, host) = (k.account.name.clone(), k.account.host.clone());
+            signed.push(SignedInTo { id: id.clone(), name, read_only, host, user: user.clone() });
             handles.push((id, handle));
         }
         let (handle, replace) = slakio_tui::many::serve_replaceable(handles);

@@ -113,12 +113,26 @@ pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected:
         out.extend(comfortable(app, pane, tl, i, w, selected));
     }
     out.extend(footer(app, pane, tl, i, w));
-    // A thread read only in part says so after the last reply read.
+    // A thread read only in part, or a conversation read around a link's message, says so after
+    // the last message read (a conversation with the key that reads the newest).
     if tl.cut && i + 1 == tl.items.len() {
         out.push((Line::raw(""), Kind::Gap, Vec::new()));
-        out.extend(notice(&app.i18n.label(Label::PaneThreadCut).to_string(), w, app.theme.faint()));
+        out.extend(notice(&cut_words(app, pane), w, app.theme.faint()));
     }
     out
+}
+
+/// What the last message read of a timeline whose newest are not read says after it.
+fn cut_words(app: &App, pane: &Pane) -> String {
+    if pane.is_thread() {
+        return app.i18n.label(Label::PaneThreadCut).to_string();
+    }
+    let words = app.i18n.label(Label::PaneNewerCut).to_string();
+    let last = crate::action::Action::Pane(crate::action::PaneAction::Last);
+    match crate::ui::empty::key_of(app, last, crate::keymap::Ctx::PaneNormal) {
+        Some(keys) => format!("{words} · {}", app.i18n.msg(&slakio_core::i18n::Msg::PaneNewerKeys { keys })),
+        None => words,
+    }
 }
 
 /// What is above the oldest message loaded: older ones on their way, older ones that failed

@@ -89,7 +89,13 @@ impl Run {
         app.resize(w, h);
         let signed: Vec<SignedIn> = (ids().into_iter().zip(names))
             .take(n)
-            .map(|(id, name)| SignedIn { id, name: name.into(), read_only: true, user: String::new() })
+            .map(|(id, name)| SignedIn {
+                id,
+                name: name.into(),
+                read_only: true,
+                host: String::new(),
+                user: String::new(),
+            })
             .collect();
         app.connect_workspaces(handle.capabilities, &signed);
         d.app = app;

@@ -144,7 +144,13 @@ impl Timeline {
                 self.items[i] = shown;
                 true
             }
-            Err(i) if !changed && (i > 0 || self.complete) && (!self.items.is_empty() || self.pending.is_none()) => {
+            // Nor after the newest loaded when the newest are not read: that span is not either.
+            Err(i)
+                if !changed
+                    && (i > 0 || self.complete)
+                    && !(self.cut && i == self.items.len())
+                    && (!self.items.is_empty() || self.pending.is_none()) =>
+            {
                 self.items.insert(i, shown);
                 true
             }
@@ -231,6 +237,19 @@ impl Timeline {
             self.pending = None;
         }
         self.items.extend(tail);
+    }
+
+    /// The message at `at` is among what is loaded, or would be (deleted since): it is between
+    /// the oldest and the newest loaded (or older, when the oldest of all is loaded), and these
+    /// are the backend's (not the cache's).
+    pub fn holds(&self, at: Ts) -> bool {
+        let (Some(first), Some(last)) = (self.items.first(), self.items.last()) else { return false };
+        !self.cached && (self.complete || first.ts <= at) && at <= last.ts
+    }
+
+    /// Read again around a message instead (request `id`): what was loaded goes.
+    pub fn read_around(&mut self, id: Generation) {
+        *self = Self { pending: Some(id), ..Self::default() };
     }
 
     /// The index of the message at `ts`, when loaded.

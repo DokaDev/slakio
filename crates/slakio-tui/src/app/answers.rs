@@ -47,6 +47,7 @@ impl App {
     pub fn connect_workspaces(&mut self, caps: Capabilities, signed: &[SignedIn]) {
         self.backend = Some(caps);
         self.model.sign_ins(signed);
+        self.set_hosts(signed);
         self.shell.clamp(&self.model, self.list_height());
         self.work.clamp(&self.model);
         self.boots = signed
@@ -206,12 +207,15 @@ impl App {
             Event::History(page) => {
                 // Its authors' names first: a page's messages are drawn with them as it arrives.
                 self.model.add_users(page.target.workspace(), &page.users);
+                self.jump_answered(id, None);
                 self.work.on_page(id, &page, &self.model)
             }
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
         };
+        // A link's message, selected as its page came, is marked from now.
+        self.work.arm_flash(now);
         // The tabs of the last run open once every pane's conversation is known.
         let changed = changed | self.try_restore(now);
         // A pane the answer closed may have ended a zoom.
@@ -274,6 +278,7 @@ impl App {
     /// Request `id` failed: whatever waited for it stops waiting, the status line says why and
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
+        self.jump_answered(id, Some(&kind));
         let (mut whose, mut page, mut stale) = (None, None, None);
         let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
             b.failed = Some(kind.clone());

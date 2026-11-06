@@ -181,6 +181,10 @@ pub struct Pane {
     /// When the keyboard last came to it, as a count of its moves (`0`: never): a move by place
     /// prefers the pane it came from.
     pub focused_at: u64,
+    /// A link opened at this message: it is selected once its messages are loaded.
+    pub jump: Option<Ts>,
+    /// The message a link opened, marked for a moment; until when, once the app's clock said.
+    pub flash: Option<(Ts, Option<std::time::Instant>)>,
 }
 
 impl Pane {
@@ -203,6 +207,8 @@ impl Pane {
             links: RefCell::new(Vec::new()),
             links_moved: Cell::new(None),
             focused_at: 0,
+            jump: None,
+            flash: None,
         }
     }
 
@@ -300,6 +306,18 @@ impl Pane {
         let s = self.selected_index(tl)?;
         let v = self.visual.and_then(|ts| tl.index_near(ts)).unwrap_or(s);
         Some((s.min(v), s.max(v)))
+    }
+
+    /// The message a link opened (`at`, or the nearest loaded) selected in `tl` (this pane's
+    /// timeline) and marked, once `tl` has its messages; then nothing more is waited for.
+    pub fn land(&mut self, tl: &Timeline) {
+        let Some(at) = self.jump.filter(|at| (tl.pending.is_none() || tl.holds(*at)) && !tl.cached) else { return };
+        let Some(i) = tl.index_near(at) else { return };
+        self.jump = None;
+        (self.visual, self.older, self.to_root) = (None, false, false);
+        self.held.set(None);
+        self.selected = Some(tl.items[i].ts);
+        self.flash = self.selected.map(|ts| (ts, None));
     }
 
     /// The user's own message was added after the newest: back to the newest, so it is in

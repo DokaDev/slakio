@@ -226,3 +226,24 @@ fn a_catch_up_slack_refused_for_good_is_not_asked_for_again() {
     store.fail(Generation(10), FailKind::Api { code: "internal_error".into() }, now);
     assert!(store.get(&target("T")).unwrap().recatch.is_some());
 }
+
+#[test]
+fn read_around_a_message_its_newest_unread_nothing_comes_live_after_the_last_read() {
+    let mut tl = Timeline::default();
+    tl.add_page(&page("T", false), (50..60).map(msg).collect());
+    assert!(tl.holds(Ts(50)) && tl.holds(Ts(59)) && !tl.holds(Ts(49)) && !tl.holds(Ts(60)));
+    tl.read_around(Generation(7));
+    assert!(tl.items.is_empty() && tl.pending == Some(Generation(7)) && !tl.holds(Ts(55)));
+    let around = Page { cut: true, ..page("T", false) };
+    tl.add_page(&around, (10..20).map(msg).collect());
+    assert!(tl.cut && tl.holds(Ts(15)));
+    // A message newer than every one read: the span between is not read, so it stays out.
+    assert!(!tl.put_live(msg(99), false));
+    assert_eq!(tl.items.last().map(|m| m.ts), Some(Ts(19)));
+    // One among what is read goes in, as ever.
+    assert!(tl.put_live(msg(15), true) && tl.items.len() == 10);
+    // The cache's messages are not held: they are read again.
+    let mut cached = Timeline::default();
+    cached.add_cached((50..60).map(msg).collect());
+    assert!(!cached.holds(Ts(55)));
+}

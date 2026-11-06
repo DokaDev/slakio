@@ -34,6 +34,7 @@ pub(crate) mod drafts;
 mod effects;
 mod focus;
 pub mod help;
+pub mod jump;
 mod layout;
 pub mod links;
 pub mod model;
@@ -145,6 +146,8 @@ pub struct App {
     /// A question, while asked; the link it asks about, if it does.
     pub(crate) dialog: Option<Dialog>,
     opening: Option<links::Opening>,
+    /// Slack links opened here, or offered for the browser.
+    jumps: jump::Jumps,
     /// The links of a message being picked (`o`), while they are.
     picker: Option<picker::Picker>,
     /// What the backend can do; `None` without one.
@@ -189,6 +192,7 @@ impl App {
             help: None,
             dialog: None,
             opening: None,
+            jumps: jump::Jumps::default(),
             picker: None,
             backend: None,
             sign_in: signin::Offer::default(),
@@ -441,7 +445,7 @@ impl App {
             PaneAction::PageDown => self.work.step(page),
             PaneAction::PageUp => self.work.step(-page),
             PaneAction::First => self.work.with_pane(|p, tl| p.select_oldest(tl)),
-            PaneAction::Last => self.work.with_pane(|p, tl| p.select_newest(tl)),
+            PaneAction::Last => self.work.newest(),
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
                 Some(p) if p.selected.is_none() || p.is_thread() => self.write(now),
@@ -489,6 +493,7 @@ impl App {
     /// The deadline passed. `true` when the screen changed.
     pub fn on_tick(&mut self, now: Instant) -> bool {
         let mut changed = self.status.expire(now) | self.work.deadline().is_some_and(|at| at <= now);
+        changed |= self.work.expire_flash(now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

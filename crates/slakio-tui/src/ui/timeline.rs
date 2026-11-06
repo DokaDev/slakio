@@ -207,6 +207,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             if selected && matches!(kind, Kind::Content | Kind::Link) {
                 highlight(f, app, row, how(i));
             }
+            // The message a link opened is marked in the gutter for a moment.
+            if pane.flash.is_some_and(|(ts, _)| ts == tl.items[i].ts) && matches!(kind, Kind::Content | Kind::Link) {
+                f.buffer_mut().set_string(row.x, y, "▌", t.hint());
+            }
             if kind != Kind::Gap {
                 hits.push(Hit { y, message: i, link: kind == Kind::Link });
             }

@@ -80,8 +80,20 @@ impl Two {
         app.settings = Settings::default();
         app.resize(w, h);
         let signed = [
-            SignedIn { id: ia, name: names[0].into(), read_only: read_only.0, user: String::new() },
-            SignedIn { id: ib, name: names[1].into(), read_only: read_only.1, user: String::new() },
+            SignedIn {
+                id: ia,
+                name: names[0].into(),
+                read_only: read_only.0,
+                host: String::new(),
+                user: String::new(),
+            },
+            SignedIn {
+                id: ib,
+                name: names[1].into(),
+                read_only: read_only.1,
+                host: String::new(),
+                user: String::new(),
+            },
         ];
         app.connect_workspaces(handle.capabilities, &signed);
         d.app = app;

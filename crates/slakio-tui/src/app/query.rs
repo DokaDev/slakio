@@ -95,6 +95,17 @@ impl<'a> PaneRef<'a> {
         self.timeline.complete
     }
 
+    /// The newest messages are not among those loaded (a thread read in part, a conversation
+    /// read around a link's message).
+    pub fn cut(self) -> bool {
+        self.timeline.cut
+    }
+
+    /// The message a link opened, while it is marked.
+    pub fn flashed(self) -> Option<slakio_core::model::Ts> {
+        self.pane.flash.map(|(ts, _)| ts)
+    }
+
     /// The selected message (index into [`Self::messages`]).
     pub fn selected(self) -> Option<usize> {
         self.pane.selected_index(self.timeline)
