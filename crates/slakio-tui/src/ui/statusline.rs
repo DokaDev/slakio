@@ -17,7 +17,7 @@ use super::work::breadcrumb;
 use crate::action::{Action, SignInAction};
 use crate::app::model::Row;
 use crate::app::signin::SignIn;
-use crate::app::status::Level;
+use crate::app::status::{Level, NOTICE_MAX};
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
 use crate::keymap::{Ctx, keys};
@@ -493,9 +493,6 @@ const DND_WORDS_FROM: usize = 100;
 
 /// The width from which the mark of live updates the budget holds says why.
 const WHY_FROM: usize = 100;
-
-/// The most cells the hints make room for a notice.
-const NOTICE_MAX: usize = 48;
 
 /// The most of a workspace's name the hints make room for in a notice about it.
 const NOTICE_NAME: usize = 24;

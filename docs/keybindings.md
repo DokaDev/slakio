@@ -274,10 +274,10 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | Keys | Action | Id |
 |---|---|---|
 | `o` | Show the links as a list | `links.list` |
-| `j` | Next link in the list (letters on the links: show the list) | `links.down` |
-| `Down` | Next link in the list (letters on the links: show the list) | `links.down` |
-| `k` | Previous link in the list (letters on the links: show the list) | `links.up` |
-| `Up` | Previous link in the list (letters on the links: show the list) | `links.up` |
+| `j` | Next link (letters showing: list them) | `links.down` |
+| `Down` | Next link (letters showing: list them) | `links.down` |
+| `k` | Previous link (letters showing: list them) | `links.up` |
+| `Up` | Previous link (letters showing: list them) | `links.up` |
 | `Enter` | Open the link under the list's cursor | `links.open` |
 | `Backspace` | Take the last letter typed back | `links.back` |
 | `Esc` | Stop picking, open nothing | `links.cancel` |

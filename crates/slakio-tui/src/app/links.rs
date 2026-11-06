@@ -7,6 +7,7 @@
 
 use super::dialog::{Dialog, Question};
 use super::pane::LinkSpot;
+use super::status::NOTICE_MAX;
 use super::{App, Effect};
 use crate::mrkdwn::{self, Block, Piece};
 use crate::opener;
@@ -43,6 +44,9 @@ const SAID_MAX: usize = 40;
 
 /// The most of a host the status line names (its end), so the words fit at 80 columns.
 const HOST_SAID: usize = 19;
+
+/// From this width on, the status line has the room it makes for a notice ([`NOTICE_MAX`]).
+const WIDE: u16 = 120;
 
 impl App {
     /// Copy the selected messages (the VISUAL range, or the selected one) as text: one
@@ -123,8 +127,7 @@ impl App {
             }
             None => {
                 self.effects.push(Effect::OpenLink(checked.url));
-                // The end of a long host is what says whose it is: cut from its start, last.
-                self.info(Msg::OpenOpening { host: opener::host_tail(&checked.host, HOST_SAID) }, now);
+                self.say_opening(&checked.host, now);
             }
         }
     }
@@ -133,8 +136,19 @@ impl App {
     pub(super) fn answer_open(&mut self, yes: bool, now: Instant) {
         if let Some(o) = self.opening.take().filter(|_| yes) {
             self.effects.push(Effect::OpenLink(o.url));
-            self.info(Msg::OpenOpening { host: opener::host_tail(&o.host, HOST_SAID) }, now);
+            self.say_opening(&o.host, now);
         }
+    }
+
+    /// Say the link to `host` is opening. A notice that no link opened, still showing from a
+    /// click or key before, is no longer true: this one takes its place. The end of a long host
+    /// is what says whose it is: it is cut from its start, to the room the status line has.
+    fn say_opening(&mut self, host: &str, now: Instant) {
+        let before = |m: &Msg| matches!(m, Msg::Label(Label::OpenRefused | Label::OpenChanged | Label::OpenNone));
+        self.status.forget(now, before);
+        let around = crate::text::width(&self.i18n.msg(&Msg::OpenOpening { host: String::new() }));
+        let room = if self.size.width < WIDE { HOST_SAID } else { NOTICE_MAX.saturating_sub(around).max(HOST_SAID) };
+        self.info(Msg::OpenOpening { host: opener::host_tail(host, room) }, now);
     }
 
     /// The palette's row of `:open <arg>`.

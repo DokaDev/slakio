@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 pub const INFO_FOR: Duration = Duration::from_secs(3);
 /// How long a warning shows.
 pub const WARNING_FOR: Duration = Duration::from_secs(6);
+/// The most cells the status line's hints make room for a notice.
+pub const NOTICE_MAX: usize = 48;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {

@@ -761,3 +761,49 @@ fn no_link_says_so_the_same_way_with_or_without_a_selection() {
     let level = s.d.app.status.notice(s.d.now).map(|n| n.level);
     assert_eq!(level, Some(Level::Info));
 }
+
+#[test]
+fn an_open_after_a_refusal_says_it_is_opening_at_once() {
+    for (lang, w, h) in SIZES {
+        let at = format!("{lang:?} {w}x{h}");
+        let mut s = shown(&["see <https://docs.example.com/a>"], w, h, lang);
+        command(&mut s, "open javascript:alert(1)");
+        let refused = s.d.app.i18n.label(Label::OpenRefused).to_string();
+        assert!(s.d.status_line().contains(&refused), "{at}: {}", s.d.status_line());
+        // A second later the link opens: the refusal is no longer the news.
+        s.d.now += std::time::Duration::from_secs(1);
+        press(&mut s, "o");
+        assert_eq!(opened(&mut s), ["https://docs.example.com/a"], "{at}");
+        let said = s.d.app.i18n.msg(&slakio_core::i18n::Msg::OpenOpening { host: "docs.example.com".into() });
+        let line = s.d.status_line();
+        assert!(line.contains(said.as_str()) && !line.contains(&refused), "{at}: {line}");
+    }
+}
+
+#[test]
+fn a_long_host_is_said_whole_where_the_status_line_has_the_room() {
+    let host = "build-artifacts.delta.h0.example.com";
+    let mut s = shown(&[&format!("see <https://{host}/x>")], 120, 40, Lang::En);
+    press(&mut s, "o");
+    assert_eq!(opened(&mut s).len(), 1);
+    assert!(s.d.status_line().contains(&format!("Opening {host}")), "{}", s.d.status_line());
+    // At 80 columns its end is said, so the words fit.
+    let mut s = shown(&[&format!("see <https://{host}/x>")], 80, 24, Lang::En);
+    press(&mut s, "o");
+    assert_eq!(opened(&mut s).len(), 1);
+    assert!(s.d.status_line().contains("Opening …lta.h0.example.com"), "{}", s.d.status_line());
+}
+
+#[test]
+fn the_help_rows_of_the_link_list_are_whole_at_80_columns() {
+    // (The Korean rows were whole already.)
+    let mut s = shown(&["see <https://docs.example.com/a>"], 80, 24, Lang::En);
+    s.keys("?");
+    s.keys("/");
+    s.d.type_text("link");
+    let screen = s.d.screen();
+    for l in [Label::ActionLinksDown, Label::ActionLinksUp] {
+        let label = s.d.app.i18n.label(l).to_string();
+        assert!(screen.contains(&label), "{label} is whole:\n{screen}");
+    }
+}
