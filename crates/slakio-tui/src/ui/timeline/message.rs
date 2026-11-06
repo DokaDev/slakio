@@ -393,7 +393,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
         } else if tl.complete {
             // A blank row apart from the message, as between blocks.
             out.push((Line::raw(""), Kind::Gap, Vec::new()));
-            out.push((Line::styled(no_replies(app), t.faint()), Kind::Rule, Vec::new()));
+            out.push((Line::styled(no_replies(app, w), t.faint()), Kind::Rule, Vec::new()));
         }
     }
     out
@@ -434,11 +434,13 @@ pub fn rule(label: &str, w: usize, style: Style) -> Line<'static> {
     Line::styled(format!("{}{label}{}", "─".repeat(left), "─".repeat(right)), style)
 }
 
-/// "No replies yet · i reply", with the key bound.
-fn no_replies(app: &App) -> String {
+/// "No replies yet · i reply", with the key bound; in `w` cells, without the key where it does
+/// not fit whole.
+fn no_replies(app: &App, w: usize) -> String {
+    let short = app.i18n.label(slakio_core::i18n::Label::ThreadNoRepliesReadOnly).to_string();
     if app.read_only() {
-        return app.i18n.label(slakio_core::i18n::Label::ThreadNoRepliesReadOnly).to_string();
+        return short;
     }
     let keys = super::super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
-    app.i18n.msg(&Msg::ThreadNoReplies { keys }).to_string()
+    super::whole_or(app.i18n.msg(&Msg::ThreadNoReplies { keys }).to_string(), &short, w)
 }

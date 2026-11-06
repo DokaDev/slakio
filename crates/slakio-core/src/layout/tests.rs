@@ -163,7 +163,7 @@ fn equalized_a_run_of_splits_the_same_way_gives_each_part_the_same_room() {
 #[test]
 fn toward_finds_the_pane_beside_by_place() {
     let laid = three().solve(area(80, 20), None);
-    let go = |from: u64, t: Toward| toward(&laid, PaneId(from), t).map(|p| p.0);
+    let go = |from: u64, t: Toward| toward(&laid, PaneId(from), t, |_| 0).map(|p| p.0);
     assert_eq!(go(1, Toward::Right), Some(2), "of 2 and 3, the first (top)");
     assert_eq!(go(3, Toward::Left), Some(1));
     assert_eq!(go(2, Toward::Down), Some(3));
@@ -172,6 +172,10 @@ fn toward_finds_the_pane_beside_by_place() {
     assert_eq!(go(1, Toward::Up), None);
     assert_eq!(go(2, Toward::Right), None);
     assert_eq!(go(9, Toward::Right), None, "a pane not laid out");
+    // Of the two that touch it, the one the keyboard was on last.
+    let last = |p: PaneId| u64::from(p == PaneId(3));
+    assert_eq!(toward(&laid, PaneId(1), Toward::Right, last), Some(PaneId(3)));
+    assert_eq!(toward(&laid, PaneId(1), Toward::Right, |_| 0), Some(PaneId(2)));
 }
 
 /// A tree of panes `1..=n` made by splitting one of them at a time, either way.
@@ -189,18 +193,44 @@ fn grown() -> impl Strategy<Value = Node> {
 }
 
 proptest! {
-    /// Going a way and back comes back to a pane on the side started from, and every pane
+    /// Going a way and back comes back to the pane started from (the one the keyboard was on
+    /// last), and, whatever was focused before, to a pane touching the one gone to; every pane
     /// laid out is reached from any other by going toward it.
     #[test]
-    fn toward_moves_between_panes_that_touch(t in grown(), w in 20u16..300, h in 10u16..120) {
+    fn toward_moves_between_panes_that_touch(t in grown(), w in 20u16..300, h in 10u16..120, seed in any::<u64>()) {
         let laid = t.solve(area(w, h), None);
+        // Some order of focus before.
+        let before = |p: PaneId| p.0.wrapping_mul(seed | 1) >> 8;
+        let ways = [(Toward::Left, Toward::Right), (Toward::Right, Toward::Left), (Toward::Up, Toward::Down), (Toward::Down, Toward::Up)];
+        let rect = |id: PaneId| laid.iter().find(|(p, _)| *p == id).map(|(_, a)| *a).unwrap();
+        let touch = |a: Area, b: Area| {
+            let rows = a.y.max(b.y) < (a.y + a.height).min(b.y + b.height);
+            let cols = a.x.max(b.x) < (a.x + a.width).min(b.x + b.width);
+            (rows && (a.x + a.width == b.x || b.x + b.width == a.x)) || (cols && (a.y + a.height == b.y || b.y + b.height == a.y))
+        };
         for (id, _) in &laid {
-            for (there, back) in [(Toward::Left, Toward::Right), (Toward::Right, Toward::Left), (Toward::Up, Toward::Down), (Toward::Down, Toward::Up)] {
-                if let Some(to) = toward(&laid, *id, there) {
+            for (there, back) in ways {
+                if let Some(to) = toward(&laid, *id, there, before) {
                     prop_assert_ne!(to, *id);
-                    prop_assert!(toward(&laid, to, back).is_some(), "{:?} back from {:?}", back, to);
+                    prop_assert!(touch(rect(*id), rect(to)), "{:?} from {:?} to {:?} touches", there, id, to);
+                    let came = |p: PaneId| u64::from(p == *id);
+                    prop_assert_eq!(toward(&laid, to, back, came), Some(*id), "{:?} back from {:?}", back, to);
+                    let any = toward(&laid, to, back, before);
+                    prop_assert!(any.is_some_and(|q| touch(rect(q), rect(to))), "{:?} back from {:?}: {:?}", back, to, any);
                 }
             }
+            // Every pane laid out is reached from this one.
+            let mut seen = vec![*id];
+            let mut next = vec![*id];
+            while let Some(p) = next.pop() {
+                for (way, _) in ways {
+                    if let Some(q) = toward(&laid, p, way, before).filter(|q| !seen.contains(q)) {
+                        seen.push(q);
+                        next.push(q);
+                    }
+                }
+            }
+            prop_assert_eq!(seen.len(), laid.len(), "from {:?}: {:?} of {:?}", id, seen, laid);
         }
     }
 

@@ -21,6 +21,7 @@ use crate::app::status::{Level, NOTICE_MAX};
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
 use crate::keymap::{Ctx, keys};
+use crate::opener::host_tail;
 use crate::text::{clip, width};
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -402,7 +403,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             && let Some(p) = place_text.as_mut()
         {
             let excess = over(&ws_name, &Some(p.clone()), &chosen);
-            *p = clip_middle(p, width(p).saturating_sub(excess).max(10));
+            *p = clip_place(p, width(p).saturating_sub(excess).max(10));
             if over(&ws_name, &place_text, &chosen) == 0 {
                 break;
             }
@@ -418,7 +419,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     if let Some(p) = place_text.as_mut() {
         let excess = over(&ws_name, &Some(p.clone()), &chosen);
         if excess > 0 {
-            *p = clip_middle(p, width(p).saturating_sub(excess).max(4));
+            *p = clip_place(p, width(p).saturating_sub(excess).max(4));
         }
     }
     // The name is cut for more hints only where it had to be cut anyway.
@@ -520,6 +521,9 @@ fn renamed(msg: &Msg, name: String) -> Msg {
 /// The room the hints make for notice `msg`: [`NOTICE_MAX`], or more for one about a workspace,
 /// so its whole reason fits beside its name cut to [`NOTICE_NAME`] cells.
 fn notice_max(app: &App, msg: &Msg) -> usize {
+    if let Msg::OpenOpening { host } = msg {
+        return width(&app.i18n.msg(&Msg::OpenOpening { host: host_tail(host, app.host_room()) }));
+    }
     let Some(name) = named(msg) else { return NOTICE_MAX };
     NOTICE_MAX.max(width(&app.i18n.msg(&renamed(msg, clip(name, NOTICE_NAME)))))
 }
@@ -528,10 +532,15 @@ fn notice_max(app: &App, msg: &Msg) -> usize {
 /// `…` (never under [`NOTICE_NAME_KEPT`] cells) before the words after it lose their end.
 fn fit_notice(app: &App, msg: &Msg, room: usize) -> String {
     let whole = app.i18n.msg(msg).to_string();
-    let Some(name) = named(msg) else { return clip(&whole, room) };
     if width(&whole) <= room {
         return whole;
     }
+    // A host that opens is cut from its start, to the cells free.
+    if let Msg::OpenOpening { host } = msg {
+        let around = width(&whole).saturating_sub(width(host));
+        return clip(&app.i18n.msg(&Msg::OpenOpening { host: host_tail(host, room.saturating_sub(around)) }), room);
+    }
+    let Some(name) = named(msg) else { return clip(&whole, room) };
     let around = width(&whole).saturating_sub(width(name));
     let kept = room.saturating_sub(around).max(NOTICE_NAME_KEPT.min(width(name)));
     clip(&app.i18n.msg(&renamed(msg, clip(name, kept))), room)
@@ -545,6 +554,18 @@ fn draw_right(f: &mut Frame, area: Rect, spans: Spans) {
     }
     let at = Rect { x: area.right() - w, width: w, ..area };
     f.render_widget(Paragraph::new(Line::from(spans)), at);
+}
+
+/// Place `p` in `w` cells: what is after its last ` › ` (the thread, `⤷ Thread`) stays whole
+/// with the `›` before it, and what comes before is cut by its middle; where that leaves no
+/// room, the whole place is.
+fn clip_place(p: &str, w: usize) -> String {
+    match p.rsplit_once(" › ") {
+        Some((head, tail)) if width(tail) + 3 + 2 <= w && width(p) > w => {
+            format!("{} › {tail}", clip_middle(head, w - width(tail) - 3))
+        }
+        _ => clip_middle(p, w),
+    }
 }
 
 /// `s` cut to `w` cells by its middle: `#feed-cu…-16`.
@@ -568,12 +589,4 @@ fn clip_middle(s: &str, w: usize) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::clip_middle;
-
-    #[test]
-    fn a_long_place_is_cut_in_its_middle() {
-        assert_eq!(clip_middle("#feed-customer-16", 10), "#fee…er-16");
-        assert_eq!(clip_middle("#backend", 10), "#backend");
-    }
-}
+mod tests;

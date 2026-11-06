@@ -199,9 +199,15 @@ pub enum Toward {
 
 /// The pane next to `from` going `toward`, among the panes laid out at `areas` ([`Node::solve`]):
 /// of those whose side touches or faces that side of `from` and that share some of its rows
-/// (columns), the nearest; then the one sharing the most; then the first (top, left). `None`
-/// when there is none that way, or `from` is not laid out.
-pub fn toward(areas: &[(PaneId, Area)], from: PaneId, toward: Toward) -> Option<PaneId> {
+/// (columns), the nearest; then the one `recent` ranks highest (the one the keyboard was on
+/// last, so going there and back comes back); then the one sharing the most; then the first
+/// (top, left). `None` when there is none that way, or `from` is not laid out.
+pub fn toward(
+    areas: &[(PaneId, Area)],
+    from: PaneId,
+    toward: Toward,
+    recent: impl Fn(PaneId) -> u64,
+) -> Option<PaneId> {
     let (_, f) = areas.iter().find(|(id, _)| *id == from)?;
     let span = |a: &Area, rows: bool| {
         if rows { (a.y, a.y + a.height) } else { (a.x, a.x + a.width) }
@@ -219,7 +225,13 @@ pub fn toward(areas: &[(PaneId, Area)], from: PaneId, toward: Toward) -> Option<
             };
             let rows = matches!(toward, Toward::Left | Toward::Right);
             let shared = overlap(span(a, rows), span(f, rows));
-            (shared > 0).then_some((gap, std::cmp::Reverse(shared), span(a, rows).0, *id))
+            (shared > 0).then_some((
+                gap,
+                std::cmp::Reverse(recent(*id)),
+                std::cmp::Reverse(shared),
+                span(a, rows).0,
+                *id,
+            ))
         })
         .min()
         .map(|(.., id)| id)

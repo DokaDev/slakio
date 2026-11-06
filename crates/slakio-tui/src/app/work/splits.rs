@@ -38,14 +38,24 @@ impl Work {
         std::iter::once(id).chain(panel).collect()
     }
 
+    /// A pane of the tab shown is some pane's auto thread panel.
+    pub fn has_panel(&self) -> bool {
+        self.ids().into_iter().any(|id| self.owner(id).is_some())
+    }
+
     /// Open `target` in a new pane after pane `at` (and its thread panel) along `dir`, the two
-    /// sharing their room evenly; the new pane, which is the tab's active one.
+    /// sharing their room evenly; the new pane, which is the tab's active one. Beside, the
+    /// thread panel of `at` would have no room left to show: it splits off as a pane of its own
+    /// first, and the three share the room.
     pub fn split(&mut self, at: PaneId, dir: Dir, target: Target) -> Option<PaneId> {
         self.tabs.find(at)?;
         self.set_insert(false);
-        let unit = self.unit(at);
+        let (unit, share) = match self.panes.get(&at).and_then(|p| p.thread).filter(|_| dir == Dir::Row) {
+            Some(panel) => (vec![at, self.detach(panel, dir)?], split_share(dir, 2, 1)),
+            None => (self.unit(at), split_share(dir, 1, 1)),
+        };
         let id = self.add(Pane::new(target));
-        if !self.tabs.split(&unit, dir, split_share(dir, 1, 1), id) {
+        if !self.tabs.split(&unit, dir, share, id) {
             self.panes.remove(&id);
             return None;
         }
@@ -55,18 +65,25 @@ impl Work {
     }
 
     /// Split thread panel `panel` off as a pane of its own, after the pane that opened it along
-    /// `dir`; the pane, which is the tab's active one. `None` when it is no pane's panel.
+    /// `dir`; the pane, which is the tab's active one. `None` when it is no pane's panel (or
+    /// the split could not be made: the tab is left as it was).
     pub fn detach(&mut self, panel: PaneId, dir: Dir) -> Option<PaneId> {
         let owner = self.owner(panel)?;
         self.set_insert(false);
         let i = self.tabs.find(panel)?;
         let tab = self.tabs.get_mut(i)?;
+        let before = (tab.root.clone(), tab.active);
         tab.root = tab.root.without(panel)?;
         tab.active = owner;
+        if !self.tabs.split(&[owner], dir, split_share(dir, 1, 1), panel) {
+            if let Some(tab) = self.tabs.get_mut(i) {
+                (tab.root, tab.active) = before;
+            }
+            return None;
+        }
         if let Some(p) = self.panes.get_mut(&owner) {
             p.thread = None;
         }
-        self.tabs.split(&[owner], dir, split_share(dir, 1, 1), panel);
         self.check();
         Some(panel)
     }
@@ -78,13 +95,16 @@ impl Work {
     }
 
     /// The panes of the tab shown share its room evenly (a thread panel keeps its share beside
-    /// its pane). `false` when the tab has one pane, or there is none.
-    pub fn equalize(&mut self) -> bool {
-        let Some(tab) = self.tabs.current_tab_mut().filter(|t| matches!(t.root, Node::Split { .. })) else {
-            return false;
-        };
+    /// its pane). `Some(false)` when there is nothing to even: one pane (with its thread panel,
+    /// or not); `None` with no tab.
+    pub fn equalize(&mut self) -> Option<bool> {
+        let panes = self.ids().into_iter().filter(|id| self.owner(*id).is_none()).count();
+        let tab = self.tabs.current_tab_mut()?;
+        if panes < 2 {
+            return Some(false);
+        }
         tab.root = tab.root.equalized(&|s| *s == THREAD_SHARE, &split_share);
-        true
+        Some(true)
     }
 
     /// The pane the keyboard goes to when `id` closes: the one before it in reading order (not

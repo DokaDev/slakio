@@ -172,10 +172,12 @@ pub enum PaneAction {
     /// The pane to the right, by place.
     Right,
     /// Split the pane: the selected message's thread (else what it shows) beside it, or under
-    /// it; the thread panel splits off as a pane of its own. From the list, what is under its
-    /// cursor.
+    /// it; the thread panel splits off as a pane of its own. From the list (`Space w v`), what
+    /// is under its cursor.
     SplitRight,
     SplitBelow,
+    /// From the list: what is under its cursor, in a new pane beside the one it opens into.
+    OpenBeside,
     /// The active pane takes the whole tab, or every pane shows again.
     Zoom,
     /// The panes of the tab shown share its room evenly.
@@ -408,6 +410,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Right, "pane.right", Label::ActionPaneRight, &[]),
     pane(PaneAction::SplitRight, "pane.split_right", Label::ActionPaneSplitRight, &["vsplit", "vs"]),
     pane(PaneAction::SplitBelow, "pane.split_below", Label::ActionPaneSplitBelow, &["split", "sp"]),
+    pane(PaneAction::OpenBeside, "pane.open_beside", Label::ActionPaneOpenBeside, &[]),
     pane(PaneAction::Zoom, "pane.zoom", Label::ActionPaneZoom, &["zoom"]),
     pane(PaneAction::Equalize, "pane.equalize", Label::ActionPaneEqualize, &["equalize", "equalise"]),
     // `:q` closes as in vim (the pane, then its tab), never the app: that is `:qa`.

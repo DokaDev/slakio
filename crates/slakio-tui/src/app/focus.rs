@@ -81,8 +81,9 @@ impl App {
             Focus::Pane(h) if self.work.pane(h.id()).is_some() => {
                 if self.work.active() != Some(h.id()) {
                     self.work.set_insert(false);
-                    self.work.activate(h.id());
                 }
+                // Also a pane active already (a new one): the keyboard came to it last.
+                self.work.activate(h.id());
                 Region::Work
             }
             Focus::Pane(_) => {

@@ -35,10 +35,10 @@ expression: s
 │   # feed-dashboard-22      ││                                                                                        │
 │   # feed-dashboard-41      ││                                                                                        │
 ╭ Space w — Window ────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ h  Move the focus left                                     v  Split right (the thread selected, or the same)         │
-│ j  Move the focus down                                     s  Split below (the thread selected, or the same)         │
-│ k  Move the focus up                                       z  Zoom the pane, or show every pane again                │
-│ l  Move the focus right                                    =  Even room for the panes                                │
+│ h  Pane to the left (or the list)                          v  Split right (selected thread, else same)               │
+│ j  Pane below                                              s  Split below (selected thread, else same)               │
+│ k  Pane above                                              z  Zoom the pane, or show every pane again                │
+│ l  Pane to the right                                       =  Even room for the panes                                │
 │ c  Close the pane, then its tab                                                                                      │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

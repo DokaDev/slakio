@@ -71,7 +71,7 @@ use ratatui::layout::{Position, Rect};
 use shell::Shell;
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
-use slakio_core::layout::Toward;
+use slakio_core::layout::{Dir, Toward};
 use status::{Level, Status};
 use std::time::{Duration, Instant};
 pub use tabs::Unread;
@@ -488,16 +488,17 @@ impl App {
             PaneAction::OpenLink => self.open_link(now),
             PaneAction::Insert => self.write(now),
             PaneAction::Left => {
-                if !self.focus_toward(Toward::Left) && !self.shell.list_hidden {
+                if !self.focus_toward(Toward::Left, now) && !self.shell.list_hidden {
                     self.focus_list(main_target);
                 }
             }
             PaneAction::Right => {
-                self.focus_toward(Toward::Right);
+                self.focus_toward(Toward::Right, now);
             }
-            PaneAction::SplitRight | PaneAction::SplitBelow | PaneAction::Zoom | PaneAction::Equalize => {
-                self.layout_action(a, now);
-            }
+            PaneAction::SplitRight | PaneAction::OpenBeside => self.split(Dir::Row, now),
+            PaneAction::SplitBelow => self.split(Dir::Column, now),
+            PaneAction::Zoom => self.zoom(now),
+            PaneAction::Equalize => self.equalize(now),
             PaneAction::Close => self.close_pane(now),
         }
     }

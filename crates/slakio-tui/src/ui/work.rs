@@ -86,7 +86,8 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         spans.push(Span::styled(mark, t.presence(p)));
         spans.push(Span::styled(format!(" {} ", app.i18n.label(label)), t.muted()));
     }
-    let title = Line::from(spans);
+    // Cut as the composer's title is: with `…`, two cells of the border left before its corner.
+    let title = Line::from(fit(spans, usize::from(area.width).saturating_sub(4)));
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && pane.insert;
     let before = pane.links.borrow().clone();
@@ -122,6 +123,28 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 }
 
 pub(super) use crate::app::model::breadcrumb;
+
+/// `spans` in `w` cells: the first that does not fit whole is cut with `…` (a blank at its end
+/// goes first), and those after it are left out.
+fn fit(spans: Vec<Span<'_>>, w: usize) -> Vec<Span<'_>> {
+    let mut out = Vec::new();
+    let mut used = 0;
+    for s in spans {
+        let room = w.saturating_sub(used);
+        if width(&s.content) <= room {
+            used += width(&s.content);
+            out.push(s);
+            continue;
+        }
+        let trimmed = s.content.trim_end();
+        let cut = if width(trimmed) <= room { trimmed.to_string() } else { clip(&s.content, room) };
+        if !cut.is_empty() {
+            out.push(Span::styled(cut, s.style));
+        }
+        break;
+    }
+    out
+}
 
 /// The divider over `pane`'s composer, joined to its border (`├─ Message #backend ───┤`), and the
 /// count of messages that came live below a view the user holds, said faintly at the pane's

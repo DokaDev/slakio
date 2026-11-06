@@ -135,10 +135,12 @@ images, and settings. This README only lists what works; it will grow with each 
     names are not kept across restarts yet;
   - splits, tmux style: `v` opens beside the pane and `s` under it (the selected message's
     thread, else the same conversation again; the thread panel splits off as a pane of its
-    own), `v` on the list opens the conversation under the cursor beside (`Space w v` /
+    own, also when `v` opens another thread beside it, so all three show), `v` on the list
+    opens the conversation under the cursor beside (`Space w v` /
     `Space w s`, `:vsplit` / `:split` too); as many panes as fit, at least 24×8 cells each (a
     split with no room left says so); `Ctrl+H/J/K/L` (`Space w h/j/k/l`) go to the pane on
-    that side, `Tab` / `F6` go round, a click focuses; `z` (`:zoom`) shows the pane alone and
+    that side (the one last there first, so going and back returns), `Tab` / `F6` go round,
+    a click focuses; `z` (`:zoom`) shows the pane alone and
     back, `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the pane. Each pane keeps
     its own selection and history. Sizes are not changed by keys or the mouse yet, nor kept
     across restarts;

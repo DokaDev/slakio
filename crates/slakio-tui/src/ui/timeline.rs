@@ -41,6 +41,12 @@ pub fn reset_rows_laid_out() {
     LAID_OUT.with(|c| c.set(0));
 }
 
+/// An empty pane's words: `full` where it fits in `w` cells, else `short` (its words without
+/// the key, cut with `…` where they do not fit either), so no word is cut in two.
+fn whole_or(full: String, short: &str, w: usize) -> String {
+    if crate::text::width(&full) <= w { full } else { crate::text::clip(short, w) }
+}
+
 /// Draw `pane`'s messages into `area`; `focused`: the pane has the keyboard (the selection is
 /// drawn as the bar of the focused panel, else as the faint one).
 #[expect(clippy::too_many_lines, reason = "anchoring and painting in one pass; to be split")]
@@ -59,7 +65,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             ratatui::text::Text::styled(app.i18n.label(Label::PaneNoMessagesReadOnly).to_string(), t.faint())
         } else if tl.complete {
             let keys = super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
-            ratatui::text::Text::styled(app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string(), t.faint())
+            let full = app.i18n.msg(&Msg::PaneNoMessages { keys }).to_string();
+            let short = app.i18n.label(Label::PaneNoMessagesReadOnly).to_string();
+            ratatui::text::Text::styled(whole_or(full, &short, usize::from(text_area(area).width)), t.faint())
         } else if tl.failed.is_some() {
             super::failed_text(app, Label::PaneFailed, tl.retryable())
         } else {

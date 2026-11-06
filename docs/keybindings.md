@@ -44,17 +44,17 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Shift+F6` | Previous panel | `focus.prev` |
 | `Ctrl+R` | View switcher (in the list panel) | `nav.focus` |
 | `Space r` | View switcher (in the list panel) | `nav.focus` |
-| `Ctrl+H` | Move the focus left | `focus.left` |
-| `Ctrl+J` | Move the focus down | `focus.down` |
-| `Ctrl+K` | Move the focus up | `focus.up` |
-| `Ctrl+L` | Move the focus right | `focus.right` |
-| `Space w h` | Move the focus left | `focus.left` |
-| `Space w j` | Move the focus down | `focus.down` |
-| `Space w k` | Move the focus up | `focus.up` |
-| `Space w l` | Move the focus right | `focus.right` |
+| `Ctrl+H` | Pane to the left (or the list) | `focus.left` |
+| `Ctrl+J` | Pane below | `focus.down` |
+| `Ctrl+K` | Pane above | `focus.up` |
+| `Ctrl+L` | Pane to the right | `focus.right` |
+| `Space w h` | Pane to the left (or the list) | `focus.left` |
+| `Space w j` | Pane below | `focus.down` |
+| `Space w k` | Pane above | `focus.up` |
+| `Space w l` | Pane to the right | `focus.right` |
 | `Space w c` | Close the pane, then its tab | `pane.close` |
-| `Space w v` | Split right (the thread selected, or the same) | `pane.split_right` |
-| `Space w s` | Split below (the thread selected, or the same) | `pane.split_below` |
+| `Space w v` | Split right (selected thread, else same) | `pane.split_right` |
+| `Space w s` | Split below (selected thread, else same) | `pane.split_below` |
 | `Space w z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Space w =` | Even room for the panes | `pane.equalize` |
 | `Space h` | Show Home | `view.home` |
@@ -146,7 +146,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `[` | Show the previous view | `view.prev` |
 | `]` | Show the next view | `view.next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
-| `v` | Split right (the thread selected, or the same) | `pane.split_right` |
+| `v` | Open in a pane beside (the one at the cursor) | `pane.open_beside` |
 | `x` | Complete the to-do, or reopen it | `todo.toggle` |
 | `m` | Move the item to Saved, or back to To-dos | `todo.move` |
 | `d` | Clear the saved item (asks first) | `todo.clear` |
@@ -176,14 +176,14 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `o` | Open a message's link (or :open &lt;url&gt;) | `pane.open_link` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
-| `v` | Split right (the thread selected, or the same) | `pane.split_right` |
-| `s` | Split below (the thread selected, or the same) | `pane.split_below` |
+| `v` | Split right (selected thread, else same) | `pane.split_right` |
+| `s` | Split below (selected thread, else same) | `pane.split_below` |
 | `z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Esc` | One step out (VISUAL, selection, thread, list) | `pane.escape` |
-| `h` | The panel to the left | `pane.left` |
-| `Left` | The panel to the left | `pane.left` |
-| `l` | The panel to the right | `pane.right` |
-| `Right` | The panel to the right | `pane.right` |
+| `h` | Pane to the left (or the list) | `pane.left` |
+| `Left` | Pane to the left (or the list) | `pane.left` |
+| `l` | Pane to the right | `pane.right` |
+| `Right` | Pane to the right | `pane.right` |
 | `Ctrl+W` | Close the pane, then its tab | `pane.close` |
 
 ## Command line (`cmdline`) **[text]**
@@ -317,8 +317,8 @@ Type `:` and the command, then `Enter`.
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
 | `:open` |  | Open a message's link (or :open &lt;url&gt;) |
-| `:vsplit` | `:vs` | Split right (the thread selected, or the same) |
-| `:split` | `:sp` | Split below (the thread selected, or the same) |
+| `:vsplit` | `:vs` | Split right (selected thread, else same) |
+| `:split` | `:sp` | Split below (selected thread, else same) |
 | `:zoom` |  | Zoom the pane, or show every pane again |
 | `:equalize` | `:equalise` | Even room for the panes |
 | `:q` | `:quit` `:close` | Close the pane, then its tab |
@@ -336,7 +336,7 @@ Without the kitty keyboard protocol a terminal sends `Ctrl+I` as `Tab`, `Ctrl+M`
 
 | Keys | Action | Also |
 |---|---|---|
-| `Ctrl+H` | Move the focus left | `Space w h` |
+| `Ctrl+H` | Pane to the left (or the list) | `Space w h` |
 | `Alt+Left` | Back to the conversation before | `Ctrl+O` `Space [` |
 | `Ctrl+I` (bound only with the kitty keyboard protocol) | Forward again | `Space ]` |
 | `Alt+Right` | Forward again | `Space ]` |

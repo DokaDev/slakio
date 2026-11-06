@@ -242,7 +242,7 @@ pub const DEFAULTS: &[Binding] = &[
     shell(Ctx::List, "]", ShellAction::ViewNext),
     tab(Ctx::List, "t", TabAction::Open),
     // `s` sorts To-dos here: `Space w s` splits below from the list.
-    pane(Ctx::List, "v", PaneAction::SplitRight),
+    pane(Ctx::List, "v", PaneAction::OpenBeside),
     // On a to-do or a saved message (To-dos, Home's Saved).
     shell(Ctx::List, "x", ShellAction::TodoToggle),
     shell(Ctx::List, "m", ShellAction::TodoMove),

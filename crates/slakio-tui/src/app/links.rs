@@ -141,14 +141,19 @@ impl App {
     }
 
     /// Say the link to `host` is opening. A notice that no link opened, still showing from a
-    /// click or key before, is no longer true: this one takes its place. The end of a long host
-    /// is what says whose it is: it is cut from its start, to the room the status line has.
+    /// click or key before, is no longer true: this one takes its place. The status line cuts a
+    /// long host from its start ([`Self::host_room`]): its end is what says whose it is.
     fn say_opening(&mut self, host: &str, now: Instant) {
         let before = |m: &Msg| matches!(m, Msg::Label(Label::OpenRefused | Label::OpenChanged | Label::OpenNone));
         self.status.forget(now, before);
+        self.info(Msg::OpenOpening { host: host.to_string() }, now);
+    }
+
+    /// The most of a host the status line makes room for in `Opening <host>` (by leaving hints
+    /// out); it says more of it where more cells are free.
+    pub(crate) fn host_room(&self) -> usize {
         let around = crate::text::width(&self.i18n.msg(&Msg::OpenOpening { host: String::new() }));
-        let room = if self.size.width < WIDE { HOST_SAID } else { NOTICE_MAX.saturating_sub(around).max(HOST_SAID) };
-        self.info(Msg::OpenOpening { host: opener::host_tail(host, room) }, now);
+        if self.size.width < WIDE { HOST_SAID } else { NOTICE_MAX.saturating_sub(around).max(HOST_SAID) }
     }
 
     /// The palette's row of `:open <arg>`.

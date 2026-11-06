@@ -320,3 +320,191 @@ fn which_key_and_help_list_the_split_keys() {
         assert!(help.contains(&label(&d, l)), "{l:?}: {help}");
     }
 }
+
+/// The panes on screen that show a thread.
+fn threads_on_screen(d: &Demo) -> usize {
+    panes(d).into_iter().filter(|(p, _)| d.app.pane_for(*p).unwrap().kind() == PaneKind::Thread).count()
+}
+
+#[test]
+fn v_beside_a_pane_with_its_thread_panel_splits_the_panel_off_so_all_three_show() {
+    let mut d = Demo::new(120, 40);
+    d.open("backend");
+    let main = focused(&d);
+    d.keys("k");
+    d.keys("enter");
+    let panel = focused(&d);
+    assert_eq!(panes(&d).len(), 2);
+    // Another message, then `v`: its thread beside, and the panel stays on screen.
+    d.keys("h");
+    assert_eq!(focused(&d), main);
+    d.keys("k");
+    d.keys("v");
+    let new = focused(&d);
+    assert_eq!(name(&d, new), "thread of backend");
+    let shown: Vec<PaneHandle> = panes(&d).into_iter().map(|(p, _)| p).collect();
+    assert_eq!(shown, vec![main, panel, new], "the three side by side:\n{}", d.screen());
+    let widths: Vec<u16> = panes(&d).into_iter().map(|(_, r)| r.width).collect();
+    assert!(widths.iter().max().unwrap() - widths.iter().min().unwrap() <= 1, "even: {widths:?}");
+    assert_eq!(threads_on_screen(&d), 2);
+    // By place, each is reached.
+    d.keys("ctrl+h");
+    assert_eq!(focused(&d), panel);
+    d.keys("ctrl+h");
+    assert_eq!(focused(&d), main);
+    d.keys("l");
+    assert_eq!(focused(&d), panel);
+    // Where the three do not fit, the split is refused and the panel stays beside its pane.
+    let mut d = Demo::new(80, 24);
+    d.open("backend");
+    d.keys("k");
+    d.keys("enter");
+    d.keys("h");
+    d.keys("k");
+    d.keys("v");
+    assert!(d.status_line().contains(&label(&d, Label::StatusSplitRoom)), "{}", d.status_line());
+    assert_eq!(d.app.open_panes().len(), 2);
+}
+
+#[test]
+fn l_and_h_reach_a_panes_own_thread_panel_left_out_for_room_before_the_pane_beside() {
+    for (w, h) in [(120, 40), (110, 30), (80, 24)] {
+        let mut d = Demo::new(w, h);
+        d.open("backend");
+        d.keys("v");
+        let right = focused(&d);
+        d.keys("ctrl+h");
+        let main = focused(&d);
+        d.keys("k");
+        d.keys("enter");
+        let panel = focused(&d);
+        assert_ne!(panel, main);
+        d.keys("h");
+        assert_eq!(focused(&d), main, "{w}x{h}");
+        assert!(panes(&d).iter().all(|(p, _)| *p != panel), "left out for room at {w}x{h}");
+        d.keys("l");
+        assert_eq!(focused(&d), panel, "its own panel first, not the pane beside, at {w}x{h}");
+        d.keys("l");
+        assert_eq!(focused(&d), right, "{w}x{h}");
+        // The pane beside and the one the panel shows: never the same thread twice.
+        assert!(threads_on_screen(&d) <= 1, "{}", d.screen());
+    }
+}
+
+#[test]
+fn the_list_comes_back_while_the_thread_panel_is_left_out_for_room() {
+    for (w, h) in [(110, 30), (80, 24)] {
+        let mut d = Demo::new(w, h);
+        d.open("backend");
+        d.keys("v");
+        d.keys("ctrl+h");
+        d.keys("k");
+        d.keys("enter");
+        assert!(d.app.areas().list.is_none(), "the panel shown takes the list's room at {w}x{h}");
+        d.keys("h");
+        assert!(threads_on_screen(&d) == 0, "the panel is left out: {}", d.screen());
+        assert!(d.app.areas().list.is_some(), "no panel shown, the list stays at {w}x{h}:\n{}", d.screen());
+    }
+}
+
+#[test]
+fn a_split_that_is_done_drops_the_no_room_notice() {
+    let mut d = Demo::new(80, 24);
+    d.open("backend");
+    d.keys("v");
+    d.keys("v");
+    let room = label(&d, Label::StatusSplitRoom);
+    assert!(d.status_line().contains(&room), "{}", d.status_line());
+    d.keys("s");
+    assert_eq!(panes(&d).len(), 3);
+    assert!(!d.status_line().contains(&room), "{}", d.status_line());
+    // A move that is done drops `No pane below` too.
+    d.keys("ctrl+j");
+    let below = label(&d, Label::StatusNoPaneBelow);
+    assert!(d.status_line().contains(&below), "{}", d.status_line());
+    d.keys("ctrl+k");
+    assert!(!d.status_line().contains(&below), "{}", d.status_line());
+}
+
+#[test]
+fn a_move_by_place_and_back_returns_to_the_pane_it_came_from() {
+    // Left: one pane over another; right: one the whole height.
+    let mut d = Demo::new(120, 40);
+    d.open("backend");
+    d.keys("v");
+    let tall = focused(&d);
+    d.keys("ctrl+h");
+    let top = focused(&d);
+    d.keys("s");
+    let bottom = focused(&d);
+    assert!(rect(&d, top).bottom() == rect(&d, bottom).y && rect(&d, top).right() == rect(&d, tall).x);
+    d.keys("ctrl+l");
+    assert_eq!(focused(&d), tall);
+    d.keys("ctrl+h");
+    assert_eq!(focused(&d), bottom, "back where it came from");
+    d.keys("ctrl+k");
+    d.keys("l");
+    d.keys("h");
+    assert_eq!(focused(&d), top);
+}
+
+#[test]
+fn narrow_pane_titles_and_empty_threads_are_cut_whole_or_with_an_ellipsis() {
+    let mut d = Demo::new(80, 24);
+    d.open("long-threads");
+    d.keys("g g");
+    d.keys("v");
+    assert_eq!(name(&d, focused(&d)), "thread of long-threads");
+    let screen = d.screen();
+    let r = rect(&d, focused(&d));
+    let top: String = screen.lines().nth(usize::from(r.y)).unwrap().chars().skip(usize::from(r.x)).collect();
+    let top: String = top.chars().take(usize::from(r.width)).collect();
+    assert!(top.contains('…') && top.ends_with("──╮"), "{top:?}");
+    // A thread with no replies, in a narrow pane: its words whole, the key left out.
+    let mut d = Demo::new(80, 24);
+    d.open("backend");
+    d.keys("k");
+    d.keys("v");
+    assert_eq!(name(&d, focused(&d)), "thread of backend");
+    let none = label(&d, Label::ThreadNoRepliesReadOnly);
+    let screen = d.screen();
+    assert!(screen.contains(&none) && !screen.contains(&format!("{none} ·")), "{screen}");
+}
+
+#[test]
+fn help_says_what_v_does_on_the_list_and_on_a_pane_and_pane_moves_are_found_by_pane() {
+    for lang in [slakio_core::i18n::Lang::En, slakio_core::i18n::Lang::Ko] {
+        let mut d = Demo::with(80, 200, lang, Default::default());
+        d.open("backend");
+        // On a pane, `v` splits; on the list, it opens what is under the cursor beside.
+        d.keys("?");
+        let screen = d.screen();
+        let moves = [Label::ActionPaneLeft, Label::ActionPaneRight, Label::ActionFocusUp, Label::ActionFocusDown];
+        for l in [Label::ActionPaneSplitRight, Label::ActionPaneSplitBelow].into_iter().chain(moves) {
+            assert!(screen.contains(&label(&d, l)), "{lang:?} {l:?} whole at 80:\n{screen}");
+        }
+        d.keys("escape");
+        d.list_cursor_on("incidents");
+        d.keys("?");
+        let beside = label(&d, Label::ActionPaneOpenBeside);
+        d.keys("/");
+        d.type_text(beside.split_whitespace().next().unwrap());
+        let screen = d.screen();
+        let row = screen.lines().find(|l| l.contains(&beside)).unwrap_or_else(|| panic!("{lang:?}:\n{screen}"));
+        assert!(row.trim_end_matches(['│', ' ']).ends_with('v'), "{lang:?}: {row}");
+        d.keys("escape");
+        d.keys("ctrl+l");
+        // One word for a pane: searching it finds the moves, zoom and close.
+        let word = label(&d, Label::ActionPaneClose).split_whitespace().find(|w| w.len() > 1).unwrap().to_lowercase();
+        let word = if lang == slakio_core::i18n::Lang::En { "pane".to_string() } else { word };
+        d.keys("escape");
+        d.keys("?");
+        d.keys("/");
+        d.type_text(&word);
+        let found = d.screen();
+        for l in moves.into_iter().chain([Label::ActionPaneZoom, Label::ActionPaneClose]) {
+            assert!(label(&d, l).to_lowercase().contains(&word), "{lang:?} {l:?} says {word}");
+            assert!(found.contains(&label(&d, l)), "{lang:?} /{word} finds {l:?}:\n{found}");
+        }
+    }
+}

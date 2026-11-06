@@ -53,6 +53,8 @@ pub struct Work {
     tabs: Tabs,
     /// The last pane id handed out.
     last: u64,
+    /// How many times the keyboard came to a pane ([`Pane::focused_at`]).
+    moves: u64,
     /// The tabs closed, to open again; the newest last.
     closed: Vec<ClosedTab>,
     /// The messages of the targets the panes show.
@@ -109,19 +111,9 @@ impl Work {
         self.layout().map(Node::leaves).unwrap_or_default()
     }
 
-    /// The panes of the tab shown that some pane names as its thread panel.
-    fn panel_shown(&self) -> bool {
-        self.ids().into_iter().any(|id| self.owner(id).is_some())
-    }
-
     /// The pane that opened the thread panel `id`; `None` when `id` is no pane's thread panel.
     pub fn owner(&self, id: PaneId) -> Option<PaneId> {
         self.panes.iter().find(|(_, p)| p.thread == Some(id)).map(|(owner, _)| *owner)
-    }
-
-    /// A pane of the tab shown is some pane's auto thread panel.
-    pub fn has_panel(&self) -> bool {
-        self.panel_shown()
     }
 
     /// The pane what the list opens goes to: the active pane, or the pane that opened it when it
@@ -179,6 +171,10 @@ impl Work {
         if let Some(t) = self.tabs.current_tab_mut() {
             // Another pane of a zoomed tab shows the layout again.
             (t.zoomed, t.active) = (t.zoomed && t.active == id, id);
+        }
+        self.moves += 1;
+        if let Some(p) = self.panes.get_mut(&id) {
+            p.focused_at = self.moves;
         }
     }
 

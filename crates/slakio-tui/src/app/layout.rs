@@ -7,14 +7,27 @@ use crate::screen::{self, FrameLayout};
 use slakio_core::layout::PaneId;
 
 impl App {
-    /// What the layout depends on now besides the size.
+    /// What the layout depends on now besides the size. The list panel makes room for a thread
+    /// panel only where one is laid out in that room (not one left out for room, or zoomed out).
     fn shape(&self) -> screen::Shape {
-        screen::Shape {
+        let mut s = screen::Shape {
             list_hidden: self.shell.list_hidden,
             thread: self.work.has_panel() && !self.work.zoomed(),
             list_focused: matches!(self.focus(), Focus::List | Focus::ViewSwitcher),
             tabs: self.work.tabs().len() > 1,
+        };
+        if s.thread {
+            let work = screen::areas(self.size, s).work;
+            let laid = self.work.layout().map(|t| screen::work_panes(work, t, self.work.active())).unwrap_or_default();
+            s.thread = laid.iter().any(|(id, _)| self.work.owner(*id).is_some());
         }
+        s
+    }
+
+    /// The work area with no thread panel taking the list panel's room: a split measures its
+    /// room there, since it may take the panel out of the layout and the list come back.
+    pub(super) fn plain_work(&self) -> ratatui::layout::Rect {
+        screen::areas(self.size, screen::Shape { thread: false, ..self.shape() }).work
     }
 
     /// The screen's areas now.

@@ -23,7 +23,7 @@ expression: s
 │         │   Show the previous view                                                                       [ │         │
 │ ▾ Channe│   Show the next view                                                                           ] │         │
 │   # anno│   Open in a new tab (a message: its thread)                                                    t │         │
-│   # desi│   Split right (the thread selected, or the same)                                               v │         │
+│   # desi│   Open in a pane beside (the one at the cursor)                                                v │         │
 │   # feed│   Complete the to-do, or reopen it                                                             x │         │
 │   # feed│   Move the item to Saved, or back to To-dos                                                    m │         │
 │   # feed│   Clear the saved item (asks first)                                                            d │         │
@@ -33,12 +33,12 @@ expression: s
 │   # feed│   Next panel                                                                            Tab / F6 │         │
 │   # feed│   Previous panel                                                            Shift+Tab / Shift+F6 │         │
 │   # feed│   View switcher (in the list panel)                                             Ctrl+R / Space r │         │
-│   # feed│   Move the focus left                                                         Ctrl+H / Space w h │         │
-│   # feed│   Move the focus down                                                         Ctrl+J / Space w j │         │
-│   # feed│   Move the focus up                                                           Ctrl+K / Space w k │         │
-│   # feed│   Move the focus right                                                        Ctrl+L / Space w l │         │
+│   # feed│   Pane to the left (or the list)                                              Ctrl+H / Space w h │         │
+│   # feed│   Pane below                                                                  Ctrl+J / Space w j │         │
+│   # feed│   Pane above                                                                  Ctrl+K / Space w k │         │
+│   # feed│   Pane to the right                                                           Ctrl+L / Space w l │         │
 │   # feed│   Close the pane, then its tab                                                         Space w c │         │
-│   # feed│   Split right (the thread selected, or the same)                                       Space w v │         │
+│   # feed│   Split right (selected thread, else same)                                             Space w v │         │
 │   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                                       │ demo

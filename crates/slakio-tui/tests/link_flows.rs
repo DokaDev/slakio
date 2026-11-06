@@ -788,11 +788,22 @@ fn a_long_host_is_said_whole_where_the_status_line_has_the_room() {
     press(&mut s, "o");
     assert_eq!(opened(&mut s).len(), 1);
     assert!(s.d.status_line().contains(&format!("Opening {host}")), "{}", s.d.status_line());
-    // At 80 columns its end is said, so the words fit.
+    // At 80 columns its end is said, in the cells the line has free, so the words fit.
     let mut s = shown(&[&format!("see <https://{host}/x>")], 80, 24, Lang::En);
     press(&mut s, "o");
     assert_eq!(opened(&mut s).len(), 1);
-    assert!(s.d.status_line().contains("Opening …lta.h0.example.com"), "{}", s.d.status_line());
+    let line = s.d.status_line();
+    assert!(line.contains("Opening …acts.delta.h0.example.com │") && line.ends_with("read only"), "{line}");
+}
+
+#[test]
+fn a_host_longer_than_the_room_made_for_it_takes_the_cells_left_free() {
+    let host = "grafana.observability-eu.example-corp.net";
+    let mut s = shown(&[&format!("see <https://{host}/r>")], 120, 40, Lang::En);
+    press(&mut s, "o");
+    assert_eq!(opened(&mut s).len(), 1);
+    let line = s.d.status_line();
+    assert!(line.contains(&format!("Opening {host}")), "{line}");
 }
 
 #[test]

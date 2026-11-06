@@ -178,6 +178,9 @@ pub struct Pane {
     /// When its links were last drawn where they were not before (a message came, was edited,
     /// or the view moved), by drawing: a click on one just after only selects.
     pub links_moved: Cell<Option<std::time::Instant>>,
+    /// When the keyboard last came to it, as a count of its moves (`0`: never): a move by place
+    /// prefers the pane it came from.
+    pub focused_at: u64,
 }
 
 impl Pane {
@@ -199,6 +202,7 @@ impl Pane {
             hits: RefCell::new(Vec::new()),
             links: RefCell::new(Vec::new()),
             links_moved: Cell::new(None),
+            focused_at: 0,
         }
     }
 
