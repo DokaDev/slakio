@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────────────────────────┬ ▌#deploys ─────────────────────────────────╮
+│▎Home                   @24 ││     can staging should                    │     for dashboard can looks waiting        │
+│ DMs                    ●11 ││                                           │                                            │
+│ Activity               @36 ││ KN  Kate Nam  06:51                       │ AM  Alex Morgan  06:10                     │
+│ Files                      ││     Production roadmap customer build     │     Review looks rollback production the   │
+│ To-dos                   6 ││     alert now latency fine review latency │     please broken retry done               │
+├─▾──────────────────────────┤│     roadmap broken should for             │                                            │
+│ ▾ Favorites                ││                                           │ SR  Sam Rivera  06:49                      │
+│   # backend                ││ ＊  ＊＊＊  06:59                         │     Sprint a check for on branch invoice   │
+│   # incidents           3  ││     Confirmed                             │     draft production                       │
+│                            ││                                           │     ⤷ 7 replies · last 06:56               │
+│ ▾ Ops                      ││ KN  Kate Nam  07:05                       │                                            │
+│   # deploys                ││     Ticket review pager pager production  │ AS  Ava Shin  07:37                        │
+│   # alerts                 ││     on build alert the on draft           │     The ticket merge                       │
+│   # partner-shared ext     ││                                           │                                            │
+│   # hostile-strings        ││ SR  Sam Rivera  07:14                     │ DB  Deploy Bot app  07:50                  │
+│   # big-history            ││     Meeting moved to 3pm                  │     Again is after broken index            │
+│▎  # long-threads           │├─ Message #backend ────────────────────────┼─ Message #deploys ─────────────────────────┤
+│                            ││ › Press i to write                        │ › Press i to write                         │
+│ ▾ Channels                 │├ ▌#incidents ──────────────────────────┬ ▌#long-threads ────────────────────────────────┤
+│   # announcements          ││     rollback rollback retry sprint    │ TK  Taylor Kim  11:58                          │
+│   # design-review          ││     draft maybe lunch waiting the     │     Looks retry we tracing roadmap branch      │
+│   # feed-alert-134         ││     budget                            │     queue is fine maybe                        │
+│   # feed-alert-8           ││                                       │                                                │
+│   # feed-budget-162        ││ DY  Dana Yoon  02:38                  │ EB  Eve Bae  12:05                             │
+│   # feed-budget-33         ││     Tomorrow ticket should merge      │     Tomorrow can merge invoice pager still     │
+│   # feed-build-50          ││     waiting                           │     after is on branch roadmap alert           │
+│   # feed-cache-119         ││                                       │                                                │
+│   # feed-customer-161      ││ MK  Minsu Kim  02:52                  │ HJ  Hyunwoo Jung  12:11                        │
+│   # feed-customer-167   1  ││     After check fine check branch     │     Ticket is today staging review branch for  │
+│   # feed-dashboard-22      ││     metrics latency check             │     waiting a draft                            │
+│   # feed-dashboard-41      ││                                       │     🙏 3                                       │
+│   # feed-design-34         ││ MJ  Mia Jang  03:33                   │                                                │
+│   # feed-design-83         ││     Budget invoice on is schema can   │ IM  Ivy Moon  12:15                            │
+│   # feed-draft-142         ││     on deploy check now release       │     We customer migration now now budget still │
+│   # feed-draft-58          ││     tracing on invoice                │     staging                                    │
+│   # feed-draft-84          │├─ Message #incidents ──────────────────┼─ Message #long-threads ────────────────────────┤
+│   # feed-index-199      2  ││ › Press i to write                    │ › Press i to write                             │
+╰────────────────────────────╯╰───────────────────────────────────────┴────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #long-threads       │ i write · k messages · Esc list · Ctrl+R views · ? help · Space more │ demo

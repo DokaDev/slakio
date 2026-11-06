@@ -38,7 +38,7 @@ expression: s
 │   # feed│   Pane above                                                                  Ctrl+K / Space w k │         │
 │   # feed│   Pane to the right                                                           Ctrl+L / Space w l │         │
 │   # feed│   Close the pane, then its tab                                                         Space w c │         │
-│   # feed│   Split right (selected thread, else same)                                             Space w v │         │
+│   # feed│   Split right (thread, else same)                                                      Space w v │         │
 │   # feed╰────────────────────────────────────────────────────── ↑↓ move · Enter run · / search · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                                                                       │ demo

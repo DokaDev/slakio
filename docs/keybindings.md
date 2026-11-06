@@ -53,8 +53,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space w k` | Pane above | `focus.up` |
 | `Space w l` | Pane to the right | `focus.right` |
 | `Space w c` | Close the pane, then its tab | `pane.close` |
-| `Space w v` | Split right (selected thread, else same) | `pane.split_right` |
-| `Space w s` | Split below (selected thread, else same) | `pane.split_below` |
+| `Space w v` | Split right (thread, else same) | `pane.split_right` |
+| `Space w s` | Split below (thread, else same) | `pane.split_below` |
 | `Space w z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Space w =` | Even room for the panes | `pane.equalize` |
 | `Space w >` | Wider pane | `pane.wider` |
@@ -180,8 +180,8 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `o` | Open a message's link (or :open &lt;url&gt;) | `pane.open_link` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
-| `v` | Split right (selected thread, else same) | `pane.split_right` |
-| `s` | Split below (selected thread, else same) | `pane.split_below` |
+| `v` | Split right (thread, else same) | `pane.split_right` |
+| `s` | Split below (thread, else same) | `pane.split_below` |
 | `z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Esc` | One step out (VISUAL, selection, thread, list) | `pane.escape` |
 | `h` | Pane to the left (or the list) | `pane.left` |
@@ -321,8 +321,8 @@ Type `:` and the command, then `Enter`.
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
 | `:open` |  | Open a message's link (or :open &lt;url&gt;) |
-| `:vsplit` | `:vs` | Split right (selected thread, else same) |
-| `:split` | `:sp` | Split below (selected thread, else same) |
+| `:vsplit` | `:vs` | Split right (thread, else same) |
+| `:split` | `:sp` | Split below (thread, else same) |
 | `:zoom` |  | Zoom the pane, or show every pane again |
 | `:equalize` | `:equalise` | Even room for the panes |
 | `:q` | `:quit` `:close` | Close the pane, then its tab |

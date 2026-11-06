@@ -354,6 +354,47 @@ fn the_panes_under_the_focused_one_keep_their_titles() {
     }
 }
 
+/// No border joins inside a title on row `r.y` of pane `r`: the cells from its first past the
+/// corner up to the dashes after its title hold no tee or cross.
+fn no_junction_in_titles(d: &Demo, what: &str) {
+    let s = d.screen();
+    let rows: Vec<&str> = s.lines().collect();
+    for (_, r) in panes(d) {
+        let title: String =
+            rows[usize::from(r.y)].chars().skip(usize::from(r.x) + 1).take_while(|c| *c != '─').collect();
+        assert!(!title.contains(['┴', '┬', '┼', '├', '┤']), "{what}: a junction in the title `{title}`\n{s}");
+    }
+}
+
+#[test]
+fn a_two_by_two_with_uneven_seams_keeps_every_title_whole() {
+    for (w, h) in [(120, 40), (100, 30), (80, 24)] {
+        // Two over two, the lower seam moved off the upper one.
+        let mut d = Demo::new(w, h);
+        d.open("backend");
+        d.keys("space w s");
+        d.open("incidents");
+        d.keys("ctrl+k");
+        d.keys("space w v");
+        d.open("deploys");
+        d.keys("ctrl+j");
+        d.keys("space w v");
+        d.open("long-threads");
+        d.keys("space w >");
+        let p = panes(&d);
+        assert_eq!(p.len(), 4, "{}", d.screen());
+        assert_ne!(p[0].1.right(), p[2].1.right(), "uneven seams\n{}", d.screen());
+        every_title_shows(&d, "uneven, lower focused");
+        no_junction_in_titles(&d, "uneven, lower focused");
+        insta::assert_snapshot!(format!("split_2x2_uneven_lower_focused_{w}x{h}"), d.snap());
+        d.keys("ctrl+k");
+        assert_eq!(focused(&d), panes(&d)[1].0, "the top right one");
+        every_title_shows(&d, "uneven, top focused");
+        no_junction_in_titles(&d, "uneven, top focused");
+        insta::assert_snapshot!(format!("split_2x2_uneven_top_focused_{w}x{h}"), d.snap());
+    }
+}
+
 #[test]
 fn which_key_and_help_list_the_split_keys() {
     let mut d = Demo::new(120, 40);

@@ -46,15 +46,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Pan
         let active = ids.remove(at);
         ids.push(active);
     }
-    let mut titles = Vec::new();
+    let (mut titles, mut spans) = (Vec::new(), Vec::new());
     for id in ids {
         let Some(pane) = app.work.pane(id) else { continue };
         let view = views.iter().find(|(v, _)| *v == id).map(|(_, v)| v);
         match (layout.pane(id), view) {
             (Some(l), Some(view)) => {
                 let w = draw_pane(f, app, pane, (l, view), now);
+                let (x, y) = (l.rect.x + 1, l.rect.y);
+                spans.push((y, x, x + w));
                 if Some(id) != app.work.active() {
-                    let (x, y) = (l.rect.x + 1, l.rect.y);
                     let cells: Vec<_> = (x..x + w).filter_map(|x| f.buffer_mut().cell((x, y)).cloned()).collect();
                     titles.push(((x, y), cells));
                 }
@@ -70,13 +71,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Pan
         }
     }
     if layout.panes.len() > 1 {
-        join(f, layout);
+        join(f, layout, &spans);
     }
 }
 
 /// Where the borders of panes side by side meet, the cells that join them: a corner, a tee or a
 /// cross, as the lines through each corner of a pane and each end of its composer's divider run.
-fn join(f: &mut Frame, layout: &FrameLayout) {
+/// A cell of a title (`titles`: row, first column, column past the end) keeps its text: where a
+/// border meets one from across the seam, the title wins.
+fn join(f: &mut Frame, layout: &FrameLayout, titles: &[(u16, u16, u16)]) {
     let (mut cols, mut rows) = (Vec::new(), Vec::new());
     let mut points = Vec::new();
     for p in layout.panes.iter().filter(|p| p.rect.width > 1 && p.rect.height > 1) {
@@ -91,6 +94,9 @@ fn join(f: &mut Frame, layout: &FrameLayout) {
         }
     }
     for (x, y) in points {
+        if titles.iter().any(|&(r, a, b)| r == y && a <= x && x < b) {
+            continue;
+        }
         let up = cols.iter().any(|&(c, t, b)| c == x && t < y && y <= b);
         let down = cols.iter().any(|&(c, t, b)| c == x && t <= y && y < b);
         let left = rows.iter().any(|&(r, l, rt)| r == y && l < x && x <= rt);

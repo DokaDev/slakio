@@ -22,7 +22,7 @@ expression: d.snap()
 │ k  Pane above                          >  Wider pane                         │
 │ l  Pane to the right                   <  Narrower pane                      │
 │ c  Close the pane, then its tab        +  Taller pane                        │
-│ v  Split right (selected thread, els…  -  Shorter pane                       │
-│ s  Split below (selected thread, els…                                        │
+│ v  Split right (thread, else same)     -  Shorter pane                       │
+│ s  Split below (thread, else same)                                           │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo
