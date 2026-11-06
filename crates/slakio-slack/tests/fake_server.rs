@@ -265,12 +265,16 @@ fn a_newer_page_of_the_same_target_supersedes_one_in_flight() {
             tokio::task::yield_now().await;
         }
         ask(&handle, 2, Command::History { target, before: None, limit: 28 });
+        // The older one is answered once, as superseded; the newer one with its page.
+        let older = next(&mut handle).await;
+        assert_eq!(older.generation, Generation(1));
+        assert!(matches!(older.event, Event::Failed { kind: FailKind::Busy, .. }), "{older:?}");
         let answer = next(&mut handle).await;
         assert_eq!(answer.generation, Generation(2));
         assert!(matches!(answer.event, Event::History(_)));
         assert!(
             tokio::time::timeout(Duration::from_millis(200), handle.rx.recv()).await.is_err(),
-            "the older one is dropped"
+            "nothing more: each is answered once"
         );
     });
 }

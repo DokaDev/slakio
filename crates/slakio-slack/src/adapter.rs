@@ -1,14 +1,14 @@
 //! The Slack backend behind a [`BackendHandle`]: a task that owns the [`BackendEnd`], reads the
 //! UI's requests and answers each one exactly once (its event, or `Failed`), never with
 //! silence. A change is refused before anything is sent (the backend is read-only). A newer
-//! `History` for the same target supersedes one still in flight: the older one is dropped
-//! unanswered, since the UI no longer waits for it. When the UI is gone the task ends, and
-//! what it had in flight with it.
+//! page of a target (`History`, `Around`) supersedes the one of the same target still on its
+//! way: that one is cancelled — before it is sent, or by dropping its answer — and answered
+//! `Failed(Busy)`. Pages of other targets never cancel each other: the panes of a layout opened
+//! again ask for theirs at once, and each gets its own. They all go through the governor, which
+//! paces them. When the UI is gone the task ends, and what it had in flight with it.
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
-//! first, and at most one is under way: a newer open cancels the older one — before it is
-//! sent, or by dropping its answer — and the older one is answered `Failed(Busy)`, so a pane
-//! that still shows it can be retried instead of waiting.
+//! first: opening it again meanwhile fetches it once.
 //!
 //! A thread is read from its start by `conversations.replies` (Slack pages it forward only) and
 //! kept for the session ([`crate::threads`]): its newest page is the end of what was read, its
@@ -29,8 +29,9 @@ use slakio_core::backend::{
 };
 use slakio_core::model::{ConversationId, Message, Target, Ts, UserId};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, PoisonError};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use tokio::task::{AbortHandle, JoinSet};
 
 /// How many requests, and how many events, wait in the handle's channels at most.
@@ -39,8 +40,8 @@ pub const BOUND: usize = 64;
 /// The most messages one page asks for: what the web client shows first.
 pub const PAGE_MAX: u32 = 28;
 
-/// How long an open waits before its conversation is fetched: moving quickly through
-/// conversations fetches only the one the user stops on.
+/// How long an open waits before its conversation is fetched: opening it again meanwhile
+/// fetches it once.
 pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// What the backend can do: read, never change.
@@ -91,11 +92,29 @@ pub(crate) struct Session {
 
 pub use crate::people::LOOKUP_BATCH;
 
+/// A page on its way: its request, its task, and whether it was answered (by the task, or as
+/// superseded): whichever comes first answers, the other never does.
+struct InFlight {
+    id: Generation,
+    task: AbortHandle,
+    answered: Arc<AtomicBool>,
+}
+
+/// The page of `target` on its way, superseded by a newer one: cancelled and answered
+/// `Failed(Busy)`, unless it was answered already. `false` when the UI is gone.
+async fn supersede(in_flight: &mut HashMap<Target, InFlight>, target: &Target, tx: &mpsc::Sender<Envelope>) -> bool {
+    let Some(older) = in_flight.remove(target) else { return true };
+    if older.answered.swap(true, Ordering::SeqCst) {
+        return true;
+    }
+    older.task.abort();
+    let e = SlackError::Superseded;
+    tx.send(Envelope::failed(older.id, e.kind(), e.detail())).await.is_ok()
+}
+
 async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut tasks = JoinSet::new();
-    let mut in_flight: HashMap<Target, AbortHandle> = HashMap::new();
-    // The open under way, to cancel when a newer one comes.
-    let mut open: Option<oneshot::Sender<()>> = None;
+    let mut in_flight: HashMap<Target, InFlight> = HashMap::new();
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -128,37 +147,37 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 });
             }
             Command::History { target, before, limit } => {
-                if let Some(older) = in_flight.remove(&target) {
-                    older.abort();
+                if !supersede(&mut in_flight, &target, &end.tx).await {
+                    return;
                 }
-                let key = target.clone();
+                let (key, answered) = (target.clone(), Arc::new(AtomicBool::new(false)));
+                let once = Arc::clone(&answered);
                 let opening = before.is_none() && matches!(target, Target::Conversation { .. });
-                let cancelled = opening.then(|| {
-                    if let Some(older) = open.take() {
-                        let _ = older.send(());
-                    }
-                    let (cancel, cancelled) = oneshot::channel();
-                    open = Some(cancel);
-                    cancelled
-                });
                 let task = tasks.spawn(async move {
-                    let page = opened(&client, &ctx, (target, before, limit), cancelled).await;
-                    answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                    if opening {
+                        tokio::time::sleep(OPEN_DEBOUNCE).await;
+                    }
+                    let page = history(&client, &ctx, target, before, limit).await;
+                    if !once.swap(true, Ordering::SeqCst) {
+                        answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                    }
                 });
-                in_flight.insert(key, task);
+                in_flight.insert(key, InFlight { id, task, answered });
             }
-            // A link opened: a request the user waits for, like an open, but never debounced nor
-            // cancelling one; it supersedes a page of the same target still on its way.
+            // A link opened: a request the user waits for, like an open, but never debounced.
             Command::Around { target, at, limit } => {
-                if let Some(older) = in_flight.remove(&target) {
-                    older.abort();
+                if !supersede(&mut in_flight, &target, &end.tx).await {
+                    return;
                 }
-                let key = target.clone();
+                let (key, answered) = (target.clone(), Arc::new(AtomicBool::new(false)));
+                let once = Arc::clone(&answered);
                 let task = tasks.spawn(async move {
                     let page = around(&client, &ctx, target, at, limit).await;
-                    answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                    if !once.swap(true, Ordering::SeqCst) {
+                        answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                    }
                 });
-                in_flight.insert(key, task);
+                in_flight.insert(key, InFlight { id, task, answered });
             }
             // A change never gets here (refused above); answered all the same.
             Command::Save { .. } => {
@@ -168,32 +187,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 }
             }
         }
-        in_flight.retain(|_, task| !task.is_finished());
-    }
-}
-
-/// The page of `target` older than `before` (`limit` of it); an open (`cancelled` is given)
-/// waits [`OPEN_DEBOUNCE`] first, and ends as superseded once a newer open cancels it.
-async fn opened(
-    client: &Client,
-    ctx: &Session,
-    (target, before, limit): (Target, Option<Ts>, u32),
-    cancelled: Option<oneshot::Receiver<()>>,
-) -> Result<Page, SlackError> {
-    let opening = cancelled.is_some();
-    let fetch = async {
-        if opening {
-            tokio::time::sleep(OPEN_DEBOUNCE).await;
-        }
-        history(client, ctx, target, before, limit).await
-    };
-    match cancelled {
-        Some(cancelled) => tokio::select! {
-            biased;
-            _ = cancelled => Err(SlackError::Superseded),
-            page = fetch => page,
-        },
-        None => fetch.await,
+        in_flight.retain(|_, f| !f.task.is_finished());
     }
 }
 
@@ -318,7 +312,8 @@ async fn catch_up(client: &Client, ctx: &Session, target: Target, limit: u32) ->
 /// those before it (`latest`, `inclusive`), then those after it (`oldest`). Slack lists the
 /// newest first, so the newer ones join only when Slack says none is left past them: then the
 /// page reaches the newest; else they are left out and the page says its newest messages are
-/// not read ([`Page::cut`]), so no gap is ever hidden. A thread is read as when it opens.
+/// not read ([`Page::cut`]), so no gap is ever hidden; so too when the second request fails. A
+/// thread is read as when it opens.
 async fn around(client: &Client, ctx: &Session, target: Target, at: Ts, limit: u32) -> Result<Page, SlackError> {
     let Target::Conversation { conversation, .. } = &target else {
         return history(client, ctx, target, None, limit).await;
@@ -335,13 +330,19 @@ async fn around(client: &Client, ctx: &Session, target: Target, at: Ts, limit: u
     let older: wire::History = client.call(&Call::form(Method::ConversationsHistory, &older), Priority::User).await?;
     let newer =
         [("channel", channel), ("oldest", at_text.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
-    let newer: wire::History = client.call(&Call::form(Method::ConversationsHistory, &newer), Priority::User).await?;
+    // The newer ones not read (but for the sign-in, which every request would fail with): the
+    // message and those before it are shown all the same, as a page whose newest are not read.
+    let newer =
+        match client.call::<wire::History>(&Call::form(Method::ConversationsHistory, &newer), Priority::User).await {
+            Err(e @ SlackError::Auth { .. }) => return Err(e),
+            newer => newer.ok(),
+        };
     // Unknown is not complete: only Slack's own "no more" says the start (or the newest) is in.
     let complete = older.has_more == Some(false);
-    let reaches = newer.has_more == Some(false);
+    let reaches = newer.as_ref().is_some_and(|n| n.has_more == Some(false));
     let mut raw = older.messages.unwrap_or_default();
     if reaches {
-        raw.extend(newer.messages.unwrap_or_default());
+        raw.extend(newer.and_then(|n| n.messages).unwrap_or_default());
     }
     let (mut messages, bots) = read(raw, me.as_ref());
     // `read` puts them in order, each once.

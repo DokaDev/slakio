@@ -551,3 +551,29 @@ async fn a_sign_in_replaced_by_another_user_writes_nothing_into_that_users_part(
     assert!(r.cache.newest(t, 28).await.is_some(), "UB's page is kept");
     r.no_faults();
 }
+
+#[tokio::test]
+async fn a_page_read_around_a_message_is_never_given_first_nor_kept_as_the_newest() {
+    let (dir, w) = (scratch("around"), world());
+    first_run(&dir, &w).await;
+    let ws = snapshot(&w).workspaces[0].id.clone();
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    let t = target(&w, "general");
+    let newest = page(&w, &t, None).messages;
+    let at = newest[0].ts;
+    r.ask(1, Command::Around { target: t.clone(), at, limit: 28 });
+    let req = r.backend_next().await;
+    assert!(matches!(req.command, Command::Around { .. }));
+    assert!(r.ui.rx.try_recv().is_err(), "a read around a message is the backend's to give");
+    // Its answer (older messages, cut) goes through, and is not kept.
+    let mut cut = page(&w, &t, Some(at));
+    cut.cut = true;
+    r.answer(req.id, Event::History(Box::new(cut.clone()))).await;
+    assert_eq!(r.ui_next().await.event, Event::History(Box::new(cut)));
+    r.settled().await;
+    r.ask(2, history(&t, None));
+    r.backend_next().await;
+    let Event::CachedHistory(p) = r.ui_next().await.event else { panic!("cached") };
+    assert_eq!(p.messages, newest, "still the newest page the first run kept");
+    r.no_faults();
+}

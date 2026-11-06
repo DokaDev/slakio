@@ -21,7 +21,7 @@ pub enum SlackError {
     Offline { why: &'static str },
     /// More calls wait for a free slot than the transport queues: nothing was sent.
     Busy,
-    /// A newer open of a conversation came first: this one was not sent, or its answer dropped.
+    /// A newer page of the same target came first: this one was not sent, or its answer dropped.
     Superseded,
     /// The request cap is reached: nothing was sent.
     CapReached { why: &'static str },
@@ -55,7 +55,7 @@ impl SlackError {
             SlackError::Network { detail } => detail.clone(),
             SlackError::Offline { why } | SlackError::CapReached { why } => (*why).to_string(),
             SlackError::Busy => "too many requests waiting".to_string(),
-            SlackError::Superseded => "superseded by a newer open".to_string(),
+            SlackError::Superseded => "superseded by a newer request".to_string(),
         }
     }
 }
