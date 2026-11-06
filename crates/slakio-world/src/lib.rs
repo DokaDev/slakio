@@ -350,7 +350,7 @@ impl World {
     }
 
     /// The index of the first message of `conversation` written at or after `ts`.
-    fn first_at_or_after(&self, conversation: &ConversationId, ts: Ts) -> usize {
+    pub fn first_at_or_after(&self, conversation: &ConversationId, ts: Ts) -> usize {
         let (mut lo, mut hi) = (0, self.message_count(conversation));
         while lo < hi {
             let mid = (lo + hi) / 2;

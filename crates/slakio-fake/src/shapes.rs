@@ -190,9 +190,18 @@ fn history(world: &World, request: &Logged) -> Value {
     let Some(c) = channel(request).filter(|c| world.message_count(c) > 0) else {
         return json!({"ok": false, "error": "channel_not_found"});
     };
-    let before = field(request, "latest").as_deref().and_then(ts_of);
-    let (messages, complete) = world.history(&c, before, limit(request, "limit"));
-    let mut out = page(messages, complete);
+    // Slack's bounds: after `oldest`, before `latest` (each message itself too when
+    // `inclusive`); of those the newest `limit`, and whether more are left within them.
+    let inclusive = field(request, "inclusive").as_deref() == Some("true");
+    let bound = |key: &str, past: bool| {
+        let t = field(request, key).as_deref().and_then(ts_of)?;
+        Some(world.first_at_or_after(&c, if past { Ts(t.0 + 1) } else { t }))
+    };
+    let end = bound("latest", inclusive).unwrap_or_else(|| world.message_count(&c));
+    let from = bound("oldest", !inclusive).unwrap_or(0);
+    let start = end.saturating_sub(limit(request, "limit")).max(from);
+    let messages = (start..end).filter_map(|i| world.message(&c, i)).collect();
+    let mut out = page(messages, start <= from);
     out["ok"] = json!(true);
     out
 }

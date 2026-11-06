@@ -108,7 +108,9 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         }
         let (client, tx, ctx) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&session));
         let Request { id, command, .. } = request;
-        if let Command::History { target, .. } | Command::Catchup { target, .. } = &command {
+        if let Command::History { target, .. } | Command::Catchup { target, .. } | Command::Around { target, .. } =
+            &command
+        {
             session.opened.lock().unwrap_or_else(PoisonError::into_inner).insert(target.conversation().clone());
         }
         match command {
@@ -142,20 +144,20 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                     cancelled
                 });
                 let task = tasks.spawn(async move {
-                    let fetch = async {
-                        if opening {
-                            tokio::time::sleep(OPEN_DEBOUNCE).await;
-                        }
-                        history(&client, &ctx, target, before, limit).await
-                    };
-                    let page = match cancelled {
-                        Some(cancelled) => tokio::select! {
-                            biased;
-                            _ = cancelled => Err(SlackError::Superseded),
-                            page = fetch => page,
-                        },
-                        None => fetch.await,
-                    };
+                    let page = opened(&client, &ctx, (target, before, limit), cancelled).await;
+                    answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
+                });
+                in_flight.insert(key, task);
+            }
+            // A link opened: a request the user waits for, like an open, but never debounced nor
+            // cancelling one; it supersedes a page of the same target still on its way.
+            Command::Around { target, at, limit } => {
+                if let Some(older) = in_flight.remove(&target) {
+                    older.abort();
+                }
+                let key = target.clone();
+                let task = tasks.spawn(async move {
+                    let page = around(&client, &ctx, target, at, limit).await;
                     answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
                 });
                 in_flight.insert(key, task);
@@ -169,6 +171,31 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
             }
         }
         in_flight.retain(|_, task| !task.is_finished());
+    }
+}
+
+/// The page of `target` older than `before` (`limit` of it); an open (`cancelled` is given)
+/// waits [`OPEN_DEBOUNCE`] first, and ends as superseded once a newer open cancels it.
+async fn opened(
+    client: &Client,
+    ctx: &Session,
+    (target, before, limit): (Target, Option<Ts>, u32),
+    cancelled: Option<oneshot::Receiver<()>>,
+) -> Result<Page, SlackError> {
+    let opening = cancelled.is_some();
+    let fetch = async {
+        if opening {
+            tokio::time::sleep(OPEN_DEBOUNCE).await;
+        }
+        history(client, ctx, target, before, limit).await
+    };
+    match cancelled {
+        Some(cancelled) => tokio::select! {
+            biased;
+            _ = cancelled => Err(SlackError::Superseded),
+            page = fetch => page,
+        },
+        None => fetch.await,
     }
 }
 
@@ -286,6 +313,43 @@ async fn catch_up(client: &Client, ctx: &Session, target: Target, limit: u32) ->
     let (messages, bots) = read(history.messages.unwrap_or_default(), me.as_ref());
     let page = Page { target, messages, complete, users: Vec::new(), cut: false };
     Ok(named(client, ctx, page, None, bots, me.as_ref(), Priority::Background).await)
+}
+
+/// The messages of `target` around the one at `at`, oldest first, in the user's share of the
+/// request budget: a conversation's by two `conversations.history` requests, the message and
+/// those before it (`latest`, `inclusive`), then those after it (`oldest`). Slack lists the
+/// newest first, so the newer ones join only when Slack says none is left past them: then the
+/// page reaches the newest; else they are left out and the page says its newest messages are
+/// not read ([`Page::cut`]), so no gap is ever hidden. A thread is read as when it opens.
+async fn around(client: &Client, ctx: &Session, target: Target, at: Ts, limit: u32) -> Result<Page, SlackError> {
+    let Target::Conversation { conversation, .. } = &target else {
+        return history(client, ctx, target, None, limit).await;
+    };
+    let me = ctx.me.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    let (channel, count, at_text) = (conversation.as_str(), limit.clamp(1, PAGE_MAX).to_string(), at.to_string());
+    let older = [
+        ("channel", channel),
+        ("latest", at_text.as_str()),
+        ("inclusive", "true"),
+        ("limit", count.as_str()),
+        ("ignore_replies", "true"),
+    ];
+    let older: wire::History = client.call(&Call::form(Method::ConversationsHistory, &older), Priority::User).await?;
+    let newer =
+        [("channel", channel), ("oldest", at_text.as_str()), ("limit", count.as_str()), ("ignore_replies", "true")];
+    let newer: wire::History = client.call(&Call::form(Method::ConversationsHistory, &newer), Priority::User).await?;
+    // Unknown is not complete: only Slack's own "no more" says the start (or the newest) is in.
+    let complete = older.has_more == Some(false);
+    let reaches = newer.has_more == Some(false);
+    let mut raw = older.messages.unwrap_or_default();
+    if reaches {
+        raw.extend(newer.messages.unwrap_or_default());
+    }
+    let (mut messages, bots) = read(raw, me.as_ref());
+    // `read` puts them in order, each once.
+    messages.retain(|m| m.ts <= at || reaches);
+    let page = Page { target, messages, complete, users: Vec::new(), cut: !reaches };
+    Ok(named(client, ctx, page, None, bots, me.as_ref(), Priority::User).await)
 }
 
 /// Pages of deleted messages only read past at most, in one older page.

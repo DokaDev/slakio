@@ -32,6 +32,7 @@ impl Backend for DemoBackend {
             })),
             Command::History { target, before, limit } => self.page(target, before, limit),
             Command::Catchup { target, limit } => self.page(target, None, limit),
+            Command::Around { target, at, limit } => self.around(target, at, limit),
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
@@ -57,5 +58,19 @@ impl DemoBackend {
             }
         };
         Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: false }))
+    }
+
+    /// Up to `limit` messages of `target` up to the one at `at`, and the newest `limit` after it
+    /// when they reach back to it (as Slack's are read); else the page says its newest are not
+    /// in it. A thread's from its start.
+    fn around(&self, target: Target, at: Ts, limit: u32) -> Event {
+        let Target::Conversation { conversation, .. } = &target else { return self.page(target, None, limit) };
+        let (mut messages, complete) = self.world.history(conversation, Some(Ts(at.0 + 1)), limit as usize);
+        let newest = self.world.history(conversation, None, limit as usize).0;
+        let reaches = newest.first().is_some_and(|m| m.ts <= at) || newest.last().is_none_or(|m| m.ts <= at);
+        if reaches {
+            messages.extend(newest.into_iter().filter(|m| m.ts > at));
+        }
+        Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: !reaches }))
     }
 }

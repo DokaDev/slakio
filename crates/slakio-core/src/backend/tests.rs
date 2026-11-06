@@ -11,7 +11,8 @@ fn every_command() -> Vec<Command> {
     vec![
         Command::Boot,
         Command::History { target: target.clone(), before: None, limit: 28 },
-        Command::Catchup { target, limit: 28 },
+        Command::Catchup { target: target.clone(), limit: 28 },
+        Command::Around { target, at: crate::model::Ts(1), limit: 28 },
         Command::Save { item: SavedId::new("S1"), change: SavedChange::Complete },
     ]
 }

@@ -61,6 +61,11 @@ pub enum Command {
     /// lost a while (they replay nothing): answered with [`Event::History`], read in the
     /// background. Unlike an open, it never waits for or supersedes one.
     Catchup { target: Target, limit: u32 },
+    /// The messages of the conversation `target` around the message at `at` (a link opened):
+    /// up to `limit` from it back, and the newer ones after it when they reach the newest. Answered
+    /// with [`Event::History`]; a page whose newest messages are not among those read says so
+    /// ([`Page::cut`]).
+    Around { target: Target, at: Ts, limit: u32 },
 }
 
 impl Command {
@@ -68,7 +73,7 @@ impl Command {
     /// command is named here, so a new one is classified when it is added.
     pub fn changes(&self) -> bool {
         match self {
-            Command::Boot | Command::History { .. } | Command::Catchup { .. } => false,
+            Command::Boot | Command::History { .. } | Command::Catchup { .. } | Command::Around { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -100,8 +105,10 @@ pub struct Page {
     /// People the messages name whom the backend learned of with this page (their names, for
     /// authors not in the snapshot); none when it has nothing new.
     pub users: Vec<User>,
-    /// A thread read only in part (longer than is read at once, or Slack gave no way on): its
-    /// newest replies are not among those read, and the page is no word on what is newer.
+    /// A thread read only in part (longer than is read at once, or Slack gave no way on), or a
+    /// conversation read around a message ([`Command::Around`]) whose newer messages did not reach
+    /// the newest: its newest messages are not among those read, and the page is no word on what
+    /// is newer.
     pub cut: bool,
 }
 
