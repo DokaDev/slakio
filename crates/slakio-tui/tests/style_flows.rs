@@ -209,7 +209,8 @@ fn one_accent_border() {
     for t in themes().into_iter().filter(|t| t.kind != Kind::NoColor) {
         for (what, d) in frames(&t) {
             let buf = d.buffer();
-            let corners = buf.content().iter().filter(|c| c.symbol() == "╭" && c.fg == t.accent).count();
+            // A top-left corner: a pane beside another starts on its border (`┬`).
+            let corners = buf.content().iter().filter(|c| ["╭", "┬"].contains(&c.symbol()) && c.fg == t.accent).count();
             // The view switcher is the list panel's: with the focus there, the list's border.
             assert_eq!(corners, 1, "{} {what}", t.name);
         }

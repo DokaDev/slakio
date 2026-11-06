@@ -196,7 +196,7 @@ impl App {
     pub fn on_backend(&mut self, envelope: Envelope, now: Instant) -> bool {
         let id = envelope.generation;
         let boot = self.boots.iter().position(|b| b.id == id);
-        match envelope.event {
+        let changed = match envelope.event {
             Event::Booted(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, false, now)),
             Event::CachedBoot(snapshot) => boot.is_some_and(|b| self.on_boot(b, &snapshot, true, now)),
             Event::CachedHistory(page) => {
@@ -211,7 +211,9 @@ impl App {
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
-        }
+        };
+        // The tabs of the last run open once every workspace has answered its boot.
+        changed | self.try_restore(now)
     }
 
     /// The answer of boot `b` (the cache's, when `cached`: drawn only while the backend's own

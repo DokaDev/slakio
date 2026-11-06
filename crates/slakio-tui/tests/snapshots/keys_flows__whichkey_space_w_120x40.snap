@@ -32,13 +32,13 @@ expression: s
 │   # feed-cache-119         ││                                                                                        │
 │   # feed-customer-161      ││                                                                                        │
 │   # feed-customer-167   1  ││                                                                                        │
-│   # feed-dashboard-22      ││                                                                                        │
-│   # feed-dashboard-41      ││                                                                                        │
 ╭ Space w — Window ────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ h  Pane to the left (or the list)                          v  Split right (selected thread, else same)               │
-│ j  Pane below                                              s  Split below (selected thread, else same)               │
-│ k  Pane above                                              z  Zoom the pane, or show every pane again                │
-│ l  Pane to the right                                       =  Even room for the panes                                │
-│ c  Close the pane, then its tab                                                                                      │
+│ h  Pane to the left (or the list)                          z  Zoom the pane, or show every pane again                │
+│ j  Pane below                                              =  Even room for the panes                                │
+│ k  Pane above                                              >  Wider pane                                             │
+│ l  Pane to the right                                       <  Narrower pane                                          │
+│ c  Close the pane, then its tab                            +  Taller pane                                            │
+│ v  Split right (selected thread, else same)                -  Shorter pane                                           │
+│ s  Split below (selected thread, else same)                                                                          │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

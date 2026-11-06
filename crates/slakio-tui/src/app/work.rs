@@ -251,6 +251,7 @@ impl Work {
     /// where it was its tab's active pane, `next` is (or the tab's first pane).
     fn remove(&mut self, id: PaneId, next: Option<PaneId>) -> Option<Pane> {
         self.tabs.close_pane(id, next);
+        self.fit();
         self.panes.remove(&id)
     }
 
@@ -578,6 +579,7 @@ impl Work {
 
 pub(crate) mod live;
 mod older;
+mod restore;
 mod splits;
 mod tabs;
 use tabs::ClosedTab;

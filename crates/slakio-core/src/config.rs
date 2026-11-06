@@ -16,6 +16,7 @@
 //! cache_messages = 200     # the most messages kept a conversation (10 to 10000)
 //! cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
 //! cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
+//! restore = "on"           # "off": the tabs and panes of the last run are not opened again
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -66,6 +67,9 @@ pub struct Config {
     pub cache_max_mb: u32,
     /// A conversation not opened for this many days leaves the cache ([`CACHE_DAYS`]).
     pub cache_days: u32,
+    /// `off`: the tabs and panes are neither saved at the end of a run nor opened again at the
+    /// start of the next ([`RESTORE`]).
+    pub restore: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -88,6 +92,7 @@ impl Default for Config {
             cache_messages: 200,
             cache_max_mb: 500,
             cache_days: 30,
+            restore: "on".to_string(),
             path: None,
             retired: Vec::new(),
         }
@@ -137,6 +142,9 @@ pub const LIVE: &[&str] = &["on", "off"];
 
 /// The values `cache` takes.
 pub const CACHE: &[&str] = &["on", "off"];
+
+/// The values `restore` takes.
+pub const RESTORE: &[&str] = &["on", "off"];
 
 /// The range of `cache_messages`.
 pub const CACHE_MESSAGES: std::ops::RangeInclusive<u32> = 10..=10_000;
@@ -210,6 +218,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "network" => cfg.network = one_of(item, NETWORK).ok_or_else(|| bad(NETWORK.join(", ")))?,
             "live" => cfg.live = one_of(item, LIVE).ok_or_else(|| bad(LIVE.join(", ")))?,
             "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,
+            "restore" => cfg.restore = one_of(item, RESTORE).ok_or_else(|| bad(RESTORE.join(", ")))?,
             "cache_messages" => {
                 cfg.cache_messages = within(item, &CACHE_MESSAGES).ok_or_else(|| bad(span(&CACHE_MESSAGES)))?
             }

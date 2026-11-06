@@ -67,7 +67,8 @@ fn every_action_is_registered() {
         use PaneAction::*;
         [
             Next, Prev, First, Last, HalfDown, HalfUp, PageDown, PageUp, OpenThread, Visual, Copy, Escape, Insert,
-            Close, Left, Right, Back, Forward, OpenLink, SplitRight, SplitBelow, OpenBeside, Zoom, Equalize,
+            Close, Left, Right, Back, Forward, OpenLink, SplitRight, SplitBelow, OpenBeside, Zoom, Equalize, Wider,
+            Narrower, Taller, Shorter,
         ]
         .map(Action::Pane)
     };

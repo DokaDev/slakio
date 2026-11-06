@@ -45,6 +45,7 @@ pub mod pane;
 pub mod picker;
 pub mod query;
 pub(crate) mod requests;
+mod restore;
 pub mod shell;
 pub mod signin;
 mod splits;
@@ -156,6 +157,10 @@ pub struct App {
     last_click: Option<(Instant, Position)>,
     /// The tab being dragged along the tab bar (its index now).
     tab_drag: Option<usize>,
+    /// The seam between panes being dragged ([`splits`]).
+    seam_drag: Option<splits::SeamDrag>,
+    /// The tabs of the last run, until the workspaces they show have answered ([`restore`]).
+    restoring: Option<slakio_core::layout::saved::Saved>,
     /// The workspace switcher's cursor, while it is open.
     pub(crate) switcher: Option<usize>,
     /// The terminal's size, for the mouse and scrolling.
@@ -191,6 +196,8 @@ impl App {
             effects: Vec::new(),
             last_click: None,
             tab_drag: None,
+            seam_drag: None,
+            restoring: None,
             switcher: None,
             size: Rect::default(),
             quit: false,
@@ -252,6 +259,15 @@ impl App {
 
     /// Handle a terminal event at `now`. `true` when the screen may have changed.
     pub fn handle_event(&mut self, ev: Event, now: Instant) -> bool {
+        let changed = self.handle(ev, now);
+        // Whatever showed every pane again (or another tab), "Zoomed" is no longer true.
+        if !self.work.zoomed() {
+            self.status.forget(now, |m| matches!(m, Msg::StatusZoomed { .. }));
+        }
+        changed
+    }
+
+    fn handle(&mut self, ev: Event, now: Instant) -> bool {
         match ev {
             // Release and repeat events come only with kitty flags this app never asks for; a press counts.
             Event::Key(k) if k.kind == KeyEventKind::Press => {
@@ -499,6 +515,9 @@ impl App {
             PaneAction::SplitBelow => self.split(Dir::Column, now),
             PaneAction::Zoom => self.zoom(now),
             PaneAction::Equalize => self.equalize(now),
+            PaneAction::Wider | PaneAction::Narrower | PaneAction::Taller | PaneAction::Shorter => {
+                self.resize_pane(a, now)
+            }
             PaneAction::Close => self.close_pane(now),
         }
     }

@@ -114,11 +114,12 @@ fn split_before(work: Rect, thread_focused: bool) -> Vec<(PaneId, Rect)> {
         return vec![if thread_focused { (THREAD, work) } else { (MAIN, work) }];
     }
     let [main, side] = Layout::horizontal([Constraint::Min(0), Constraint::Length(w)]).areas(work);
-    vec![(MAIN, main), (THREAD, side)]
+    // The panel starts on the main pane's right border: the two share it.
+    vec![(MAIN, main), (THREAD, Rect { x: side.x - 1, width: side.width + 1, ..side })]
 }
 
 #[test]
-fn the_layout_tree_splits_the_work_area_as_before_at_every_width() {
+fn the_layout_tree_splits_the_work_area_as_before_at_every_width_sharing_the_border() {
     for width in 0..=400 {
         for focused in [MAIN, THREAD] {
             let work = Rect::new(30, 0, width, 40);
@@ -142,8 +143,8 @@ fn the_frame_lays_out_each_open_pane_with_its_composer() {
         assert_eq!(vec![(MAIN, m.rect), (THREAD, t.rect)], work_panes(f.areas.work, &beside(), None), "{w}x{h}");
         assert_eq!(m.parts, pane_parts(m.rect, 1), "{w}x{h}");
         assert_eq!(t.parts, pane_parts(t.rect, 3), "{w}x{h}");
-        // The panes tile the work area side by side.
-        assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x, f.areas.work.right()));
+        // The panes tile the work area side by side, sharing the border between them.
+        assert_eq!((m.rect.x, m.rect.right(), t.rect.right()), (f.areas.work.x, t.rect.x + 1, f.areas.work.right()));
         let inside = Position { x: t.rect.x + 1, y: t.rect.y + 1 };
         assert_eq!(f.pane_at(inside).map(|p| p.id), Some(THREAD));
         assert_eq!(f.pane_at(Position { x: 0, y: h - 1 }), None, "the status line is no pane");
@@ -166,4 +167,18 @@ fn the_frame_shows_no_pane_without_a_conversation_and_one_where_two_do_not_fit()
     assert_eq!(main_only.panes[0].rect, main_only.areas.work);
     // A screen too small to draw still lays out without panicking.
     let _ = frame(Rect::new(0, 0, 3, 2), Shape { thread: true, ..plain() }, Some(&beside()), Some(THREAD), lines(5));
+}
+
+#[test]
+fn panes_split_either_way_share_each_border_once() {
+    use slakio_core::layout::{Dir, Node, Share};
+    let half = Share { num: 1, den: 2, min: 1, max: u16::MAX, keep: 1 };
+    let (a, b, c) = (PaneId(1), PaneId(2), PaneId(3));
+    let tree = Node::split(Dir::Row, half, Node::Leaf(a), Node::split(Dir::Column, half, Node::Leaf(b), Node::Leaf(c)));
+    let work = Rect::new(10, 2, 81, 31);
+    let got = work_panes(work, &tree, None);
+    assert_eq!(
+        got,
+        vec![(a, Rect::new(10, 2, 41, 31)), (b, Rect::new(50, 2, 41, 16)), (c, Rect::new(50, 17, 41, 16)),]
+    );
 }

@@ -17,6 +17,8 @@
 //! workspace, the views, the list), the right one is the work. With two tabs or more, the work
 //! area's first row is the tab bar ([`crate::tabbar`]).
 //!
+//! Panes side by side (or one above the other) share the border between them.
+//!
 //! On a narrow screen an open thread panel takes the list panel's room (the list is left out
 //! of the layout only, and comes back when the thread closes or the list is focused);
 //! narrower still, the pane with the keyboard takes the whole work area.
@@ -128,10 +130,38 @@ pub fn split_share(dir: Dir, first: u16, second: u16) -> Share {
     Share { num: second, den: first.saturating_add(second), min, max: u16::MAX, keep }
 }
 
+/// A share a pane's auto thread panel has beside it (as [`THREAD_SHARE`] made it, however far it
+/// was resized since): it gives way where the two do not fit, and evening the room puts it back.
+pub fn is_thread_share(s: &Share) -> bool {
+    (s.min, s.max, s.keep) == (THREAD_SHARE.min, THREAD_SHARE.max, THREAD_SHARE.keep)
+}
+
+/// The least room a pane keeps along `dir`.
+pub fn least(dir: Dir) -> u16 {
+    if dir == Dir::Row { PANE_MIN_WIDTH } else { PANE_MIN_HEIGHT }
+}
+
+/// `tree` with each split needing the room its sides hold ([`Node::fitted`]).
+pub fn fitted(tree: &Node) -> Node {
+    tree.fitted(&is_thread_share, &least)
+}
+
+/// `work` as the layout tree's area.
+pub fn work_area(work: Rect) -> Area {
+    Area { x: work.x, y: work.y, width: work.width, height: work.height }
+}
+
 /// The panes of `tree` shown in `work`, and where (`focused` stays where two do not fit).
+/// Neighbours share the border between them: a pane not at the work area's left (top) edge
+/// starts on the last column (row) of the one before it, so each seam costs one cell.
 pub fn work_panes(work: Rect, tree: &Node, focused: Option<PaneId>) -> Vec<(PaneId, Rect)> {
-    let area = Area { x: work.x, y: work.y, width: work.width, height: work.height };
-    tree.solve(area, focused).into_iter().map(|(id, a)| (id, Rect::new(a.x, a.y, a.width, a.height))).collect()
+    tree.solve(work_area(work), focused)
+        .into_iter()
+        .map(|(id, a)| {
+            let (left, up) = (u16::from(a.x > work.x), u16::from(a.y > work.y));
+            (id, Rect::new(a.x - left, a.y - up, a.width + left, a.height + up))
+        })
+        .collect()
 }
 
 /// Inside a bordered area.

@@ -28,7 +28,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
-use slakio_core::model::{ConversationKind, Presence, Ts};
+use slakio_core::model::{ConversationKind, Presence, Target, Ts};
 use std::time::Instant;
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)], now: Instant) {
@@ -38,12 +38,61 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Pan
         super::empty::work(f, app, screen::inner(area));
         return;
     }
-    for id in app.work.ids() {
+    // The pane with the keyboard last: the borders it shares are drawn in its colour.
+    let mut ids = app.work.ids();
+    if let Some(at) = ids.iter().position(|id| Some(*id) == app.work.active()) {
+        let active = ids.remove(at);
+        ids.push(active);
+    }
+    for id in ids {
         let Some(pane) = app.work.pane(id) else { continue };
         let view = views.iter().find(|(v, _)| *v == id).map(|(_, v)| v);
         match (layout.pane(id), view) {
             (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view), now),
             _ => pane.hits.borrow_mut().clear(),
+        }
+    }
+    if layout.panes.len() > 1 {
+        join(f, layout);
+    }
+}
+
+/// Where the borders of panes side by side meet, the cells that join them: a corner, a tee or a
+/// cross, as the lines through each corner of a pane and each end of its composer's divider run.
+fn join(f: &mut Frame, layout: &FrameLayout) {
+    let (mut cols, mut rows) = (Vec::new(), Vec::new());
+    let mut points = Vec::new();
+    for p in layout.panes.iter().filter(|p| p.rect.width > 1 && p.rect.height > 1) {
+        let r = p.rect;
+        let (l, t, rt, b) = (r.x, r.y, r.right() - 1, r.bottom() - 1);
+        cols.extend([(l, t, b), (rt, t, b)]);
+        rows.extend([(t, l, rt), (b, l, rt)]);
+        points.extend([(l, t), (rt, t), (l, b), (rt, b)]);
+        if let Some(y) = p.parts.divider {
+            rows.push((y, l, rt));
+            points.extend([(l, y), (rt, y)]);
+        }
+    }
+    for (x, y) in points {
+        let up = cols.iter().any(|&(c, t, b)| c == x && t < y && y <= b);
+        let down = cols.iter().any(|&(c, t, b)| c == x && t <= y && y < b);
+        let left = rows.iter().any(|&(r, l, rt)| r == y && l < x && x <= rt);
+        let right = rows.iter().any(|&(r, l, rt)| r == y && l <= x && x < rt);
+        let glyph = match (up, down, left, right) {
+            (true, true, true, true) => "┼",
+            (true, true, false, true) => "├",
+            (true, true, true, false) => "┤",
+            (false, true, true, true) => "┬",
+            (true, false, true, true) => "┴",
+            (false, true, false, true) => "╭",
+            (false, true, true, false) => "╮",
+            (true, false, false, true) => "╰",
+            (true, false, true, false) => "╯",
+            (true, true, false, false) => "│",
+            _ => "─",
+        };
+        if let Some(cell) = f.buffer_mut().cell_mut((x, y)) {
+            cell.set_symbol(glyph);
         }
     }
 }
@@ -60,8 +109,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         .workspace(pane.target.workspace())
         .map(|w| Span::styled("▌", t.workspace(w.color)))
         .unwrap_or_default();
-    let text =
-        if thread { format!("⤷ {} · {name} ", app.i18n.label(Label::PaneThread)) } else { format!("{name} ") };
+    let text = if thread { format!("⤷ {} · {name} ", thread_name(app, pane)) } else { format!("{name} ") };
     let peer = match conversation.map(|c| &c.kind) {
         Some(ConversationKind::Dm { user }) if !thread => app.model.user(pane.target.workspace(), user),
         _ => None,
@@ -124,6 +172,35 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 
 pub(super) use crate::app::model::breadcrumb;
 
+/// What a thread pane is called: `Thread`; beside another pane of the tab on a thread of the same
+/// conversation, its first message's author (`⤷ Ivy Moon · #long-threads`), or where that is the
+/// other's too, the start of its text.
+fn thread_name(app: &App, pane: &Pane) -> String {
+    let first = |p: &Pane| {
+        let Target::Thread { thread, .. } = p.target else { return None };
+        app.work.timeline(p).items.first().filter(|m| m.ts == thread).cloned()
+    };
+    let others: Vec<_> = app
+        .work
+        .ids()
+        .into_iter()
+        .filter_map(|id| app.work.pane(id))
+        .filter(|p| !std::ptr::eq(*p, pane) && p.is_thread() && p.target.conversation() == pane.target.conversation())
+        .filter(|p| p.target.workspace() == pane.target.workspace())
+        .collect();
+    let (true, Some(m)) = (!others.is_empty(), first(pane)) else {
+        return app.i18n.label(Label::PaneThread).to_string();
+    };
+    let same = others.iter().any(|p| first(p).is_some_and(|o| o.author == m.author));
+    if same {
+        let text = m.text.as_str().split_whitespace().collect::<Vec<_>>().join(" ");
+        if !text.is_empty() {
+            return clip(&text, 20);
+        }
+    }
+    m.author.as_str().to_string()
+}
+
 /// `spans` in `w` cells: the first that does not fit whole is cut with `…` (a blank at its end
 /// goes first), and those after it are left out.
 fn fit(spans: Vec<Span<'_>>, w: usize) -> Vec<Span<'_>> {
@@ -136,8 +213,9 @@ fn fit(spans: Vec<Span<'_>>, w: usize) -> Vec<Span<'_>> {
             out.push(s);
             continue;
         }
+        // Words that would just fill the room touch the border's dashes: cut, they end in `…`.
         let trimmed = s.content.trim_end();
-        let cut = if width(trimmed) <= room { trimmed.to_string() } else { clip(&s.content, room) };
+        let cut = clip(trimmed, if width(trimmed) == room { room.saturating_sub(1) } else { room });
         if !cut.is_empty() {
             out.push(Span::styled(cut, s.style));
         }
@@ -209,3 +287,6 @@ fn composer_hint(app: &App, thread: bool) -> String {
         })
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests;

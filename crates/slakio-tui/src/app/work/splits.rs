@@ -16,8 +16,9 @@
 
 use super::Work;
 use crate::app::pane::Pane;
-use crate::screen::{THREAD_SHARE, split_share};
-use slakio_core::layout::{Dir, Node, PaneId};
+use crate::screen::{self, THREAD_SHARE, split_share};
+use ratatui::layout::Rect;
+use slakio_core::layout::{Dir, Node, PaneId, Seam};
 use slakio_core::model::Target;
 use std::borrow::Cow;
 
@@ -59,6 +60,7 @@ impl Work {
             self.panes.remove(&id);
             return None;
         }
+        self.fit();
         self.fill();
         self.check();
         Some(id)
@@ -84,6 +86,7 @@ impl Work {
         if let Some(p) = self.panes.get_mut(&owner) {
             p.thread = None;
         }
+        self.fit();
         self.check();
         Some(panel)
     }
@@ -94,25 +97,69 @@ impl Work {
         self.tabs.toggle_zoom()
     }
 
-    /// The panes of the tab shown share its room evenly (a thread panel keeps its share beside
-    /// its pane). `Some(false)` when there is nothing to even: one pane (with its thread panel,
-    /// or not); `None` with no tab.
+    /// The panes of the tab shown share its room evenly (a thread panel gets its first share
+    /// back beside its pane). `Some(false)` when there is nothing to even: one pane (with its
+    /// thread panel, or not); `None` with no tab.
     pub fn equalize(&mut self) -> Option<bool> {
         let panes = self.ids().into_iter().filter(|id| self.owner(*id).is_none()).count();
         let tab = self.tabs.current_tab_mut()?;
         if panes < 2 {
             return Some(false);
         }
-        tab.root = tab.root.equalized(&|s| *s == THREAD_SHARE, &split_share);
+        let panel = |s: &slakio_core::layout::Share| screen::is_thread_share(s).then_some(THREAD_SHARE);
+        tab.root = screen::fitted(&tab.root.equalized(&panel, &split_share));
         Some(true)
     }
 
-    /// The pane the keyboard goes to when `id` closes: the one before it in reading order (not
-    /// its own thread panel), else the one after it.
+    /// Every tab's splits need the room their sides hold ([`screen::fitted`]): a smaller screen
+    /// takes from every pane alike before a side gives way.
+    pub(super) fn fit(&mut self) {
+        for i in 0..self.tabs.len() {
+            if let Some(t) = self.tabs.get_mut(i) {
+                t.root = screen::fitted(&t.root);
+            }
+        }
+    }
+
+    /// The active pane `by` cells bigger along `dir` (smaller below zero) in the work area
+    /// `work`, as far as every pane keeps its least; `false` when nothing changed (no split that
+    /// way around it, at the end of its room, or the tab is zoomed).
+    pub fn resize(&mut self, work: Rect, dir: Dir, by: i32) -> bool {
+        let (Some(active), false) = (self.active(), self.zoomed()) else { return false };
+        let Some(tab) = self.tabs.current_tab_mut() else { return false };
+        let Some(root) = tab.root.resize(screen::work_area(work), Some(active), active, dir, by) else { return false };
+        tab.root = root;
+        true
+    }
+
+    /// The seams between the panes of the tab shown, laid out in `work`.
+    pub fn seams(&self, work: Rect) -> Vec<Seam> {
+        let active = self.active();
+        self.shown_layout().map(|t| t.seams(screen::work_area(work), active)).unwrap_or_default()
+    }
+
+    /// Move seam `id` ([`Seam::id`]) to column (row) `at` of the work area `work`; `false` when
+    /// it did not move.
+    pub fn drag(&mut self, work: Rect, id: PaneId, at: u16) -> bool {
+        let active = self.active();
+        if self.zoomed() {
+            return false;
+        }
+        let Some(tab) = self.tabs.current_tab_mut() else { return false };
+        let Some(root) = tab.root.drag(screen::work_area(work), active, id, at) else { return false };
+        tab.root = root;
+        true
+    }
+
+    /// The pane the keyboard goes to when `id` closes: of the panes that take its room (the
+    /// other side of the split it is a side of, with its thread panel), the one the keyboard was
+    /// on last, a thread panel only where there is no other pane.
     pub(super) fn near(&self, id: PaneId) -> Option<PaneId> {
-        let panel = self.panes.get(&id).and_then(|p| p.thread);
-        let ids: Vec<PaneId> = self.ids().into_iter().filter(|p| Some(*p) != panel).collect();
-        let at = ids.iter().position(|p| *p == id)?;
-        at.checked_sub(1).or(Some(at + 1)).and_then(|i| ids.get(i)).copied()
+        let root = &self.tabs.all().get(self.tabs.find(id)?)?.root;
+        let side = root.sibling(root.around(&self.unit(id))?)?.leaves();
+        let last = |ids: &mut dyn Iterator<Item = &PaneId>| {
+            ids.min_by_key(|p| std::cmp::Reverse(self.panes.get(p).map_or(0, |p| p.focused_at))).copied()
+        };
+        last(&mut side.iter().filter(|p| self.owner(**p).is_none())).or_else(|| last(&mut side.iter()))
     }
 }

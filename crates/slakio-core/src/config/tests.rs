@@ -150,3 +150,13 @@ fn the_cache_settings_are_read_within_their_ranges() {
         })
     );
 }
+
+#[test]
+fn restoring_the_last_layout_is_on_unless_turned_off() {
+    assert_eq!(Config::default().restore, "on");
+    assert_eq!(parse("restore = \"Off\"").unwrap().restore, "off");
+    assert_eq!(parse("restore = \"on\"").unwrap().restore, "on");
+    for bad in ["restore = false", "restore = \"later\""] {
+        assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
+    }
+}

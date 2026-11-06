@@ -28,7 +28,9 @@ reactions show when a conversation is opened again, and who is typing or online 
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); the latest release, 0.0.15, splits the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
+([Install](#install)); the next release resizes panes (`Space w >` / `<` / `+` / `-`, `:resize`, or a border
+dragged with the mouse), lets neighbouring panes share one border, and opens the tabs and panes of the last run again
+at the start. 0.0.15 split the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
 panes, `z` zooms one pane, `Space w =` gives them even room, and Ctrl+W closes one. A thread panel splits off into its own
 pane. The lowercase `v` now splits; the VISUAL selection is `V`. It is still
 read-only: it sends nothing and marks nothing as read. While live is on, your coworkers may see you as active in Slack.
@@ -135,7 +137,7 @@ images, and settings. This README only lists what works; it will grow with each 
     one leaves an empty work area, nothing quits) and `Space t u` opens the tabs closed this
     session again where they were; `Space t r`, `:rename <name>` or a double click rename one;
     `Space t h` / `Space t l` or a drag move one. The app never reorders tabs. Tabs and their
-    names are not kept across restarts yet;
+    names are kept across restarts (below);
   - splits, tmux style: `v` opens beside the pane and `s` under it (the selected message's
     thread, else the same conversation again; the thread panel splits off as a pane of its
     own, also when `v` opens another thread beside it, so all three show), `v` on the list
@@ -144,9 +146,18 @@ images, and settings. This README only lists what works; it will grow with each 
     split with no room left says so); `Ctrl+H/J/K/L` (`Space w h/j/k/l`) go to the pane on
     that side (the one last there first, so going and back returns), `Tab` / `F6` go round,
     a click focuses; `z` (`:zoom`) shows the pane alone and
-    back, `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the pane. Each pane keeps
-    its own selection and history. Sizes are not changed by keys or the mouse yet, nor kept
-    across restarts;
+    back (it stays zoomed while that pane has the keyboard; moving to another pane, a split
+    or closing it shows every pane), `Space w >` / `<` / `+` / `-` make the pane wider,
+    narrower, taller or shorter (`:resize >N`, `<N`, `+N`, `-N` by N cells), a border
+    dragged with the mouse moves, `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the
+    pane (the keyboard goes to the pane that takes its room). Panes side by side share one
+    border. Each pane keeps its own selection and history;
+  - the tabs (their order, names and the one shown), each tab's splits and sizes, what each
+    pane shows, zoom and the pane with the keyboard are saved in the state directory, one file
+    per set of signed-in workspaces (private to you), and opened again at the next start
+    (`restore = "off"` in the config turns this off). A pane whose conversation is gone is left
+    out, and a file that cannot be read is not used; either is said once. Drafts are not saved:
+    what you were writing is not there after a restart;
   - `V` selects a range of messages and `y` copies it (or the selected message) to the
     clipboard through the terminal (OSC 52);
   - `i` writes in the pane's composer (multiline: `Ctrl+J` or `Alt+Enter` for a new line,
@@ -356,6 +367,7 @@ cache = "on"             # "off": nothing is kept on disk between runs (every st
 cache_messages = 200     # the most messages kept a conversation (10 to 10000)
 cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
 cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
+restore = "on"           # "off": the tabs and panes of the last run are not opened again
 ```
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`

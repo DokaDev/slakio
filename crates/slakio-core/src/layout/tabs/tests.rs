@@ -131,10 +131,15 @@ proptest! {
                 }
                 Op::ClosePane(p) => {
                     let tab = t.find(PaneId(p));
+                    let before = tab.map(|i| t.all()[i].clone());
                     let gone = t.close_pane(PaneId(p), None);
-                    if let Closed::Pane(i) = gone {
-                        prop_assert_eq!(Some(i), tab);
-                        prop_assert!(!t.all()[i].zoomed, "closing a pane shows the layout again");
+                    if let (Closed::Pane(i), Some(b)) = (&gone, before) {
+                        prop_assert_eq!(Some(*i), tab);
+                        let now = &t.all()[*i];
+                        // Zoomed still only while the zoomed pane stays, with others left.
+                        let stays = b.zoomed && b.active != PaneId(p) && matches!(now.root, Node::Split { .. });
+                        prop_assert_eq!(now.zoomed, stays, "closing the zoomed pane shows the layout again");
+                        prop_assert!(!stays || now.active == b.active);
                     }
                     if let Closed::Tab(i, c) = gone {
                         prop_assert!(!c.root.contains(PaneId(p)) || c.root.leaves() == vec![PaneId(p)]);

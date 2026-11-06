@@ -61,8 +61,9 @@ fn v_opens_beside_and_s_under_the_pane_each_keeping_its_own_selection() {
     assert_ne!(first, second, "the new pane has the keyboard");
     assert_eq!(name(&d, second), "backend", "nothing selected: the same conversation again");
     let (a, b) = (rect(&d, first), rect(&d, second));
-    assert!(a.y == b.y && a.height == b.height && a.right() == b.x, "side by side: {a:?} {b:?}");
-    assert_eq!(a.width + b.width, whole.width);
+    // Side by side, sharing the border between them.
+    assert!(a.y == b.y && a.height == b.height && a.right() - 1 == b.x, "side by side: {a:?} {b:?}");
+    assert_eq!(a.width + b.width, whole.width + 1);
     assert!(a.width.abs_diff(b.width) <= 1, "even: {a:?} {b:?}");
     // Each pane has its own selection.
     d.keys("k k");
@@ -73,7 +74,7 @@ fn v_opens_beside_and_s_under_the_pane_each_keeping_its_own_selection() {
     d.keys("s");
     let third = focused(&d);
     let (b, c) = (rect(&d, second), rect(&d, third));
-    assert!(b.x == c.x && b.width == c.width && b.bottom() == c.y, "under: {b:?} {c:?}");
+    assert!(b.x == c.x && b.width == c.width && b.bottom() - 1 == c.y, "under: {b:?} {c:?}");
     assert_eq!(panes(&d).len(), 3);
     assert_eq!(d.app.open_panes().len(), 3);
     // `:vsplit` and `:split` do the same.
@@ -94,7 +95,7 @@ fn a_split_opens_the_selected_thread_and_the_thread_panel_splits_off() {
     d.keys("v");
     let thread = focused(&d);
     assert_eq!(name(&d, thread), "thread of long-threads");
-    assert!(rect(&d, main).right() == rect(&d, thread).x, "beside");
+    assert!(rect(&d, main).right() - 1 == rect(&d, thread).x, "beside, sharing a border");
     // Again on the same message: the thread is open already, so it is focused.
     d.keys("ctrl+h");
     assert_eq!(focused(&d), main);
@@ -111,7 +112,7 @@ fn a_split_opens_the_selected_thread_and_the_thread_panel_splits_off() {
     assert_eq!(focused(&d), panel, "the panel itself, with its messages and selection");
     assert_eq!(d.app.open_panes().len(), 3);
     let (m, p) = (rect(&d, main), rect(&d, panel));
-    assert!(m.x == p.x && m.bottom() == p.y, "under its pane: {m:?} {p:?}");
+    assert!(m.x == p.x && m.bottom() - 1 == p.y, "under its pane: {m:?} {p:?}");
     // It is no panel any more: Enter on another message opens a new panel.
     d.keys("ctrl+k");
     assert_eq!(focused(&d), main);
@@ -135,7 +136,7 @@ fn the_list_v_opens_the_conversation_under_its_cursor_beside() {
     let incidents = focused(&d);
     assert_eq!(name(&d, incidents), "incidents");
     assert_eq!(panes(&d).len(), 2);
-    assert!(rect(&d, backend).right() == rect(&d, incidents).x);
+    assert!(rect(&d, backend).right() - 1 == rect(&d, incidents).x);
     // What is open already is focused instead.
     d.list_cursor_on("backend");
     d.keys("v");
@@ -145,7 +146,7 @@ fn the_list_v_opens_the_conversation_under_its_cursor_beside() {
     d.keys("space w s");
     let deploys = focused(&d);
     assert_eq!(name(&d, deploys), "deploys");
-    assert!(rect(&d, backend).bottom() == rect(&d, deploys).y, "under the pane the list opens into");
+    assert!(rect(&d, backend).bottom() - 1 == rect(&d, deploys).y, "under the pane the list opens into");
     // With nothing open, `v` opens as Enter does.
     let mut d = Demo::new(120, 40);
     d.list_cursor_on("general");
@@ -437,7 +438,7 @@ fn a_move_by_place_and_back_returns_to_the_pane_it_came_from() {
     let top = focused(&d);
     d.keys("s");
     let bottom = focused(&d);
-    assert!(rect(&d, top).bottom() == rect(&d, bottom).y && rect(&d, top).right() == rect(&d, tall).x);
+    assert!(rect(&d, top).bottom() - 1 == rect(&d, bottom).y && rect(&d, top).right() - 1 == rect(&d, tall).x);
     d.keys("ctrl+l");
     assert_eq!(focused(&d), tall);
     d.keys("ctrl+h");

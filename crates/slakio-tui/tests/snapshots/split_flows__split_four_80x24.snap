@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/split_flows.rs
 expression: d.snap()
 ---
-╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────╮╭ ▌#incidents ──────────╮
-│▎Home                   @24 ││ Kate Nam  07:05       ││ ──── 2026-01-05 ───── │
-│ DMs                    ●11 ││ Ticket review pager   ││▎Tom Ko  13:14         │
-│ Activity               @36 ││ pager production on   ││▎On can meeting today  │
-│ Files                      ││ build alert the on    ││▎please we still       │
-│ To-dos                   6 ││ draft                 ││▎design review retry   │
-├─▾──────────────────────────┤│                       ││▎tomorrow a rollback   │
-│ ▾ Favorites                ││ Sam Rivera  07:14     ││                       │
-│   # backend                ││ Meeting moved to 3pm  ││ Grafana app  13:51    │
-│   # incidents           3  │├─ Message #backend ────┤├─ Message #incidents ──┤
-│                            ││ › Press i to write    ││ › Press i to write    │
-│ ▾ Ops                      │╰───────────────────────╯╰───────────────────────╯
-│▎  # deploys                │╭ ▌#deploys ────────────╮╭ ▌⤷ Thread · #incide…──╮
-│   # alerts                 ││                       ││ Tom Ko  13:14         │
-│   # partner-shared ext     ││ Ava Shin  07:37       ││ On can meeting today  │
-│   # hostile-strings        ││ The ticket merge      ││ please we still       │
-│   # big-history            ││                       ││ design review retry   │
-│   # long-threads           ││ Deploy Bot app  07:50 ││ tomorrow a rollback   │
-│                            ││ Again is after broken ││                       │
-│ ▾ Channels                 ││ index                 ││ No replies yet        │
-│   # announcements          │├─ Message #deploys ────┤├─ Reply ───────────────┤
-│   # design-review          ││ › Press i to write    ││ › Press i to reply    │
-╰────────────────────────────╯╰───────────────────────╯╰───────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────┬ ▌#incidents ───────────╮
+│▎Home                   @24 ││ Kate Nam  07:05       │ ───── 2026-01-05 ───── │
+│ DMs                    ●11 ││ Ticket review pager   │▎Tom Ko  13:14          │
+│ Activity               @36 ││ pager production on   │▎On can meeting today   │
+│ Files                      ││ build alert the on    │▎please we still design │
+│ To-dos                   6 ││ draft                 │▎review retry tomorrow  │
+├─▾──────────────────────────┤│                       │▎a rollback             │
+│ ▾ Favorites                ││ Sam Rivera  07:14     │                        │
+│   # backend                ││ Meeting moved to 3pm  │ Grafana app  13:51     │
+│   # incidents           3  │├─ Message #backend ────┼─ Message #incidents ───┤
+│                            ││ › Press i to write    │ › Press i to write     │
+│ ▾ Ops                      │├ ▌#deploys ────────────┼ ▌⤷ Thread · #inciden…──┤
+│▎  # deploys                ││ ⤷ 7 replies · last 0… │ ───── 2026-01-05 ───── │
+│   # alerts                 ││                       │ Tom Ko  13:14          │
+│   # partner-shared ext     ││ Ava Shin  07:37       │ On can meeting today   │
+│   # hostile-strings        ││ The ticket merge      │ please we still design │
+│   # big-history            ││                       │ review retry tomorrow  │
+│   # long-threads           ││ Deploy Bot app  07:50 │ a rollback             │
+│                            ││ Again is after broken │                        │
+│ ▾ Channels                 ││ index                 │ No replies yet         │
+│   # announcements          │├─ Message #deploys ────┼─ Reply ────────────────┤
+│   # design-review          ││ › Press i to write    │ › Press i to reply     │
+╰────────────────────────────╯╰───────────────────────┴────────────────────────╯
  NORMAL  ▌A compa… › #deploys │ i write · Esc list · ? help · Space more │ demo

@@ -7,6 +7,7 @@
 //! | the pane on a side | `Ctrl+H/J/K/L`, `Space w h/j/k/l`, `h` / `l` on a pane; `Tab` / `F6` go round | that pane (from the leftmost, `h` goes to the list) |
 //! | zoom, or every pane again | `z`, `Space w z`, `:zoom` | stays |
 //! | even room | `Space w =`, `:equalize` | stays |
+//! | wider / narrower / taller / shorter | `Space w >` / `<` / `+` / `-`, `:resize >N` / `<N` / `+N` / `-N`, a border dragged | stays |
 //! | close | `Ctrl+W` (the pane, then its tab) | the pane before it |
 //!
 //! A split of a pane opens the selected message's thread beside it (focused instead where it is
@@ -17,16 +18,41 @@
 //! open would leave the panel no room to show: the panel splits off first, and the three share
 //! the room. A split that would leave a pane under [`screen::PANE_MIN_WIDTH`] ×
 //! [`screen::PANE_MIN_HEIGHT`] is refused with a notice; one that is done drops that notice.
+//!
+//! A resize gives the active pane room from its neighbour in the nearest split that way (vim's
+//! `Ctrl+W >`), never under a pane's least; a border between two panes dragged with the mouse
+//! moves where it is let go. A click on a border that is not dragged is a click on the pane
+//! after it (its title is on that border).
+//!
+//! Zoom: a zoomed tab shows its active pane alone for as long as that pane stays and has the
+//! keyboard — opening something in it from the list keeps the zoom. The keyboard going to
+//! another pane of the tab (by place, `Tab`/`F6`, a click), a split, closing the zoomed pane, a
+//! thread panel opening, or `z` again shows every pane, and the notice that it is zoomed goes.
+//! Another tab keeps its own zoom.
 
 use super::{App, Focus};
 use crate::action::{Action, PaneAction};
 use crate::keymap::hints::key_label;
 use crate::screen;
+use ratatui::layout::Position;
 use ratatui::layout::Rect;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::{Area, Dir, PaneId, Toward, toward};
 use slakio_core::model::Target;
 use std::time::Instant;
+
+/// Columns a pane gets wider (narrower) by, rows taller (shorter), at a key.
+pub const RESIZE_COLS: i32 = 4;
+pub const RESIZE_ROWS: i32 = 2;
+
+/// A press on a border between two panes: the seam it moves, where it was pressed, and whether
+/// the mouse moved it since.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SeamDrag {
+    id: PaneId,
+    at: Position,
+    moved: bool,
+}
 
 /// What a split opens.
 enum Opens {
@@ -172,5 +198,71 @@ impl App {
     fn only_one(&mut self, now: Instant) {
         let l = if self.work.tabs().is_empty() { Label::StatusNoTab } else { Label::StatusZoomOne };
         self.info(Msg::Label(l), now);
+    }
+
+    /// `Space w >` and the like: the active pane bigger or smaller by a step.
+    pub(super) fn resize_pane(&mut self, a: PaneAction, now: Instant) {
+        let (dir, by) = match a {
+            PaneAction::Wider => (Dir::Row, RESIZE_COLS),
+            PaneAction::Narrower => (Dir::Row, -RESIZE_COLS),
+            PaneAction::Taller => (Dir::Column, RESIZE_ROWS),
+            _ => (Dir::Column, -RESIZE_ROWS),
+        };
+        self.resize_by(dir, by, now);
+    }
+
+    /// The active pane `by` cells bigger along `dir` (smaller below zero), else say why not.
+    pub(super) fn resize_by(&mut self, dir: Dir, by: i32, now: Instant) {
+        if self.work.tabs().is_empty() {
+            self.info(Msg::Label(Label::StatusNoTab), now);
+        } else if self.work.resize(self.areas().work, dir, by) {
+            self.forget_resize(now);
+        } else {
+            self.info(Msg::Label(Label::StatusResizeNone), now);
+        }
+    }
+
+    fn forget_resize(&mut self, now: Instant) {
+        self.status.forget(now, |m| matches!(m, Msg::Label(Label::StatusResizeNone)));
+    }
+
+    /// A press at `at` on a border between two panes starts dragging it; `false` when there is
+    /// no border there.
+    pub(super) fn seam_press(&mut self, at: Position) -> bool {
+        let on = |s: &&slakio_core::layout::Seam| {
+            let (line, across) = if s.dir == Dir::Row { (at.x, at.y) } else { (at.y, at.x) };
+            line == s.at && (s.from..s.to).contains(&across)
+        };
+        let Some(seam) = self.work.seams(self.areas().work).iter().find(on).copied() else { return false };
+        self.seam_drag = Some(SeamDrag { id: seam.id, at, moved: false });
+        true
+    }
+
+    /// The border pressed follows the mouse to `at`.
+    pub(super) fn seam_move(&mut self, at: Position, now: Instant) -> bool {
+        let Some(id) = self.seam_drag.map(|d| d.id) else { return false };
+        let seam = self.work.seams(self.areas().work).into_iter().find(|s| s.id == id);
+        let Some(seam) = seam else { return false };
+        let to = if seam.dir == Dir::Row { at.x } else { at.y };
+        if let Some(d) = self.seam_drag.as_mut() {
+            d.moved |= to != seam.at;
+        }
+        let moved = self.work.drag(self.areas().work, seam.id, to);
+        if moved {
+            self.forget_resize(now);
+        }
+        moved
+    }
+
+    /// The button let go over a border: a press that moved nothing was a click on the pane
+    /// whose title (or left edge) is there. `false` when no border was pressed.
+    pub(super) fn seam_release(&mut self) -> bool {
+        let Some(d) = self.seam_drag.take() else { return false };
+        if !d.moved
+            && let Some(id) = self.frame().panes.iter().rev().find(|p| p.rect.contains(d.at)).map(|p| p.id)
+        {
+            self.set_focus(Focus::on(id));
+        }
+        true
     }
 }

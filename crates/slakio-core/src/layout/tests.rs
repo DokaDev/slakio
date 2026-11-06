@@ -74,7 +74,135 @@ fn tree() -> impl Strategy<Value = Node> {
     ]
 }
 
+/// The least of a pane: 4 columns, 2 rows.
+fn least(d: Dir) -> u16 {
+    if d == Dir::Row { 4 } else { 2 }
+}
+
+fn never(_: &Share) -> bool {
+    false
+}
+
+#[test]
+fn fitted_shares_need_what_their_sides_hold() {
+    // 1 | (2 | 3): the outer split's second side needs two panes' room.
+    let t = Node::split(
+        Dir::Row,
+        HALF,
+        Node::Leaf(PaneId(1)),
+        Node::split(Dir::Row, HALF, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3))),
+    );
+    let f = t.fitted(&never, &least);
+    let Node::Split { share, second, .. } = &f else { panic!("a split") };
+    assert_eq!((share.min, share.keep, share.num, share.den), (8, 4, HALF.num, HALF.den));
+    assert!(matches!(**second, Node::Split { share, .. } if (share.min, share.keep) == (4, 4)));
+    // Shrunk, every pane keeps its least before one gives way.
+    let got = f.solve(area(12, 5), None);
+    assert_eq!(got.iter().map(|(_, a)| a.width).collect::<Vec<_>>(), vec![4, 4, 4]);
+    assert_eq!(f.solve(area(11, 5), Some(PaneId(3))).len(), 2, "the side with the keyboard stays");
+    // A split the other way needs its larger side; a kept split one pane.
+    assert_eq!(three().needs(Dir::Row, &never, &least), 8);
+    assert_eq!(three().needs(Dir::Column, &never, &least), 4);
+    assert_eq!(beside().needs(Dir::Row, &|s: &Share| *s == THREAD, &least), 4);
+    assert_eq!(beside().fitted(&|s: &Share| *s == THREAD, &least), beside());
+}
+
+#[test]
+fn the_sibling_is_what_takes_the_room() {
+    let t = three();
+    let two = Node::Leaf(PaneId(2));
+    assert_eq!(t.sibling(&two), Some(&Node::Leaf(PaneId(3))));
+    assert_eq!(t.sibling(&Node::Leaf(PaneId(1))).map(Node::leaves), Some(vec![PaneId(2), PaneId(3)]));
+    assert_eq!(t.sibling(&t), None);
+    assert_eq!(t.sibling(&Node::Leaf(PaneId(9))), None);
+}
+
+#[test]
+fn seams_are_the_last_line_of_each_first_side() {
+    let t = three();
+    let seams = t.seams(area(80, 20), None);
+    assert_eq!(
+        seams,
+        vec![
+            Seam { dir: Dir::Row, at: 7 + 40 - 1, from: 3, to: 23, id: PaneId(2) },
+            Seam { dir: Dir::Column, at: 3 + 10 - 1, from: 47, to: 87, id: PaneId(3) },
+        ]
+    );
+    // A split one side of which gives way has no seam.
+    assert_eq!(beside().seams(area(60, 20), None), vec![]);
+    let z = Node::Leaf(PaneId(1));
+    assert_eq!(z.seams(area(60, 20), None), vec![]);
+}
+
+#[test]
+fn a_seam_dragged_moves_within_the_least_sizes() {
+    let t = three().fitted(&never, &least);
+    let a = area(80, 20);
+    let moved = t.drag(a, None, PaneId(2), 7 + 59).expect("moves");
+    let w: Vec<u16> = moved.solve(a, None).iter().map(|(_, r)| r.width).collect();
+    assert_eq!(w, vec![60, 20, 20]);
+    assert_eq!(moved.seams(a, None)[0].at, 7 + 59);
+    // As far as the right side keeps its least.
+    let far = t.drag(a, None, PaneId(2), 200).unwrap();
+    assert_eq!(far.solve(a, None)[0].1.width, 76);
+    let near = t.drag(a, None, PaneId(2), 0).unwrap();
+    assert_eq!(near.solve(a, None)[0].1.width, 4);
+    // Rows the same way; a seam not laid out, or not moved, changes nothing.
+    let down = t.drag(a, None, PaneId(3), 3 + 4).unwrap();
+    assert_eq!(down.solve(a, None)[1].1.height, 5);
+    assert_eq!(t.drag(a, None, PaneId(9), 10), None);
+    assert_eq!(t.drag(a, None, PaneId(2), 7 + 39), None);
+}
+
+#[test]
+fn a_pane_resized_takes_room_from_the_nearest_split_that_way() {
+    let t = three().fitted(&never, &least);
+    let a = area(80, 20);
+    let width = |n: &Node, id: u64| n.solve(a, None).into_iter().find(|(p, _)| p.0 == id).unwrap().1;
+    // 2 is the second side: wider moves the seam left; 1 is the first: wider moves it right.
+    let got = t.resize(a, None, PaneId(2), Dir::Row, 4).unwrap();
+    assert_eq!((width(&got, 1).width, width(&got, 2).width), (36, 44));
+    let got = t.resize(a, None, PaneId(1), Dir::Row, 4).unwrap();
+    assert_eq!((width(&got, 1).width, width(&got, 2).width), (44, 36));
+    let got = t.resize(a, None, PaneId(2), Dir::Column, -2).unwrap();
+    assert_eq!((width(&got, 2).height, width(&got, 3).height), (8, 12));
+    // No split that way around it, or none that can give: nothing.
+    assert_eq!(t.resize(a, None, PaneId(1), Dir::Column, 2), None);
+    assert_eq!(t.resize(a, None, PaneId(1), Dir::Row, 500).map(|n| width(&n, 1).width), Some(76));
+    let full = t.resize(a, None, PaneId(1), Dir::Row, 500).unwrap();
+    assert_eq!(full.resize(a, None, PaneId(1), Dir::Row, 4), None);
+}
+
 proptest! {
+    /// Resized or dragged, a fitted tree keeps its panes, tiles the area, and every pane it
+    /// showed keeps its least room.
+    #[test]
+    fn resizing_keeps_every_pane_its_least(t in grown(), w in 0u16..300, h in 0u16..120, by in -400i32..400, pick in 0usize..9, row in any::<bool>()) {
+        let t = t.fitted(&never, &least);
+        let a = area(w, h);
+        let shown = t.solve(a, None).len();
+        let leaves = t.leaves();
+        let pane = leaves[pick % leaves.len()];
+        let dir = if row { Dir::Row } else { Dir::Column };
+        let mut changed = vec![t.resize(a, None, pane, dir, by)];
+        if let Some(s) = t.seams(a, None).get(pick % 3) {
+            changed.push(t.drag(a, None, s.id, s.at.wrapping_add(by as u16)));
+        }
+        for n in changed.into_iter().flatten() {
+            prop_assert_eq!(n.leaves(), t.leaves());
+            let laid = n.solve(a, None);
+            prop_assert_eq!(laid.len(), shown, "as many panes shown");
+            let cells: u64 = laid.iter().map(|(_, r)| u64::from(r.width) * u64::from(r.height)).sum();
+            prop_assert_eq!(cells, u64::from(w) * u64::from(h));
+            if shown > 1 {
+                for (_, r) in &laid {
+                    prop_assert!(r.width >= least(Dir::Row) || r.width == w, "{:?}", r);
+                    prop_assert!(r.height >= least(Dir::Column) || r.height == h, "{:?}", r);
+                }
+            }
+        }
+    }
+
     #[test]
     fn the_panes_shown_tile_the_area_without_overlap(
         t in tree(), width in 0u16..400, height in 0u16..200, focus in 0u64..4,
@@ -134,7 +262,7 @@ fn the_part_around_panes_is_the_smallest_that_holds_them_all() {
 #[test]
 fn equalized_a_run_of_splits_the_same_way_gives_each_part_the_same_room() {
     let share = |_: Dir, a: u16, b: u16| Share { num: b, den: a + b, min: 1, max: 400, keep: 1 };
-    let none = |_: &Share| false;
+    let none = |_: &Share| None;
     // 1 | (2 | 3): three columns of a third each.
     let lopsided = Share { num: 9, den: 10, min: 1, max: 400, keep: 1 };
     let row = Node::split(
@@ -154,7 +282,7 @@ fn equalized_a_run_of_splits_the_same_way_gives_each_part_the_same_room() {
         Node::Leaf(PaneId(1)),
         Node::split(Dir::Row, THREAD, Node::Leaf(PaneId(2)), Node::Leaf(PaneId(3))),
     );
-    let got = kept.equalized(&|s: &Share| *s == THREAD, &share);
+    let got = kept.equalized(&|s: &Share| (*s == THREAD).then_some(*s), &share);
     let Node::Split { share: outer, second, .. } = &got else { panic!("a split") };
     assert_eq!((outer.num, outer.den), (1, 2));
     assert!(matches!(**second, Node::Split { share, .. } if share == THREAD));
@@ -238,7 +366,7 @@ proptest! {
     #[test]
     fn equalized_keeps_the_panes(t in grown(), w in 0u16..300, h in 0u16..120) {
         let share = |_: Dir, a: u16, b: u16| Share { num: b, den: a + b, min: 1, max: u16::MAX, keep: 1 };
-        let e = t.equalized(&|_: &Share| false, &share);
+        let e = t.equalized(&|_: &Share| None, &share);
         prop_assert_eq!(e.leaves(), t.leaves());
         let cells: u64 = e.solve(area(w, h), None).iter().map(|(_, r)| u64::from(r.width) * u64::from(r.height)).sum();
         prop_assert_eq!(cells, u64::from(w) * u64::from(h));

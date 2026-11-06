@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/resize_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ────────────╮╭ ▌#long-threads ────────────────────────┬ ▌⤷ Ivy Moon · #long-threads ────────────┬ ▌⤷ Eve Bae · #long-threads ────────────╮
+│▎Home                        @24 ││ ＊  ＊＊＊  11:23                      │ ───────────── 2026-01-06 ────────────── │ ───────────── 2026-01-06 ───────────── │
+│ DMs                         ●11 ││     see https://docs.example.com/      │ IM  Ivy Moon  12:15                     │ EB  Eve Bae  12:05                     │
+│ Activity                    @36 ││     runbooks/latency                   │     We customer migration now now       │     Tomorrow can merge invoice pager   │
+│ Files                           ││                                        │     budget still staging                │     still after is on branch roadmap   │
+│ To-dos                        6 ││ RO  Ryan Oh  11:33                     │                                         │     alert                              │
+├─▾───────────────────────────────┤│     We staging broken lunch timeout    │ No replies yet · i reply                │                                        │
+│ ▾ Favorites                     ││     lunch lunch tomorrow someone       │                                         │ No replies yet · i reply               │
+│   # backend                     ││     tomorrow staging                   │                                         │                                        │
+│   # incidents                3  ││                                        │                                         │                                        │
+│                                 ││ CP  Chris Park  11:42                  │                                         │                                        │
+│ ▾ Ops                           ││     Should after roadmap review        │                                         │                                        │
+│   # deploys                     ││     metrics after staging should maybe │                                         │                                        │
+│   # alerts                      ││     release production                 │                                         │                                        │
+│   # partner-shared ext          ││                                        │                                         │                                        │
+│   # hostile-strings             ││ SR  Sam Rivera  11:44                  │                                         │                                        │
+│   # big-history                 ││     Ticket latency meeting tomorrow    │                                         │                                        │
+│▎  # long-threads                ││     schema timeout                     │                                         │                                        │
+│                                 ││                                        │                                         │                                        │
+│ ▾ Channels                      ││ TK  Taylor Kim  11:58                  │                                         │                                        │
+│   # announcements               ││     Looks retry we tracing roadmap     │                                         │                                        │
+│   # design-review               ││     branch queue is fine maybe         │                                         │                                        │
+│   # feed-alert-134              ││                                        │                                         │                                        │
+│   # feed-alert-8                ││▎EB  Eve Bae  12:05                     │                                         │                                        │
+│   # feed-budget-162             ││▎    Tomorrow can merge invoice pager   │                                         │                                        │
+│   # feed-budget-33              ││▎    still after is on branch roadmap   │                                         │                                        │
+│   # feed-build-50               ││▎    alert                              │                                         │                                        │
+│   # feed-cache-119              ││                                        │                                         │                                        │
+│   # feed-customer-161           ││ HJ  Hyunwoo Jung  12:11                │                                         │                                        │
+│   # feed-customer-167        1  ││     Ticket is today staging review     │                                         │                                        │
+│   # feed-dashboard-22           ││     branch for waiting a draft         │                                         │                                        │
+│   # feed-dashboard-41           ││     🙏 3                               │                                         │                                        │
+│   # feed-design-34              ││                                        │                                         │                                        │
+│   # feed-design-83              ││ IM  Ivy Moon  12:15                    │                                         │                                        │
+│   # feed-draft-142              ││     We customer migration now now      │                                         │                                        │
+│   # feed-draft-58               ││     budget still staging               │                                         │                                        │
+│   # feed-draft-84               │├─ Message #long-threads ────────────────┼─ Reply ─────────────────────────────────┼─ Reply ────────────────────────────────┤
+│   # feed-index-199           2  ││ › Press i to write                     │ › Press i to reply                      │ › Press i to reply                     │
+╰─────────────────────────────────╯╰────────────────────────────────────────┴─────────────────────────────────────────┴────────────────────────────────────────╯
+ NORMAL  ▌A company › #long-threads › ⤷ Thread                                                 │ i reply · k messages · Esc list · Ctrl+W close · ? help │ demo

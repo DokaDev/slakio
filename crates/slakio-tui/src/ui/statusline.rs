@@ -557,13 +557,16 @@ fn draw_right(f: &mut Frame, area: Rect, spans: Spans) {
 }
 
 /// Place `p` in `w` cells: what is after its last ` › ` (the thread, `⤷ Thread`) stays whole
-/// with the `›` before it, and what comes before is cut by its middle; where that leaves no
-/// room, the whole place is.
+/// with the `›` before it, and what comes before is cut by its middle, down to `…`; where that
+/// leaves no room, the thread alone; where it does not fit either, the whole place is cut.
 fn clip_place(p: &str, w: usize) -> String {
     match p.rsplit_once(" › ") {
-        Some((head, tail)) if width(tail) + 3 + 2 <= w && width(p) > w => {
+        _ if width(p) <= w => p.to_string(),
+        Some((head, tail)) if width(tail) + 3 + 2 <= w => {
             format!("{} › {tail}", clip_middle(head, w - width(tail) - 3))
         }
+        Some((_, tail)) if width(tail) + 4 <= w => format!("… › {tail}"),
+        Some((_, tail)) if width(tail) <= w => tail.to_string(),
         _ => clip_middle(p, w),
     }
 }

@@ -29,6 +29,7 @@ use slakio_tui::app::status::Level;
 use slakio_tui::app::{App, Effect, Settings};
 use slakio_tui::demo::DemoBackend;
 use slakio_tui::exchange;
+use slakio_tui::layout_file::{self, LayoutFile};
 use slakio_tui::terminal::{Cursor, cursor_shape, osc52};
 use slakio_tui::theme::{Background, Look};
 use slakio_tui::ui;
@@ -191,15 +192,20 @@ fn main() -> ExitCode {
         let _restore = term::guard();
         let (mut terminal, enhanced) = term::setup_terminal()?;
         app.keymap = slakio_tui::keymap::Keymap::new(enhanced);
+        // The tabs of the last run, for this set of workspaces (`restore = "off"`: none).
+        let mut layout = LayoutFile::default();
         let backend = kind.map(|k| match k {
             BackendKind::Demo(b) => {
                 app.connect(b.capabilities());
+                layout = LayoutFile::new(paths.state.as_deref(), &layout_file::file_name(None));
                 exchange::serve(b)
             }
             BackendKind::Slack(kept) => {
                 let mut notices = Vec::new();
                 let (handle, signed) = wiring.connect(kept, &mut notices);
                 app.connect_workspaces(handle.capabilities, &signed);
+                let ids: Vec<_> = signed.iter().map(|s| s.id.clone()).collect();
+                layout = LayoutFile::new(paths.state.as_deref(), &layout_file::file_name(Some(&ids)));
                 // Queued: a boot that fails at once (offline) does not hide them.
                 for n in notices {
                     app.status.queue(n, Level::Warning, Instant::now());
@@ -207,7 +213,18 @@ fn main() -> ExitCode {
                 handle
             }
         });
-        let saved = Saved { config: config_path.filter(|_| writable), errors: paths.errors_log() };
+        if cfg.restore == "off" {
+            layout = LayoutFile::default();
+        }
+        match layout.load() {
+            Ok(Some(saved)) => app.restore_layout(saved, Instant::now()),
+            Ok(None) => {}
+            Err(fault) => {
+                ErrorLog::new(paths.errors_log()).record("layout", &fault);
+                app.layout_unreadable(Instant::now());
+            }
+        }
+        let saved = Saved { config: config_path.filter(|_| writable), errors: paths.errors_log(), layout };
         run(&mut terminal, app, backend, &mut stats, saved, &mut wiring).await
     });
     // What the cache was asked to keep is written before the process ends.
@@ -436,6 +453,22 @@ impl Wiring {
 struct Saved {
     config: Option<std::path::PathBuf>,
     errors: Option<std::path::PathBuf>,
+    /// The tabs and panes, kept for the next run.
+    layout: LayoutFile,
+}
+
+impl Saved {
+    /// Keep the layout as it is now (`end`: the run ends, so whatever waits is written).
+    fn keep_layout(&mut self, app: &App, end: bool) {
+        let now = Instant::now();
+        let mut result = self.layout.offer(app.layout_to_save().as_ref(), now);
+        if end || self.layout.deadline().is_some_and(|at| at <= now) {
+            result = result.and(self.layout.flush(now));
+        }
+        if let Err(fault) = result {
+            ErrorLog::new(self.errors.clone()).record("layout", &fault);
+        }
+    }
 }
 
 impl Saved {
@@ -467,7 +500,7 @@ async fn run(
     mut app: App,
     mut backend: Option<BackendHandle>,
     stats: &mut Option<stats::Stats>,
-    saved: Saved,
+    mut saved: Saved,
     wiring: &mut Wiring,
 ) -> io::Result<()> {
     let size = terminal.size()?;
@@ -504,6 +537,7 @@ async fn run(
                 Effect::OpenLink(url) => saved.open(&url, &mut app),
             }
         }
+        saved.keep_layout(&app, false);
         if redraw {
             cursor.apply(&mut io::stdout(), cursor_shape(&app))?;
             terminal.draw(|f| ui::draw(f, &app, Instant::now()))?;
@@ -517,7 +551,7 @@ async fn run(
         if let Some(s) = stats.as_mut() {
             s.woke();
         }
-        let deadline = app.deadline();
+        let deadline = [app.deadline(), saved.layout.deadline()].into_iter().flatten().min();
         let timer = async {
             match deadline {
                 Some(at) => tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await,
@@ -552,5 +586,6 @@ async fn run(
             }
         };
     }
+    saved.keep_layout(&app, true);
     Ok(())
 }

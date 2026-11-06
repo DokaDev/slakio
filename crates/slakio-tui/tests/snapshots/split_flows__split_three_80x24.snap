@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/split_flows.rs
 expression: d.snap()
 ---
-╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────╮╭ ▌#incidents ──────────╮
-│▎Home                   @24 ││ Kate Nam  06:51       ││ ──── 2026-01-05 ───── │
-│ DMs                    ●11 ││ Production roadmap    ││▎Tom Ko  13:14         │
-│ Activity               @36 ││ customer build alert  ││▎On can meeting today  │
-│ Files                      ││ now latency fine      ││▎please we still       │
-│ To-dos                   6 ││ review latency        ││▎design review retry   │
-├─▾──────────────────────────┤│ roadmap broken should ││▎tomorrow a rollback   │
-│ ▾ Favorites                ││ for                   ││                       │
-│   # backend                ││                       ││ Grafana app  13:51    │
-│▎  # incidents           3  ││ ＊＊＊  06:59         │├─ Message #incidents ──┤
-│                            ││ Confirmed             ││ › Press i to write    │
-│ ▾ Ops                      ││                       │╰───────────────────────╯
-│   # deploys                ││ Kate Nam  07:05       │╭ ▌⤷ Thread · #incide…──╮
-│   # alerts                 ││ Ticket review pager   ││ Tom Ko  13:14         │
-│   # partner-shared ext     ││ pager production on   ││ On can meeting today  │
-│   # hostile-strings        ││ build alert the on    ││ please we still       │
-│   # big-history            ││ draft                 ││ design review retry   │
-│   # long-threads           ││                       ││ tomorrow a rollback   │
-│                            ││ Sam Rivera  07:14     ││                       │
-│ ▾ Channels                 ││ Meeting moved to 3pm  ││ No replies yet        │
-│   # announcements          │├─ Message #backend ────┤├─ Reply ───────────────┤
-│   # design-review          ││ › Press i to write    ││ › Press i to reply    │
-╰────────────────────────────╯╰───────────────────────╯╰───────────────────────╯
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────┬ ▌#incidents ───────────╮
+│▎Home                   @24 ││ Kate Nam  06:51       │ ───── 2026-01-05 ───── │
+│ DMs                    ●11 ││ Production roadmap    │▎Tom Ko  13:14          │
+│ Activity               @36 ││ customer build alert  │▎On can meeting today   │
+│ Files                      ││ now latency fine      │▎please we still design │
+│ To-dos                   6 ││ review latency        │▎review retry tomorrow  │
+├─▾──────────────────────────┤│ roadmap broken should │▎a rollback             │
+│ ▾ Favorites                ││ for                   │                        │
+│   # backend                ││                       │ Grafana app  13:51     │
+│▎  # incidents           3  ││ ＊＊＊  06:59         ├─ Message #incidents ───┤
+│                            ││ Confirmed             │ › Press i to write     │
+│ ▾ Ops                      ││                       ├ ▌⤷ Thread · #inciden…──┤
+│   # deploys                ││ Kate Nam  07:05       │ ───── 2026-01-05 ───── │
+│   # alerts                 ││ Ticket review pager   │ Tom Ko  13:14          │
+│   # partner-shared ext     ││ pager production on   │ On can meeting today   │
+│   # hostile-strings        ││ build alert the on    │ please we still design │
+│   # big-history            ││ draft                 │ review retry tomorrow  │
+│   # long-threads           ││                       │ a rollback             │
+│                            ││ Sam Rivera  07:14     │                        │
+│ ▾ Channels                 ││ Meeting moved to 3pm  │ No replies yet         │
+│   # announcements          │├─ Message #backend ────┼─ Reply ────────────────┤
+│   # design-review          ││ › Press i to write    │ › Press i to reply     │
+╰────────────────────────────╯╰───────────────────────┴────────────────────────╯
  NORMAL  ▌A compa… › #incidents › ⤷ Thread │ i reply · Esc list · ? help │ demo

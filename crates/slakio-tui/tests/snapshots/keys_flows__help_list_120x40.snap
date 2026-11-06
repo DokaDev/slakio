@@ -23,7 +23,7 @@ expression: s
 │         │   Show the previous view                                                                       [ │         │
 │ ▾ Channe│   Show the next view                                                                           ] │         │
 │   # anno│   Open in a new tab (a message: its thread)                                                    t │         │
-│   # desi│   Open in a pane beside (the one at the cursor)                                                v │         │
+│   # desi│   Open beside (the one at the cursor)                                                          v │         │
 │   # feed│   Complete the to-do, or reopen it                                                             x │         │
 │   # feed│   Move the item to Saved, or back to To-dos                                                    m │         │
 │   # feed│   Clear the saved item (asks first)                                                            d │         │

@@ -182,6 +182,11 @@ pub enum PaneAction {
     Zoom,
     /// The panes of the tab shown share its room evenly.
     Equalize,
+    /// The active pane wider, narrower, taller or shorter (its neighbour gives or takes).
+    Wider,
+    Narrower,
+    Taller,
+    Shorter,
     /// What the pane showed before (each pane has its own back/forward history).
     Back,
     Forward,
@@ -413,6 +418,10 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::OpenBeside, "pane.open_beside", Label::ActionPaneOpenBeside, &[]),
     pane(PaneAction::Zoom, "pane.zoom", Label::ActionPaneZoom, &["zoom"]),
     pane(PaneAction::Equalize, "pane.equalize", Label::ActionPaneEqualize, &["equalize", "equalise"]),
+    pane(PaneAction::Wider, "pane.wider", Label::ActionPaneWider, &[]),
+    pane(PaneAction::Narrower, "pane.narrower", Label::ActionPaneNarrower, &[]),
+    pane(PaneAction::Taller, "pane.taller", Label::ActionPaneTaller, &[]),
+    pane(PaneAction::Shorter, "pane.shorter", Label::ActionPaneShorter, &[]),
     // `:q` closes as in vim (the pane, then its tab), never the app: that is `:qa`.
     pane(PaneAction::Close, "pane.close", Label::ActionPaneClose, &["q", "quit", "close"]),
     pane(PaneAction::Back, "history.back", Label::ActionHistoryBack, &["back"]),

@@ -145,6 +145,11 @@ pub const DEFAULTS: &[Binding] = &[
     pane(Ctx::Shell, "space w s", PaneAction::SplitBelow),
     pane(Ctx::Shell, "space w z", PaneAction::Zoom),
     pane(Ctx::Shell, "space w =", PaneAction::Equalize),
+    // Resize the active pane as `Ctrl+W >` / `<` / `+` / `-` do in vim (the border drags too).
+    pane(Ctx::Shell, "space w >", PaneAction::Wider),
+    pane(Ctx::Shell, "space w <", PaneAction::Narrower),
+    pane(Ctx::Shell, "space w +", PaneAction::Taller),
+    pane(Ctx::Shell, "space w -", PaneAction::Shorter),
     // The views, by key.
     shell(Ctx::Shell, "space h", ShellAction::Show(View::Home)),
     shell(Ctx::Shell, "space d", ShellAction::Show(View::Dms)),

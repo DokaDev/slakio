@@ -168,8 +168,9 @@ fn dividers_span_the_pane_and_use_one_color() {
             assert!(row.starts_with('─') && row.ends_with('─'), "{row:?}");
         }
     }
-    // The composer's divider: one color from tee to tee.
-    let y = (inner.top()..inner.bottom()).find(|&y| buf[(thread.x, y)].symbol() == "├").unwrap();
+    // The composer's divider: one color from tee to tee (a cross where the main pane's meets it
+    // on the border they share).
+    let y = (inner.top()..inner.bottom()).find(|&y| ["├", "┼"].contains(&buf[(thread.x, y)].symbol())).unwrap();
     let colors: std::collections::HashSet<Color> =
         (thread.x..thread.right()).map(|x| &buf[(x, y)]).filter(|c| c.symbol() != " ").map(|c| c.fg).collect();
     assert_eq!(colors.len(), 1, "{colors:?}");

@@ -10,6 +10,9 @@ fn a_long_place_is_cut_in_its_middle() {
 fn a_cut_place_keeps_the_thread_after_its_mark() {
     assert_eq!(clip_place("#long-threads › ⤷ Thread", 20), "#lon…eads › ⤷ Thread");
     assert_eq!(clip_place("#long-threads › ⤷ Thread", 30), "#long-threads › ⤷ Thread");
+    // Room for the thread and its mark only, or the thread alone.
+    assert_eq!(clip_place("#long-threads › ⤷ Thread", 12), "… › ⤷ Thread");
+    assert_eq!(clip_place("#long-threads › ⤷ Thread", 10), "⤷ Thread");
     // No room for the thread whole: the place is cut by its middle.
-    assert_eq!(clip_place("#long-threads › ⤷ Thread", 10), clip_middle("#long-threads › ⤷ Thread", 10));
+    assert_eq!(clip_place("#long-threads › ⤷ Thread", 7), clip_middle("#long-threads › ⤷ Thread", 7));
 }

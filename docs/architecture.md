@@ -64,9 +64,13 @@ area, the view switcher's and the list's cursors, folded sections (`app/shell.rs
 tabs of `slakio-core` (`layout/tabs.rs`: tabs in the user's order, never reordered by the app,
 each a layout tree of `layout.rs` — panes split beside or under each other, a pane and the
 auto thread panel it opened split as one — its active pane and whether it is zoomed on it), the
-user's splits, zoom and even room (`app/work/splits.rs`; what a split opens, the room it needs
-and the keyboard moving to the pane on a side, by place, in `app/splits.rs`), the tabs closed
-to open again
+user's splits, zoom, even room and resizing (`app/work/splits.rs`; what a split opens, the room
+it needs, the keyboard moving to the pane on a side, by place, keys and a dragged border
+resizing a pane, in `app/splits.rs`; the core's `Node::fitted` gives every split the room its
+sides need, so a smaller screen shrinks every pane alike), the tabs saved for the next run and
+opened again (`app/work/restore.rs`, `app/restore.rs`; the file's form is the core's
+`layout/saved.rs`, the file itself `layout_file.rs`, read and written by the binary only), the
+tabs closed to open again
 (`app/work.rs`, `app/work/tabs.rs`; the app's side of tabs, their titles and the tab bar's mouse
 in `app/tabs.rs`, the bar's geometry in `tabbar.rs`), the list panel's workspace chip, its view switcher and the workspace switcher
 (`app/nav.rs`; their geometry in `navbar.rs`, where a Nerd Font glyph always takes two cells) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
@@ -82,7 +86,9 @@ a closed pane; the shell and the work area hand back where it should go) — and
 popups come in one order (`app/overlay.rs`); the key map, the mouse and drawing all read
 those two. The geometry of the screen (`screen.rs`) is pure:
 `screen::frame` lays out a frame once — the regions, each open pane, its messages and its
-composer — and drawing, the mouse and scrolling all read that one layout. Rules:
+composer — and drawing, the mouse and scrolling all read that one layout. Panes side by side
+share the border between them (a pane starts on the last column or row of the one before it);
+drawing joins the lines where they meet. Rules:
 
 - An `Action` is namespaced by its owner (`Action::CommandLine(CommandLineAction::Run)`), so
   dispatching one is routing, not one match over every action of the app.

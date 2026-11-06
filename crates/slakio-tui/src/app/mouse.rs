@@ -1,7 +1,7 @@
 //! The mouse over the main screen: the list panel's chip and views (click), the list
 //! (click, wheel), the tab
 //! bar ([`super::tabs`]) and the panes (click, double click, the reply link, the composer,
-//! wheel). Popups take the mouse first ([`super::overlay`]). Where things are comes from the
+//! wheel), the borders between panes (drag). Popups take the mouse first ([`super::overlay`]). Where things are comes from the
 //! frame's one layout ([`crate::screen`]), as drawn.
 
 use super::model::Row;
@@ -58,7 +58,14 @@ impl App {
         match m.kind {
             // A tab pressed follows the mouse along the bar until the button is let go.
             MouseEventKind::Drag(MouseButton::Left) if self.tab_drag.is_some() => self.tab_bar_mouse(m, false),
-            MouseEventKind::Up(MouseButton::Left) => self.tab_drag.take().is_some(),
+            // A border between panes pressed follows the mouse the same way.
+            MouseEventKind::Drag(MouseButton::Left) if self.seam_drag.is_some() => self.seam_move(at, now),
+            MouseEventKind::Up(MouseButton::Left) => self.tab_drag.take().is_some() | self.seam_release(),
+            MouseEventKind::Down(MouseButton::Left) if a.work.contains(at) && self.seam_press(at) => {
+                self.keys.clear();
+                self.guide = Guide::default();
+                true
+            }
             MouseEventKind::Down(MouseButton::Middle) if on_tabs => self.tab_bar_mouse(m, false),
             MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
                 let by = if m.kind == MouseEventKind::ScrollDown { 1 } else { -1 };

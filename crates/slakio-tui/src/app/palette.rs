@@ -74,6 +74,9 @@ pub enum Item {
     Net(usize),
     /// An action found by its words (index into [`REGISTRY`]).
     Action(usize),
+    /// `:resize <+N|-N|>N|<N>`: the active pane N rows taller or shorter, N columns wider or
+    /// narrower.
+    Resize,
 }
 
 /// An entry ready to draw: what it completes to (empty for an action), what it does, and its
@@ -149,6 +152,27 @@ fn rename_arg(line: &str) -> Option<&str> {
     rest.starts_with(char::is_whitespace).then(|| rest.trim())
 }
 
+/// What follows `:resize` (empty: nothing yet), when the line is that command.
+fn resize_arg(line: &str) -> Option<&str> {
+    let rest = line.trim_start().strip_prefix("resize")?;
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then(|| rest.trim())
+}
+
+/// The way and the cells of a `:resize` argument: `+N` / `-N` rows, `>N` / `<N` columns.
+fn resize_by(arg: &str) -> Option<(slakio_core::layout::Dir, i32)> {
+    use slakio_core::layout::Dir;
+    let mut chars = arg.chars();
+    let (dir, sign) = match chars.next()? {
+        '+' => (Dir::Column, 1),
+        '-' => (Dir::Column, -1),
+        '>' => (Dir::Row, 1),
+        '<' => (Dir::Row, -1),
+        _ => return None,
+    };
+    let n = chars.as_str().trim().parse::<u16>().ok().filter(|n| *n > 0)?;
+    Some((dir, sign * i32::from(n)))
+}
+
 impl App {
     /// The palette's entries for the text typed so far: every one [`action::rank`] matches,
     /// the better match first; on a tie, commands in the registry's order (`:theme` after
@@ -158,6 +182,9 @@ impl App {
         let line = self.cmdline.text().trim_start();
         if rename_arg(line).is_some() && self.backend.is_some() {
             return vec![Item::Rename];
+        }
+        if resize_arg(line).is_some() && self.backend.is_some() {
+            return vec![Item::Resize];
         }
         if open_arg(line).is_some_and(|a| !a.is_empty()) {
             return vec![Item::Open];
@@ -295,6 +322,7 @@ impl App {
                 Item::TodoFilter(_) | Item::TodoSort(_) => self.todo_palette_row(item).unwrap_or_default(),
                 Item::Net(i) => self.net_row(i),
                 Item::Open => self.open_row(open_arg(self.cmdline.text()).unwrap_or_default()),
+                Item::Resize => self.resize_row(),
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
                     let what = if name.is_empty() {
@@ -307,6 +335,14 @@ impl App {
                 }
             })
             .collect()
+    }
+
+    /// The palette's row of `:resize <arg>`.
+    fn resize_row(&self) -> Row {
+        let label = |l| self.i18n.label(l).to_string();
+        let arg = resize_arg(self.cmdline.text()).unwrap_or_default();
+        let arg = if arg.is_empty() { label(Label::PaletteResizeArg) } else { arg.to_string() };
+        Row { name: format!(":resize {arg}"), label: label(Label::PaletteResize), keys: String::new() }
     }
 
     /// Why the last `Enter` ran nothing, wrapped to the width of the palette on a screen `size`
@@ -386,6 +422,13 @@ impl App {
                 self.cmdline.close();
                 self.open_typed(&arg, now);
             }
+            Some(Item::Resize) => match resize_arg(&text).and_then(resize_by) {
+                Some((dir, by)) => {
+                    self.cmdline.close();
+                    self.resize_by(dir, by, now);
+                }
+                None => self.cmdline.error = Some(Msg::Label(Label::PaletteResizeBad)),
+            },
             Some(Item::Rename) => {
                 let name = rename_arg(&text).unwrap_or_default().to_string();
                 self.cmdline.close();

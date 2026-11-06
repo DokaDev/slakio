@@ -57,6 +57,10 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space w s` | Split below (selected thread, else same) | `pane.split_below` |
 | `Space w z` | Zoom the pane, or show every pane again | `pane.zoom` |
 | `Space w =` | Even room for the panes | `pane.equalize` |
+| `Space w >` | Wider pane | `pane.wider` |
+| `Space w <` | Narrower pane | `pane.narrower` |
+| `Space w +` | Taller pane | `pane.taller` |
+| `Space w -` | Shorter pane | `pane.shorter` |
 | `Space h` | Show Home | `view.home` |
 | `Space d` | Show DMs | `view.dms` |
 | `Space a` | Show Activity | `view.activity` |
@@ -146,7 +150,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `[` | Show the previous view | `view.prev` |
 | `]` | Show the next view | `view.next` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
-| `v` | Open in a pane beside (the one at the cursor) | `pane.open_beside` |
+| `v` | Open beside (the one at the cursor) | `pane.open_beside` |
 | `x` | Complete the to-do, or reopen it | `todo.toggle` |
 | `m` | Move the item to Saved, or back to To-dos | `todo.move` |
 | `d` | Clear the saved item (asks first) | `todo.clear` |

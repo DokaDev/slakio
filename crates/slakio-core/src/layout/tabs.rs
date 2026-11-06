@@ -165,16 +165,18 @@ impl Tabs {
     }
 
     /// Take pane `pane` out of its tab, which closes when it was its last pane. Where the tab's
-    /// active pane was `pane`, `next` (if it is still in the tab) or the tab's first pane is.
+    /// active pane was `pane`, `next` (if it is still in the tab) or the tab's first pane is. A
+    /// zoomed tab stays zoomed while its zoomed (active) pane stays and others are left.
     pub fn close_pane(&mut self, pane: PaneId, next: Option<PaneId>) -> Closed {
         let Some(i) = self.find(pane) else { return Closed::Nothing };
         let tab = &mut self.tabs[i];
-        tab.zoomed = false;
+        tab.zoomed &= tab.active != pane;
         match tab.root.without(pane) {
             Some(root) => {
                 if tab.active == pane {
                     tab.active = next.filter(|n| root.contains(*n)).unwrap_or_else(|| root.leaves()[0]);
                 }
+                tab.zoomed &= matches!(root, Node::Split { .. });
                 tab.root = root;
                 Closed::Pane(i)
             }
