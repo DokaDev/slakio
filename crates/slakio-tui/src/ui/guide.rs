@@ -21,6 +21,8 @@ use slakio_core::i18n::{Label, Msg};
 
 /// The widest column (longer labels end in `…`).
 const COLUMN: usize = 40;
+/// The least of a label a column shows when the keys need more columns than fit whole.
+const MIN_LABEL: usize = 12;
 
 /// Draw the popup along the bottom of `area` (the screen above the status line).
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -42,8 +44,12 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let key_w = items.iter().map(|(k, _, _)| width(k)).max().unwrap_or(1);
     let col_w = (items.iter().map(|(_, l, _)| key_w + 2 + width(l)).max().unwrap_or(1)).min(COLUMN) + 3;
     let inner_w = usize::from(area.width.saturating_sub(2));
-    let cols = (inner_w / col_w).clamp(1, items.len());
     let max_rows = usize::from(area.height / 2).max(1);
+    // Too many rows for the height: more, narrower columns (labels cut with `…`) rather than
+    // keys left out, while each still shows its key and the start of its label.
+    let need = items.len().div_ceil(max_rows);
+    let least = key_w + 2 + MIN_LABEL + 3;
+    let cols = (inner_w / col_w).max(if inner_w / need.max(1) >= least { need } else { 1 }).clamp(1, items.len());
     let rows = items.len().div_ceil(cols).clamp(1, max_rows);
     let h = rows as u16 + 2;
     let rect = Rect::new(area.x, area.bottom().saturating_sub(h), area.width, h.min(area.height));

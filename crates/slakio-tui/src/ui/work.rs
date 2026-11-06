@@ -38,18 +38,35 @@ pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(Pan
         super::empty::work(f, app, screen::inner(area));
         return;
     }
-    // The pane with the keyboard last: the borders it shares are drawn in its colour.
+    // The pane with the keyboard last: the borders it shares are drawn in its colour. The
+    // titles of the others stay: a pane's title is on the border it shares with the pane
+    // above, kept as drawn and put back once every border is.
     let mut ids = app.work.ids();
     if let Some(at) = ids.iter().position(|id| Some(*id) == app.work.active()) {
         let active = ids.remove(at);
         ids.push(active);
     }
+    let mut titles = Vec::new();
     for id in ids {
         let Some(pane) = app.work.pane(id) else { continue };
         let view = views.iter().find(|(v, _)| *v == id).map(|(_, v)| v);
         match (layout.pane(id), view) {
-            (Some(l), Some(view)) => draw_pane(f, app, pane, (l, view), now),
+            (Some(l), Some(view)) => {
+                let w = draw_pane(f, app, pane, (l, view), now);
+                if Some(id) != app.work.active() {
+                    let (x, y) = (l.rect.x + 1, l.rect.y);
+                    let cells: Vec<_> = (x..x + w).filter_map(|x| f.buffer_mut().cell((x, y)).cloned()).collect();
+                    titles.push(((x, y), cells));
+                }
+            }
             _ => pane.hits.borrow_mut().clear(),
+        }
+    }
+    for ((x, y), cells) in titles {
+        for (k, cell) in cells.into_iter().enumerate() {
+            if let Some(c) = f.buffer_mut().cell_mut((x + k as u16, y)) {
+                *c = cell;
+            }
         }
     }
     if layout.panes.len() > 1 {
@@ -97,7 +114,8 @@ fn join(f: &mut Frame, layout: &FrameLayout) {
     }
 }
 
-fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View), now: Instant) {
+/// Draw `pane`; the width of its title (on its top border, after the corner).
+fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout, &View), now: Instant) -> u16 {
     let area = layout.rect;
     let t = &app.theme;
     let focused = app.focus() == Focus::Pane(PaneHandle::of(layout.id));
@@ -136,6 +154,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     }
     // Cut as the composer's title is: with `…`, two cells of the border left before its corner.
     let title = Line::from(fit(spans, usize::from(area.width).saturating_sub(4)));
+    let title_w = title.width() as u16;
     f.render_widget(panel(app, focused, title), area);
     let insert = focused && pane.insert;
     let before = pane.links.borrow().clone();
@@ -144,7 +163,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         pane.links_moved.set(Some(now));
     }
     if !draw_divider(f, app, pane, (area, layout.parts.divider), (name, focused)) {
-        return;
+        return title_w;
     }
     let input = layout.parts.input;
     let prompt = Rect { x: input.x + 1, width: 2.min(input.width), ..input };
@@ -153,7 +172,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     if app.work.draft(pane).is_empty() && !insert {
         let hint = composer_hint(app, thread);
         f.render_widget(Paragraph::new(clip(&hint, usize::from(text_area.width))).style(t.faint()), text_area);
-        return;
+        return title_w;
     }
     let h = usize::from(text_area.height);
     let top = (view.cursor.0 + 1).saturating_sub(h);
@@ -168,6 +187,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     }
     // Width of what is drawn never exceeds the area: the composer wraps at its width.
     debug_assert!(view.lines.iter().all(|l| width(l) <= usize::from(text_area.width.max(2))));
+    title_w
 }
 
 pub(super) use crate::app::model::breadcrumb;

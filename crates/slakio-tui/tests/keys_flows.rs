@@ -332,6 +332,29 @@ fn the_which_key_popup_fits_an_80x24_terminal_and_question_mark_opens_the_help()
     assert!(d.app.overlay() == Some(Overlay::Help), "? after a group shows every key");
 }
 
+#[test]
+fn every_window_key_shows_in_the_popup_at_80x24_in_both_languages() {
+    use slakio_tui::keymap::guide;
+    for lang in [Lang::En, Lang::Ko] {
+        let mut d = Demo::with(80, 24, lang, Settings::default());
+        let t0 = d.now;
+        d.keys("space w");
+        d.now = t0 + WHICH_KEY_DELAY;
+        d.app.on_tick(d.now);
+        let next = guide::next(&d.app.keymap, d.app.keys.ctx().unwrap(), d.app.keys.pending());
+        assert!(next.len() >= 13, "{}", next.len());
+        let s = d.screen();
+        for n in &next {
+            let label = d.app.i18n.label(guide::label(n)).to_string();
+            let start: String = label.chars().take(4).collect();
+            assert!(s.contains(&format!("{}  {start}", n.key)), "{lang:?}: `{}` {label}\n{s}", n.key);
+        }
+        if lang == Lang::En {
+            insta::assert_snapshot!("whichkey_space_w_80x24", d.snap());
+        }
+    }
+}
+
 // --- The keyboard help ----------------------------------------------------------------------
 
 #[test]

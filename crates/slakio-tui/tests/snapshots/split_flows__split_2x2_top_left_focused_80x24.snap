@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ────────────┬ ▌#deploys ─────────────╮
+│▎Home                   @24 ││ Kate Nam  07:05       │ ⤷ 7 replies · last 06… │
+│ DMs                    ●11 ││ Ticket review pager   │                        │
+│ Activity               @36 ││ pager production on   │ Ava Shin  07:37        │
+│ Files                      ││ build alert the on    │ The ticket merge       │
+│ To-dos                   6 ││ draft                 │                        │
+├─▾──────────────────────────┤│                       │ Deploy Bot app  07:50  │
+│ ▾ Favorites                ││ Sam Rivera  07:14     │ Again is after broken  │
+│   # backend                ││ Meeting moved to 3pm  │ index                  │
+│   # incidents           3  │├─ Message #backend ────┼─ Message #deploys ─────┤
+│                            ││ › Press i to write    │ › Press i to write     │
+│ ▾ Ops                      │├ ▌#long-threads ───────┼ ▌#incidents ───────────┤
+│   # deploys                ││ staging review branch │ branch metrics latency │
+│   # alerts                 ││ for waiting a draft   │ check                  │
+│   # partner-shared ext     ││  🙏 3                 │                        │
+│   # hostile-strings        ││                       │ Mia Jang  03:33        │
+│   # big-history            ││ Ivy Moon  12:15       │ Budget invoice on is   │
+│▎  # long-threads           ││ We customer migration │ schema can on deploy   │
+│                            ││ now now budget still  │ check now release      │
+│ ▾ Channels                 ││ staging               │ tracing on invoice     │
+│   # announcements          │├─ Message #long-thre…──┼─ Message #incidents ───┤
+│   # design-review          ││ › Press i to write    │ › Press i to write     │
+╰────────────────────────────╯╰───────────────────────┴────────────────────────╯
+ NORMAL  ▌A compa… › #backend │ i write · Esc list · ? help · Space more │ demo

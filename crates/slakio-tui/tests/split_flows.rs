@@ -311,6 +311,49 @@ fn split_snapshots_with_two_to_four_panes() {
     }
 }
 
+/// Every pane on screen shows the start of its name on its top border.
+fn every_title_shows(d: &Demo, what: &str) {
+    let s = d.screen();
+    let rows: Vec<&str> = s.lines().collect();
+    for (h, r) in panes(d) {
+        let name = name(d, h);
+        let start: String = name.chars().take(4).collect();
+        let row: String = rows[usize::from(r.y)].chars().skip(usize::from(r.x)).take(usize::from(r.width)).collect();
+        assert!(row.contains(&start), "{what}: {name} not on its border `{row}`\n{s}");
+    }
+}
+
+#[test]
+fn the_panes_under_the_focused_one_keep_their_titles() {
+    for (w, h) in [(120, 40), (80, 24)] {
+        // Two under each other, the top one with the keyboard.
+        let mut d = Demo::new(w, h);
+        d.open("backend");
+        d.keys("space w s");
+        d.open("incidents");
+        d.keys("ctrl+k");
+        assert_eq!(panes(&d).len(), 2);
+        assert_eq!(focused(&d), panes(&d)[0].0, "the top one");
+        every_title_shows(&d, "stack");
+        insta::assert_snapshot!(format!("split_stack_top_focused_{w}x{h}"), d.snap());
+        // Four, two by two, the top left one with the keyboard.
+        let mut d = Demo::new(w, h);
+        d.open("backend");
+        d.keys("space w v");
+        d.open("deploys");
+        d.keys("space w s");
+        d.open("incidents");
+        d.keys("ctrl+h");
+        d.keys("space w s");
+        d.open("long-threads");
+        d.keys("ctrl+k");
+        assert_eq!(panes(&d).len(), 4, "{}", d.screen());
+        assert_eq!(focused(&d), panes(&d)[0].0, "the top left one");
+        every_title_shows(&d, "2x2");
+        insta::assert_snapshot!(format!("split_2x2_top_left_focused_{w}x{h}"), d.snap());
+    }
+}
+
 #[test]
 fn which_key_and_help_list_the_split_keys() {
     let mut d = Demo::new(120, 40);

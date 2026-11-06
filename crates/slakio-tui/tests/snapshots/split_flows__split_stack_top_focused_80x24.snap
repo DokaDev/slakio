@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/split_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#backend ─────────────────────────────────────╮
+│▎Home                   @24 ││     Confirmed                                  │
+│ DMs                    ●11 ││                                                │
+│ Activity               @36 ││ KN  Kate Nam  07:05                            │
+│ Files                      ││     Ticket review pager pager production on    │
+│ To-dos                   6 ││     build alert the on draft                   │
+├─▾──────────────────────────┤│                                                │
+│ ▾ Favorites                ││ SR  Sam Rivera  07:14                          │
+│   # backend                ││     Meeting moved to 3pm                       │
+│▎  # incidents           3  │├─ Message #backend ─────────────────────────────┤
+│                            ││ › Press i to write                             │
+│ ▾ Ops                      │├ ▌#incidents ───────────────────────────────────┤
+│   # deploys                ││                                                │
+│   # alerts                 ││ MK  Minsu Kim  02:52                           │
+│   # partner-shared ext     ││     After check fine check branch metrics      │
+│   # hostile-strings        ││     latency check                              │
+│   # big-history            ││                                                │
+│   # long-threads           ││ MJ  Mia Jang  03:33                            │
+│                            ││     Budget invoice on is schema can on deploy  │
+│ ▾ Channels                 ││     check now release tracing on invoice       │
+│   # announcements          │├─ Message #incidents ───────────────────────────┤
+│   # design-review          ││ › Press i to write                             │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A compa… › #backend │ i write · Esc list · ? help · Space more │ demo
