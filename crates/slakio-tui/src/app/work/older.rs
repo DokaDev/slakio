@@ -26,7 +26,7 @@ impl Work {
         for id in self.ids() {
             let Some(pane) = self.panes.get_mut(&id) else { continue };
             let tl = self.timelines.entry(&pane.target);
-            pane.land(tl);
+            self.missed |= pane.land(tl) == Some(false);
             let workspace = Some(pane.target.workspace().clone());
             match pane.wants(tl) {
                 Some(None) => {

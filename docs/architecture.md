@@ -206,15 +206,21 @@ comes back); people and channels are named from the read model when drawn
   last two labels are `slack.com`, a workspace's or an Enterprise Grid one, or
   `app.slack.com/client/<team>/<conversation>`; ids and a 16-digit time of Slack's shape) opens
   inside (`app/jump.rs`). Its workspace is the one signed in on that host (`SignedIn::host`) or
-  with that id, else one signed in to that lists the conversation; none, or one that does not
-  list it, or Slack refusing to read it (its own error), asks before opening it in the browser
-  (`dialog::Question::Browser`, then the web link's own rules). A message loaded already is
+  with that id, and only that one; an Enterprise Grid organization's link (its host, or its
+  `E…` id) names none, so one signed in to that lists the conversation. None, or one that does
+  not list it, or Slack saying the conversation cannot be read here (`channel_not_found`,
+  `not_in_channel`, `access_denied`, `missing_scope`, `is_archived`), asks before opening it in
+  the browser (`dialog::Question::Browser`, then the web link's own rules). A message loaded already is
   selected; one that is not is read around (`Command::Around`, `app/work/jump.rs`: what was
   loaded goes): the backend reads `conversations.history` with `latest` and `inclusive`, then
   with `oldest`, and keeps the newer ones only when Slack says none is left past them, else the
   page is `cut` (no gap hidden; nothing comes live after the last message read, there is no
-  catch-up, and `G` reads the newest again). It is not cached. The message is marked in the
-  gutter for two seconds (`Pane::flash`).
+  catch-up, and `G` reads the newest again); when that second request fails, the first half is
+  shown as a cut page. It is not cached, and the same link opened again before its answer asks
+  nothing more. The message is marked in the gutter for two seconds (`Pane::flash`); one that is
+  not there any more is said (`jump.gone`) and nothing is marked. A reply older than a thread's
+  newest page is read back to (older pages of a thread come from what the backend kept, without
+  a request).
 
 ## The Slack transport
 
@@ -293,10 +299,10 @@ socket is its own; one that fails holds none back, and the background share is s
 cannot spend another's either (`Limits::lane_background_*`).
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
-is refused before any request, and a newer page of the same conversation supersedes one in
-flight. Opening a conversation waits 200 ms first and at most one open is under way: a newer
-one cancels it (before it is sent, or by dropping its answer), and the cancelled one is answered
-`Busy`. People are named by id lookups, never a directory listing: a view brings some of its
+is refused before any request, and a newer page of the same conversation or thread supersedes
+the one in flight: that one is cancelled (before it is sent, or by dropping its answer) and
+answered `Busy`. Pages of different targets never cancel each other, so the panes of a restored
+layout each load; the governor paces them. Opening a conversation waits 200 ms first. People are named by id lookups, never a directory listing: a view brings some of its
 authors along, the rest (and the DMs' people at the start) are asked of the edge cache's
 `users/info` in batches of 80, each id once a session (kept in memory); until then an id shows.
 A start reads, besides `client.userBoot`, the unread counts (`client.counts`; when they

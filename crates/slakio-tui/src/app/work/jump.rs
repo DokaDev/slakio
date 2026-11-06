@@ -17,9 +17,16 @@ pub const FLASH: Duration = Duration::from_secs(2);
 
 impl Work {
     /// Open `conversation` at the message at `at` (selected once loaded): the pane, and the
-    /// request reading around it when it is not loaded.
+    /// request reading around it when it is not loaded (the one on its way already, when the
+    /// same link was opened again before its answer came: it is not asked twice).
     pub fn jump(&mut self, conversation: Target, at: Ts) -> (Option<PaneId>, Option<Generation>) {
         let tl = self.timelines.entry(&conversation);
+        let waits = self.panes.values().any(|p| p.target == conversation && p.jump == Some(at));
+        if let Some(pending) = tl.pending.filter(|_| waits) {
+            let pane = self.open(conversation);
+            self.fill();
+            return (pane, Some(pending));
+        }
         let asked = (!tl.holds(at)).then(|| {
             let command = Command::Around { target: conversation.clone(), at, limit: PAGE };
             let id = self.requests.ask(Some(conversation.workspace().clone()), command);
@@ -105,6 +112,12 @@ impl Work {
             }
         }
         gone
+    }
+
+    /// A link's message was not there (deleted, or not in what was read) when its pane landed
+    /// on the nearest one since the last call: said once.
+    pub fn take_missed(&mut self) -> bool {
+        std::mem::take(&mut self.missed)
     }
 
     /// When a mark goes next.

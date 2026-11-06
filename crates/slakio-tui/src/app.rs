@@ -265,6 +265,8 @@ impl App {
     pub fn handle_event(&mut self, ev: Event, now: Instant) -> bool {
         let changed = self.handle(ev, now);
         self.forget_zoomed(now);
+        self.landed(now);
+        self.forget_asked(false);
         changed
     }
 
@@ -445,7 +447,10 @@ impl App {
             PaneAction::PageDown => self.work.step(page),
             PaneAction::PageUp => self.work.step(-page),
             PaneAction::First => self.work.with_pane(|p, tl| p.select_oldest(tl)),
-            PaneAction::Last => self.work.newest(),
+            PaneAction::Last => {
+                self.forget_asked(true);
+                self.work.newest();
+            }
             PaneAction::OpenThread => match self.work.focused() {
                 // Nothing selected: Enter writes, as in GUI Slack.
                 Some(p) if p.selected.is_none() || p.is_thread() => self.write(now),

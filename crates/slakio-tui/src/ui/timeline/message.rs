@@ -161,9 +161,13 @@ fn start(app: &App, pane: &Pane, tl: &Timeline, w: usize) -> Vec<Laid> {
     out
 }
 
-/// A notice `text` in `style`, wrapped at blanks to `w` cells (a few rows at most).
+/// The most lines a notice in a pane takes (far more than any needs at the narrowest pane).
+const NOTICE_LINES: usize = 12;
+
+/// A notice `text` in `style`, wrapped at blanks to `w` cells, whole.
 fn notice(text: &str, w: usize, style: Style) -> Vec<Laid> {
-    let (lines, _) = crate::text::wrap(text, w.max(1), 3);
+    // Every line it takes: a notice cut short could lose the key it names.
+    let (lines, _) = crate::text::wrap(text, w.max(1), NOTICE_LINES);
     lines.into_iter().map(|l| (Line::from(Span::styled(l, style)), Kind::Gap, Vec::new())).collect()
 }
 
@@ -457,4 +461,21 @@ fn no_replies(app: &App, w: usize) -> String {
     }
     let keys = super::super::empty::key_of(app, Action::Pane(PaneAction::Insert), Ctx::PaneNormal).unwrap_or_default();
     super::whole_or(app.i18n.msg(&Msg::ThreadNoReplies { keys }).to_string(), &short, w)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::notice;
+    use ratatui::style::Style;
+
+    #[test]
+    fn a_notice_keeps_every_word_however_narrow_the_pane() {
+        let text = "Newer messages not loaded · G reads the newest";
+        for w in [12, 16, 18, 24] {
+            let lines = notice(text, w, Style::default());
+            let shown: Vec<String> = lines.iter().map(|(l, ..)| l.to_string()).collect();
+            let words: Vec<&str> = shown.iter().flat_map(|l| l.split_whitespace()).collect();
+            assert_eq!(words, text.split_whitespace().collect::<Vec<_>>(), "{w}: {shown:?}");
+        }
+    }
 }

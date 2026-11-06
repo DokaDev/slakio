@@ -67,6 +67,8 @@ pub struct Work {
     older_at: Option<Instant>,
     /// Bumped by every change to the tabs (what is saved between runs).
     edits: u64,
+    /// A link's message was not found where its pane landed ([`Work::take_missed`]).
+    missed: bool,
 }
 
 /// The draft of a target that has none yet.

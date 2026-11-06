@@ -215,7 +215,7 @@ impl App {
             Event::Live(live) => self.on_live(*live, now),
         };
         // A link's message, selected as its page came, is marked from now.
-        self.work.arm_flash(now);
+        self.landed(now);
         // The tabs of the last run open once every pane's conversation is known.
         let changed = changed | self.try_restore(now);
         // A pane the answer closed may have ended a zoom.

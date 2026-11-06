@@ -246,7 +246,7 @@ impl Pane {
         }
         let Some(first) = tl.items.first() else { return Some(None) };
         let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
-        (self.to_root || (self.older && near_top)).then_some(Some(first.ts))
+        (self.to_root || self.seeking(tl) || (self.older && near_top)).then_some(Some(first.ts))
     }
 
     /// The selected message's index in `tl` (this pane's timeline).
@@ -308,16 +308,31 @@ impl Pane {
         Some((s.min(v), s.max(v)))
     }
 
-    /// The message a link opened (`at`, or the nearest loaded) selected in `tl` (this pane's
-    /// timeline) and marked, once `tl` has its messages; then nothing more is waited for.
-    pub fn land(&mut self, tl: &Timeline) {
-        let Some(at) = self.jump.filter(|at| (tl.pending.is_none() || tl.holds(*at)) && !tl.cached) else { return };
-        let Some(i) = tl.index_near(at) else { return };
+    /// The message a link opened selected in `tl` (this pane's timeline) and marked, once `tl`
+    /// has its messages; then nothing more is waited for. A thread whose older replies are not
+    /// all loaded keeps reading them back ([`Pane::wants`]) until the reply is among them. A
+    /// message that is not there (deleted) is not marked: the nearest one is selected. `Some`
+    /// once landed: whether the message was there.
+    pub fn land(&mut self, tl: &Timeline) -> Option<bool> {
+        let at = self.jump.filter(|at| (tl.pending.is_none() || tl.holds(*at)) && !tl.cached)?;
+        if self.seeking(tl) {
+            return None;
+        }
+        let i = tl.index_near(at)?;
         self.jump = None;
         (self.visual, self.older, self.to_root) = (None, false, false);
         self.held.set(None);
         self.selected = Some(tl.items[i].ts);
-        self.flash = self.selected.map(|ts| (ts, None));
+        let found = tl.position(at).is_some();
+        self.flash = found.then_some((at, None));
+        Some(found)
+    }
+
+    /// A thread pane waits for a link's reply older than the oldest loaded, and older ones are
+    /// left to read back.
+    fn seeking(&self, tl: &Timeline) -> bool {
+        let first = tl.items.first().map(|m| m.ts);
+        self.is_thread() && !tl.complete && self.jump.is_some_and(|at| first.is_some_and(|f| at < f))
     }
 
     /// The user's own message was added after the newest: back to the newest, so it is in

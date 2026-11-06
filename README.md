@@ -209,8 +209,9 @@ images, and settings. This README only lists what works; it will grow with each 
   it is focused, and the message is selected and marked for a moment; a message not loaded is
   read with the ones before it (and the newer ones when they are few; else the pane says they
   are not loaded and `G` reads the newest). A reply's link opens its thread beside the
-  conversation. A link to a workspace you have not signed in to, or a conversation slakio
-  cannot see, asks whether to open it in the browser instead.
+  conversation. A link opens only in the workspace it names (an Enterprise Grid link in the
+  one of yours that has the conversation). A link to a workspace you have not signed in to, or
+  a conversation slakio cannot see there, asks whether to open it in the browser instead.
 - Failures are written to `errors.log` in the state directory (`$SLAKIO_STATE_DIR`, else
   `$XDG_STATE_HOME/slakio`, or the platform's equivalent), readable by you only. It never holds
   a token, a cookie, a request's address past its host or message text, and it is kept small:

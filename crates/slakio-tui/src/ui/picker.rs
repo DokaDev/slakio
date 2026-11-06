@@ -60,7 +60,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, body: Rect) {
         let host = host_tail(&k.host, HOST_MAX.min(w.saturating_sub(lead_w + 2 + width(mark))));
         let room = w.saturating_sub(lead_w + 1 + width(mark) + width(&host) + 2);
         let named = slack.map(|l| {
-            let what = if l.message.is_some() { Label::OpenSlackMessage } else { Label::OpenSlackConversation };
+            let what = match (l.message, l.thread) {
+                (Some(_), Some(_)) => Label::OpenSlackReply,
+                (Some(_), None) => Label::OpenSlackMessage,
+                (None, _) => Label::OpenSlackConversation,
+            };
             label(what)
         });
         let said = k.label.clone().or(named).map(|l| clip(&l, room)).unwrap_or_default();
