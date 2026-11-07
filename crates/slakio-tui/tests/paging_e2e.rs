@@ -91,7 +91,10 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     run.wait_for("the list", |t| t.contains("big-history"));
     click(&mut run, "big-history");
     wait_until("the channel opened", || m.calls("conversations.view") >= 1);
-    run.wait_for("its messages", |t| t.contains("#big-history") && t.contains("Message #big-history"));
+    // Its first page in (the composer shows before it): the keys below act on its messages.
+    run.wait_for("its messages", |t| {
+        t.contains("#big-history") && t.contains("Message #big-history") && !t.contains("Loading messages…")
+    });
     run.type_bytes(b"k");
     // Forty `gg` as fast as they can be typed.
     let t0 = Instant::now();
