@@ -93,34 +93,35 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     wait_until("the channel opened", || m.calls("conversations.view") >= 1);
     run.wait_for("its messages", |t| t.contains("#big-history") && t.contains("Message #big-history"));
     run.type_bytes(b"k");
-    // Forty `gg` within a second.
+    // Forty `gg` as fast as they can be typed.
     let t0 = Instant::now();
     for _ in 0..40 {
         run.type_bytes(b"gg");
-        std::thread::sleep(Duration::from_millis(25));
     }
-    std::thread::sleep(Duration::from_millis(500));
-    let paced = 1 + (t0.elapsed().as_millis() / 1500) as usize + 1;
+    wait_until("the first older page", || m.calls("conversations.history") >= 1);
+    // However slow the machine, at most one page a turn went out: counted before the time is
+    // read, so a page sent in between only makes the bound looser.
     let asked = m.calls("conversations.history");
+    let paced = 1 + (t0.elapsed().as_millis() / 1500) as usize + 1;
     assert!((1..=paced).contains(&asked), "{asked} older pages for 40 gestures in {:?}", t0.elapsed());
-    // Slack refuses the next one with 429 and two seconds to wait (once the page a gesture of
-    // the burst queued has gone out, and its turn passed).
-    std::thread::sleep(Duration::from_millis(3200));
+    settle(&mut run);
+    // Slack refuses the next one with 429 and three seconds to wait: nothing else is on its way
+    // now, so the `gg` below asks for it.
     let before = m.calls("conversations.history");
-    m.fake.fail_next("conversations.history", Fault::Status { status: 429, retry_after: Some("2".into()) });
+    m.fake.fail_next("conversations.history", Fault::Status { status: 429, retry_after: Some("3".into()) });
     run.type_bytes(b"gg");
     wait_until("the refused page", || m.calls("conversations.history") > before);
     run.wait_for("the failed row", |t| t.contains("Older messages not loaded"));
     wait_until("asked again by itself", || m.calls("conversations.history") > before + 1);
     run.wait_for("the row gone", |t| !t.contains("Older messages not loaded"));
-    // And paging goes on: no stall.
-    std::thread::sleep(Duration::from_millis(1600));
+    run.wait_for("the page landed", |t| !t.contains("Loading older messages…"));
+    // And paging goes on: no stall (a gesture in its pause waits for its turn).
     let n = m.calls("conversations.history");
     run.type_bytes(b"gg");
     wait_until("one more page", || m.calls("conversations.history") > n);
+    run.wait_for("that page landed", |t| !t.contains("Loading older messages…"));
     // On a slow network the page on its way shows a row above the oldest message.
     m.fake.set_delay(Duration::from_secs(3));
-    std::thread::sleep(Duration::from_millis(1600));
     run.type_bytes(b"gg");
     run.wait_for("the loading row", |t| t.contains("Loading older messages…"));
     run.wait_for("the page landed", |t| !t.contains("Loading older messages…"));
@@ -128,6 +129,16 @@ fn gg_in_the_10k_channel_is_paced_and_recovers_after_a_429() {
     let total = m.fake.log().len();
     assert!(total < 60, "far under the per-minute cap: {total} requests");
     run.quit();
+}
+
+/// Wait until the binary read every key typed so far (the palette, opened after them, shows
+/// and closes) and no older page is on its way or waits for its turn.
+fn settle(run: &mut Run) {
+    run.type_bytes(b":");
+    run.wait_for("the palette, after every key typed", |t| t.contains("type a command or an action name"));
+    run.type_bytes(b"\x1b");
+    run.wait_for("the palette closed", |t| !t.contains("type a command or an action name"));
+    run.wait_for("no older page on its way", |t| !t.contains("Loading older messages…"));
 }
 
 #[test]
