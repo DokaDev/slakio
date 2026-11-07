@@ -288,6 +288,8 @@ impl App {
         self.sign_in = Offer::default();
         for s in signed {
             let other = self.model.me(&s.id).is_some_and(|me| me.as_str() != s.user);
+            // Activity is read again from the new sign-in once it shows.
+            self.forget_activity(&s.id);
             if other {
                 self.work.forget_workspace(&s.id);
                 self.model.forget_workspace(&s.id);

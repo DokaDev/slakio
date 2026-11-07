@@ -1,8 +1,9 @@
 //! The list panel: under its workspace chip and views ([`super::navbar`]), the view picked
 //! there. Home lists the workspace's sidebar sections
 //! (folded with `Enter`) and their conversations, a blank row between two sections; DMs lists
-//! the DMs, To-dos its to-dos and Home ends with the saved messages ([`super::todos`]). Views
-//! built in a later version say so and how to get back.
+//! the DMs, To-dos its to-dos and Home ends with the saved messages ([`super::todos`]),
+//! Activity the user's notices ([`super::activity`]). Views built in a later version say so and
+//! how to get back.
 //!
 //! ```text
 //! ╭ ▌A company ▾ ─────────────╮
@@ -86,6 +87,15 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         f.render_widget(p, pad(inner));
         return;
     }
+    if app.shell.view == View::Activity && rows.is_empty() {
+        let text = match app.activity_unloaded() {
+            Some(None) => faint(Label::ListLoading),
+            Some(Some(kind)) => super::failed_text(app, Label::ActivityFailed, kind.retryable()),
+            None => faint(Label::ActivityEmpty),
+        };
+        f.render_widget(Paragraph::new(text).wrap(ratatui::widgets::Wrap { trim: true }), pad(inner));
+        return;
+    }
     if app.shell.view.is_placeholder() || rows.is_empty() {
         super::empty::list(f, app, inner);
         return;
@@ -96,7 +106,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         let area = Rect { y, height: 1, ..inner };
         let mark = draw_row(f, app, row, area);
         // A to-do's second line is under the cursor with its first.
-        let on_item = matches!(row, Row::ItemMeta(_)) && k == app.shell.list_cursor + 1;
+        let on_item = matches!(row, Row::ItemMeta(_) | Row::NoticeMeta(_)) && k == app.shell.list_cursor + 1;
         if on_item {
             highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });
         }
@@ -107,6 +117,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
                 f.buffer_mut()[(x, y)].set_fg(fg);
             }
         }
+    }
+    // Activity's end: a page on its way, or one that failed, under the last notice.
+    let drawn = rows.len().saturating_sub(app.shell.list_top);
+    if app.shell.view == View::Activity && drawn < usize::from(inner.height) {
+        super::activity::foot(f, app, Rect { y: inner.y + drawn as u16, height: 1, ..inner });
     }
 }
 
@@ -149,6 +164,14 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
         Row::Spacer => None,
         Row::Filter | Row::Group(_) | Row::Item(_) | Row::ItemMeta(_) => {
             super::todos::draw(f, app, row, area);
+            None
+        }
+        Row::Notice(i) => {
+            super::activity::notice(f, app, i, area);
+            None
+        }
+        Row::NoticeMeta(i) => {
+            super::activity::meta(f, app, i, area);
             None
         }
         Row::Section(i) => {

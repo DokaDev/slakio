@@ -16,7 +16,10 @@ header set, the reconnect pause and silence limit) and `internal/slack/events.go
 (which events and message subtypes are read, and their fields). Also ported
 into `crates/slakio-slack/src/search.rs`: `internal/slack/client.go`
 (`SearchMessages`: the query passed through verbatim to `search.messages`) and
-`cmd/slk/workspace_search.go` (a reply's thread read from its permalink).
+`cmd/slk/workspace_search.go` (a reply's thread read from its permalink). Also
+ported into `crates/slakio-slack/src/activity.rs`: `internal/slack/activity.go`
+(the parameters of `activity.feed`, the shapes of its items by type, and the
+texts looked up with `messages.list`, a few conversations a request).
 Note: like Slack's own clients, an open live updates socket may show the
 user as active to coworkers; `live = "off"` in the config file disables it.
 

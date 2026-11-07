@@ -5,7 +5,7 @@ use slakio_core::model::{UserId, WorkspaceId};
 
 impl Model {
     /// Forget everything workspace `ws` showed — its people, sections, conversations (their
-    /// counts with them), saved items and live updates — until its next boot answers; it stays
+    /// counts with them), saved items, Activity and live updates — until its next boot answers; it stays
     /// listed, by its name, in its place.
     pub fn forget_workspace(&mut self, ws: &WorkspaceId) {
         let s = &mut self.snapshot;
@@ -24,6 +24,7 @@ impl Model {
         self.counts_unknown.remove(ws);
         self.bot_names.retain(|(w, _), _| w != ws);
         self.live.remove(ws);
+        self.notices.forget(ws);
         self.index_users();
     }
 }

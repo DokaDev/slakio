@@ -15,6 +15,7 @@
 //! only be drawn through the sanitiser (`line()`, `block()`), never as it came. A test keeps
 //! `Remote::unsanitized` out of this module.
 
+pub mod activity;
 mod dialog;
 mod empty;
 mod guide;

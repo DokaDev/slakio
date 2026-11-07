@@ -14,8 +14,10 @@
 //! name. All of it is [`slakio_core::sanitize::Remote`] text, drawn only through the sanitiser.
 //!
 //! Saved messages and to-dos ([`saved`]) come with it, with a clock of the world's own (the
-//! snapshot's `taken`) so a reminder is overdue or upcoming the same way on every run.
+//! snapshot's `taken`) so a reminder is overdue or upcoming the same way on every run; so does
+//! the user's Activity ([`activity`]).
 
+pub mod activity;
 mod hostile;
 mod rng;
 mod saved;

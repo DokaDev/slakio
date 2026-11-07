@@ -64,7 +64,7 @@ pub const DEFAULT_PAUSE: Duration = Duration::from_secs(30);
 /// of a minute (its "Tier 2", about 20) that the user can ask for again and again.
 pub fn spacing(method: Method) -> Option<Duration> {
     match method {
-        Method::SearchMessages => Some(Duration::from_secs(1)),
+        Method::SearchMessages | Method::ActivityFeed => Some(Duration::from_secs(1)),
         _ => None,
     }
 }

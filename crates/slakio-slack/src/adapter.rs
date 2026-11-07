@@ -5,7 +5,8 @@
 //! way: that one is cancelled — before it is sent, or by dropping its answer — and answered
 //! `Failed(Busy)`. Pages of other targets never cancel each other: the panes of a layout opened
 //! again ask for theirs at once, and each gets its own. They all go through the governor, which
-//! paces them. A newer search supersedes the one on its way the same way. When the UI is gone
+//! paces them. A newer search supersedes the one on its way the same way, and so does a newer
+//! page of Activity. When the UI is gone
 //! the task ends, and what it had in flight with it.
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
@@ -146,6 +147,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut in_flight: HashMap<Target, InFlight> = HashMap::new();
     // The search on its way: a newer one (another query, another page) supersedes it.
     let mut searching: Option<InFlight> = None;
+    // The page of Activity on its way: a newer one supersedes it.
+    let mut noticing: Option<InFlight> = None;
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -204,14 +207,13 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 };
                 in_flight.insert(key, spawn_once(&mut tasks, tx, id, work));
             }
-            Command::Search { query, page } => {
-                if !supersede(searching.take(), &end.tx).await {
+            // A page of a list the user reads: a newer one of the same list supersedes it.
+            Command::Search { .. } | Command::Activity { .. } => {
+                let slot = if matches!(command, Command::Search { .. }) { &mut searching } else { &mut noticing };
+                if !supersede(slot.take(), &end.tx).await {
                     return;
                 }
-                let work = async move {
-                    crate::search::search(&client, &ctx, &query, page).await.map(|f| Event::Found(Box::new(f)))
-                };
-                searching = Some(spawn_once(&mut tasks, tx, id, work));
+                *slot = Some(spawn_once(&mut tasks, tx, id, listed(client, ctx, command)));
             }
             // A change never gets here (refused above); answered all the same.
             Command::Save { .. } => {
@@ -223,6 +225,21 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         }
         in_flight.retain(|_, f| !f.task.is_finished());
         searching = searching.filter(|f| !f.task.is_finished());
+        noticing = noticing.filter(|f| !f.task.is_finished());
+    }
+}
+
+/// A page of a list the user reads: what a search found, or Activity.
+async fn listed(client: Arc<Client>, ctx: Arc<Session>, command: Command) -> Result<Event, SlackError> {
+    match command {
+        Command::Search { query, page } => {
+            crate::search::search(&client, &ctx, &query, page).await.map(|f| Event::Found(Box::new(f)))
+        }
+        Command::Activity { cursor } => {
+            crate::activity::activity(&client, &ctx, cursor.as_deref()).await.map(|f| Event::Activity(Box::new(f)))
+        }
+        // The other commands have arms of their own in `run`: none comes here.
+        _ => Err(SlackError::NotAllowed { method: String::new() }),
     }
 }
 

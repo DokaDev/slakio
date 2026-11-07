@@ -26,6 +26,7 @@
 //! `Ctrl+R` or `Space r` ([`nav`]), is a stop of the `Tab` round, and runs on into the list. Tabs ([`tabs`]) keep their own panes; the mouse is
 //! [`mouse`]'s.
 
+pub mod activity;
 mod answers;
 pub mod cmdline;
 pub mod composer;
@@ -154,6 +155,8 @@ pub struct App {
     picker: Option<picker::Picker>,
     /// The search popup: open or not, its words and results.
     pub(crate) search: search::Search,
+    /// What was asked of each workspace's Activity.
+    pub(crate) activity: activity::Activity,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: signin::Offer,
@@ -204,6 +207,7 @@ impl App {
             jumps: jump::Jumps::default(),
             picker: None,
             search: search::Search::default(),
+            activity: activity::Activity::default(),
             backend: None,
             sign_in: signin::Offer::default(),
             boots: Vec::new(),
@@ -286,6 +290,7 @@ impl App {
     /// Handle a terminal event at `now`. `true` when the screen may have changed.
     pub fn handle_event(&mut self, ev: Event, now: Instant) -> bool {
         let changed = self.handle(ev, now);
+        self.watch_activity(now, true);
         self.forget_zoomed(now);
         self.landed(now);
         self.forget_asked(false);
@@ -528,7 +533,9 @@ impl App {
     /// goes away, or the which-key popup shows.
     pub fn deadline(&self) -> Option<Instant> {
         let guide = self.guide.at.filter(|_| !self.guide.shown && !self.keys.pending().is_empty());
-        [self.status.deadline(), guide, self.work.deadline(), self.search_deadline()].into_iter().flatten().min()
+        let soon =
+            [self.status.deadline(), guide, self.work.deadline(), self.search_deadline(), self.activity_deadline()];
+        soon.into_iter().flatten().min()
     }
 
     /// The deadline passed. `true` when the screen changed.
@@ -536,6 +543,7 @@ impl App {
         let mut changed = self.status.expire(now) | self.work.deadline().is_some_and(|at| at <= now);
         changed |= self.work.expire_flash(now);
         changed |= self.search_tick(now);
+        changed |= self.activity_tick(now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

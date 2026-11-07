@@ -74,6 +74,13 @@
 "list.failed_one" = "Could not load"
 "list.unavailable" = "Not available"
 
+# Activity: the user's notices in the list panel.
+"activity.empty" = "No mentions, replies or reactions yet"
+"activity.failed" = "Could not load Activity"
+"activity.more_failed" = "Older notices not loaded"
+"activity.no_text" = "Message not loaded"
+"activity.reacted" = "{who} reacted :{emoji}:"
+
 # The work area.
 "pane.loading" = "Loading messages…"
 "pane.no_messages" = "No messages yet · {keys} write"

@@ -79,7 +79,7 @@ impl View {
     /// Built in a later version: the list panel shows a placeholder, never invented data that
     /// could pass for the real thing.
     pub fn is_placeholder(self) -> bool {
-        matches!(self, View::Activity | View::Files)
+        matches!(self, View::Files)
     }
 }
 
@@ -216,7 +216,7 @@ impl Shell {
                 _ => {}
             },
             ShellAction::ListLeft => match list.get(self.list_cursor) {
-                Some(Row::Conversation(_) | Row::Item(_)) => {
+                Some(Row::Conversation(_) | Row::Item(_) | Row::Notice(_)) => {
                     match list[..self.list_cursor].iter().rposition(|r| r.is_header()) {
                         Some(header) => self.list_cursor = header,
                         None => *here = Region::ViewSwitcher,
@@ -265,7 +265,7 @@ impl Shell {
         }
         self.scroll(list_height);
         // An item's second line shows with it.
-        if matches!(list.get(self.list_cursor + 1), Some(Row::ItemMeta(_)))
+        if matches!(list.get(self.list_cursor + 1), Some(Row::ItemMeta(_) | Row::NoticeMeta(_)))
             && self.list_cursor + 1 >= self.list_top + list_height.max(1)
         {
             self.list_top += 1;
@@ -425,7 +425,8 @@ impl Shell {
     /// not on a section header).
     pub fn home_cursor(&mut self, model: &Model) {
         let rows = self.rows(model);
-        self.list_cursor = rows.iter().position(|r| matches!(r, Row::Conversation(_) | Row::Item(_))).unwrap_or(0);
+        let first = |r: &Row| matches!(r, Row::Conversation(_) | Row::Item(_) | Row::Notice(_));
+        self.list_cursor = rows.iter().position(first).unwrap_or(0);
         self.list_top = 0;
     }
 

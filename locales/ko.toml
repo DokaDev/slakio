@@ -60,6 +60,11 @@
 "list.failed" = "워크스페이스를 불러오지 못했습니다"
 "list.failed_one" = "불러오지 못했습니다"
 "list.unavailable" = "쓸 수 없음"
+"activity.empty" = "아직 멘션, 답글, 반응이 없습니다"
+"activity.failed" = "활동을 불러오지 못했습니다"
+"activity.more_failed" = "이전 알림을 불러오지 못함"
+"activity.no_text" = "메시지를 불러오지 못함"
+"activity.reacted" = "{who} · 반응 :{emoji}:"
 
 "pane.loading" = "메시지를 불러오는 중…"
 "pane.no_messages" = "아직 메시지가 없습니다 · {keys} 쓰기"

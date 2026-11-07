@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/activity_flows.rs
+expression: mask_hangul(&screen)
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│ Home                   @24 ││                                                                                        │
+│ DMs                    ●11 ││                                                                                        │
+│▎Activity               @36 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ To-dos                   6 ││                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
+│▌* #general           01:28 ││                                                                                        │
+│▌  Alex Morgan: Fine branc… ││                                                                                        │
+│▌! #general     01-12 11:43 ││                                                                                        │
+│▌  Sam Rivera: Still cache… ││                                                                                        │
+│▌⤷ #ideas       01-11 16:45 ││                                                                                        │
+│▌  ＊＊＊: see https://doc… ││                                                                                        │
+│▌@ #deploys     01-11 06:10 ││                                                                                        │
+│▌  Alex Morgan: Review loo… ││                                                                                        │
+│▌» @Minsu Kim   01-09 07:27 ││                         No conversation open                                           │
+│▌  Me: Metrics staging das… ││                         Pick one in the list and press Enter.                          │
+│▌@ #side-proje… 01-07 16:15 ││                                                                                        │
+│▌  ＊＊＊: Broken queue ca… ││                         Enter    Open                                                  │
+│▌+ #alerts      01-07 14:43 ││                         Space h  Home                                                  │
+│▌  Minsu Kim reacted :eyes: ││                         Space d  DMs                                                   │
+│▌@ #incidents   01-07 03:33 ││                         Ctrl+O   Back to the last one                                  │
+│▌  Mia Jang: Budget invoic… ││                         ?        Keyboard help                                         │
+│▌⤷ #long-threa… 01-06 08:36 ││                         Ctrl+Q   Quit                                                  │
+│▌  Tom Ko: Metrics tracing… ││                                                                                        │
+│▌! #backend     01-06 07:05 ││                                                                                        │
+│▌  Kate Nam: Ticket review… ││                                                                                        │
+│▌& #frontend    01-06 03:44 ││                                                                                        │
+│▌  Tom Ko: Someone migrati… ││                                                                                        │
+│▌@ #hostile-st… 01-05 22:46 ││                                                                                        │
+│▌  Zoe Lim: ＊＊👩‍💻👍🏽🇰🇷      ││                                                                                        │
+│▌@ #big-history 01-05 21:46 ││                                                                                        │
+│▌  Max Baek: ＊＊ ＊＊＊＊… ││                                                                                        │
+│▌@ #big-history 01-05 20:46 ││                                                                                        │
+│▌  Hyunwoo Jung: Looks ple… ││                                                                                        │
+│▌@ #big-history 01-05 19:46 ││                                                                                        │
+│▌  Owen Hwang: Deploy cust… ││                                                                                        │
+│▌@ #big-history 01-05 18:46 ││                                                                                        │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › Activity   │ Enter open · t new tab · Tab next pane · [/] views · ? help · Space more │ read only

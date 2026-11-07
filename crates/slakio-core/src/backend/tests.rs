@@ -15,6 +15,8 @@ fn every_command() -> Vec<Command> {
         Command::Around { target: target.clone(), at: crate::model::Ts(1), limit: 28 },
         Command::Dated { target, at: crate::model::Ts(1), limit: 28 },
         Command::Search { query: "in:#general deploy".into(), page: 1 },
+        Command::Activity { cursor: None },
+        Command::Activity { cursor: Some("bmV4dA==".into()) },
         Command::Save { item: SavedId::new("S1"), change: SavedChange::Complete },
     ]
 }

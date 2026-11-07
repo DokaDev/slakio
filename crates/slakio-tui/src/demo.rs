@@ -2,7 +2,10 @@
 //! `slakio-world`, at once and without any network. It is the only backend for now; the
 //! binary's wiring is the one place that names it.
 
-use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Found, Hit, Page, Request, SEARCH_PAGE};
+use slakio_core::backend::{
+    ACTIVITY_PAGE, Backend, Capabilities, Command, Envelope, Event, Feed, Found, Hit, Notice, NoticeKind, Page,
+    Request, SEARCH_PAGE,
+};
 use slakio_core::model::{Target, Ts, WorkspaceId};
 use slakio_world::World;
 use std::collections::VecDeque;
@@ -37,6 +40,10 @@ impl Backend for DemoBackend {
             Command::Search { query, page } => {
                 let ws = request.workspace.clone().unwrap_or_else(|| self.world.snapshot().workspaces[0].id.clone());
                 self.search(ws, query, page)
+            }
+            Command::Activity { cursor } => {
+                let ws = request.workspace.clone().unwrap_or_else(|| self.world.snapshot().workspaces[0].id.clone());
+                self.activity(ws, cursor)
             }
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
@@ -101,6 +108,37 @@ impl DemoBackend {
             .collect();
         let total = all.len() as u32;
         Event::Found(Box::new(Found { workspace: ws, query, page, pages, total, hits, users: Vec::new() }))
+    }
+
+    /// The page of `ws`'s Activity after `cursor` (`c<offset>`; the newest without one).
+    fn activity(&self, ws: WorkspaceId, cursor: Option<String>) -> Event {
+        let all = self.world.activity(&ws);
+        let from = cursor.as_deref().and_then(|c| c.strip_prefix('c')?.parse::<usize>().ok()).unwrap_or(0);
+        let per = ACTIVITY_PAGE as usize;
+        let notices = (all.iter().skip(from).take(per))
+            .map(|n| Notice {
+                key: n.key.clone(),
+                kind: match n.kind {
+                    "at_channel" => NoticeKind::Everyone,
+                    "at_user_group" => NoticeKind::Group,
+                    "keyword" => NoticeKind::Keyword,
+                    "thread_v2" => NoticeKind::Thread,
+                    "message_reaction" => NoticeKind::Reaction,
+                    "dm" => NoticeKind::Dm,
+                    _ => NoticeKind::Mention,
+                },
+                at: n.at,
+                conversation: n.conversation.clone(),
+                ts: n.message.ts,
+                thread: n.thread,
+                user: n.reactor.as_ref().map_or_else(|| n.message.user.clone(), |(u, _)| u.clone()),
+                text: Some(n.message.text.clone()),
+                reaction: n.reactor.as_ref().map(|(_, r)| (*r).into()),
+                unread: n.unread,
+            })
+            .collect();
+        let next = (from + per < all.len()).then(|| format!("c{}", from + per));
+        Event::Activity(Box::new(Feed { workspace: ws, after: cursor, notices, next, users: Vec::new() }))
     }
 
     /// Up to `limit` messages of `target` up to the one at `at`, and the newest `limit` after it

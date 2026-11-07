@@ -164,11 +164,16 @@ fn draw_hits(f: &mut Frame, app: &App, ws: Option<&WorkspaceId>, first: usize, s
     }
 }
 
-/// When `hit` was written, as short as is clear: the time today, the month and day with it
-/// this year, the date alone before that (all in the zone shown).
+/// When `hit` was written ([`short_time`]).
 fn stamp(app: &App, hit: &Hit) -> String {
+    short_time(app, hit.ts)
+}
+
+/// Time `ts` as short as is clear: the time today, the month and day with it this year, the
+/// date alone before that (all in the zone shown).
+pub(super) fn short_time(app: &App, ts: slakio_core::model::Ts) -> String {
     let z = &app.zone;
-    let (date, hm) = (crate::time::date(hit.ts, z), crate::time::hm(hit.ts, z));
+    let (date, hm) = (crate::time::date(ts, z), crate::time::hm(ts, z));
     let today = crate::time::date(app.now_ts(), z);
     match (date.split_once('-'), today.split_once('-')) {
         _ if date == today => hm,

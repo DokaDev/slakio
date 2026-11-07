@@ -11,7 +11,8 @@
 //!   HTTP to a server on this machine (the tests' fake Slack);
 //! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
 //!   the names of the people messages and DMs name, looked up in batches and kept;
-//! * [`search`] — a workspace's messages a query finds, a page at a time;
+//! * [`search`] — a workspace's messages a query finds, a page at a time; [`activity`] — the
+//!   user's Activity, a page at a time;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
 //!   behind the UI's handle; [`live`] — the workspace's live updates (a socket that only
 //!   receives).
@@ -33,6 +34,7 @@
 //! The crate depends on `slakio-core` only. The terminal UI never names it but in the binary's
 //! wiring; the authentication crate never depends on it (the binary hands it the credentials).
 
+pub mod activity;
 pub mod adapter;
 pub mod blocks;
 pub(crate) mod boot;

@@ -106,7 +106,7 @@ impl App {
     /// the values of the part clicked.
     fn click_list(&mut self, row: usize, x: u16, now: Instant) {
         let rows = self.shell.rows(&self.model);
-        let row = if matches!(rows.get(row), Some(Row::ItemMeta(_))) { row - 1 } else { row };
+        let row = if matches!(rows.get(row), Some(Row::ItemMeta(_) | Row::NoticeMeta(_))) { row - 1 } else { row };
         if !rows.get(row).is_some_and(|r| r.is_selectable()) {
             return;
         }
@@ -116,6 +116,7 @@ impl App {
             Row::Filter if x >= self.filter_row().sort_x => self.todo(ShellAction::TodoSort, now),
             Row::Filter => self.todo(ShellAction::TodoFilter, now),
             Row::Item(_) => self.open_item(true),
+            Row::Notice(_) => self.open_notice(true, now),
             _ => {
                 if let Some(t) = self.shell.open_row(&self.model) {
                     self.open(t, true);

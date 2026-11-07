@@ -91,13 +91,12 @@ fn the_switcher_changes_workspace_and_the_keys_the_view() {
 #[test]
 fn views_of_a_later_version_say_so_and_show_no_invented_rows() {
     let mut d = Demo::new(120, 40);
-    for (keys, view) in [("space a", View::Activity), ("space f", View::Files)] {
-        d.keys(keys);
-        assert_eq!(d.app.view(), view);
-        let s = d.screen();
-        assert!(s.contains("comes in a") && s.contains("Space h  Home"), "{s}");
-        assert!(!s.contains("# "), "{s}");
-    }
+    // Activity lists the user's notices now (activity_flows); Files is still to come.
+    d.keys("space f");
+    assert_eq!(d.app.view(), View::Files);
+    let s = d.screen();
+    assert!(s.contains("comes in a") && s.contains("Space h  Home"), "{s}");
+    assert!(!s.contains("# "), "{s}");
     d.command("home");
     assert_eq!(d.app.view(), View::Home);
 }

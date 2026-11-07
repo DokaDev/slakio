@@ -142,6 +142,9 @@ impl App {
     /// answered: its backend may hang or be gone), else the active pane's messages. Only when
     /// asked: nothing retries on its own.
     pub(super) fn retry(&mut self, now: Instant) {
+        if self.shell.view == super::shell::View::Activity && self.retry_activity() {
+            return;
+        }
         let here = self.boot_here().map(|b| (b.workspace.clone(), b.failed.clone()));
         let loading = matches!(&here, Some((Some(ws), None)) if !self.model.is_fresh(ws));
         match here {
@@ -211,12 +214,15 @@ impl App {
                 self.work.on_page(id, &page, &self.model)
             }
             Event::Found(found) => self.on_found(id, *found),
+            Event::Activity(feed) => self.on_activity(id, *feed, now),
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
         };
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);
+        // A workspace booted while Activity shows is read.
+        self.watch_activity(now, false);
         // The tabs of the last run open once every pane's conversation is known.
         let changed = changed | self.try_restore(now);
         // A pane the answer closed may have ended a zoom.
@@ -228,13 +234,17 @@ impl App {
     /// has not come). The list's cursor stays on the row it was on.
     fn on_boot(&mut self, b: usize, snapshot: &Snapshot, cached: bool, now: Instant) -> bool {
         let (anchor, net) = (self.shell.anchor(&self.model), self.model.net);
+        let notices = std::mem::take(&mut self.model.notices);
         match self.boots[b].workspace.clone() {
             None if !cached => self.model = Model::new(snapshot.clone()),
             None if !self.model.is_loaded() || self.model.is_cached() => self.model = Model::cached(snapshot.clone()),
             Some(ws) if !cached || !self.model.is_fresh(&ws) => self.model.merge(&ws, snapshot, cached),
-            _ => return false,
+            _ => {
+                self.model.notices = notices;
+                return false;
+            }
         }
-        self.model.net = net;
+        (self.model.net, self.model.notices) = (net, notices);
         if !cached {
             self.boots[b].failed = None;
             if let Some(ws) = self.boots[b].workspace.clone().filter(|_| std::mem::take(&mut self.boots[b].again)) {
@@ -280,9 +290,9 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
         self.jump_answered(id, Some(&kind));
-        // A search's failure is said in its popup (and kept in the error log); refused for the
-        // sign-in, its workspace is signed out as for any other request.
-        if let Some(ws) = self.search_failed(id, &kind, now) {
+        // A search's failure is said in its popup, Activity's at its end (and kept in the error
+        // log); refused for the sign-in, its workspace is signed out as for any other request.
+        if let Some(ws) = self.search_failed(id, &kind, now).or_else(|| self.activity_failed(id, &kind)) {
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
             self.effects.push(Effect::Record { context: "backend", fault });
             if kind == FailKind::Auth && self.model.is_fresh(&ws) {

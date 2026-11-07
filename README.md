@@ -88,7 +88,7 @@ images, and settings. This README only lists what works; it will grow with each 
   - the left column navigates, the right one is the work: the list panel's title is the
     workspace (its color band, its name, `▾`, then each other workspace that wants you by its
     letter and mark, `· B @9`), its first rows the view switcher as in GUI Slack's sidebar — a
-    row each for Home, DMs, Activity, Files and To-dos (Activity and Files say they come in a
+    row each for Home, DMs, Activity, Files and To-dos (Files says it comes in a
     later version; To-dos counts its to-dos in progress, in the warning color when one is
     overdue), an icon (icons on) and the name, the count at the right, the view shown marked
     with an accent `▎` (bars are for cursors only) — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
@@ -221,6 +221,18 @@ images, and settings. This README only lists what works; it will grow with each 
   closes it; the words and results stay for next time (typing replaces the words). Searching
   reads only; it is Slack's `search.messages`, one request per page you ask for, at most one a
   second.
+- Activity (`Space a`): your mentions (by name, `@here` / `@channel` / `@everyone`, a group of
+  yours, a word you follow), new replies in threads you follow, reactions to your messages and
+  DMs, of every workspace you are signed in to, newest first (each workspace's color stripe at
+  the left when there are several). Each notice shows its mark (`@` you, `!` everyone, `&` a
+  group, `*` a word, `⤷` a thread, `+` a reaction, `»` a DM), where and when, then who and the
+  message's text; unread ones are bold, as Slack counts them. `Enter` opens the message as a
+  Slack link opens (a reply's thread beside its conversation), `l` opens it staying in the
+  list; older notices load as you near the end. It is read when it shows (Slack's
+  `activity.feed`, and `messages.list` for the texts: a few requests a page), not again within
+  30 seconds; a mention that comes live is listed at once and Activity read again shortly after
+  (also after the live updates come back). Nothing is marked read; `r` asks again for a page
+  that could not be loaded.
 - `:jump <day>` (or `Space j`) reads the conversation you are in from a day: `today`,
   `yesterday`, `2026-11-01`, `11-01` (month-day), `-3d`, `-2w` or a weekday (`monday`); with
   `language = "ko"` also the Korean words for today, yesterday, the day before and the

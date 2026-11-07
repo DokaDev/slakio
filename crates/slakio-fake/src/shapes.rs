@@ -17,6 +17,8 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
         "dnd.teamInfo" => dnd_team(world, request),
         "users/info" => edge_users(world, request),
         "search.messages" => search(world, team, request),
+        "activity.feed" => activity(world, team, request),
+        "messages.list" => messages_list(world, team, request),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
     if let Some(o) = out.as_object_mut() {
@@ -328,4 +330,67 @@ fn search(world: &World, team: usize, request: &Logged) -> Value {
         .collect();
     let paging = json!({"count": count, "total": all.len(), "page": page, "pages": pages});
     json!({"ok": true, "query": query, "messages": {"total": all.len(), "paging": paging, "pagination": {"page": page, "page_count": pages}, "matches": matches}})
+}
+
+/// `activity.feed`: `limit` (20 unless asked) of the world's notices of the workspace served,
+/// newest first, from the cursor (`c<offset>`) on, each in the shape of its kind; the next
+/// cursor while more are left, an empty one at the end (as Slack ends a list).
+fn activity(world: &World, team: usize, request: &Logged) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
+    let all = world.activity(&ws.id);
+    let limit = field(request, "limit").and_then(|v| v.parse::<usize>().ok()).unwrap_or(20).clamp(1, 100);
+    let from = field(request, "cursor").and_then(|c| c.strip_prefix('c')?.parse::<usize>().ok()).unwrap_or(0);
+    let me = ws.me.as_str();
+    let items: Vec<Value> = (all.iter().skip(from).take(limit))
+        .map(|n| {
+            let (ts, channel) = (n.message.ts.to_string(), n.conversation.as_str());
+            let mut message = json!({"ts": ts, "channel": channel, "author_user_id": n.message.user.as_str()});
+            if let Some(t) = n.thread {
+                message["thread_ts"] = json!(t.to_string());
+            }
+            let mut item = json!({"type": n.kind});
+            match n.kind {
+                "thread_v2" => {
+                    let entry =
+                        json!({"channel_id": channel, "thread_ts": n.thread.map(|t| t.to_string()), "latest_ts": ts});
+                    item["bundle_info"] = json!({"unread_count": 2, "payload": {"thread_entry": entry}});
+                }
+                "dm" => item["bundle_info"] = json!({"payload": {"dm_entry": {"latest_message": message}}}),
+                "message_reaction" => {
+                    message["author_user_id"] = json!(me);
+                    item["message"] = message;
+                    let (who, name) = n.reactor.as_ref().map_or(("", ""), |(u, r)| (u.as_str(), *r));
+                    item["reaction"] = json!({"user": who, "name": name});
+                }
+                _ => item["message"] = message,
+            }
+            json!({"key": n.key, "feed_ts": n.at.to_string(), "is_unread": n.unread, "item": item})
+        })
+        .collect();
+    let next = if from + limit < all.len() { format!("c{}", from + limit) } else { String::new() };
+    json!({"ok": true, "items": items, "response_metadata": {"next_cursor": next}})
+}
+
+/// `messages.list`: the messages `message_ids` names (`[{"channel", "timestamps"}]`) that the
+/// world has, by conversation; one it does not have is left out.
+fn messages_list(world: &World, team: usize, request: &Logged) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
+    let ids: Value = field(request, "message_ids").and_then(|v| serde_json::from_str(&v).ok()).unwrap_or_default();
+    let notices = world.activity(&ws.id);
+    let mut data = serde_json::Map::new();
+    for group in ids.as_array().into_iter().flatten() {
+        let Some(channel) = group["channel"].as_str() else { continue };
+        let id = ConversationId::new(channel);
+        let found: Vec<Value> = (group["timestamps"].as_array().into_iter().flatten())
+            .filter_map(|t| ts_of(t.as_str()?))
+            .filter_map(|ts| {
+                let noticed = notices.iter().find(|n| n.conversation == id && n.message.ts == ts);
+                noticed.map(|n| n.message.clone()).or_else(|| world.message(&id, world.index_of(&id, ts)?))
+            })
+            .enumerate()
+            .map(|(n, m)| message(&m, n))
+            .collect();
+        data.insert(channel.to_string(), json!({"messages": found}));
+    }
+    json!({"ok": true, "messages_data": data})
 }

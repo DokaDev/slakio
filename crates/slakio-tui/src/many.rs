@@ -33,7 +33,9 @@ pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
         | Command::Catchup { target, .. }
         | Command::Around { target, .. }
         | Command::Dated { target, .. } => Some(target.workspace()),
-        Command::Boot | Command::Save { .. } | Command::Search { .. } => request.workspace.as_ref(),
+        Command::Boot | Command::Save { .. } | Command::Search { .. } | Command::Activity { .. } => {
+            request.workspace.as_ref()
+        }
     }
 }
 
@@ -71,7 +73,15 @@ struct Asked {
 /// The answer that ends request `generation`'s wait (not one of the cache's, given first, nor
 /// a live update).
 fn ends(event: &Event) -> bool {
-    matches!(event, Event::Booted(_) | Event::History(_) | Event::Found(_) | Event::Saved { .. } | Event::Failed { .. })
+    matches!(
+        event,
+        Event::Booted(_)
+            | Event::History(_)
+            | Event::Found(_)
+            | Event::Activity(_)
+            | Event::Saved { .. }
+            | Event::Failed { .. }
+    )
 }
 
 impl Replace {

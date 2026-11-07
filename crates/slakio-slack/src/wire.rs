@@ -327,6 +327,89 @@ pub struct SearchChannel {
     pub name: Option<String>,
 }
 
+/// `activity.feed`: one page of the user's notices, each naming what it is about by id.
+#[derive(Debug, Default, Deserialize)]
+pub struct Activity {
+    #[serde(default, deserialize_with = "lenient")]
+    pub items: Option<Vec<ActivityItem>>,
+    #[serde(default, deserialize_with = "loose")]
+    pub response_metadata: Option<Metadata>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ActivityItem {
+    pub key: String,
+    pub is_unread: Option<bool>,
+    pub feed_ts: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub item: Option<ActivityInner>,
+}
+
+/// What a notice is about; its shape depends on its `type`.
+#[derive(Debug, Default, Deserialize)]
+pub struct ActivityInner {
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub message: Option<ActivityMessage>,
+    #[serde(default, deserialize_with = "loose")]
+    pub reaction: Option<ActivityReaction>,
+    #[serde(default, deserialize_with = "loose")]
+    pub bundle_info: Option<ActivityBundle>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ActivityMessage {
+    pub ts: Option<String>,
+    pub channel: Option<String>,
+    pub author_user_id: Option<String>,
+    pub thread_ts: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ActivityReaction {
+    pub user: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ActivityBundle {
+    #[serde(default, deserialize_with = "loose")]
+    pub payload: Option<ActivityPayload>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ActivityPayload {
+    #[serde(default, deserialize_with = "loose")]
+    pub thread_entry: Option<ThreadEntry>,
+    #[serde(default, deserialize_with = "loose")]
+    pub dm_entry: Option<LatestEntry>,
+    #[serde(default, deserialize_with = "loose")]
+    pub message: Option<ActivityMessage>,
+}
+
+/// A thread with new replies: its conversation, its own message, its newest reply.
+#[derive(Debug, Default, Deserialize)]
+pub struct ThreadEntry {
+    pub channel_id: Option<String>,
+    pub thread_ts: Option<String>,
+    pub latest_ts: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct LatestEntry {
+    #[serde(default, deserialize_with = "loose")]
+    pub latest_message: Option<ActivityMessage>,
+}
+
+/// `messages.list`: the messages asked for by id, by conversation (each read on its own, so
+/// one that cannot be read leaves the others).
+#[derive(Debug, Default, Deserialize)]
+pub struct MessagesList {
+    #[serde(default, deserialize_with = "loose")]
+    pub messages_data: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
 /// A Slack timestamp (`1767603600.000100`) as microseconds; `None` when it is not one.
 pub fn ts(s: &str) -> Option<u64> {
     let (secs, micros) = s.split_once('.').unwrap_or((s, "0"));

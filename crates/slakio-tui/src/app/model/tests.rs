@@ -1,5 +1,5 @@
 use super::*;
-use slakio_core::model::Org;
+use slakio_core::model::{Org, SavedItem, SavedState};
 use slakio_world::World;
 
 fn model() -> Model {

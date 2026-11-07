@@ -12,6 +12,9 @@ use crate::model::{
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+mod activity;
+pub use activity::{ACTIVITY_PAGE, CURSOR_MAX, Feed, Notice, NoticeKind};
+
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
 /// drops events of an older one.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,6 +79,9 @@ pub enum Command {
     /// Slack's search words (`in:#channel`, `from:@name`, quotes), passed on as typed. Answered
     /// with [`Event::Found`].
     Search { query: String, page: u32 },
+    /// A page of the request's workspace's Activity: the newest when `cursor` is `None`, else
+    /// the one after the page whose [`Feed::next`] it is. Answered with [`Event::Activity`].
+    Activity { cursor: Option<String> },
 }
 
 impl Command {
@@ -88,7 +94,8 @@ impl Command {
             | Command::Catchup { .. }
             | Command::Around { .. }
             | Command::Dated { .. }
-            | Command::Search { .. } => false,
+            | Command::Search { .. }
+            | Command::Activity { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -226,6 +233,8 @@ pub enum Event {
     },
     /// A page of what a [`Command::Search`] found.
     Found(Box<Found>),
+    /// A page of Activity a [`Command::Activity`] asked for.
+    Activity(Box<Feed>),
     /// Request `request` failed: nothing changed. `detail` is raw text for the error log only.
     Failed {
         request: Generation,

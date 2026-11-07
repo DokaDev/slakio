@@ -82,7 +82,7 @@ fn hit(m: wire::SearchMatch) -> Option<Hit> {
 }
 
 /// An id of Slack's shape: one of `first`, then 2 to 31 upper-case letters or digits.
-fn shaped(id: &str, first: &[u8]) -> bool {
+pub(crate) fn shaped(id: &str, first: &[u8]) -> bool {
     let b = id.as_bytes();
     (3..=32).contains(&b.len())
         && first.contains(&b[0])

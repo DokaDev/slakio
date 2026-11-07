@@ -27,6 +27,10 @@ impl App {
                 if counts && self.model.me(&workspace) != Some(&message.user) {
                     drawn |= self.model.bump(&workspace, &conversation, mention);
                 }
+                // A new mention is listed in Activity (a reply too), and Activity read again.
+                if mention && !changed && self.model.me(&workspace) != Some(&message.user) {
+                    drawn |= self.live_mention(&workspace, &conversation, thread, &message, now);
+                }
                 drawn
             }
             Live::Deleted { workspace, conversation, thread, ts } => {
@@ -66,6 +70,7 @@ impl App {
             Connection::Connected { catch_up } => {
                 if catch_up {
                     self.work.catch_up(&ws, false);
+                    self.activity_back(&ws, now);
                 }
                 (if ever { Label::LiveBack } else { Label::LiveOn }, Level::Info)
             }

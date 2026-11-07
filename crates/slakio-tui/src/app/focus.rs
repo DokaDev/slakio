@@ -196,6 +196,9 @@ impl App {
                 return self.open_item(a == ShellAction::ListOpen);
             }
             ShellAction::ListOpen if self.on_filter_row() => return self.todo(ShellAction::TodoFilter, now),
+            ShellAction::ListOpen | ShellAction::ListPeek if self.notice_at_cursor().is_some() => {
+                return self.open_notice(a == ShellAction::ListOpen, now);
+            }
             _ => {}
         }
         let height = self.list_height();

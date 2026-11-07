@@ -5,7 +5,8 @@
 //! None of these changes anything in Slack, and none lists a whole directory (`users.list`,
 //! `conversations.list`): what the client knows is looked up by id, in batches. The one search
 //! (`search.messages`) lists only messages the user can read already, a page at a time, when
-//! the user asks.
+//! the user asks; so does Activity (`activity.feed`, the user's own notices), whose messages'
+//! texts are looked up by id (`messages.list`, only those the page names).
 
 use crate::error::SlackError;
 
@@ -33,6 +34,11 @@ pub enum Method {
     EdgeUsersInfo,
     /// Messages a query finds (read only: it lists what the user can already read).
     SearchMessages,
+    /// A page of the user's Activity: what each notice is about, by id (read only: nothing is
+    /// marked read).
+    ActivityFeed,
+    /// The messages named by id, conversation by conversation (Activity's texts).
+    MessagesList,
 }
 
 impl Method {
@@ -56,6 +62,8 @@ impl Method {
         Method::EdgeChannelsInfo,
         Method::EdgeUsersInfo,
         Method::SearchMessages,
+        Method::ActivityFeed,
+        Method::MessagesList,
     ];
 
     /// The method's name: the last part of its URL (`client.userBoot`, `channels/info`).
@@ -79,6 +87,8 @@ impl Method {
             Method::EdgeChannelsInfo => "channels/info",
             Method::EdgeUsersInfo => "users/info",
             Method::SearchMessages => "search.messages",
+            Method::ActivityFeed => "activity.feed",
+            Method::MessagesList => "messages.list",
         }
     }
 
