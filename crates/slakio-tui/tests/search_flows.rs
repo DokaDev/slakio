@@ -361,6 +361,20 @@ fn a_day_reads_the_focused_conversation_from_its_first_message() {
 }
 
 #[test]
+fn the_browser_question_names_a_signed_in_workspace_by_its_host_not_its_id() {
+    let world = World::demo();
+    let ws = world.snapshot().workspaces[1].id.clone();
+    let mut s = signed(80, 24, Lang::En);
+    s.keys(":");
+    type_words(&mut s, &format!("open https://app.slack.com/client/{ws}/C0NOTLISTED"));
+    s.keys("enter");
+    assert_eq!(s.d.app.question(), Some(Question::Browser));
+    let why = s.d.app.offered().unwrap().why.clone();
+    assert_eq!(why, Msg::JumpUnlisted { host: "other-co.slack.com".into() });
+    assert!(!has(&s.d.screen(), ws.as_str()), "{}", s.d.screen());
+}
+
+#[test]
 fn a_result_whose_conversation_the_workspace_does_not_list_is_offered_for_the_browser() {
     let mut s = signed(80, 24, Lang::En);
     s.keys("/");

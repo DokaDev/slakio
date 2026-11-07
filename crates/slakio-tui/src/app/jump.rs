@@ -68,7 +68,11 @@ impl App {
         let Some(link) = permalink::parse(url).filter(|_| self.backend.is_some()) else { return false };
         let host = match &link.place {
             Place::Host(h) | Place::Enterprise(h) => h.clone(),
-            Place::Team(t) => t.clone(),
+            // A workspace signed in to is named by its host (or name), not its id.
+            Place::Team(t) => match self.model.workspaces().iter().find(|w| w.id.as_str() == t) {
+                Some(w) => self.workspace_label(&w.id.clone()),
+                None => t.clone(),
+            },
         };
         match self.find(&link) {
             Found::Here(target) => self.jump_to(target, &link, url, label, now),
