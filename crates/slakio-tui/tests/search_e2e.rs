@@ -127,6 +127,9 @@ fn a_search_finds_and_opens_a_message_and_a_day_reads_from_its_first() {
         let asked = m.fake.log().len();
         run.type_bytes(format!(":jump {day}\r").as_bytes());
         run.wait_for("the day", |t| t.contains(&day));
+        // The day typed shows before it is read: wait for the reads themselves.
+        let reads = || m.since(asked).iter().filter(|x| *x == "conversations.history").count();
+        wait_until("the day's reads", || reads() >= 2);
         std::thread::sleep(Duration::from_millis(300));
         let methods = m.since(asked);
         let reads = methods.iter().filter(|x| *x == "conversations.history").count();

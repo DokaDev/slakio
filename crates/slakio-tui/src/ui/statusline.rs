@@ -535,8 +535,10 @@ fn notice_max(app: &App, msg: &Msg) -> usize {
 /// `…` (never under [`NOTICE_NAME_KEPT`] cells) before the words after it lose their end.
 fn fit_notice(app: &App, msg: &Msg, room: usize) -> String {
     let whole = app.i18n.msg(msg).to_string();
-    if width(&whole) <= room {
-        return whole;
+    match msg {
+        _ if width(&whole) <= room => return whole,
+        Msg::JumpDateQuiet { .. } => return clip(&app.i18n.label(Label::JumpDateQuietShort).to_string(), room),
+        _ => {}
     }
     // A host that opens is cut from its start, to the cells free.
     if let Msg::OpenOpening { host } = msg {

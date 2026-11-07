@@ -448,13 +448,23 @@ impl Work {
 
     /// Move the active pane's selection by `by` messages.
     pub fn step(&mut self, by: isize) {
-        self.with_pane(|p, tl| p.step(by, tl));
+        let id = self.active();
+        self.step_in(id, by);
     }
 
-    /// Move the selection of pane `id`, if any, by `by` messages (the mouse wheel).
+    /// Move the selection of pane `id`, if any, by `by` messages (the mouse wheel). Down from
+    /// the newest loaded of a conversation whose newer messages were not read reads on
+    /// ([`Work::read_on`]).
     pub fn step_in(&mut self, id: Option<PaneId>, by: isize) {
         if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
-            p.step(by, self.timelines.get(&p.target).unwrap_or(&EMPTY));
+            let tl = self.timelines.get(&p.target).unwrap_or(&EMPTY);
+            let past =
+                by > 0 && !p.is_thread() && tl.cut && p.selected_index(tl).is_some_and(|i| i + 1 == tl.items.len());
+            p.step(by, tl);
+            if past {
+                let target = p.target.clone();
+                self.read_on(&target);
+            }
         }
         self.fill();
     }

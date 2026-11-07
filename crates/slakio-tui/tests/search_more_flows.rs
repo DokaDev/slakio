@@ -311,6 +311,7 @@ fn a_failure_is_its_own_sentence_says_the_wait_and_enter_meanwhile_says_what_is_
         assert!(searches(&s).is_empty(), "nothing sent during the wait");
         let left = i18n.msg(&Msg::SearchWaitLeft { seconds: "12".into() }).to_string();
         assert!(has(&popup_text(&s), &left), "{}", popup_text(&s));
+        assert!(!has(&popup_text(&s), &why), "the wait alone says why: {}", popup_text(&s));
         // Once it is over, Enter tries again.
         s.d.now += Duration::from_secs(12);
         s.keys("enter");
@@ -437,4 +438,126 @@ fn in_seoul_the_days_and_times_shown_and_jumped_to_are_korea_s() {
     let screen = s.d.screen();
     assert!(screen.contains(&local), "the date row in Seoul's days: {screen}");
     assert!(screen.contains(&time::hm(first, &seoul)), "its time in Seoul's hours: {screen}");
+}
+
+#[test]
+fn a_search_with_no_word_found_shows_each_result_from_its_start() {
+    let big = conversation(0, names::BIG_HISTORY);
+    for (w, h) in [(120, 40), (80, 24), (50, 24)] {
+        let mut s = signed(w, h, Lang::En);
+        s.keys("/");
+        type_words(&mut s, "in:#big-history");
+        s.keys("enter");
+        // Slack marks no word for a search of only `in:` or `from:`.
+        let text = "Still dashboard done meeting we";
+        let mut one = hit(&big, Ts(5 * DAY), None, text);
+        one.author = Remote::new("ann");
+        answer_with(&mut s, vec![one], 1, 1, 1);
+        let screen = popup_text(&s);
+        assert!(has(&screen, "Still dashboard"), "{w}x{h}: {screen}");
+        assert!(!screen.contains('…'), "{w}x{h}: {screen}");
+    }
+}
+
+#[test]
+fn the_text_before_the_word_found_is_cut_at_a_word_at_every_width() {
+    let big = conversation(0, names::BIG_HISTORY);
+    let words = ["tomorrow", "rollback", "metrics", "an", "deployment", "x", "checklist", "release"];
+    for lead_words in 1..=words.len() * 3 {
+        let lead: String = words.iter().cycle().take(lead_words).map(|w| format!("{w} ")).collect();
+        for (w, h) in [(120, 40), (80, 24), (50, 24)] {
+            let mut s = signed(w, h, Lang::En);
+            s.keys("/");
+            type_words(&mut s, "deploy");
+            s.keys("enter");
+            let text = format!("{lead}\u{E000}deploy\u{E001} done");
+            let mut one = hit(&big, Ts(5 * DAY), None, &text);
+            one.author = Remote::new("ann");
+            answer_with(&mut s, vec![one], 1, 1, 1);
+            let screen = popup_text(&s);
+            let Some((_, cut)) = screen.split_once('…') else { continue };
+            let first = cut.split_whitespace().next().unwrap_or_default();
+            assert!(words.contains(&first) || first.starts_with("deploy"), "{w}x{h}, {lead_words}: {cut:?}");
+        }
+    }
+}
+
+#[test]
+fn enter_on_jump_with_no_space_after_it_says_what_to_type() {
+    for lang in [Lang::En, Lang::Ko] {
+        let mut s = signed(80, 24, lang);
+        open_big(&mut s);
+        s.keys(":");
+        type_words(&mut s, "jump");
+        s.keys("enter");
+        assert_eq!(s.d.app.cmdline.error, Some(Msg::Label(Label::JumpDateEmpty)), "{lang:?}");
+        assert!(s.b.held.is_empty());
+    }
+}
+
+#[test]
+fn the_quiet_day_notice_keeps_that_the_newest_is_shown_at_80_and_50_columns() {
+    for (w, lang) in [(80, Lang::En), (80, Lang::Ko), (50, Lang::En), (50, Lang::Ko)] {
+        let mut s = signed(w, 24, lang);
+        let big = open_big(&mut s);
+        s.d.app.clock = Some(later);
+        let world = World::demo();
+        let newest = world.message(big.conversation(), world.message_count(big.conversation()) - 1).unwrap().ts;
+        let day = time::date(Ts(newest.0 + 2 * DAY), &Zone::utc());
+        s.keys(":");
+        type_words(&mut s, &format!("jump {day}"));
+        s.keys("enter");
+        let (i, _) = dated(&s).expect("a day read");
+        s.b.answer(i);
+        s.pump();
+        let i18n = I18n::new(lang);
+        let said = i18n.msg(&Msg::JumpDateQuiet { day: day.clone() }).to_string();
+        let line = s.d.status_line();
+        if w >= 80 {
+            assert!(has(&line, &said), "{w} {lang:?}: {line}");
+        } else {
+            assert!(has(&line, &i18n.label(Label::JumpDateQuietShort).to_string()), "{w} {lang:?}: {line}");
+        }
+    }
+}
+
+#[test]
+fn down_past_the_last_message_read_from_a_day_reads_on_the_selection_kept() {
+    let mut s = signed(120, 40, Lang::En);
+    let big = open_big(&mut s);
+    let world = World::demo();
+    let first = world.message(big.conversation(), 0).unwrap().ts;
+    s.keys(":");
+    type_words(&mut s, &format!("jump {}", time::date(first, &Zone::utc())));
+    s.keys("enter");
+    let (i, _) = dated(&s).expect("a day read");
+    s.b.answer(i);
+    s.pump();
+    let p = s.d.app.focused_pane().unwrap();
+    assert!(p.cut(), "the newer ones are not read");
+    // Down to the last one read: nothing more asked yet.
+    for _ in 0..500 {
+        let p = s.d.app.focused_pane().unwrap();
+        if p.selected().is_some_and(|i| i + 1 == p.messages().len()) {
+            break;
+        }
+        s.keys("j");
+    }
+    assert!(dated(&s).is_none(), "{:?}", s.b.held);
+    let p = s.d.app.focused_pane().unwrap();
+    let last = p.messages().last().unwrap().ts;
+    // One more down: read on from just after it.
+    s.keys("j");
+    let (i, at) = dated(&s).expect("read on");
+    assert_eq!(at, Ts(last.0 + 1));
+    s.keys("j");
+    assert_eq!(s.b.held.len(), 1, "asked once at a time");
+    s.b.answer(i);
+    s.pump();
+    let p = s.d.app.focused_pane().unwrap();
+    assert_eq!(p.selected().map(|i| p.messages()[i].ts), Some(last), "the selection kept");
+    assert!(p.messages().last().unwrap().ts > last, "the newer ones read");
+    s.keys("j");
+    let p = s.d.app.focused_pane().unwrap();
+    assert!(p.selected().map(|i| p.messages()[i].ts) > Some(last), "and down goes on to them");
 }

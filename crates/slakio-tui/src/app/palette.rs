@@ -398,6 +398,12 @@ impl App {
             return self.cmdline.close();
         }
         match self.palette_items().get(self.cmdline.selected).copied() {
+            // `:jump` typed whole with no day: what to type after it is said.
+            Some(Item::Command(i))
+                if REGISTRY[i].action == Action::App(AppAction::JumpDate) && REGISTRY[i].commands.contains(&&*text) =>
+            {
+                self.run_jump(&text, now)
+            }
             Some(Item::Command(i) | Item::Action(i)) => {
                 self.cmdline.close();
                 self.dispatch(REGISTRY[i].action, now);

@@ -103,6 +103,19 @@ impl Work {
         self.fill();
     }
 
+    /// Down past the newest loaded of the conversation `target`, whose newer messages were not
+    /// read: it is read again from just after that message ([`Command::Dated`]), once at a time;
+    /// the selection stays on it, the newer ones after it.
+    pub(super) fn read_on(&mut self, target: &Target) {
+        let tl = self.timelines.entry(target);
+        let Some(last) = tl.items.last().map(|m| m.ts).filter(|_| tl.cut && tl.pending.is_none() && !tl.cached) else {
+            return;
+        };
+        let command = Command::Dated { target: target.clone(), at: Ts(last.0 + 1), limit: PAGE };
+        let id = self.requests.ask(Some(target.workspace().clone()), command);
+        self.timelines.entry(target).read_around(id);
+    }
+
     /// A page of `target` failed: a pane waiting for it to select a link's message waits no more.
     pub(super) fn forget_jumps(&mut self, target: &Target) {
         for p in self.panes.values_mut().filter(|p| p.target == *target) {

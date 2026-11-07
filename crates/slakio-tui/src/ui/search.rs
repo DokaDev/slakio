@@ -91,12 +91,15 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         Showing::Nothing => (said(Label::SearchNothing), t.muted()),
         Showing::Failed => {
             let why = app.search_failed_kind().map(|k| said(crate::app::failure_label(k))).unwrap_or_default();
-            let then = match app.search_wait() {
+            // What is left of Slack's wait says why on its own.
+            let words = match app.search_wait() {
                 (_, Some(left)) => app.i18n.msg(&Msg::SearchWaitLeft { seconds: left.to_string() }).to_string(),
-                (Some(secs), None) => app.i18n.msg(&Msg::SearchRetryIn { seconds: secs.to_string() }).to_string(),
-                (None, None) => said(Label::SearchRetry),
+                (Some(secs), None) => {
+                    format!("{why}. {}", app.i18n.msg(&Msg::SearchRetryIn { seconds: secs.to_string() }))
+                }
+                (None, None) => format!("{why}. {}", said(Label::SearchRetry)),
             };
-            (format!("{why}. {then}"), t.warning())
+            (words, t.warning())
         }
     };
     let iw = usize::from(list.width.saturating_sub(4));
@@ -211,14 +214,20 @@ fn snippet(app: &App, ws: Option<&WorkspaceId>, runs: &[(String, bool)], w: usiz
     };
     let mut spans = Vec::new();
     let mut room = w;
-    // Runs alternate: only the first can be plain text before the first word found.
-    let mut lead = runs.first().filter(|(_, m)| !m).map(|(s, _)| flat(s.clone()));
+    // Runs alternate: only the first can be plain text before the first word found; with no
+    // word found after it (a search of only `in:` or `from:`), the text shows from its start.
+    let found = runs.iter().any(|(_, m)| *m);
+    let mut lead = runs.first().filter(|(_, m)| !m && found).map(|(s, _)| flat(s.clone()));
     if let Some(l) = lead.as_mut().filter(|l| width(l) > w / 3) {
         let cut = tail(l, w / 6);
-        // At a word: what is left of a word cut in two goes.
+        // At a word: what is left of a word cut in two goes, the whole of it when it is all
+        // there is.
+        let whole = l.len() - cut.len();
+        let at_word = l[..whole].ends_with(char::is_whitespace) || cut.starts_with(char::is_whitespace);
         *l = match cut.split_once(char::is_whitespace) {
-            Some((_, rest)) if !rest.trim().is_empty() && width(&cut) < width(l) => rest.to_string(),
-            _ => cut,
+            _ if at_word => cut.trim_start().to_string(),
+            Some((_, rest)) => rest.trim_start().to_string(),
+            None => String::new(),
         };
         spans.push(Span::styled("…", t.faint()));
         room = room.saturating_sub(1);

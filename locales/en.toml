@@ -580,7 +580,9 @@
 "jump.date_none" = "Open a conversation first, then :jump"
 "jump.date_empty" = "Type a day after :jump (today, yesterday, mon, 11-01, -3d)"
 "jump.date_future" = "Not yet: {day} is still to come"
-"jump.date_quiet" = "Nothing written on {day} or after: the newest is shown"
+"jump.date_quiet" = "Nothing since {day}: newest shown"
+# The same where the line has no room for it whole.
+"jump.date_quiet_short" = "Newest shown"
 # The words `:jump` takes for days in this language (English ones always work too): one word
 # each, the weekdays from Sunday, separated by spaces.
 "jump.word_today" = "today"
