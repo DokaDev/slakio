@@ -37,6 +37,8 @@ pub enum Ctx {
     Switcher,
     /// Picking a message's link: letters on the links, or their list (modal).
     Links,
+    /// The search popup's words (text input) and its results.
+    Search,
 }
 
 impl Ctx {
@@ -57,6 +59,7 @@ impl Ctx {
         Ctx::Dialog,
         Ctx::Switcher,
         Ctx::Links,
+        Ctx::Search,
     ];
 
     /// The id config files and the docs use.
@@ -77,6 +80,7 @@ impl Ctx {
             Ctx::Dialog => "dialog",
             Ctx::Switcher => "switcher",
             Ctx::Links => "links",
+            Ctx::Search => "search",
         }
     }
 
@@ -97,6 +101,7 @@ impl Ctx {
             Ctx::Dialog => Label::CtxDialog,
             Ctx::Switcher => Label::CtxSwitcher,
             Ctx::Links => Label::CtxLinks,
+            Ctx::Search => Label::CtxSearch,
         }
     }
 
@@ -112,7 +117,8 @@ impl Ctx {
             | Ctx::HelpFilter
             | Ctx::Dialog
             | Ctx::Switcher
-            | Ctx::Links => None,
+            | Ctx::Links
+            | Ctx::Search => None,
             Ctx::Shell | Ctx::SignIn => Some(Ctx::Root),
             Ctx::ViewSwitcher | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
             Ctx::PaneVisual => Some(Ctx::PaneNormal),
@@ -126,7 +132,7 @@ impl Ctx {
 
     /// Characters typed here are text, not commands.
     pub fn is_text_input(self) -> bool {
-        matches!(self, Ctx::CommandLine | Ctx::ComposerInsert | Ctx::HelpFilter)
+        matches!(self, Ctx::CommandLine | Ctx::ComposerInsert | Ctx::HelpFilter | Ctx::Search)
     }
 
     /// Only its own keys (and the global ones) work here.

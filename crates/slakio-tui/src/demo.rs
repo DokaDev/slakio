@@ -2,8 +2,8 @@
 //! `slakio-world`, at once and without any network. It is the only backend for now; the
 //! binary's wiring is the one place that names it.
 
-use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Page, Request};
-use slakio_core::model::{Target, Ts};
+use slakio_core::backend::{Backend, Capabilities, Command, Envelope, Event, Found, Hit, Page, Request, SEARCH_PAGE};
+use slakio_core::model::{Target, Ts, WorkspaceId};
 use slakio_world::World;
 use std::collections::VecDeque;
 
@@ -33,6 +33,11 @@ impl Backend for DemoBackend {
             Command::History { target, before, limit } => self.page(target, before, limit),
             Command::Catchup { target, limit } => self.page(target, None, limit),
             Command::Around { target, at, limit } => self.around(target, at, limit),
+            Command::Dated { target, at, limit } => self.dated(target, at, limit),
+            Command::Search { query, page } => {
+                let ws = request.workspace.clone().unwrap_or_else(|| self.world.snapshot().workspaces[0].id.clone());
+                self.search(ws, query, page)
+            }
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
@@ -58,6 +63,44 @@ impl DemoBackend {
             }
         };
         Event::History(Box::new(Page { target, messages, complete, users: Vec::new(), cut: false }))
+    }
+
+    /// Up to `limit` messages of `target` around the first one at `at` or after: about half of
+    /// them before it; the page says when its newest are not in it. A thread's from its start.
+    fn dated(&self, target: Target, at: Ts, limit: u32) -> Event {
+        let Target::Conversation { conversation, .. } = &target else { return self.page(target, None, limit) };
+        let (count, limit) = (self.world.message_count(conversation), limit as usize);
+        let first = self.world.first_at_or_after(conversation, at);
+        let end = (first + limit / 2).clamp(limit.min(count), count);
+        let start = end.saturating_sub(limit);
+        let messages = (start..end).filter_map(|i| self.world.message(conversation, i)).collect();
+        Event::History(Box::new(Page { target, messages, complete: start == 0, users: Vec::new(), cut: end < count }))
+    }
+
+    /// Page `page` of what `query` finds in `ws`, as Slack pages it.
+    fn search(&self, ws: WorkspaceId, query: String, page: u32) -> Event {
+        let all = self.world.search(&ws, &query);
+        let per = SEARCH_PAGE as usize;
+        let pages = all.len().div_ceil(per) as u32;
+        let page = page.clamp(1, pages.max(1));
+        let names = |id: &slakio_core::model::ConversationId| {
+            let c = self.world.snapshot().conversations.iter().find(|c| c.id == *id);
+            c.map(|c| c.name.clone()).unwrap_or_default()
+        };
+        let hits = (all.iter().skip((page as usize - 1) * per).take(per))
+            .map(|h| Hit {
+                conversation: h.conversation.clone(),
+                name: names(&h.conversation),
+                ts: h.message.ts,
+                thread: h.thread,
+                user: h.message.user.clone(),
+                author: Default::default(),
+                text: h.message.text.clone(),
+                permalink: String::new(),
+            })
+            .collect();
+        let total = all.len() as u32;
+        Event::Found(Box::new(Found { workspace: ws, query, page, pages, total, hits, users: Vec::new() }))
     }
 
     /// Up to `limit` messages of `target` up to the one at `at`, and the newest `limit` after it

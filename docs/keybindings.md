@@ -107,6 +107,9 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space t l` | Move the tab right | `tab.move_right` |
 | `Space ?` | Keyboard help | `help.open` |
 | `Space /` | Open the command line | `cmdline.open` |
+| `/` | Search messages | `search.open` |
+| `Space s` | Search messages | `search.open` |
+| `Space j` | Read the conversation from a day | `jump.date` |
 | `Space q` | Quit | `app.quit` |
 
 ## View switcher (`nav`)
@@ -295,6 +298,22 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Esc` | Stop picking, open nothing | `links.cancel` |
 | `Ctrl+C` | Stop picking, open nothing | `links.cancel` |
 
+## Search popup (`search`) **[text]**
+
+| Keys | Action | Id |
+|---|---|---|
+| `Enter` | Search the words, or open the result | `search.run` |
+| `Down` | Next result | `search.next` |
+| `Ctrl+N` | Next result | `search.next` |
+| `Up` | Previous result | `search.prev` |
+| `PageDown` | Next page of results | `search.page_next` |
+| `PageUp` | Previous page of results | `search.page_prev` |
+| `Tab` | Search the next workspace | `search.scope_next` |
+| `Shift+Tab` | Search the previous workspace | `search.scope_prev` |
+| `Ctrl+U` | Clear the words | `search.clear` |
+| `Esc` | Close the search | `search.close` |
+| `Ctrl+C` | Close the search | `search.close` |
+
 ## Commands
 
 Type `:` and the command, then `Enter`.
@@ -310,6 +329,8 @@ Type `:` and the command, then `Enter`.
 | `:density` |  | Comfortable or compact messages |
 | `:net` |  | Switch the network off, or on again |
 | `:login` |  | Sign in again: a workspace Slack signed out, or another |
+| `:search` |  | Search messages |
+| `:jump` |  | Read the conversation from a day |
 | `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
 | `:navrows` |  | Fold the view switcher to the view shown, or unfold it |

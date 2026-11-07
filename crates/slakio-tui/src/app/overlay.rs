@@ -4,7 +4,7 @@
 //!
 //! From the top: a question ([`super::dialog`]), the list of links to pick ([`super::links`],
 //! which takes its keys before any context), the keyboard help, the command palette, the
-//! workspace switcher ([`super::nav`]), the which-key popup. The palette and the which-key popup are drawn only on top; the help stays
+//! search popup ([`super::search`]), the workspace switcher ([`super::nav`]), the which-key popup. The palette and the which-key popup are drawn only on top; the help stays
 //! visible under a question.
 
 use super::App;
@@ -18,6 +18,7 @@ pub enum Layer {
     Links,
     Help,
     Palette,
+    Search,
     Switcher,
     WhichKey,
 }
@@ -31,6 +32,7 @@ impl App {
             (Layer::Links, self.picker.as_ref().is_some_and(|p| p.list.is_some())),
             (Layer::Help, self.help.is_some()),
             (Layer::Palette, self.cmdline.is_open()),
+            (Layer::Search, self.search.open),
             (Layer::Switcher, self.switcher.is_some()),
             (Layer::WhichKey, now.is_some_and(|t| self.which_key_visible(t))),
         ];
@@ -43,6 +45,7 @@ impl App {
             Layer::Dialog => self.dialog.map(|d| Overlay::Dialog(d.question)),
             Layer::Help => Some(Overlay::Help),
             Layer::Palette => Some(Overlay::Palette),
+            Layer::Search => Some(Overlay::Search),
             Layer::Switcher => Some(Overlay::Switcher),
             Layer::Links | Layer::WhichKey => None,
         }

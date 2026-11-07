@@ -12,7 +12,9 @@ fn every_command() -> Vec<Command> {
         Command::Boot,
         Command::History { target: target.clone(), before: None, limit: 28 },
         Command::Catchup { target: target.clone(), limit: 28 },
-        Command::Around { target, at: crate::model::Ts(1), limit: 28 },
+        Command::Around { target: target.clone(), at: crate::model::Ts(1), limit: 28 },
+        Command::Dated { target, at: crate::model::Ts(1), limit: 28 },
+        Command::Search { query: "in:#general deploy".into(), page: 1 },
         Command::Save { item: SavedId::new("S1"), change: SavedChange::Complete },
     ]
 }

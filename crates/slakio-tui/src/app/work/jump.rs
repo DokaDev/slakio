@@ -20,6 +20,17 @@ impl Work {
     /// request reading around it when it is not loaded (the one on its way already, when the
     /// same link was opened again before its answer came: it is not asked twice).
     pub fn jump(&mut self, conversation: Target, at: Ts) -> (Option<PaneId>, Option<Generation>) {
+        self.jump_with(conversation, at, false)
+    }
+
+    /// Open `conversation` at the first message written at `at` or after (the start of a day
+    /// asked for), selected and marked once loaded; when it is not loaded the conversation is read
+    /// around it ([`Command::Dated`]). With none after `at`, the newest is selected.
+    pub fn jump_date(&mut self, conversation: Target, at: Ts) -> (Option<PaneId>, Option<Generation>) {
+        self.jump_with(conversation, at, true)
+    }
+
+    fn jump_with(&mut self, conversation: Target, at: Ts, dated: bool) -> (Option<PaneId>, Option<Generation>) {
         let tl = self.timelines.entry(&conversation);
         let waits = self.panes.values().any(|p| p.target == conversation && p.jump == Some(at));
         if let Some(pending) = tl.pending.filter(|_| waits) {
@@ -28,14 +39,19 @@ impl Work {
             return (pane, Some(pending));
         }
         let asked = (!tl.holds(at)).then(|| {
-            let command = Command::Around { target: conversation.clone(), at, limit: PAGE };
+            let target = conversation.clone();
+            let command = if dated {
+                Command::Dated { target, at, limit: PAGE }
+            } else {
+                Command::Around { target, at, limit: PAGE }
+            };
             let id = self.requests.ask(Some(conversation.workspace().clone()), command);
             self.timelines.entry(&conversation).read_around(id);
             id
         });
         let pane = self.open(conversation);
         if let Some(p) = pane.and_then(|id| self.panes.get_mut(&id)) {
-            p.jump = Some(at);
+            (p.jump, p.by_date) = (Some(at), dated);
         }
         self.fill();
         (pane, asked)
@@ -77,7 +93,7 @@ impl Work {
         *self.timelines.entry(&target) = super::Timeline::default();
         // Every pane on it follows the newest again.
         for p in self.panes.values_mut().filter(|p| p.target == target) {
-            (p.selected, p.visual, p.jump, p.flash) = (None, None, None, None);
+            (p.selected, p.visual, p.jump, p.flash, p.by_date) = (None, None, None, None, false);
             (p.older, p.to_root) = (false, false);
             p.bottom.set(None);
             p.held.set(None);
@@ -90,7 +106,7 @@ impl Work {
     /// A page of `target` failed: a pane waiting for it to select a link's message waits no more.
     pub(super) fn forget_jumps(&mut self, target: &Target) {
         for p in self.panes.values_mut().filter(|p| p.target == *target) {
-            p.jump = None;
+            (p.jump, p.by_date) = (None, false);
         }
     }
 

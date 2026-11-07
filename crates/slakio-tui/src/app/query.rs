@@ -59,6 +59,8 @@ pub enum Overlay {
     Dialog(Question),
     Help,
     Palette,
+    /// The search popup.
+    Search,
     /// The workspace switcher.
     Switcher,
 }

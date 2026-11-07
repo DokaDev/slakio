@@ -285,6 +285,48 @@ pub struct Reaction {
     pub users: Option<Vec<String>>,
 }
 
+/// `search.messages`: one page of the messages a query found.
+#[derive(Debug, Default, Deserialize)]
+pub struct Search {
+    #[serde(default, deserialize_with = "loose")]
+    pub messages: Option<SearchMessages>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct SearchMessages {
+    #[serde(default, deserialize_with = "lenient")]
+    pub matches: Option<Vec<SearchMatch>>,
+    pub total: Option<u32>,
+    #[serde(default, deserialize_with = "loose")]
+    pub paging: Option<Paging>,
+}
+
+/// Which page this is, of how many.
+#[derive(Debug, Default, Deserialize)]
+pub struct Paging {
+    pub page: Option<u32>,
+    pub pages: Option<u32>,
+    pub total: Option<u32>,
+}
+
+/// A message found: where, by whom, its text (the words matched marked), its web link.
+#[derive(Debug, Deserialize)]
+pub struct SearchMatch {
+    pub ts: String,
+    #[serde(default, deserialize_with = "loose")]
+    pub channel: Option<SearchChannel>,
+    pub user: Option<String>,
+    pub username: Option<String>,
+    pub text: Option<String>,
+    pub permalink: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchChannel {
+    pub id: String,
+    pub name: Option<String>,
+}
+
 /// A Slack timestamp (`1767603600.000100`) as microseconds; `None` when it is not one.
 pub fn ts(s: &str) -> Option<u64> {
     let (secs, micros) = s.split_once('.').unwrap_or((s, "0"));

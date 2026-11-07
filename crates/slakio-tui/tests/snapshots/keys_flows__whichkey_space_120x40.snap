@@ -1,6 +1,6 @@
 ---
 source: crates/slakio-tui/tests/keys_flows.rs
-assertion_line: 302
+assertion_line: 305
 expression: s
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
@@ -30,16 +30,16 @@ expression: s
 │   # feed-budget-162        ││                                                                                        │
 │   # feed-budget-33         ││                                                                                        │
 │   # feed-build-50          ││                                                                                        │
-│   # feed-cache-119         ││                                                                                        │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ r    View switcher (in the list panel)                     [    Back to the conversation before                      │
-│ h    Show Home                                             ]    Forward again                                        │
-│ d    Show DMs                                              1…9  Show tab 1 to 9                                      │
-│ a    Show Activity                                         ?    Keyboard help                                        │
-│ f    Show Files                                            /    Open the command line                                │
-│ o    Show To-dos                                           q    Quit                                                 │
-│ e    Show or hide the list panel                           w    +Window                                              │
-│ v    Fold the view switcher to the view shown, or unfold…  t    +Tab                                                 │
-│ W    Switch workspace                                                                                                │
+│ r    View switcher (in the list panel)                     ]    Forward again                                        │
+│ h    Show Home                                             1…9  Show tab 1 to 9                                      │
+│ d    Show DMs                                              ?    Keyboard help                                        │
+│ a    Show Activity                                         /    Open the command line                                │
+│ f    Show Files                                            s    Search messages                                      │
+│ o    Show To-dos                                           j    Read the conversation from a day                     │
+│ e    Show or hide the list panel                           q    Quit                                                 │
+│ v    Fold the view switcher to the view shown, or unfold…  w    +Window                                              │
+│ W    Switch workspace                                      t    +Tab                                                 │
+│ [    Back to the conversation before                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                                                                       │ demo

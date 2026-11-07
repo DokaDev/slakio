@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/keys_flows.rs
+assertion_line: 330
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -13,16 +14,16 @@ expression: d.snap()
 │   # backend                ││     Pick one in the list and press Enter.      │
 │   # incidents           3  ││                                                │
 │                            ││     Enter    Open                              │
-│ ▾ Ops                      ││     Space h  Home                              │
 ╭ Space — Leader ──────────────────────────────────────────────────────────────╮
-│ r    View switcher (in the list pane…  [    Back to the conversation before  │
-│ h    Show Home                         ]    Forward again                    │
-│ d    Show DMs                          1…9  Show tab 1 to 9                  │
-│ a    Show Activity                     ?    Keyboard help                    │
-│ f    Show Files                        /    Open the command line            │
-│ o    Show To-dos                       q    Quit                             │
-│ e    Show or hide the list panel       w    +Window                          │
-│ v    Fold the view switcher to the v…  t    +Tab                             │
-│ W    Switch workspace                                                        │
+│ r    View switcher (in the list pane…  ]    Forward again                    │
+│ h    Show Home                         1…9  Show tab 1 to 9                  │
+│ d    Show DMs                          ?    Keyboard help                    │
+│ a    Show Activity                     /    Open the command line            │
+│ f    Show Files                        s    Search messages                  │
+│ o    Show To-dos                       j    Read the conversation from a day │
+│ e    Show or hide the list panel       q    Quit                             │
+│ v    Fold the view switcher to the v…  w    +Window                          │
+│ W    Switch workspace                  t    +Tab                             │
+│ [    Back to the conversation before                                         │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo

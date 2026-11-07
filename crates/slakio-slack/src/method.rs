@@ -3,7 +3,9 @@
 //! as text ([`Method::parse`]) is refused before anything is sent, counted or opened.
 //!
 //! None of these changes anything in Slack, and none lists a whole directory (`users.list`,
-//! `conversations.list`): what the client knows is looked up by id, in batches.
+//! `conversations.list`): what the client knows is looked up by id, in batches. The one search
+//! (`search.messages`) lists only messages the user can read already, a page at a time, when
+//! the user asks.
 
 use crate::error::SlackError;
 
@@ -29,6 +31,8 @@ pub enum Method {
     EdgeChannelsInfo,
     /// The edge cache's people lookup by id and version.
     EdgeUsersInfo,
+    /// Messages a query finds (read only: it lists what the user can already read).
+    SearchMessages,
 }
 
 impl Method {
@@ -51,6 +55,7 @@ impl Method {
         Method::DndTeamInfo,
         Method::EdgeChannelsInfo,
         Method::EdgeUsersInfo,
+        Method::SearchMessages,
     ];
 
     /// The method's name: the last part of its URL (`client.userBoot`, `channels/info`).
@@ -73,6 +78,7 @@ impl Method {
             Method::DndTeamInfo => "dnd.teamInfo",
             Method::EdgeChannelsInfo => "channels/info",
             Method::EdgeUsersInfo => "users/info",
+            Method::SearchMessages => "search.messages",
         }
     }
 

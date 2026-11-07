@@ -1,11 +1,12 @@
 //! The Slack backend behind a [`BackendHandle`]: a task that owns the [`BackendEnd`], reads the
 //! UI's requests and answers each one exactly once (its event, or `Failed`), never with
 //! silence. A change is refused before anything is sent (the backend is read-only). A newer
-//! page of a target (`History`, `Around`) supersedes the one of the same target still on its
+//! page of a target (`History`, `Around`, `Dated`) supersedes the one of the same target still on its
 //! way: that one is cancelled — before it is sent, or by dropping its answer — and answered
 //! `Failed(Busy)`. Pages of other targets never cancel each other: the panes of a layout opened
 //! again ask for theirs at once, and each gets its own. They all go through the governor, which
-//! paces them. When the UI is gone the task ends, and what it had in flight with it.
+//! paces them. A newer search supersedes the one on its way the same way. When the UI is gone
+//! the task ends, and what it had in flight with it.
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
 //! first: opening it again meanwhile fetches it once.
@@ -100,10 +101,10 @@ struct InFlight {
     answered: Arc<AtomicBool>,
 }
 
-/// The page of `target` on its way, superseded by a newer one: cancelled and answered
-/// `Failed(Busy)`, unless it was answered already. `false` when the UI is gone.
-async fn supersede(in_flight: &mut HashMap<Target, InFlight>, target: &Target, tx: &mpsc::Sender<Envelope>) -> bool {
-    let Some(older) = in_flight.remove(target) else { return true };
+/// The request on its way (a page of a target, a search), superseded by a newer one: cancelled
+/// and answered `Failed(Busy)`, unless it was answered already. `false` when the UI is gone.
+async fn supersede(older: Option<InFlight>, tx: &mpsc::Sender<Envelope>) -> bool {
+    let Some(older) = older else { return true };
     if older.answered.swap(true, Ordering::SeqCst) {
         return true;
     }
@@ -112,9 +113,39 @@ async fn supersede(in_flight: &mut HashMap<Target, InFlight>, target: &Target, t
     tx.send(Envelope::failed(older.id, e.kind(), e.detail())).await.is_ok()
 }
 
+/// Carry out request `id` (`work`) on a task of its own, answered once: by the task, or as
+/// superseded ([`supersede`]), whichever comes first.
+fn spawn_once<W>(tasks: &mut JoinSet<()>, tx: mpsc::Sender<Envelope>, id: Generation, work: W) -> InFlight
+where
+    W: std::future::Future<Output = Result<Event, SlackError>> + Send + 'static,
+{
+    let answered = Arc::new(AtomicBool::new(false));
+    let once = Arc::clone(&answered);
+    let task = tasks.spawn(async move {
+        let result = work.await;
+        if !once.swap(true, Ordering::SeqCst) {
+            answer(&tx, id, result).await;
+        }
+    });
+    InFlight { id, task, answered }
+}
+
+/// The conversation `command` reads, remembered as read this session.
+fn opened(session: &Session, command: &Command) {
+    if let Command::History { target, .. }
+    | Command::Catchup { target, .. }
+    | Command::Around { target, .. }
+    | Command::Dated { target, .. } = command
+    {
+        session.opened.lock().unwrap_or_else(PoisonError::into_inner).insert(target.conversation().clone());
+    }
+}
+
 async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut tasks = JoinSet::new();
     let mut in_flight: HashMap<Target, InFlight> = HashMap::new();
+    // The search on its way: a newer one (another query, another page) supersedes it.
+    let mut searching: Option<InFlight> = None;
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -125,11 +156,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         }
         let (client, tx, ctx) = (Arc::clone(&client), end.tx.clone(), Arc::clone(&session));
         let Request { id, command, .. } = request;
-        if let Command::History { target, .. } | Command::Catchup { target, .. } | Command::Around { target, .. } =
-            &command
-        {
-            session.opened.lock().unwrap_or_else(PoisonError::into_inner).insert(target.conversation().clone());
-        }
+        opened(&session, &command);
+        let dated = matches!(command, Command::Dated { .. });
         match command {
             Command::Boot => {
                 tasks.spawn(async move {
@@ -141,43 +169,49 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 });
             }
             Command::Catchup { target, limit } => {
-                tasks.spawn(async move {
-                    let page = catch_up(&client, &ctx, target, limit).await;
-                    answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
-                });
+                let work =
+                    async move { catch_up(&client, &ctx, target, limit).await.map(|p| Event::History(Box::new(p))) };
+                spawn_once(&mut tasks, tx, id, work);
             }
             Command::History { target, before, limit } => {
-                if !supersede(&mut in_flight, &target, &end.tx).await {
+                if !supersede(in_flight.remove(&target), &end.tx).await {
                     return;
                 }
-                let (key, answered) = (target.clone(), Arc::new(AtomicBool::new(false)));
-                let once = Arc::clone(&answered);
                 let opening = before.is_none() && matches!(target, Target::Conversation { .. });
-                let task = tasks.spawn(async move {
+                let key = target.clone();
+                let work = async move {
                     if opening {
                         tokio::time::sleep(OPEN_DEBOUNCE).await;
                     }
-                    let page = history(&client, &ctx, target, before, limit).await;
-                    if !once.swap(true, Ordering::SeqCst) {
-                        answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
-                    }
-                });
-                in_flight.insert(key, InFlight { id, task, answered });
+                    history(&client, &ctx, target, before, limit).await.map(|p| Event::History(Box::new(p)))
+                };
+                in_flight.insert(key, spawn_once(&mut tasks, tx, id, work));
             }
-            // A link opened: a request the user waits for, like an open, but never debounced.
-            Command::Around { target, at, limit } => {
-                if !supersede(&mut in_flight, &target, &end.tx).await {
+            // A link opened, or a date: a request the user waits for, like an open, but never
+            // debounced.
+            Command::Around { target, at, limit } | Command::Dated { target, at, limit } => {
+                if !supersede(in_flight.remove(&target), &end.tx).await {
                     return;
                 }
-                let (key, answered) = (target.clone(), Arc::new(AtomicBool::new(false)));
-                let once = Arc::clone(&answered);
-                let task = tasks.spawn(async move {
-                    let page = around(&client, &ctx, target, at, limit).await;
-                    if !once.swap(true, Ordering::SeqCst) {
-                        answer(&tx, id, page.map(|p| Event::History(Box::new(p)))).await;
-                    }
-                });
-                in_flight.insert(key, InFlight { id, task, answered });
+                let key = target.clone();
+                let work = async move {
+                    let page = if dated {
+                        crate::dated::dated(&client, &ctx, target, at, limit).await
+                    } else {
+                        around(&client, &ctx, target, at, limit).await
+                    };
+                    page.map(|p| Event::History(Box::new(p)))
+                };
+                in_flight.insert(key, spawn_once(&mut tasks, tx, id, work));
+            }
+            Command::Search { query, page } => {
+                if !supersede(searching.take(), &end.tx).await {
+                    return;
+                }
+                let work = async move {
+                    crate::search::search(&client, &ctx, &query, page).await.map(|f| Event::Found(Box::new(f)))
+                };
+                searching = Some(spawn_once(&mut tasks, tx, id, work));
             }
             // A change never gets here (refused above); answered all the same.
             Command::Save { .. } => {
@@ -188,6 +222,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
             }
         }
         in_flight.retain(|_, f| !f.task.is_finished());
+        searching = searching.filter(|f| !f.task.is_finished());
     }
 }
 
@@ -203,7 +238,7 @@ async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Even
 
 /// A page of `target`: the newest through `conversations.view`, older ones through
 /// `conversations.history`, a thread's from what [`Threads`] read of it (`conversations.replies`).
-async fn history(
+pub(crate) async fn history(
     client: &Client,
     ctx: &Session,
     target: Target,
@@ -258,7 +293,7 @@ async fn history(
 
 /// `page` with its authors by name (`everyone`'s, when given, else its messages'): what the view
 /// brought, else looked up (in batches); not the user, nor a bot (named by the name it posts as).
-async fn named(
+pub(crate) async fn named(
     client: &Client,
     ctx: &Session,
     mut page: Page,

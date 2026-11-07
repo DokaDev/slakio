@@ -22,6 +22,7 @@ pub enum Action {
     Dialog(DialogAction),
     SignIn(SignInAction),
     Links(LinksAction),
+    Search(SearchAction),
 }
 
 impl Action {
@@ -60,6 +61,11 @@ pub enum AppAction {
     ToggleNetwork,
     /// Sign in again while the app runs (`:login`): a workspace Slack signed out, or another.
     SignInAgain,
+    /// Search the messages of the workspace the keyboard is in (`:search <words>`).
+    Search,
+    /// Read the focused conversation from a day (`:jump <date>`); alone, the command line ready
+    /// for the day.
+    JumpDate,
 }
 
 /// Actions of the `:` command line.
@@ -275,6 +281,24 @@ pub enum LinksAction {
     Cancel,
 }
 
+/// Actions of the search popup. Other keys type the words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SearchAction {
+    /// Search the words typed now; when they are what is shown, open the result under the cursor.
+    Run,
+    Next,
+    Prev,
+    /// The next (previous) page of results.
+    PageNext,
+    PagePrev,
+    /// Search the next (previous) workspace signed in to.
+    ScopeNext,
+    ScopePrev,
+    /// Clear the words.
+    Clear,
+    Close,
+}
+
 /// Actions of the sign-in screen's picker of the Slack desktop app's workspaces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SignInAction {
@@ -333,6 +357,10 @@ const fn dialog(a: DialogAction, id: &'static str, label: Label) -> ActionSpec {
     spec_of(Action::Dialog(a), id, label, &[])
 }
 
+const fn find(a: SearchAction, id: &'static str, label: Label) -> ActionSpec {
+    spec_of(Action::Search(a), id, label, &[])
+}
+
 /// Every action, in the order the docs and the key help list them.
 pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::Quit, "app.quit", Label::ActionQuit, &["qa", "qall", "quitall"]),
@@ -346,6 +374,8 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::ToggleDensity, "density.toggle", Label::ActionDensity, &["density"]),
     app(AppAction::ToggleNetwork, "net.toggle", Label::ActionNet, &["net"]),
     app(AppAction::SignInAgain, "signin.again", Label::ActionSigninAgain, &["login"]),
+    app(AppAction::Search, "search.open", Label::ActionSearchOpen, &["search"]),
+    app(AppAction::JumpDate, "jump.date", Label::ActionJumpDate, &["jump"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),
@@ -478,6 +508,15 @@ pub const REGISTRY: &[ActionSpec] = &[
     spec_of(Action::Links(LinksAction::Open), "links.open", Label::ActionLinksOpen, &[]),
     spec_of(Action::Links(LinksAction::Back), "links.back", Label::ActionLinksBack, &[]),
     spec_of(Action::Links(LinksAction::Cancel), "links.cancel", Label::ActionLinksCancel, &[]),
+    find(SearchAction::Run, "search.run", Label::ActionSearchRun),
+    find(SearchAction::Next, "search.next", Label::ActionSearchNext),
+    find(SearchAction::Prev, "search.prev", Label::ActionSearchPrev),
+    find(SearchAction::PageNext, "search.page_next", Label::ActionSearchPageNext),
+    find(SearchAction::PagePrev, "search.page_prev", Label::ActionSearchPagePrev),
+    find(SearchAction::ScopeNext, "search.scope_next", Label::ActionSearchScopeNext),
+    find(SearchAction::ScopePrev, "search.scope_prev", Label::ActionSearchScopePrev),
+    find(SearchAction::Clear, "search.clear", Label::ActionSearchClear),
+    find(SearchAction::Close, "search.close", Label::ActionSearchClose),
 ];
 
 /// The registry entry of `action` (every action has one; a test checks it).

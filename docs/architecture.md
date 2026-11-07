@@ -230,8 +230,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
 1. **Allowlist.** A request is built from a `Method`, an enum of read-only methods
    (`client.userBoot`, `client.counts`, `client.shouldReload`, `conversations.view` / `history` /
    `replies` / `info`, `users.info`, `users.prefs.get`, `users.channelSections.list`,
-   `emoji.list`, `stars.list`, `usergroups.list`, `dnd.info`, `dnd.teamInfo`, and the edge
-   cache's `channels/info` and `users/info`). A name that comes in as text is refused
+   `emoji.list`, `stars.list`, `usergroups.list`, `dnd.info`, `dnd.teamInfo`, `search.messages`
+   (a page of the messages a query finds, only when the user asks), and the edge cache's
+   `channels/info` and `users/info`). A name that comes in as text is refused
    (`ReadOnly`) before anything is counted or sent. No write, and no directory listing
    (`users.list`, `conversations.list`), is on it.
 2. **Kill switch.** `SLAKIO_NETWORK=off` or `network = "off"` in the config file: nothing is

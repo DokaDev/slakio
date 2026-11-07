@@ -29,10 +29,11 @@ const ASKED_MAX: usize = 1024;
 /// The workspace `request` is about, if it names one.
 pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
     match &request.command {
-        Command::History { target, .. } | Command::Catchup { target, .. } | Command::Around { target, .. } => {
-            Some(target.workspace())
-        }
-        Command::Boot | Command::Save { .. } => request.workspace.as_ref(),
+        Command::History { target, .. }
+        | Command::Catchup { target, .. }
+        | Command::Around { target, .. }
+        | Command::Dated { target, .. } => Some(target.workspace()),
+        Command::Boot | Command::Save { .. } | Command::Search { .. } => request.workspace.as_ref(),
     }
 }
 
@@ -70,7 +71,7 @@ struct Asked {
 /// The answer that ends request `generation`'s wait (not one of the cache's, given first, nor
 /// a live update).
 fn ends(event: &Event) -> bool {
-    matches!(event, Event::Booted(_) | Event::History(_) | Event::Saved { .. } | Event::Failed { .. })
+    matches!(event, Event::Booted(_) | Event::History(_) | Event::Found(_) | Event::Saved { .. } | Event::Failed { .. })
 }
 
 impl Replace {

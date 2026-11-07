@@ -66,6 +66,16 @@ pub enum Command {
     /// with [`Event::History`]; a page whose newest messages are not among those read says so
     /// ([`Page::cut`]).
     Around { target: Target, at: Ts, limit: u32 },
+    /// The messages of the conversation `target` around the first one written at `at` or after
+    /// (a date asked for, `at` its start): up to `limit` of them, that one among them when it can
+    /// be found in a few requests, else the oldest found after `at`. Answered with
+    /// [`Event::History`]; like [`Command::Around`], a page whose newest messages are not among
+    /// those read says so.
+    Dated { target: Target, at: Ts, limit: u32 },
+    /// Page `page` (from 1) of the messages of the request's workspace that `query` finds, in
+    /// Slack's search words (`in:#channel`, `from:@name`, quotes), passed on as typed. Answered
+    /// with [`Event::Found`].
+    Search { query: String, page: u32 },
 }
 
 impl Command {
@@ -73,7 +83,12 @@ impl Command {
     /// command is named here, so a new one is classified when it is added.
     pub fn changes(&self) -> bool {
         match self {
-            Command::Boot | Command::History { .. } | Command::Catchup { .. } | Command::Around { .. } => false,
+            Command::Boot
+            | Command::History { .. }
+            | Command::Catchup { .. }
+            | Command::Around { .. }
+            | Command::Dated { .. }
+            | Command::Search { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -110,6 +125,48 @@ pub struct Page {
     /// the newest: its newest messages are not among those read, and the page is no word on what
     /// is newer.
     pub cut: bool,
+}
+
+/// The marks around a word a search matched in a [`Hit`]'s text (Slack's own: two characters of
+/// the Private Use Area), never shown themselves.
+pub const MATCH_START: char = '\u{E000}';
+pub const MATCH_END: char = '\u{E001}';
+
+/// Messages on one page of what a search found.
+pub const SEARCH_PAGE: u32 = 20;
+
+/// A page of what a search found: the answer to [`Command::Search`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Found {
+    pub workspace: WorkspaceId,
+    pub query: String,
+    /// This page (from 1), and how many there are (`0` when nothing was found).
+    pub page: u32,
+    pub pages: u32,
+    /// Messages found in all.
+    pub total: u32,
+    /// Newest first.
+    pub hits: Vec<Hit>,
+    /// People the hits name whom the backend learned of with this page.
+    pub users: Vec<User>,
+}
+
+/// A message a search found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Hit {
+    pub conversation: ConversationId,
+    /// The conversation's name as the search gave it (shown when the UI does not know it).
+    pub name: crate::sanitize::Remote,
+    pub ts: Ts,
+    /// The message it is a reply under, when it is a reply.
+    pub thread: Option<Ts>,
+    pub user: crate::model::UserId,
+    /// The author's name as the search gave it (shown when the UI does not know them).
+    pub author: crate::sanitize::Remote,
+    /// The message's text, the words matched between [`MATCH_START`] and [`MATCH_END`].
+    pub text: crate::sanitize::Remote,
+    /// Slack's web link to the message (offered for the browser when it cannot be read here).
+    pub permalink: String,
 }
 
 /// Everything the UI lists right after start: the answer to [`Command::Boot`].
@@ -167,6 +224,8 @@ pub enum Event {
         items: Vec<SavedItem>,
         taken: Ts,
     },
+    /// A page of what a [`Command::Search`] found.
+    Found(Box<Found>),
     /// Request `request` failed: nothing changed. `detail` is raw text for the error log only.
     Failed {
         request: Generation,

@@ -34,7 +34,7 @@ use std::time::Instant;
 
 /// Where the keyboard is, for the hint line (`None` under a popup with keys of its own).
 pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
-    if app.dialog.is_some() || app.help.is_some() {
+    if app.dialog.is_some() || app.help.is_some() || (app.searching() && !app.cmdline.is_open()) {
         return None;
     }
     let ctx = app.screen_context();

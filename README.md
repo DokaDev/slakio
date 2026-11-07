@@ -212,6 +212,18 @@ images, and settings. This README only lists what works; it will grow with each 
   conversation. A link opens only in the workspace it names (an Enterprise Grid link in the
   one of yours that has the conversation). A link to a workspace you have not signed in to, or
   a conversation slakio cannot see there, asks whether to open it in the browser instead.
+- Search (`/`, `Space s`, or `:search <words>`): a popup searches the messages of the
+  workspace you are in (`Tab` the next one) with Slack's own search words (`in:#channel`,
+  `from:@name`, `"exact words"`, `before:` / `after:` a date), newest first, the words found
+  underlined. It searches when you press `Enter` or stop typing for a moment, never per key;
+  `PageDown` / `PageUp` show the next or previous page, and `Enter` on a result opens it as a
+  Slack link opens (a reply's thread beside its conversation). `Esc` closes it; the words and
+  results stay for next time. Searching reads only; it is Slack's `search.messages`, one
+  request per page you ask for.
+- `:jump <day>` (or `Space j`) reads the conversation you are in from a day: `today`,
+  `yesterday`, `2026-11-01`, `11-01`, `-3d`, `-2w` or a weekday (`monday`). Days are in UTC,
+  like the date rows between messages. Its first message is selected and marked; reading back
+  from there (`g g`, scrolling up) reaches older ones, and `G` the newest.
 - Failures are written to `errors.log` in the state directory (`$SLAKIO_STATE_DIR`, else
   `$XDG_STATE_HOME/slakio`, or the platform's equivalent), readable by you only. It never holds
   a token, a cookie, a request's address past its host or message text, and it is kept small:

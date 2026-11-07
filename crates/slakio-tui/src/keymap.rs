@@ -43,7 +43,7 @@ pub use keys::{KeyChord, KeyError, parse_keys};
 
 use crate::action::{
     Action, AppAction, CommandLineAction, ComposerAction, DialogAction, HelpAction, LinksAction, PaneAction,
-    ShellAction, SignInAction, TabAction,
+    SearchAction, ShellAction, SignInAction, TabAction,
 };
 use crate::app::shell::View;
 /// The leader key of the non-text contexts: an unfinished `Space …` sequence is dropped.
@@ -94,6 +94,10 @@ const fn dialog(keys: &'static str, action: DialogAction) -> Binding {
 
 const fn links(keys: &'static str, action: LinksAction) -> Binding {
     bind(Ctx::Links, keys, Action::Links(action))
+}
+
+const fn search(keys: &'static str, action: SearchAction) -> Binding {
+    bind(Ctx::Search, keys, Action::Search(action))
 }
 
 const fn cmdline(ctx: Ctx, keys: &'static str, action: CommandLineAction) -> Binding {
@@ -202,6 +206,9 @@ pub const DEFAULTS: &[Binding] = &[
     tab(Ctx::Shell, "space t l", TabAction::MoveRight),
     help(Ctx::Shell, "space ?", HelpAction::Open),
     cmdline(Ctx::Shell, "space /", CommandLineAction::Open),
+    app(Ctx::Shell, "/", AppAction::Search),
+    app(Ctx::Shell, "space s", AppAction::Search),
+    app(Ctx::Shell, "space j", AppAction::JumpDate),
     app(Ctx::Shell, "space q", AppAction::Quit),
     // The view switcher runs top to bottom, the list under it: down from its last row is the
     // list's first, and `k` there comes back up. `Esc` goes back to the list as it was.
@@ -304,6 +311,18 @@ pub const DEFAULTS: &[Binding] = &[
     cmdline(Ctx::CommandLine, "ctrl+n", CommandLineAction::Next),
     cmdline(Ctx::CommandLine, "up", CommandLineAction::Prev),
     cmdline(Ctx::CommandLine, "shift+tab", CommandLineAction::Prev),
+    // The search popup: other keys type the words.
+    search("enter", SearchAction::Run),
+    search("down", SearchAction::Next),
+    search("ctrl+n", SearchAction::Next),
+    search("up", SearchAction::Prev),
+    search("pagedown", SearchAction::PageNext),
+    search("pageup", SearchAction::PagePrev),
+    search("tab", SearchAction::ScopeNext),
+    search("shift+tab", SearchAction::ScopePrev),
+    search("ctrl+u", SearchAction::Clear),
+    search("esc", SearchAction::Close),
+    search("ctrl+c", SearchAction::Close),
     help(Ctx::Help, "j", HelpAction::Next),
     help(Ctx::Help, "down", HelpAction::Next),
     help(Ctx::Help, "k", HelpAction::Prev),

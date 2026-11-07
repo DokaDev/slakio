@@ -24,6 +24,7 @@ impl App {
         match self.overlay() {
             Some(Overlay::Dialog(_)) => return false,
             Some(Overlay::Palette) => return self.palette_mouse(m, now),
+            Some(Overlay::Search) => return self.search_mouse(m, now),
             Some(Overlay::Switcher) => return self.switcher_mouse(m),
             _ => {}
         }

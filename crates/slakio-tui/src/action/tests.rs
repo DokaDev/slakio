@@ -128,8 +128,14 @@ fn every_action_is_registered() {
             ToggleDensity,
             ToggleNetwork,
             SignInAgain,
+            Search,
+            JumpDate,
         ]
         .map(Action::App)
+    };
+    let search = {
+        use SearchAction::*;
+        [Run, Next, Prev, PageNext, PagePrev, ScopeNext, ScopePrev, Clear, Close].map(Action::Search)
     };
     let all = app
         .into_iter()
@@ -150,7 +156,8 @@ fn every_action_is_registered() {
         .chain(help)
         .chain(dialog)
         .chain(sign_in)
-        .chain(links);
+        .chain(links)
+        .chain(search);
     let mut n = 0;
     for a in all {
         assert_eq!(spec(a).action, a);
@@ -166,6 +173,8 @@ fn commands_find_their_action() {
     assert_eq!(by_command("dms"), Some(Action::Shell(ShellAction::Show(View::Dms))));
     assert_eq!(by_command("todos"), Some(Action::Shell(ShellAction::Show(View::Todos))));
     assert_eq!(by_command("later"), Some(Action::Shell(ShellAction::Show(View::Todos))), "Later's name before");
+    assert_eq!(by_command("search"), Some(Action::App(AppAction::Search)));
+    assert_eq!(by_command("jump"), Some(Action::App(AppAction::JumpDate)));
     assert_eq!(by_command("wq"), None);
     assert_eq!(by_command(""), None);
 }

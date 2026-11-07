@@ -183,6 +183,8 @@ pub struct Pane {
     pub focused_at: u64,
     /// A link opened at this message: it is selected once its messages are loaded.
     pub jump: Option<Ts>,
+    /// `jump` is the start of a day: the first message at it or after is selected and marked.
+    pub by_date: bool,
     /// The message a link opened, marked for a moment; until when, once the app's clock said.
     pub flash: Option<(Ts, Option<std::time::Instant>)>,
 }
@@ -208,6 +210,7 @@ impl Pane {
             links_moved: Cell::new(None),
             focused_at: 0,
             jump: None,
+            by_date: false,
             flash: None,
         }
     }
@@ -323,6 +326,10 @@ impl Pane {
         (self.visual, self.older, self.to_root) = (None, false, false);
         self.held.set(None);
         self.selected = Some(tl.items[i].ts);
+        if std::mem::take(&mut self.by_date) {
+            self.flash = Some((tl.items[i].ts, None));
+            return Some(true);
+        }
         let found = tl.position(at).is_some();
         self.flash = found.then_some((at, None));
         Some(found)

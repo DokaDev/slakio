@@ -210,6 +210,7 @@ impl App {
                 self.jump_answered(id, None);
                 self.work.on_page(id, &page, &self.model)
             }
+            Event::Found(found) => self.on_found(id, *found),
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
@@ -279,6 +280,12 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
         self.jump_answered(id, Some(&kind));
+        // A search's failure is said in its popup (and kept in the error log).
+        if self.search_failed(id, &kind) {
+            let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
+            self.effects.push(Effect::Record { context: "backend", fault });
+            return true;
+        }
         let (mut whose, mut page, mut stale) = (None, None, None);
         let waited = if let Some(b) = self.boots.iter_mut().find(|b| b.id == id) {
             b.failed = Some(kind.clone());
@@ -342,7 +349,7 @@ impl App {
 mod live;
 
 /// The status line's words for a failure of `kind`.
-pub(super) fn failure(kind: &FailKind) -> Label {
+pub(crate) fn failure(kind: &FailKind) -> Label {
     match kind {
         FailKind::ReadOnly => Label::FailReadOnly,
         FailKind::Network => Label::FailNetwork,

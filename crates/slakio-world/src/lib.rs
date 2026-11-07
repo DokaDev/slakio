@@ -19,7 +19,10 @@
 mod hostile;
 mod rng;
 mod saved;
+mod search;
 mod text;
+
+pub use search::{Query, SearchHit, parse as parse_query};
 
 pub use hostile::{Hostile, all as hostile_strings};
 

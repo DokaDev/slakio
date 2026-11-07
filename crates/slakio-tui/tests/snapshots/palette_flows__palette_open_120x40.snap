@@ -18,12 +18,12 @@ expression: d.snap()
 │   # deploys           │  :avatars              Show or hide avatars (initials)               │                       │
 │   # alerts            │  :icons                Show Nerd Font icons, or text instead         │                       │
 │   # partner-shared ext│  :density              Comfortable or compact messages               │                       │
-│   # hostile-strings   │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
-│   # big-history       │  :list                 Show or hide the list panel           Space e │                       │
-│   # long-threads      │  :navrows              Fold the view switcher to the view…   Space v │                       │
-│                       │  :home                 Show Home                             Space h │                       │
-│ ▾ Channels            │  :dms                  Show DMs                              Space d │                       │
-│   # announcements     │  :activity             Show Activity                         Space a │                       │
+│   # hostile-strings   │  :search               Search messages                   / / Space s │                       │
+│   # big-history       │  :jump                 Read the conversation from a day      Space j │                       │
+│   # long-threads      │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
+│                       │  :list                 Show or hide the list panel           Space e │                       │
+│ ▾ Channels            │  :navrows              Fold the view switcher to the view…   Space v │                       │
+│   # announcements     │  :home                 Show Home                             Space h │                       │
 │   # design-review     ╰─────────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯                       │
 │   # feed-alert-134         ││                         ?        Keyboard help                                         │
 │   # feed-alert-8           ││                         Ctrl+Q   Quit                                                  │

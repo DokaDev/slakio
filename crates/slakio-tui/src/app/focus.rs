@@ -33,6 +33,7 @@ impl App {
             Some(Overlay::Help) if self.help.as_ref().is_some_and(|h| h.typing) => Ctx::HelpFilter,
             Some(Overlay::Help) => Ctx::Help,
             Some(Overlay::Palette) => Ctx::CommandLine,
+            Some(Overlay::Search) => Ctx::Search,
             Some(Overlay::Switcher) => Ctx::Switcher,
             None => self.region_context(),
         }

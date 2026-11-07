@@ -16,6 +16,7 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
         "conversations.replies" => replies(world, request),
         "dnd.teamInfo" => dnd_team(world, request),
         "users/info" => edge_users(world, request),
+        "search.messages" => search(world, team, request),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
     if let Some(o) = out.as_object_mut() {
@@ -287,4 +288,44 @@ fn edge_users(world: &World, request: &Logged) -> Value {
         }
     }
     json!({"ok": true, "results": results, "failed_ids": failed})
+}
+
+/// `search.messages`: page `page` of `count` (20 unless asked) of what the world's search finds
+/// in the workspace served, newest first; every third match leaves its author's handle out.
+fn search(world: &World, team: usize, request: &Logged) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
+    let query = field(request, "query").unwrap_or_default();
+    let count = field(request, "count").and_then(|v| v.parse::<usize>().ok()).unwrap_or(20).clamp(1, 100);
+    let page = field(request, "page").and_then(|v| v.parse::<usize>().ok()).unwrap_or(1).max(1);
+    let all = world.search(&ws.id, &query);
+    let pages = all.len().div_ceil(count);
+    let s = world.snapshot();
+    let host = format!("{}.slack.com", ws.id.as_str().to_ascii_lowercase());
+    let matches: Vec<Value> = (all.iter().skip((page - 1) * count).take(count).enumerate())
+        .map(|(n, h)| {
+            let c = s.conversations.iter().find(|c| c.id == h.conversation);
+            let p = format!("p{}{:06}", h.message.ts.secs(), h.message.ts.0 % 1_000_000);
+            let mut link = format!("https://{host}/archives/{}/{p}", h.conversation.as_str());
+            if let Some(t) = h.thread {
+                link.push_str(&format!("?thread_ts={t}&cid={}", h.conversation.as_str()));
+            }
+            let mut m = json!({
+                "iid": format!("iid-{n}"),
+                "type": "message",
+                "team": ws.id.as_str(),
+                "channel": {"id": h.conversation.as_str(), "name": c.map(|c| c.name.unsanitized()).unwrap_or_default(), "is_private": false},
+                "user": h.message.user.as_str(),
+                "ts": h.message.ts.to_string(),
+                "text": h.message.text.unsanitized(),
+                "permalink": link,
+            });
+            if n % 3 != 0 {
+                let handle = s.users.iter().find(|u| u.id == h.message.user).map(|u| u.name.unsanitized());
+                m["username"] = json!(handle.unwrap_or_default());
+            }
+            m
+        })
+        .collect();
+    let paging = json!({"count": count, "total": all.len(), "page": page, "pages": pages});
+    json!({"ok": true, "query": query, "messages": {"total": all.len(), "paging": paging, "pagination": {"page": page, "page_count": pages}, "matches": matches}})
 }

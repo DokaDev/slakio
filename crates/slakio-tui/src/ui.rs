@@ -23,6 +23,7 @@ mod list;
 mod navbar;
 mod palette;
 mod picker;
+mod search;
 mod signin;
 mod statusline;
 mod switcher;
@@ -97,12 +98,17 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
                 app.theme.dim_area(f.buffer_mut(), area);
                 dialog::draw(f, app, body);
             }
+            Layer::Search if !screen::too_small(area) => {
+                app.theme.dim_area(f.buffer_mut(), area);
+                statusline::badge(f, app, status);
+                search::draw(f, app);
+            }
             Layer::Switcher if !screen::too_small(area) => switcher::draw(f, app),
             Layer::Links => {
                 app.theme.dim_area(f.buffer_mut(), body);
                 picker::draw(f, app, body);
             }
-            Layer::WhichKey | Layer::Palette | Layer::Switcher => {}
+            Layer::WhichKey | Layer::Palette | Layer::Search | Layer::Switcher => {}
         }
     }
 }

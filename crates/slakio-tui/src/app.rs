@@ -47,6 +47,7 @@ pub mod picker;
 pub mod query;
 pub(crate) mod requests;
 mod restore;
+pub mod search;
 pub mod shell;
 pub mod signin;
 mod splits;
@@ -62,6 +63,7 @@ use crate::input::hangul;
 use crate::keymap::{Ctx, KeyChord, KeyState, Keymap, Resolved};
 use crate::screen;
 use crate::theme::{Look, Theme};
+pub(crate) use answers::failure as failure_label;
 use dialog::{Dialog, Question};
 pub use effects::Effect;
 use help::Help;
@@ -150,6 +152,8 @@ pub struct App {
     jumps: jump::Jumps,
     /// The links of a message being picked (`o`), while they are.
     picker: Option<picker::Picker>,
+    /// The search popup: open or not, its words and results.
+    pub(crate) search: search::Search,
     /// What the backend can do; `None` without one.
     pub backend: Option<Capabilities>,
     sign_in: signin::Offer,
@@ -194,6 +198,7 @@ impl App {
             opening: None,
             jumps: jump::Jumps::default(),
             picker: None,
+            search: search::Search::default(),
             backend: None,
             sign_in: signin::Offer::default(),
             boots: Vec::new(),
@@ -227,7 +232,7 @@ impl App {
 
     pub fn mode(&self) -> Mode {
         match self.key_context() {
-            Ctx::CommandLine => Mode::Command,
+            Ctx::CommandLine | Ctx::Search => Mode::Command,
             Ctx::ComposerInsert => Mode::Insert,
             Ctx::PaneVisual => Mode::Visual,
             _ => Mode::Normal,
@@ -299,6 +304,10 @@ impl App {
                 }
                 true
             }
+            Event::Paste(text) if self.key_context() == Ctx::Search => {
+                self.search_insert(&text, now);
+                true
+            }
             Event::Paste(text) => {
                 self.paste(text);
                 true
@@ -345,6 +354,7 @@ impl App {
             Resolved::Unbound(seq) => {
                 self.guide = Guide::default();
                 match seq[..] {
+                    [key] if ctx == Ctx::Search => self.search_key(key.code, key.mods, now),
                     [key] => self.type_key(ctx, key),
                     [.., last] if last == KeyChord::char('?') => self.open_help(ctx),
                     _ => {}
@@ -366,6 +376,7 @@ impl App {
             Action::Dialog(a) => self.answer(a, now),
             Action::SignIn(a) => self.sign_in_action(a),
             Action::Links(a) => self.links_action(a, now),
+            Action::Search(a) => self.search_action(a, now),
         }
     }
 
@@ -395,6 +406,14 @@ impl App {
                 }
             }
             AppAction::ChooseWorkspace => self.open_switcher(),
+            AppAction::Search => self.open_search(None),
+            AppAction::JumpDate => {
+                if self.backend.is_some() && !self.checking_sign_in() {
+                    self.help = None;
+                    self.cmdline.open();
+                    self.cmdline.set("jump ");
+                }
+            }
             AppAction::Retry => self.retry(now),
             _ => self.toggle(a, now),
         }
@@ -492,13 +511,14 @@ impl App {
     /// goes away, or the which-key popup shows.
     pub fn deadline(&self) -> Option<Instant> {
         let guide = self.guide.at.filter(|_| !self.guide.shown && !self.keys.pending().is_empty());
-        [self.status.deadline(), guide, self.work.deadline()].into_iter().flatten().min()
+        [self.status.deadline(), guide, self.work.deadline(), self.search_deadline()].into_iter().flatten().min()
     }
 
     /// The deadline passed. `true` when the screen changed.
     pub fn on_tick(&mut self, now: Instant) -> bool {
         let mut changed = self.status.expire(now) | self.work.deadline().is_some_and(|at| at <= now);
         changed |= self.work.expire_flash(now);
+        changed |= self.search_tick(now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

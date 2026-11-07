@@ -104,7 +104,14 @@ impl App {
 
     /// Open `conversation` where `link` points: the conversation, its message, or a reply in
     /// its thread beside it; the pane opened gets the keyboard.
-    fn jump_to(&mut self, conversation: Target, link: &SlackLink, url: &str, label: Option<&str>, now: Instant) {
+    pub(super) fn jump_to(
+        &mut self,
+        conversation: Target,
+        link: &SlackLink,
+        url: &str,
+        label: Option<&str>,
+        now: Instant,
+    ) {
         let target = conversation.clone();
         let (pane, asked) = match (link.message, link.thread) {
             (None, _) => (self.work.open(conversation), None),

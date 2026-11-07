@@ -28,6 +28,7 @@ tokio = { workspace = true, features = ["net", "rt", "sync", "time", "macros", "
 tokio-rustls.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 rcgen.workspace = true
 slakio-fake.workspace = true
 slakio-world.workspace = true

@@ -21,6 +21,10 @@ fn only_listed_names_parse_and_every_listed_one_does() {
         "saved.list",
         "drafts.create",
         "stars.add",
+        "search.all",
+        "search.files",
+        "search.modules.messages",
+        "Search.Messages",
         "Client.UserBoot",
         "",
     ] {

@@ -18,6 +18,7 @@
 //! ╰───────────────────────────── Tab/↑↓ select · Enter run · Esc close ╯
 //! ```
 
+mod jump;
 mod net;
 mod settings;
 
@@ -62,6 +63,9 @@ pub enum Item {
     Rename,
     /// `:open <address>`: the address typed.
     Open,
+    /// `:jump <date>` and `:search <words>`.
+    Jump,
+    Search,
     /// A value for `:icons <value>` (index into [`ICON_VALUES`]).
     Icons(usize),
     /// A value for `:density <value>` (index into [`DENSITY_VALUES`]).
@@ -100,13 +104,15 @@ fn offered(a: Action, backend: bool) -> bool {
             | AppAction::ToggleIcons
             | AppAction::ToggleDensity
             | AppAction::ToggleNetwork
-            | AppAction::SignInAgain,
+            | AppAction::SignInAgain
+            | AppAction::Search
+            | AppAction::JumpDate,
         )
         | Action::Shell(_)
         | Action::Pane(_)
         | Action::Tab(_) => backend,
         Action::Help(h) => h == HelpAction::Open,
-        Action::Links(_) => false,
+        Action::Links(_) | Action::Search(_) => false,
         Action::App(_) | Action::CommandLine(_) | Action::Composer(_) | Action::Dialog(_) | Action::SignIn(_) => false,
     }
 }
@@ -189,6 +195,14 @@ impl App {
         if open_arg(line).is_some_and(|a| !a.is_empty()) {
             return vec![Item::Open];
         }
+        if self.backend.is_some() {
+            if jump::jump_arg(line).is_some() {
+                return vec![Item::Jump];
+            }
+            if jump::search_arg(line).is_some_and(|a| !a.is_empty()) {
+                return vec![Item::Search];
+            }
+        }
         if let Some(arg) = theme_arg(line) {
             return themes(arg).into_iter().map(Item::Theme).collect();
         }
@@ -256,13 +270,7 @@ impl App {
 
     /// The entries as drawn.
     pub fn palette_rows(&self) -> Vec<Row> {
-        let below = self.region_context();
-        let keys_of = |a: Action| {
-            let mut all = self.keymap.keys_for(a, below);
-            all.sort_by_key(Vec::len);
-            all.dedup();
-            all.iter().take(2).map(|k| keys::label(k)).collect::<Vec<_>>().join(" / ")
-        };
+        let keys_of = |a: Action| self.palette_keys(a);
         let label = |l: Label| self.i18n.label(l).to_string();
         self.palette_items()
             .into_iter()
@@ -322,6 +330,8 @@ impl App {
                 Item::TodoFilter(_) | Item::TodoSort(_) => self.todo_palette_row(item).unwrap_or_default(),
                 Item::Net(i) => self.net_row(i),
                 Item::Open => self.open_row(open_arg(self.cmdline.text()).unwrap_or_default()),
+                Item::Jump => self.jump_row(),
+                Item::Search => self.search_row(),
                 Item::Resize => self.resize_row(),
                 Item::Rename => {
                     let name = rename_arg(self.cmdline.text()).unwrap_or_default().to_string();
@@ -335,6 +345,14 @@ impl App {
                 }
             })
             .collect()
+    }
+
+    /// The keys of `a` where the keyboard is, the shortest two.
+    fn palette_keys(&self, a: Action) -> String {
+        let mut all = self.keymap.keys_for(a, self.region_context());
+        all.sort_by_key(Vec::len);
+        all.dedup();
+        all.iter().take(2).map(|k| keys::label(k)).collect::<Vec<_>>().join(" / ")
     }
 
     /// The palette's row of `:resize <arg>`.
@@ -422,6 +440,8 @@ impl App {
                 self.cmdline.close();
                 self.open_typed(&arg, now);
             }
+            Some(Item::Jump) => self.run_jump(&text, now),
+            Some(Item::Search) => self.run_search(&text),
             Some(Item::Resize) => match resize_arg(&text).and_then(resize_by) {
                 Some((dir, by)) => {
                     self.cmdline.close();

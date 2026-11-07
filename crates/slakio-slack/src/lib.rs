@@ -11,6 +11,7 @@
 //!   HTTP to a server on this machine (the tests' fake Slack);
 //! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
 //!   the names of the people messages and DMs name, looked up in batches and kept;
+//! * [`search`] — a workspace's messages a query finds, a page at a time;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
 //!   behind the UI's handle; [`live`] — the workspace's live updates (a socket that only
 //!   receives).
@@ -36,6 +37,7 @@ pub mod adapter;
 pub mod blocks;
 pub(crate) mod boot;
 pub mod client;
+pub(crate) mod dated;
 pub mod error;
 pub mod governor;
 pub(crate) mod http;
@@ -46,6 +48,7 @@ pub mod method;
 pub(crate) mod people;
 pub mod request;
 pub mod response;
+pub mod search;
 pub(crate) mod threads;
 pub mod wire;
 
