@@ -15,7 +15,7 @@ use crate::request::Call;
 use crate::wire;
 use slakio_core::backend::{Found, Hit, SEARCH_PAGE};
 use slakio_core::model::{ConversationId, Ts, UserId, WorkspaceId};
-use slakio_core::sanitize::Remote;
+use slakio_core::sanitize::{BLOCK_MAX_CHARS, Remote};
 
 /// The last page Slack gives.
 pub const SEARCH_PAGES_MAX: u32 = 100;
@@ -59,22 +59,34 @@ pub(crate) async fn search(client: &Client, ctx: &Session, query: &str, page: u3
     })
 }
 
-/// A match as a hit; `None` without a conversation or a time.
+/// A match as a hit; `None` without a conversation of Slack's shape (`C…`, `G…`, `D…`) or a
+/// time. An author id not of Slack's shape (`U…`, `W…`, `B…`) is left out; the text keeps at
+/// most [`BLOCK_MAX_CHARS`] characters (what is shown of a message at most).
 fn hit(m: wire::SearchMatch) -> Option<Hit> {
     let ts = Ts(wire::ts(&m.ts)?);
-    let channel = m.channel?;
+    let channel = m.channel.filter(|c| shaped(&c.id, b"CGD"))?;
     let permalink = m.permalink.unwrap_or_default();
     let thread = thread_of(&permalink, &channel.id, ts);
+    let user = m.user.filter(|u| shaped(u, b"UWB")).unwrap_or_default();
+    let text: String = m.text.unwrap_or_default().chars().take(BLOCK_MAX_CHARS).collect();
     Some(Hit {
         conversation: ConversationId::new(&channel.id),
         name: Remote::new(channel.name.unwrap_or_default()),
         ts,
         thread,
-        user: UserId::new(m.user.unwrap_or_default()),
+        user: UserId::new(user),
         author: Remote::new(m.username.unwrap_or_default()),
-        text: Remote::new(m.text.unwrap_or_default()),
+        text: Remote::new(text),
         permalink,
     })
+}
+
+/// An id of Slack's shape: one of `first`, then 2 to 31 upper-case letters or digits.
+fn shaped(id: &str, first: &[u8]) -> bool {
+    let b = id.as_bytes();
+    (3..=32).contains(&b.len())
+        && first.contains(&b[0])
+        && b[1..].iter().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
 }
 
 // derived from gammons/slk (MIT)

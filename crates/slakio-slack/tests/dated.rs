@@ -142,3 +142,21 @@ fn when_the_pages_tried_miss_it_the_oldest_after_the_date_is_shown_and_a_failure
         assert!(matches!(e.event, Event::Failed { .. }), "{e:?}");
     });
 }
+
+#[test]
+fn an_answer_holding_a_message_older_than_the_date_is_read_without_harm() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let big = r.target(names::BIG_HISTORY);
+        let at = r.world.message(big.conversation(), 3000).unwrap().ts;
+        let old = r.world.message(big.conversation(), 10).unwrap().ts;
+        // Asked for what came after the date, Slack answers with one message from before it.
+        let stamp = format!("{}.{:06}", old.0 / 1_000_000, old.0 % 1_000_000);
+        let answer = serde_json::json!({"ok": true, "has_more": true,
+            "messages": [{"type": "message", "ts": stamp, "user": "UDEMOA001", "text": "older"}]});
+        r.fake.fail_next("conversations.history", Fault::Answer(answer));
+        let page = r.dated(&big, at).await;
+        assert!(page.cut, "{:?}", ts(&page));
+        assert!(r.histories() <= 7);
+    });
+}

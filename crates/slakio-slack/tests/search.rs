@@ -162,8 +162,9 @@ fn a_hostile_answer_is_read_tolerantly_and_kept_as_remote_text() {
         let mut r = Run::new().await;
         let evil = "\u{1b}]8;;https://evil.test\u{7}\u{1b}[2Jclick\u{202e}\u{e000}x\u{e001}";
         let answer = serde_json::json!({"ok": true, "messages": {"total": 4, "paging": {"page": 1, "pages": 1}, "matches": [
-            {"ts": "1767603600.000100", "channel": {"id": "C1", "name": evil}, "user": "U1", "username": evil,
-             "text": evil, "permalink": "https://evil.test/archives/C1/p1?thread_ts=1767600000.000200&cid=C9"},
+            {"ts": "1767603600.000100", "channel": {"id": "C01", "name": evil}, "user": "U1", "username": evil,
+             "text": evil, "permalink": "https://evil.test/archives/C01/p1?thread_ts=1767600000.000200&cid=C9"},
+            {"ts": "1767603600.000400", "channel": {"id": "../C01", "name": "x"}, "text": "x"},
             {"ts": "not-a-time", "channel": {"id": "C1"}, "text": "x"},
             {"ts": "1767603600.000200", "text": "no channel"},
             {"ts": "1767603600.000300", "channel": {"id": "C1"}, "text": 7, "permalink": ["x"]}

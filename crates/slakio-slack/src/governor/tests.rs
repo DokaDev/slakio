@@ -370,3 +370,29 @@ fn a_workspace_signed_in_again_shares_its_lane_and_keeps_its_background_hour() {
         g.dial(&b).unwrap();
     });
 }
+
+#[test]
+fn a_search_waits_its_turn_a_second_after_the_last_and_other_methods_do_not() {
+    rt().block_on(async {
+        let (g, _) = governor(Limits::default(), true);
+        let started = Instant::now();
+        drop(g.admit(Method::SearchMessages, Priority::User).await.unwrap());
+        assert!(started.elapsed() < Duration::from_millis(500), "the first goes at once");
+        drop(g.admit(M, Priority::User).await.unwrap());
+        assert!(started.elapsed() < Duration::from_millis(500), "another method does not wait");
+        drop(g.admit(Method::SearchMessages, Priority::User).await.unwrap());
+        assert!(started.elapsed() >= Duration::from_millis(900), "{:?}", started.elapsed());
+        assert_eq!(g.sent(), 3);
+        // Switched off while waiting: the wait ends, nothing is sent.
+        let waiting = g.admit(Method::SearchMessages, Priority::User);
+        let stop = async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            g.stop();
+        };
+        let (waited, ()) = tokio::join!(waiting, stop);
+        assert!(matches!(waited, Err(SlackError::Offline { .. })));
+        assert_eq!(g.sent(), 3);
+    });
+    assert_eq!(spacing(Method::SearchMessages), Some(Duration::from_secs(1)));
+    assert_eq!(spacing(Method::ConversationsHistory), None);
+}

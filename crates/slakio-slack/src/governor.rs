@@ -20,7 +20,9 @@
 //!   others room;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
-//!   one); the others go on.
+//!   one); the others go on;
+//! * a **least time between two requests** of a method Slack allows only a few of a minute
+//!   ([`spacing`]: `search.messages`): one asked sooner waits for its turn.
 //!
 //! The defaults are far above what the client needs (its start is three requests, opening a
 //! conversation one): they are ceilings that stop a bug from flooding Slack, not a pace.
@@ -57,6 +59,15 @@ pub const HOUR: Duration = Duration::from_secs(3600);
 
 /// How long a method waits after Slack asked to slow down without saying for how long.
 pub const DEFAULT_PAUSE: Duration = Duration::from_secs(30);
+
+/// The least time between two requests of `method`, for the methods Slack allows only a few
+/// of a minute (its "Tier 2", about 20) that the user can ask for again and again.
+pub fn spacing(method: Method) -> Option<Duration> {
+    match method {
+        Method::SearchMessages => Some(Duration::from_secs(1)),
+        _ => None,
+    }
+}
 
 /// How much may be sent, and how much at once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,6 +168,8 @@ struct Counts {
     window: VecDeque<Duration>,
     /// Methods Slack asked to slow down, and until when.
     paused: HashMap<Method, Duration>,
+    /// Methods with a [`spacing`], and when the next of each may go.
+    turns: HashMap<Method, Duration>,
     total: u32,
     /// The per-process cap was reached: nothing more is sent.
     tripped: bool,
@@ -312,6 +325,28 @@ impl Governor {
         c.paused.get(&method).filter(|until| **until > now).map(|until| *until - now)
     }
 
+    /// Wait for `method`'s turn when it has a [`spacing`]: the turn is taken at once (so two
+    /// asked together go one spacing apart), then waited for; the network switched off ends the
+    /// wait.
+    async fn turn(&self, method: Method) -> Result<(), SlackError> {
+        let Some(gap) = spacing(method) else { return Ok(()) };
+        let now = self.clock.now();
+        let wait = {
+            let mut c = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let next = c.turns.entry(method).or_default();
+            let at = (*next).max(now);
+            *next = at + gap;
+            at - now
+        };
+        if wait.is_zero() {
+            return Ok(());
+        }
+        tokio::select! {
+            () = tokio::time::sleep(wait) => Ok(()),
+            () = self.stopped() => Err(SlackError::Offline { why: "the network is switched off" }),
+        }
+    }
+
     /// A lane of its own for one workspace's requests.
     pub fn lane(&self) -> Lane {
         self.new_lane(Background::default())
@@ -350,6 +385,7 @@ impl Governor {
             return Err(off());
         }
         let Some(place) = Waiting::take(&lane.waiting, lane.limit) else { return Err(SlackError::Busy) };
+        self.turn(method).await?;
         let own = tokio::select! {
             slot = Arc::clone(&lane.slots).acquire_owned() => slot.ok(),
             () = self.stopped() => None,
@@ -378,6 +414,7 @@ impl Governor {
     /// Let a request for `method` of `priority` through, waiting for a slot when all are
     /// taken: nothing may be sent without it.
     pub async fn admit(&self, method: Method, priority: Priority) -> Result<Admitted, SlackError> {
+        self.turn(method).await?;
         self.admit_for(method, priority, None).await
     }
 

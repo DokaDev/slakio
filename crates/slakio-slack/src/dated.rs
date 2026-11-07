@@ -44,7 +44,7 @@ pub(crate) async fn dated(
     let (channel, count) = (conversation.as_str().to_string(), limit.clamp(1, PAGE_MAX));
     let after = window(client, &channel, count, Bound::After(at)).await?;
     // The oldest of those, when there are more after the date than these.
-    let more = times(&after).into_iter().min().filter(|_| after.has_more != Some(false));
+    let more = times(&after).into_iter().filter(|t| *t >= at.0).min().filter(|_| after.has_more != Some(false));
     let (raw, complete, cut) = match more {
         // All there is after the date (or nothing): with those before it, up to the newest.
         None => {
@@ -79,15 +79,16 @@ async fn first_page_after(
     at: u64,
     after: &wire::History,
 ) -> Result<wire::History, SlackError> {
-    let read = times(after);
+    // Only those at `at` or after (an answer may hold older ones, whatever was asked).
+    let read: Vec<u64> = times(after).into_iter().filter(|t| *t >= at).collect();
     let (mut lo, mut hi) = (at, read.iter().copied().min().unwrap_or(at));
-    let mut gap = pace(&read).unwrap_or_else(|| (hi - lo) / u64::from(count)).max(1);
+    let mut gap = pace(&read).unwrap_or_else(|| hi.saturating_sub(lo) / u64::from(count)).max(1);
     let (half, mut halve) = (u64::from(count / 2).max(1), false);
     for _ in 0..PROBES {
-        if hi <= lo + 1 {
+        if hi <= lo.saturating_add(1) {
             break;
         }
-        let end = if halve { lo + (hi - lo) / 2 } else { lo.saturating_add(gap.saturating_mul(half)) };
+        let end = if halve { lo + hi.saturating_sub(lo) / 2 } else { lo.saturating_add(gap.saturating_mul(half)) };
         let end = end.clamp(lo + 1, hi);
         let page = window(client, channel, count, Bound::UpTo(Ts(end))).await?;
         let read = times(&page);

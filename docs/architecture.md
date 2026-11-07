@@ -246,7 +246,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
    starts again. Over a cap a request fails with `CapReached` and is not sent.
    When Slack asks to slow down (HTTP 429 or `ratelimited`), that method is paused for its
    `Retry-After` (30 seconds when Slack does not say); a paused method fails with
-   `RateLimited` without being sent, and the other methods go on.
+   `RateLimited` without being sent, and the other methods go on. A method Slack allows only a
+   few of a minute that the user can ask for again and again (`search.messages`) goes at most
+   once a second: one asked sooner waits for its turn.
 4. **In flight**: at most 8 requests at once, 64 more waiting; beyond that a request fails as
    `Busy`. Every workspace's client has a lane of its own: one of the 8 is kept for it (for as
    many lanes as there are slots), and it holds at most 6 of the 8 and 48 of the waiting places,
