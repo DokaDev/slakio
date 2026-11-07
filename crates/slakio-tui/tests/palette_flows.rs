@@ -35,20 +35,20 @@ fn ctrl_p_opens_a_box_of_every_command_and_action_with_its_keys() {
     assert!(lines[1].contains(": type a command or an action name"), "{lines:#?}");
     assert!(lines[2].contains("├────"), "a rule joined to the sides: {lines:#?}");
     let all = lines.join("\n");
-    for want in [":theme <theme>", ":help", "? / F1"] {
+    for want in [":theme <theme>", ":help", "? · F1"] {
         assert!(all.contains(want), "{want}: {all}");
     }
     // The list scrolls: the rest is there too. Quit is last, never the entry Enter would run.
     let rows = d.app.palette_rows();
     let last = rows.last().unwrap();
     assert_eq!((last.name.as_str(), last.label.as_str()), (":qa, :qall, :quitall", "Quit"), "{rows:#?}");
-    assert_eq!(last.keys, "Ctrl+Q / Space q");
+    assert_eq!(last.keys, "Ctrl+Q · Space q");
     assert!(!all.contains("Quit"), "not in the first screen: {all}");
     assert_ne!(rows[d.app.cmdline.selected].label, "Quit");
-    for (name, keys) in [(":theme <theme>", ""), (":nav, :rail", "Ctrl+R / Space r"), (":home", "Space h")] {
+    for (name, keys) in [(":theme <theme>", ""), (":nav, :rail", "Ctrl+R · Space r"), (":home", "Space h")] {
         assert!(rows.iter().any(|r| r.name == name && r.keys == keys), "{name}: {rows:#?}");
     }
-    assert!(rows.iter().any(|r| r.name.is_empty() && r.label == "Next panel" && r.keys == "Tab / F6"), "{rows:#?}");
+    assert!(rows.iter().any(|r| r.name.is_empty() && r.label == "Next panel" && r.keys == "Tab · F6"), "{rows:#?}");
     assert!(lines.last().unwrap().contains("Tab/↑↓ select · Enter run · Esc close"), "{lines:#?}");
     insta::assert_snapshot!("palette_open_120x40", d.snap());
     // The same key closes it.
@@ -78,7 +78,7 @@ fn actions_are_found_by_their_words_and_run_with_enter() {
     d.type_text("rail");
     let rows = d.app.palette_rows();
     assert_eq!(rows[0].name, ":nav, :rail", "the old name still finds the view switcher");
-    assert_eq!(rows[0].keys, "Ctrl+R / Space r", "the keys from where the keyboard is");
+    assert_eq!(rows[0].keys, "Ctrl+R · Space r", "the keys from where the keyboard is");
     d.keys("enter");
     assert_eq!(d.app.focus(), Focus::ViewSwitcher);
     // An action without a command: found by its label.

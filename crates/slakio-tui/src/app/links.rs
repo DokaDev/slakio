@@ -61,7 +61,7 @@ impl App {
         } else {
             items
                 .iter()
-                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts), m.author, m.text))
+                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts, &self.zone), m.author, m.text))
                 .collect::<Vec<_>>()
                 .join("\n")
         };

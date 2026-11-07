@@ -181,6 +181,10 @@ impl App {
         if self.work.take_missed() {
             self.info(Msg::Label(Label::JumpGone), now);
         }
+        if let Some(at) = self.work.take_quiet() {
+            let day = crate::time::date(at, &self.zone);
+            self.info(Msg::JumpDateQuiet { day }, now);
+        }
     }
 
     /// The hosts of the workspaces `signed` signed in to: a Slack link to one opens there.

@@ -5,6 +5,7 @@
 use super::super::query::Focus;
 use super::{App, Row};
 use crate::action::{Action, AppAction};
+use crate::when::Words;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::Target;
 use std::time::Instant;
@@ -42,20 +43,44 @@ impl App {
         Row { name: format!(":search {words}"), label: self.i18n.label(Label::ActionSearchOpen).to_string(), keys }
     }
 
-    /// `:jump <date>` run: an unknown day is said under the list (the palette stays).
+    /// The words for days of the language shown (`:jump`).
+    fn day_words(&self) -> Words {
+        let label = |l| self.i18n.label(l).to_string();
+        Words {
+            today: label(Label::JumpWordToday),
+            yesterday: label(Label::JumpWordYesterday),
+            before_yesterday: label(Label::JumpWordBeforeYesterday),
+            weekdays: label(Label::JumpWordWeekdays).split_whitespace().map(str::to_string).collect(),
+        }
+    }
+
+    /// `:jump <date>` run: no day, an unknown day or one still to come is said under the list
+    /// (the palette stays). "Today" is the day it is now in the zone shown.
     pub(super) fn run_jump(&mut self, text: &str, now: Instant) {
         let day = jump_arg(text).unwrap_or_default();
-        let Some(day) = crate::when::parse(day, crate::time::day(self.model.taken())) else {
+        if day.is_empty() {
+            self.cmdline.error = Some(Msg::Label(Label::JumpDateEmpty));
+            return;
+        }
+        let today = self.today();
+        let Some(day) = crate::when::parse(day, today, &self.day_words()) else {
             self.cmdline.error = Some(Msg::JumpDateBad { text: day.chars().take(40).collect() });
             return;
         };
+        if day > today {
+            let (y, m, d) = crate::time::ymd(day);
+            self.cmdline.error = Some(Msg::JumpDateFuture { day: format!("{y:04}-{m:02}-{d:02}") });
+            return;
+        }
         self.cmdline.close();
+        // Over the search popup (the palette opened from it), the conversation shows instead.
+        self.close_search();
         let Some(p) = self.work.focused() else { return self.info(Msg::Label(Label::JumpDateNone), now) };
         let target = Target::Conversation {
             workspace: p.target.workspace().clone(),
             conversation: p.target.conversation().clone(),
         };
-        let (pane, _) = self.work.jump_date(target, crate::when::start(day));
+        let (pane, _) = self.work.jump_date(target, crate::when::start(day, &self.zone));
         if let Some(id) = pane {
             self.work.activate(id);
             self.set_focus(Focus::on(id));
@@ -64,9 +89,9 @@ impl App {
     }
 
     /// `:search <words>` run: the popup open with them searched.
-    pub(super) fn run_search(&mut self, text: &str) {
+    pub(super) fn run_search(&mut self, text: &str, now: Instant) {
         let words = search_arg(text).unwrap_or_default().to_string();
         self.cmdline.close();
-        self.open_search(Some(&words));
+        self.open_search(Some(&words), now);
     }
 }

@@ -32,6 +32,8 @@ pub fn dirs(cmd: &mut Command, dir: &Path) {
         // A warm start draws from the cache however slow the machine (the read is waited for).
         .env("SLAKIO_TEST_CACHE_WAIT_MS", "10000")
         .env("LC_ALL", "en_US.UTF-8")
+        // Times on screen in UTC, whatever this machine's zone (a test may name another).
+        .env("SLAKIO_TZ", "UTC")
         .env("TERM", "xterm-256color")
         .env_remove("TMUX")
         .env_remove("SLAKIO_NETWORK");

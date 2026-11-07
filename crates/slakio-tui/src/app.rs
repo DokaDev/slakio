@@ -170,6 +170,11 @@ pub struct App {
     restoring: Option<slakio_core::layout::saved::Saved>,
     /// The workspace switcher's cursor, while it is open.
     pub(crate) switcher: Option<usize>,
+    /// The time zone times and days are shown in.
+    pub zone: crate::time::Zone,
+    /// The clock "today" is read from when it is asked (`:jump today`); without one, the time
+    /// the backend took its snapshot (the demo's invented day, the tests').
+    pub clock: Option<fn() -> slakio_core::model::Ts>,
     /// The terminal's size, for the mouse and scrolling.
     pub size: Rect,
     /// Set once the user asked to quit; the binary's loop ends.
@@ -208,6 +213,8 @@ impl App {
             seam_drag: None,
             restoring: None,
             switcher: None,
+            zone: crate::time::Zone::utc(),
+            clock: None,
             size: Rect::default(),
             quit: false,
         }
@@ -250,6 +257,16 @@ impl App {
     fn pane_height(&self) -> usize {
         let frame = self.frame();
         self.work.active().and_then(|id| frame.pane(id)).map_or(1, |p| usize::from(p.parts.messages.height)).max(1)
+    }
+
+    /// The time it is now ([`App::clock`]).
+    pub fn now_ts(&self) -> slakio_core::model::Ts {
+        self.clock.map_or_else(|| self.model.taken(), |c| c())
+    }
+
+    /// The day it is now in the zone shown (days since 1970-01-01).
+    pub fn today(&self) -> i64 {
+        crate::time::day(self.now_ts(), &self.zone)
     }
 
     /// The which-key popup shows at `now`.
@@ -406,7 +423,7 @@ impl App {
                 }
             }
             AppAction::ChooseWorkspace => self.open_switcher(),
-            AppAction::Search => self.open_search(None),
+            AppAction::Search => self.open_search(None, now),
             AppAction::JumpDate => {
                 if self.backend.is_some() && !self.checking_sign_in() {
                     self.help = None;

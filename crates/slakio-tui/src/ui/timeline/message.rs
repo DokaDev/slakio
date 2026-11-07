@@ -73,13 +73,13 @@ pub enum Kind {
 pub type Laid = (Line<'static>, Kind, Vec<crate::text::Spot>);
 
 /// Message `i` follows one of the same sender closely: no picture, no name.
-pub fn grouped(pane: &Pane, tl: &Timeline, i: usize) -> bool {
+pub fn grouped(pane: &Pane, tl: &Timeline, i: usize, zone: &crate::time::Zone) -> bool {
     let Some(prev) = i.checked_sub(1).map(|p| &tl.items[p]) else { return false };
     let m = &tl.items[i];
     // A thread's own message and its first reply never group: the divider is between them.
     let root = pane.root(tl);
     prev.user == m.user
-        && time::day(prev.ts) == time::day(m.ts)
+        && time::day(prev.ts, zone) == time::day(m.ts, zone)
         && m.ts.0.saturating_sub(prev.ts.0) <= GROUP_SECS * 1_000_000
         && root != Some(i - 1)
         && prev.thread.is_none()
@@ -90,14 +90,14 @@ pub fn grouped(pane: &Pane, tl: &Timeline, i: usize) -> bool {
 fn above(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid> {
     let m = &tl.items[i];
     let mut out = Vec::new();
-    let new_day = i == 0 || time::day(tl.items[i - 1].ts) != time::day(m.ts);
+    let new_day = i == 0 || time::day(tl.items[i - 1].ts, &app.zone) != time::day(m.ts, &app.zone);
     let after_reactions = i > 0 && !tl.items[i - 1].reactions.is_empty();
     let after_divider = pane.root(tl) == Some(i.wrapping_sub(1));
-    if i > 0 && !after_divider && (new_day || after_reactions || !grouped(pane, tl, i)) {
+    if i > 0 && !after_divider && (new_day || after_reactions || !grouped(pane, tl, i, &app.zone)) {
         out.push((Line::raw(""), Kind::Gap, Vec::new()));
     }
     if new_day {
-        out.push((rule(&time::date(m.ts), w, app.theme.faint()), Kind::Rule, Vec::new()));
+        out.push((rule(&time::date(m.ts, &app.zone), w, app.theme.faint()), Kind::Rule, Vec::new()));
     }
     out
 }
@@ -216,13 +216,13 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     // The text starts after the slot and a gap of 2 (the time of a grouped message fits there).
     let indent = slot.map_or(0, |s| s.cols + 2);
     let text_w = w.saturating_sub(indent).max(4);
-    let group = grouped(pane, tl, i);
+    let group = grouped(pane, tl, i, &app.zone);
     let ((lines, spots), _) = text_lines(app, pane, m, text_w);
     let mut out: Vec<Laid> = Vec::new();
     if group {
         for (k, (mut spans, on)) in lines.into_iter().zip(spots).enumerate() {
             let lead = match (k, selected && indent >= TIME_WIDTH) {
-                (0, true) => Span::styled(format!("{:<indent$}", time::hm(m.ts)), t.faint()),
+                (0, true) => Span::styled(format!("{:<indent$}", time::hm(m.ts, &app.zone)), t.faint()),
                 _ => Span::raw(" ".repeat(indent)),
             };
             spans.insert(0, lead);
@@ -241,7 +241,7 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
         }
     };
     let author_style = if m.own { t.own_author() } else { t.author() };
-    let time_text = time::hm(m.ts);
+    let time_text = time::hm(m.ts, &app.zone);
     let tag = tags(app, pane, m, true);
     let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2 + width(&tag)).max(1));
     let mut header = picture(0);
@@ -269,7 +269,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
     let t = &app.theme;
     let m = &tl.items[i];
     let stacked = w < STACKED_BELOW;
-    let group = grouped(pane, tl, i);
+    let group = grouped(pane, tl, i, &app.zone);
     let author_style = if m.own { t.own_author() } else { t.author() };
     let chip_column = avatar::WIDTH + 1;
     let chip =
@@ -296,7 +296,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             Span::styled(clip(m.author.as_str(), room.saturating_sub(width(&tag))), author_style),
             Span::styled(tag, tag_style(app)),
             Span::styled(" · ", t.faint()),
-            Span::styled(time::hm(m.ts), t.faint()),
+            Span::styled(time::hm(m.ts, &app.zone), t.faint()),
         ]);
         out.push((Line::from(spans), Kind::Content, Vec::new()));
     }
@@ -330,7 +330,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
         spans.extend(line);
         if k == 0 && !stacked {
             spans.push(Span::raw(" ".repeat(text_w.saturating_sub(used) + 1)));
-            spans.push(Span::styled(time::hm(m.ts), t.faint()));
+            spans.push(Span::styled(time::hm(m.ts, &app.zone), t.faint()));
         }
         out.push((Line::from(spans), Kind::Content, shifted(on, indent_w)));
     }
@@ -392,7 +392,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
         ));
     }
     if let Some(th) = m.thread.filter(|_| !pane.is_thread()) {
-        let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply) };
+        let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply, &app.zone) };
         let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));
         out.push((Line::from(vec![Span::raw(indent.clone()), Span::styled(text, t.link())]), Kind::Link, Vec::new()));
     }

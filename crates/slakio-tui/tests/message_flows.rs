@@ -79,7 +79,10 @@ fn a_group_starts_with_the_picture_and_the_name_over_the_text() {
         }
         headers += 1;
         assert!(buf[(x0 + 6, y)].modifier.contains(Modifier::BOLD), "message {i}: the name is bold");
-        assert!(header.contains(&slakio_tui::time::hm(m.ts)), "message {i}: its time beside the name: {header}");
+        assert!(
+            header.contains(&slakio_tui::time::hm(m.ts, &slakio_tui::time::Zone::utc())),
+            "message {i}: its time beside the name: {header}"
+        );
         // The picture: 4 × 2 cells of one tint, the initials on the first row.
         for (dx, dy) in [(0, 0), (3, 0), (0, 1), (3, 1)] {
             assert_eq!(buf[(x0 + dx, y + dy)].bg, picture, "message {i}: the slot's cell {dx},{dy}");
@@ -105,7 +108,8 @@ fn blocks_are_one_blank_row_apart_and_reactions_never_touch_the_next_message() {
             let ((a, _), (b, yb)) = (w[0], w[1]);
             let starts_group = buf[(area.x + 7, yb)].modifier.contains(Modifier::BOLD);
             let after_reactions = !pane.messages()[a].reactions.is_empty();
-            let new_day = slakio_tui::time::day(pane.messages()[a].ts) != slakio_tui::time::day(pane.messages()[b].ts);
+            let new_day = slakio_tui::time::day(pane.messages()[a].ts, &slakio_tui::time::Zone::utc())
+                != slakio_tui::time::day(pane.messages()[b].ts, &slakio_tui::time::Zone::utc());
             if (starts_group || after_reactions) && !new_day {
                 assert!(blank(yb - 1), "{name}: one blank row above message {b}");
                 assert!(!blank(yb - 2), "{name}: never two, above message {b}");
@@ -172,10 +176,11 @@ fn a_grouped_message_shows_its_time_only_while_selected_and_the_selection_covers
         a.user == b.user
             && b.ts.0 - a.ts.0 <= 300_000_000
             && a.thread.is_none()
-            && slakio_tui::time::day(a.ts) == slakio_tui::time::day(b.ts)
+            && slakio_tui::time::day(a.ts, &slakio_tui::time::Zone::utc())
+                == slakio_tui::time::day(b.ts, &slakio_tui::time::Zone::utc())
     });
     if let Some(i) = grouped {
-        let hm = slakio_tui::time::hm(msgs[i].ts);
+        let hm = slakio_tui::time::hm(msgs[i].ts, &slakio_tui::time::Zone::utc());
         d.app.select_message(i);
         let rows: Vec<u16> = {
             let _ = d.buffer();
@@ -222,9 +227,16 @@ fn density_switches_to_columns_and_back_and_is_saved() {
     let s = d.screen();
     let pane = d.pane(PaneKind::Conversation).unwrap();
     let last = pane.messages().last().unwrap();
-    let line = s.lines().find(|l| l.contains(&slakio_tui::time::hm(last.ts))).unwrap_or_default().to_string();
+    let line = s
+        .lines()
+        .find(|l| l.contains(&slakio_tui::time::hm(last.ts, &slakio_tui::time::Zone::utc())))
+        .unwrap_or_default()
+        .to_string();
     assert!(
-        line.trim_end().trim_end_matches('│').trim_end().ends_with(&slakio_tui::time::hm(last.ts)),
+        line.trim_end()
+            .trim_end_matches('│')
+            .trim_end()
+            .ends_with(&slakio_tui::time::hm(last.ts, &slakio_tui::time::Zone::utc())),
         "compact: the time on the right: {line}"
     );
     d.command("density comfortable");

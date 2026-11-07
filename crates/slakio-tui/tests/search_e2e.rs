@@ -123,7 +123,7 @@ fn a_search_finds_and_opens_a_message_and_a_day_reads_from_its_first() {
         assert!(methods.iter().all(|x| x == "conversations.history" || x == "users/info"), "{methods:?}");
         // A day: read from its first message, a few requests.
         let big = ConversationId::new(m.world.find(ws.as_str(), names::BIG_HISTORY).unwrap().id.as_str());
-        let day = slakio_tui::time::date(m.world.message(&big, 4000).unwrap().ts);
+        let day = slakio_tui::time::date(m.world.message(&big, 4000).unwrap().ts, &slakio_tui::time::Zone::utc());
         let asked = m.fake.log().len();
         run.type_bytes(format!(":jump {day}\r").as_bytes());
         run.wait_for("the day", |t| t.contains(&day));

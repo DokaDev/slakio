@@ -41,3 +41,17 @@ fn the_popup_fits_the_screen_and_keeps_the_cursor_in_view() {
     assert_eq!(search_box(Rect::new(0, 0, 19, 40), 0), None);
     assert_eq!(search_box(Rect::new(0, 0, 80, 9), 0), None);
 }
+
+#[test]
+fn a_long_text_keeps_a_bounded_number_of_runs_of_bounded_length() {
+    let many = "\u{E000}a\u{E001}b".repeat(10_000);
+    let got = runs(&hit(&many));
+    assert_eq!(got.len(), RUNS_MAX);
+    let lead = format!("{}x \u{E000}deploy\u{E001} {}", "w".repeat(RUN_CHARS_MAX * 3), "z".repeat(RUN_CHARS_MAX * 3));
+    let got = runs(&hit(&lead));
+    assert_eq!(got.len(), 3);
+    assert_eq!(got[0].0.chars().count(), RUN_CHARS_MAX);
+    assert!(got[0].0.ends_with("x "), "the text before the word found keeps its end");
+    assert_eq!(got[1], ("deploy".to_string(), true));
+    assert!(got[2].0.starts_with(" z") && got[2].0.chars().count() == RUN_CHARS_MAX);
+}

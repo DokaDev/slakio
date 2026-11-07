@@ -8,7 +8,7 @@
 //! opened, without a request.
 
 use super::Work;
-use crate::app::pane::PAGE;
+use crate::app::pane::{Landed, PAGE};
 use slakio_core::backend::Command;
 use slakio_core::model::{Target, WorkspaceId};
 use std::time::{Duration, Instant};
@@ -26,7 +26,11 @@ impl Work {
         for id in self.ids() {
             let Some(pane) = self.panes.get_mut(&id) else { continue };
             let tl = self.timelines.entry(&pane.target);
-            self.missed |= pane.land(tl) == Some(false);
+            match pane.land(tl) {
+                Some(Landed::Missing) => self.missed = true,
+                Some(Landed::Quiet(at)) => self.quiet = Some(at),
+                _ => {}
+            }
             let workspace = Some(pane.target.workspace().clone());
             match pane.wants(tl) {
                 Some(None) => {

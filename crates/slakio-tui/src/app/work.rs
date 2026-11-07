@@ -69,6 +69,8 @@ pub struct Work {
     edits: u64,
     /// A link's message was not found where its pane landed ([`Work::take_missed`]).
     missed: bool,
+    /// A day read found nothing on or after the day starting then ([`Work::take_quiet`]).
+    quiet: Option<slakio_core::model::Ts>,
 }
 
 /// The draft of a target that has none yet.

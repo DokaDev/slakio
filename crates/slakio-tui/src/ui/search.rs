@@ -16,7 +16,7 @@
 
 use crate::app::App;
 use crate::app::model::breadcrumb;
-use crate::app::search::{HIT_LINES, Showing, runs};
+use crate::app::search::{HIT_LINES, Showing};
 use crate::text::{clip, width, wrap};
 use crate::theme::Selection;
 use ratatui::Frame;
@@ -45,8 +45,12 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         .border_style(t.border(true))
         .title(Line::from(Span::styled(title, t.bold())));
     let count = count(app);
-    let keys = format!(" {} ", app.i18n.label(Label::SearchKeys));
-    if width(&count) + width(&keys) + 6 <= w {
+    // The keys beside the count: all of them, else the ones that matter with results there.
+    let keys = [Label::SearchKeys, Label::SearchKeysShort, Label::SearchKeysTiny]
+        .map(|l| format!(" {} ", app.i18n.label(l)))
+        .into_iter()
+        .find(|keys| width(&count) + width(keys) + 6 <= w);
+    if let Some(keys) = keys {
         block = block.title_bottom(Line::from(Span::styled(keys, t.muted())).right_aligned());
     }
     if !count.is_empty() && width(&count) + 4 <= w {
@@ -64,7 +68,9 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         let hint = clip(&app.i18n.label(Label::SearchPlaceholder), usize::from(area.width));
         f.render_widget(Paragraph::new(hint).style(t.faint()), area);
     } else {
-        f.render_widget(Paragraph::new(shown.clone()).style(t.text()), area);
+        // Kept from before: shown selected, as typing replaces them.
+        let style = if app.search_fresh() { t.text().add_modifier(Modifier::REVERSED) } else { t.text() };
+        f.render_widget(Paragraph::new(shown.clone()).style(style), area);
     }
     let cx = area.x + width(&shown) as u16;
     if app.searching() && !app.cmdline.is_open() {
@@ -85,7 +91,12 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         Showing::Nothing => (said(Label::SearchNothing), t.muted()),
         Showing::Failed => {
             let why = app.search_failed_kind().map(|k| said(crate::app::failure_label(k))).unwrap_or_default();
-            (format!("{why} {}", said(Label::SearchRetry)), t.warning())
+            let then = match app.search_wait() {
+                (_, Some(left)) => app.i18n.msg(&Msg::SearchWaitLeft { seconds: left.to_string() }).to_string(),
+                (Some(secs), None) => app.i18n.msg(&Msg::SearchRetryIn { seconds: secs.to_string() }).to_string(),
+                (None, None) => said(Label::SearchRetry),
+            };
+            (format!("{why}. {then}"), t.warning())
         }
     };
     let iw = usize::from(list.width.saturating_sub(4));
@@ -118,8 +129,11 @@ fn draw_hits(f: &mut Frame, app: &App, ws: Option<&WorkspaceId>, first: usize, s
     for (k, (i, hit)) in found.hits.iter().enumerate().skip(first).take(shown).enumerate() {
         let y = list.y + k as u16 * HIT_LINES;
         let top = Rect { x: list.x + 2, y, width: list.width.saturating_sub(4), height: 1 };
-        let when = format!("{} {}", crate::time::date(hit.ts), crate::time::hm(hit.ts));
-        let where_ = clip(&place_of(app, ws, hit), iw / 2);
+        let when = stamp(app, hit);
+        // A reply is marked as one: `Enter` opens its thread beside the conversation.
+        let place =
+            if hit.thread.is_some() { format!("{} ⤷", place_of(app, ws, hit)) } else { place_of(app, ws, hit) };
+        let where_ = clip(&place, iw / 2);
         let who_room = iw.saturating_sub(width(&where_) + width(&when) + 4);
         let who = clip(&author_of(app, ws, hit), who_room);
         let line = Line::from(vec![
@@ -136,11 +150,27 @@ fn draw_hits(f: &mut Frame, app: &App, ws: Option<&WorkspaceId>, first: usize, s
             );
         }
         let text = Rect { x: top.x + 2, y: y + 1, width: top.width.saturating_sub(2), height: 1 };
-        f.render_widget(Paragraph::new(snippet(app, ws, hit, usize::from(text.width))), text);
+        f.render_widget(Paragraph::new(snippet(app, ws, app.search_runs(i), usize::from(text.width))), text);
         if i == app.search_selected() {
-            let bar = Rect { x: list.x, y, width: list.width, height: HIT_LINES };
-            t.paint_selection(f.buffer_mut(), bar, Selection::Focused);
+            // The bar is over both lines of the result.
+            for row in y..y + HIT_LINES {
+                let bar = Rect { x: list.x, y: row, width: list.width, height: 1 };
+                t.paint_selection(f.buffer_mut(), bar, Selection::Focused);
+            }
         }
+    }
+}
+
+/// When `hit` was written, as short as is clear: the time today, the month and day with it
+/// this year, the date alone before that (all in the zone shown).
+fn stamp(app: &App, hit: &Hit) -> String {
+    let z = &app.zone;
+    let (date, hm) = (crate::time::date(hit.ts, z), crate::time::hm(hit.ts, z));
+    let today = crate::time::date(app.now_ts(), z);
+    match (date.split_once('-'), today.split_once('-')) {
+        _ if date == today => hm,
+        (Some((y, md)), Some((ty, _))) if y == ty => format!("{md} {hm}"),
+        _ => date,
     }
 }
 
@@ -161,10 +191,11 @@ fn author_of(app: &App, ws: Option<&WorkspaceId>, hit: &Hit) -> String {
     known.filter(|n| !n.is_empty()).or(given).unwrap_or_else(|| Remote::new(hit.user.as_str()).line().into_string())
 }
 
-/// `hit`'s text on one line `w` wide, Slack's markup read (people and channels by the names the
-/// app knows, links by their text), the words found underlined; when the first of them would be
-/// past the first third, the text before it is cut (`…` in its place).
-fn snippet(app: &App, ws: Option<&WorkspaceId>, hit: &Hit, w: usize) -> Line<'static> {
+/// A result's text (its `runs`) on one line `w` wide, Slack's markup read (people and channels
+/// by the names the app knows, links by their text), the words found underlined; when the first
+/// of them would be past the first third, the text before it is cut at a word (`…` in its
+/// place). Runs past the end of the line are not read.
+fn snippet(app: &App, ws: Option<&WorkspaceId>, runs: &[(String, bool)], w: usize) -> Line<'static> {
     use crate::mrkdwn::{Block, Piece, parse, plain};
     let t = &app.theme;
     let name = |p: &Piece| ws.and_then(|ws| app.model.named(ws, p));
@@ -178,19 +209,23 @@ fn snippet(app: &App, ws: Option<&WorkspaceId>, hit: &Hit, w: usize) -> Line<'st
             .collect();
         Remote::new(lines.join(" ")).line().into_string()
     };
-    let mut parts: Vec<(String, bool)> = runs(hit).into_iter().map(|(s, m)| (flat(s), m)).collect();
-    let before: usize = parts.iter().take_while(|(_, m)| !m).map(|(s, _)| width(s)).sum();
     let mut spans = Vec::new();
     let mut room = w;
-    if before > w / 3 && parts.first().is_some_and(|(_, m)| !m) {
-        let keep = w / 6;
-        let lead = &parts[0].0;
-        let cut: String = tail(lead, keep);
-        parts[0].0 = cut;
+    // Runs alternate: only the first can be plain text before the first word found.
+    let mut lead = runs.first().filter(|(_, m)| !m).map(|(s, _)| flat(s.clone()));
+    if let Some(l) = lead.as_mut().filter(|l| width(l) > w / 3) {
+        let cut = tail(l, w / 6);
+        // At a word: what is left of a word cut in two goes.
+        *l = match cut.split_once(char::is_whitespace) {
+            Some((_, rest)) if !rest.trim().is_empty() && width(&cut) < width(l) => rest.to_string(),
+            _ => cut,
+        };
         spans.push(Span::styled("…", t.faint()));
         room = room.saturating_sub(1);
     }
-    for (s, matched) in parts {
+    let skip = usize::from(lead.is_some());
+    let rest = runs.iter().skip(skip).map(|(s, m)| (s.clone(), *m));
+    for (s, matched) in lead.map(|l| (l, false)).into_iter().chain(rest.map(|(s, m)| (flat(s), m))) {
         if room == 0 {
             break;
         }

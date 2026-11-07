@@ -267,12 +267,19 @@ fn a_failed_search_is_said_in_the_popup_and_enter_tries_again() {
         s.keys("/");
         type_words(&mut s, "deploy");
         s.keys("enter");
-        s.b.fail(search_index(&s), FailKind::RateLimited { retry_after: Some(Duration::from_secs(7)) });
+        s.b.fail(search_index(&s), FailKind::RateLimited { retry_after: None });
         s.pump();
         let screen = s.d.screen();
         let why = i18n.label(Label::FailRateLimited).to_string();
         assert!(has(&screen, &why.chars().take(12).collect::<String>()), "{w}x{h}: {screen}");
-        assert!(has(&screen, &i18n.label(Label::SearchRetry)), "{w}x{h}: {screen}");
+        // Its own sentence, perhaps wrapped: read over the popup's lines.
+        let b = s.d.app.search_box().unwrap();
+        let buf = s.d.buffer();
+        let said: String = (b.list.y..b.list.bottom())
+            .flat_map(|y| (b.list.x..b.list.right()).map(move |x| (x, y)))
+            .map(|p| buf[p].symbol().to_string())
+            .collect();
+        assert!(has(&said, &i18n.label(Label::SearchRetry)), "{w}x{h}: {said}");
         s.keys("enter");
         assert_eq!(searches(&s).len(), 1, "asked again on Enter only");
         s.b.answer(search_index(&s));
@@ -303,11 +310,16 @@ fn a_day_reads_the_focused_conversation_from_its_first_message() {
     let big = conversation(names::BIG_HISTORY);
     let world = World::demo();
     let m = world.message(big.conversation(), 4000).unwrap();
-    let day = slakio_tui::time::date(m.ts);
-    let start = slakio_tui::when::start(slakio_tui::time::day(m.ts));
+    let day = slakio_tui::time::date(m.ts, &slakio_tui::time::Zone::utc());
+    let start = slakio_tui::when::start(
+        slakio_tui::time::day(m.ts, &slakio_tui::time::Zone::utc()),
+        &slakio_tui::time::Zone::utc(),
+    );
     let first = world.message(big.conversation(), world.first_at_or_after(big.conversation(), start)).unwrap().ts;
     for (w, h, lang) in SIZES {
         let mut s = signed(w, h, lang);
+        // Today by this machine's clock: the world's own is before its newest messages.
+        s.d.app.clock = Some(slakio_tui::time::now);
         let i18n = I18n::new(lang);
         // Nothing focused: said, nothing asked.
         s.keys(":");

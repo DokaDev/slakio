@@ -217,13 +217,19 @@ images, and settings. This README only lists what works; it will grow with each 
   `from:@name`, `"exact words"`, `before:` / `after:` a date), newest first, the words found
   underlined. It searches when you press `Enter` or stop typing for a moment, never per key;
   `PageDown` / `PageUp` show the next or previous page, and `Enter` on a result opens it as a
-  Slack link opens (a reply's thread beside its conversation). `Esc` closes it; the words and
-  results stay for next time. Searching reads only; it is Slack's `search.messages`, one
-  request per page you ask for.
+  Slack link opens (a reply's thread beside its conversation; a reply is marked `⤷`). `Esc`
+  closes it; the words and results stay for next time (typing replaces the words). Searching
+  reads only; it is Slack's `search.messages`, one request per page you ask for, at most one a
+  second.
 - `:jump <day>` (or `Space j`) reads the conversation you are in from a day: `today`,
-  `yesterday`, `2026-11-01`, `11-01`, `-3d`, `-2w` or a weekday (`monday`). Days are in UTC,
-  like the date rows between messages. Its first message is selected and marked; reading back
-  from there (`g g`, scrolling up) reaches older ones, and `G` the newest.
+  `yesterday`, `2026-11-01`, `11-01` (month-day), `-3d`, `-2w` or a weekday (`monday`); with
+  `language = "ko"` also the Korean words for today, yesterday, the day before and the
+  weekdays. A day still to come is refused; when nothing was written on the day or after it,
+  the newest message is shown and the status line says so. Its first message is selected and
+  marked; reading back from there (`g g`, scrolling up) reaches older ones, and `G` the newest.
+- Times and days (beside messages, the date rows between them, search results, `:jump`) are in
+  your local time zone: `SLAKIO_TZ` (an IANA name such as `Asia/Seoul`, or a POSIX rule such as
+  `KST-9`) when set, else `TZ`, else the system's, else UTC. It is read once, at the start.
 - Failures are written to `errors.log` in the state directory (`$SLAKIO_STATE_DIR`, else
   `$XDG_STATE_HOME/slakio`, or the platform's equivalent), readable by you only. It never holds
   a token, a cookie, a request's address past its host or message text, and it is kept small:

@@ -148,10 +148,10 @@ fn meta(f: &mut Frame, app: &App, i: usize, area: Rect) {
         app.model.user(&s.workspace, &s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
     let target = Target::Conversation { workspace: s.workspace.clone(), conversation: s.conversation.clone() };
     let place = app.model.target(&target).map(breadcrumb).unwrap_or_default();
-    let date = crate::time::date(s.ts);
+    let date = crate::time::date(s.ts, &app.zone);
     // The year only when it is not this one.
     let date = match date.split_once('-') {
-        Some((y, md)) if crate::time::date(app.model.taken()).starts_with(y) => md.to_string(),
+        Some((y, md)) if crate::time::date(app.model.taken(), &app.zone).starts_with(y) => md.to_string(),
         _ => date,
     };
     // Short of room the author goes first (the chip names them), then the place is cut: never

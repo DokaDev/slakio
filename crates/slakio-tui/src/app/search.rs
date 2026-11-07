@@ -14,7 +14,7 @@ use super::jump::Offered;
 use super::query::Focus;
 use crate::action::SearchAction;
 use crate::opener;
-use crate::permalink::{Place, SlackLink};
+use crate::permalink::{self, Place, SlackLink};
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use slakio_core::backend::{Command, FailKind, Found, Generation, Hit};
 use slakio_core::i18n::Msg;
@@ -26,6 +26,13 @@ pub const PAUSE: Duration = Duration::from_millis(700);
 
 /// The most characters typed.
 pub const TYPED_MAX: usize = 500;
+
+/// The most runs (plain and found words) of a result's text kept for drawing.
+pub const RUNS_MAX: usize = 64;
+
+/// The most characters of a run kept for drawing (a long text before the first word found
+/// keeps its end, the others their start): a line shows far fewer.
+pub const RUN_CHARS_MAX: usize = 2_000;
 
 /// The search popup's state.
 #[derive(Clone, Debug, Default)]
@@ -45,6 +52,15 @@ pub(crate) struct Search {
     /// Why the last search failed, and its page (`Enter` asks for it again).
     pub failed: Option<FailKind>,
     pub retry: u32,
+    /// Until when Slack asked to wait after the last failure, and the seconds that were.
+    pub until: Option<(Instant, u64)>,
+    /// `Enter` was pressed while Slack's wait was not over: the seconds it had left.
+    pub left: Option<u64>,
+    /// The runs of each result of the page shown ([`runs`]), worked out once.
+    pub runs: Vec<Vec<(String, bool)>>,
+    /// The words kept from before were not typed in since the popup opened: typing replaces
+    /// them.
+    pub fresh: bool,
 }
 
 /// A search on its way.
@@ -107,6 +123,22 @@ impl App {
         self.search.failed.as_ref()
     }
 
+    /// The seconds Slack asked to wait after the last failure, when it said; and, when `Enter`
+    /// was pressed before they were over, the seconds that were left.
+    pub fn search_wait(&self) -> (Option<u64>, Option<u64>) {
+        (self.search.until.map(|(_, secs)| secs), self.search.left)
+    }
+
+    /// The runs of the result `i` of the page shown.
+    pub fn search_runs(&self, i: usize) -> &[(String, bool)] {
+        self.search.runs.get(i).map_or(&[], Vec::as_slice)
+    }
+
+    /// The words shown are kept from before, and typing replaces them.
+    pub fn search_fresh(&self) -> bool {
+        self.search.fresh
+    }
+
     /// What the popup shows under the words.
     pub fn search_showing(&self) -> Showing {
         let s = &self.search;
@@ -120,8 +152,10 @@ impl App {
     }
 
     /// Open the search popup over the workspace the keyboard is in (the focused pane's, else the
-    /// list's); with `query`, those words searched at once.
-    pub(super) fn open_search(&mut self, query: Option<&str>) {
+    /// list's); with `query`, those words searched at once. Words kept from before that were not
+    /// searched yet (closed while waiting) are searched once the pause passes; typing replaces
+    /// them.
+    pub(super) fn open_search(&mut self, query: Option<&str>, now: Instant) {
         if self.backend.is_none() || self.checking_sign_in() {
             return;
         }
@@ -137,8 +171,13 @@ impl App {
         self.search.open = true;
         if let Some(q) = query {
             self.search.query = q.chars().filter(|c| !c.is_control()).take(TYPED_MAX).collect();
-            self.search.typed = None;
+            (self.search.typed, self.search.fresh) = (None, false);
             self.ask_search(1);
+            return;
+        }
+        self.search.fresh = !self.search.query.is_empty();
+        if self.search_due() && self.search.failed.is_none() {
+            self.search.typed = Some(now);
         }
     }
 
@@ -148,13 +187,21 @@ impl App {
             KeyCode::Char(c) if !mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
                 self.search_insert(c.encode_utf8(&mut [0; 4]), now);
             }
+            KeyCode::Backspace if std::mem::take(&mut self.search.fresh) => {
+                self.search.query.clear();
+                self.search_typed(now);
+            }
             KeyCode::Backspace if self.search.query.pop().is_some() => self.search_typed(now),
             _ => {}
         }
     }
 
-    /// Type `text` in the search popup (a paste; control characters left out).
+    /// Type `text` in the search popup (a paste; control characters left out). Words kept from
+    /// before are replaced.
     pub(super) fn search_insert(&mut self, text: &str, now: Instant) {
+        if std::mem::take(&mut self.search.fresh) {
+            self.search.query.clear();
+        }
         let room = TYPED_MAX.saturating_sub(self.search.query.chars().count());
         self.search.query.extend(text.chars().filter(|c| !c.is_control()).take(room));
         self.search_typed(now);
@@ -162,7 +209,7 @@ impl App {
 
     fn search_typed(&mut self, now: Instant) {
         self.search.typed = Some(now);
-        self.search.failed = None;
+        (self.search.failed, self.search.until, self.search.left) = (None, None, None);
     }
 
     pub(super) fn search_action(&mut self, a: SearchAction, now: Instant) {
@@ -171,6 +218,11 @@ impl App {
         }
         let hits = self.search.found.as_ref().map_or(0, |f| f.hits.len());
         match a {
+            // Slack's wait is not over: nothing is sent, and the popup says how long is left.
+            SearchAction::Run if self.search.until.is_some_and(|(until, _)| now < until) => {
+                let left = self.search.until.map(|(until, _)| until.saturating_duration_since(now));
+                self.search.left = left.map(|d| d.as_secs() + u64::from(d.subsec_nanos() > 0));
+            }
             SearchAction::Run if self.search_due() => self.ask_search(1),
             SearchAction::Run if self.search.failed.is_some() => self.ask_search(self.search.retry.max(1)),
             SearchAction::Run => self.open_hit(now),
@@ -178,6 +230,16 @@ impl App {
             SearchAction::Prev => self.search.selected = self.search.selected.saturating_sub(1),
             SearchAction::PageNext | SearchAction::PagePrev => {
                 let Some(f) = &self.search.found else { return };
+                // Only the words shown are paged: new words on their way (or typed) are not
+                // paged with the page count of the old ones.
+                let asked_other =
+                    self.search.asked.as_ref().is_some_and(|a| a.query != f.query || a.scope != f.workspace);
+                if f.query != self.search.query.trim()
+                    || self.search.scope.as_ref() != Some(&f.workspace)
+                    || asked_other
+                {
+                    return;
+                }
                 let page = if a == SearchAction::PageNext { f.page + 1 } else { f.page.saturating_sub(1) };
                 if (1..=f.pages).contains(&page) && !self.search_due() {
                     self.ask_search(page);
@@ -195,6 +257,7 @@ impl App {
                 }
             }
             SearchAction::Clear => {
+                (self.search.fresh, self.search.until, self.search.left) = (false, None, None);
                 self.search.query.clear();
                 (self.search.found, self.search.asked, self.search.typed, self.search.failed) =
                     (None, None, None, None);
@@ -236,7 +299,7 @@ impl App {
         }
         let id = self.work.requests.ask(Some(scope.clone()), Command::Search { query: query.clone(), page });
         self.search.asked = Some(Asked { id, query, page, scope });
-        self.search.failed = None;
+        (self.search.failed, self.search.until, self.search.left) = (None, None, None);
     }
 
     /// Typing paused long enough at `now`: what was typed is searched. `true` when it was.
@@ -266,15 +329,23 @@ impl App {
         self.model.add_users(&asked.scope, &found.users);
         (found.workspace, found.query, found.page) = (asked.scope, asked.query, asked.page);
         found.pages = found.pages.max(u32::from(!found.hits.is_empty()));
+        self.search.runs = found.hits.iter().map(runs).collect();
         (self.search.found, self.search.selected, self.search.failed) = (Some(found), 0, None);
         true
     }
 
-    /// Request `id` failed: when it is the search waited for, the popup says why.
-    pub(super) fn search_failed(&mut self, id: Generation, kind: &FailKind) -> bool {
-        let Some(asked) = self.search.asked.take_if(|a| a.id == id) else { return false };
-        (self.search.failed, self.search.retry) = (Some(kind.clone()), asked.page);
-        true
+    /// Request `id` failed at `now`: when it is the search waited for, the popup says why (and,
+    /// when Slack said, how long to wait); its workspace is returned.
+    pub(super) fn search_failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> Option<WorkspaceId> {
+        let asked = self.search.asked.take_if(|a| a.id == id)?;
+        (self.search.failed, self.search.retry, self.search.left) = (Some(kind.clone()), asked.page, None);
+        self.search.until = match kind {
+            FailKind::RateLimited { retry_after: Some(d) } if !d.is_zero() => {
+                Some((now + *d, d.as_secs() + u64::from(d.subsec_nanos() > 0)))
+            }
+            _ => None,
+        };
+        Some(asked.scope)
     }
 
     /// The result under the cursor opened where its conversation is: as a Slack link to it opens,
@@ -284,7 +355,7 @@ impl App {
         let Some(hit) = f.hits.get(self.search.selected).cloned() else { return };
         self.close_search();
         let listed = self.model.conversations().iter().any(|c| c.workspace == ws && c.id == hit.conversation);
-        let web = opener::check(&hit.permalink).map(|c| c.url);
+        let web = self.hit_link(&ws, &hit);
         if !listed {
             let why = Msg::JumpUnlisted { host: self.workspace_label(&ws) };
             match web {
@@ -312,6 +383,22 @@ impl App {
         }
     }
 
+    /// `hit`'s web link, offered for the browser only when it is a Slack link to the message's
+    /// conversation in the workspace searched: on that workspace's host (or its organization's
+    /// Enterprise Grid host, or its id), naming the hit's conversation.
+    fn hit_link(&self, ws: &WorkspaceId, hit: &Hit) -> Option<String> {
+        let link = permalink::parse(&hit.permalink)?;
+        let ours = match &link.place {
+            Place::Host(h) => self.jumps.hosts.iter().any(|(w, x)| w == ws && x == h),
+            Place::Enterprise(_) => true,
+            Place::Team(t) => t == ws.as_str(),
+        };
+        (ours && link.conversation == hit.conversation.as_str())
+            .then(|| opener::check(&hit.permalink))
+            .flatten()
+            .map(|c| c.url)
+    }
+
     /// How a workspace is named in a question: its host, else its name, else its id.
     pub fn workspace_label(&self, ws: &WorkspaceId) -> String {
         let host = self.jumps.hosts.iter().find(|(w, h)| w == ws && !h.is_empty()).map(|(_, h)| h.clone());
@@ -320,12 +407,17 @@ impl App {
     }
 }
 
-/// `hit`'s text as runs of plain and matched words, the marks left out (not sanitised yet).
+/// `hit`'s text as runs of plain and matched words, the marks left out (not sanitised yet): at
+/// most [`RUNS_MAX`] runs, each at most [`RUN_CHARS_MAX`] characters (the first, when plain,
+/// keeps its end: the words found follow it).
 pub fn runs(hit: &Hit) -> Vec<(String, bool)> {
     let mut out: Vec<(String, bool)> = Vec::new();
     let mut matched = false;
     let mut run = String::new();
     for c in hit.text.unsanitized().chars() {
+        if out.len() >= RUNS_MAX {
+            break;
+        }
         let mark = match c {
             slakio_core::backend::MATCH_START => Some(true),
             slakio_core::backend::MATCH_END => Some(false),
@@ -341,8 +433,18 @@ pub fn runs(hit: &Hit) -> Vec<(String, bool)> {
             None => run.push(c),
         }
     }
-    if !run.is_empty() {
+    if !run.is_empty() && out.len() < RUNS_MAX {
         out.push((run, matched));
+    }
+    for (k, (run, matched)) in out.iter_mut().enumerate() {
+        let n = run.chars().count();
+        if n > RUN_CHARS_MAX {
+            *run = if k == 0 && !*matched {
+                run.chars().skip(n - RUN_CHARS_MAX).collect()
+            } else {
+                run.chars().take(RUN_CHARS_MAX).collect()
+            };
+        }
     }
     out
 }

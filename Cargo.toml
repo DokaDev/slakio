@@ -89,6 +89,10 @@ insta = "1.48.0"
 # The command line (`--help`, `--version`, `--config`): a small parser with no dependencies,
 # instead of a hand-rolled one or a large derive-based crate.
 lexopt = "0.3"
+# Local time: the time zone of this machine (or `SLAKIO_TZ` / `TZ`) for the times and days on
+# screen, read from the system's time zone database (bundled on Windows); days that are 23 or
+# 25 hours long (daylight saving) start where the zone says.
+jiff = "0.2"
 ratatui = "0.30"
 # The bench crate's JSONL output and the binary's stats file.
 serde_json = "1.0.151"

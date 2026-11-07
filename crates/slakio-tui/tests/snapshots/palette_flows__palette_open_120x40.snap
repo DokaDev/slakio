@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/palette_flows.rs
-assertion_line: 53
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
@@ -13,14 +12,14 @@ expression: d.snap()
 │ ▾ Favorites           │ : type a command or an action name                                   │                       │
 │   # backend           ├──────────────────────────────────────────────────────────────────────┤                       │
 │   # incidents         │  :workspace            Switch workspace                      Space W │                       │
-│                       │  :help                 Keyboard help                          ? / F1 │                       │
+│                       │  :help                 Keyboard help                          ? · F1 │                       │
 │ ▾ Ops                 │  :theme <theme>        Change the color theme                        │                       │
 │   # deploys           │  :avatars              Show or hide avatars (initials)               │                       │
 │   # alerts            │  :icons                Show Nerd Font icons, or text instead         │                       │
 │   # partner-shared ext│  :density              Comfortable or compact messages               │                       │
-│   # hostile-strings   │  :search               Search messages                   / / Space s │                       │
+│   # hostile-strings   │  :search               Search messages                   / · Space s │                       │
 │   # big-history       │  :jump                 Read the conversation from a day      Space j │                       │
-│   # long-threads      │  :nav, :rail           View switcher (in the list…  Ctrl+R / Space r │                       │
+│   # long-threads      │  :nav, :rail           View switcher (in the list…  Ctrl+R · Space r │                       │
 │                       │  :list                 Show or hide the list panel           Space e │                       │
 │ ▾ Channels            │  :navrows              Fold the view switcher to the view…   Space v │                       │
 │   # announcements     │  :home                 Show Home                             Space h │                       │

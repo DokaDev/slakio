@@ -280,10 +280,14 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
         self.jump_answered(id, Some(&kind));
-        // A search's failure is said in its popup (and kept in the error log).
-        if self.search_failed(id, &kind) {
+        // A search's failure is said in its popup (and kept in the error log); refused for the
+        // sign-in, its workspace is signed out as for any other request.
+        if let Some(ws) = self.search_failed(id, &kind, now) {
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
             self.effects.push(Effect::Record { context: "backend", fault });
+            if kind == FailKind::Auth && self.model.is_fresh(&ws) {
+                self.signed_out(ws, now);
+            }
             return true;
         }
         let (mut whose, mut page, mut stale) = (None, None, None);

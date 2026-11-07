@@ -314,9 +314,10 @@ impl Pane {
     /// The message a link opened selected in `tl` (this pane's timeline) and marked, once `tl`
     /// has its messages; then nothing more is waited for. A thread whose older replies are not
     /// all loaded keeps reading them back ([`Pane::wants`]) until the reply is among them. A
-    /// message that is not there (deleted) is not marked: the nearest one is selected. `Some`
-    /// once landed: whether the message was there.
-    pub fn land(&mut self, tl: &Timeline) -> Option<bool> {
+    /// message that is not there (deleted) is not marked: the nearest one is selected. A day
+    /// read lands on its first message, or on the newest when nothing was written on or after
+    /// it. `Some` once landed: how.
+    pub fn land(&mut self, tl: &Timeline) -> Option<Landed> {
         let at = self.jump.filter(|at| (tl.pending.is_none() || tl.holds(*at)) && !tl.cached)?;
         if self.seeking(tl) {
             return None;
@@ -328,11 +329,11 @@ impl Pane {
         self.selected = Some(tl.items[i].ts);
         if std::mem::take(&mut self.by_date) {
             self.flash = Some((tl.items[i].ts, None));
-            return Some(true);
+            return Some(if tl.items[i].ts < at { Landed::Quiet(at) } else { Landed::Found });
         }
         let found = tl.position(at).is_some();
         self.flash = found.then_some((at, None));
-        Some(found)
+        Some(if found { Landed::Found } else { Landed::Missing })
     }
 
     /// A thread pane waits for a link's reply older than the oldest loaded, and older ones are
@@ -349,6 +350,17 @@ impl Pane {
         self.visual = None;
         self.bottom.set(None);
     }
+}
+
+/// Where a pane waiting for a message landed ([`Pane::land`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Landed {
+    /// On the message (or the day's first).
+    Found,
+    /// The message is not there (deleted): on the nearest one.
+    Missing,
+    /// Nothing was written on or after the day starting at this time: on the newest.
+    Quiet(Ts),
 }
 
 /// The user's own message (the demo's local echo), after the newest of `items`.

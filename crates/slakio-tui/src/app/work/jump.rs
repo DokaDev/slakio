@@ -136,6 +136,11 @@ impl Work {
         std::mem::take(&mut self.missed)
     }
 
+    /// A day read since the last call found nothing on or after its day (its start): said once.
+    pub fn take_quiet(&mut self) -> Option<slakio_core::model::Ts> {
+        self.quiet.take()
+    }
+
     /// When a mark goes next.
     pub(super) fn flash_deadline(&self) -> Option<Instant> {
         self.panes.values().filter_map(|p| p.flash.and_then(|(_, until)| until)).min()

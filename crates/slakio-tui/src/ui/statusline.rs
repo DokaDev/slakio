@@ -187,10 +187,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     };
 
     // Where you are.
-    let ws = app.backend.and_then(|_| app.shell.current(&app.model));
+    // The workspace of the pane in front (a search result or a link may open one of another
+    // workspace than the list's), else the list's.
+    let main = app.work.home().and_then(|p| app.model.target(&p.target));
+    let front = main.and_then(|c| app.model.workspace(&c.workspace));
+    let ws = app.backend.and_then(|_| front.or_else(|| app.shell.current(&app.model)));
     let mut ws_name = ws.map(|w| w.name.line().into_string());
     let stripe = ws.map(|w| Span::styled("▌", t.workspace(w.color)));
-    let main = app.work.home().and_then(|p| app.model.target(&p.target));
     let view = app.i18n.label(view_label(app.shell.view)).to_string();
     // With the list panel out of the layout, its view switcher is too: the place names the view.
     let view_hidden = app.backend.is_some() && !crate::screen::too_small(app.size) && app.areas().list.is_none();

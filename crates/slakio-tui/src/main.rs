@@ -133,6 +133,9 @@ fn main() -> ExitCode {
         compact: cfg.density == "compact",
     };
     app.fold_views(cfg.nav_rows == "collapsed");
+    // Times in the user's zone, read once; "today" from this machine's clock.
+    app.zone = slakio_tui::time::Zone::from_env(env);
+    app.clock = Some(slakio_tui::time::now);
     // A sign-in piped in (`pbpaste | slakio login`): checked, kept, said, and the program ends.
     if login && !io::stdin().is_terminal() {
         return signin::sign_in_piped(&wiring, &i18n::I18n::new(lang));

@@ -352,7 +352,7 @@ impl App {
         let mut all = self.keymap.keys_for(a, self.region_context());
         all.sort_by_key(Vec::len);
         all.dedup();
-        all.iter().take(2).map(|k| keys::label(k)).collect::<Vec<_>>().join(" / ")
+        all.iter().take(2).map(|k| keys::label(k)).collect::<Vec<_>>().join(" · ")
     }
 
     /// The palette's row of `:resize <arg>`.
@@ -441,7 +441,7 @@ impl App {
                 self.open_typed(&arg, now);
             }
             Some(Item::Jump) => self.run_jump(&text, now),
-            Some(Item::Search) => self.run_search(&text),
+            Some(Item::Search) => self.run_search(&text, now),
             Some(Item::Resize) => match resize_arg(&text).and_then(resize_by) {
                 Some((dir, by)) => {
                     self.cmdline.close();
