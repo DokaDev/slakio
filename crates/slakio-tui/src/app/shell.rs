@@ -409,6 +409,16 @@ impl Shell {
                     Target::Conversation { workspace, conversation }
                 })
             }
+            // A notice of Activity: its thread when it is a reply, else its conversation (`t`
+            // opens it in a tab; `Enter` and `l` open it at its message, the app's).
+            Some(Row::Notice(i)) => {
+                let (workspace, n) = model.notices.get(*i)?;
+                let (workspace, conversation) = (workspace.clone(), n.conversation.clone());
+                Some(match n.thread {
+                    Some(thread) => Target::Thread { workspace, conversation, thread },
+                    None => Target::Conversation { workspace, conversation },
+                })
+            }
             _ => None,
         }
     }

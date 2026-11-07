@@ -194,8 +194,9 @@ fn a_short_status_line_keeps_the_place_tidy_and_apart_from_the_hints() {
 
 #[test]
 fn a_view_of_a_later_version_hints_no_key_that_does_nothing_there() {
+    // Files (Activity lists its notices now, which Enter opens).
     let mut d = Demo::new(160, 40);
-    d.keys("space a");
+    d.keys("space f");
     let line = d.status_line();
     assert!(!line.contains("Enter open") && !line.contains("l peek") && line.contains("? help"), "{line}");
 }

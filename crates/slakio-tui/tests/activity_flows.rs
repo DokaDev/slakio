@@ -396,3 +396,13 @@ fn a_page_of_nothing_shown_asks_for_no_more_by_itself() {
     s.keys("k j");
     assert!(!asked(&s).is_empty(), "a key near the end asks again");
 }
+
+#[test]
+fn t_opens_a_notice_in_a_new_tab_and_the_list_keeps_the_keyboard() {
+    let mut s = shown(120, 40, Lang::En);
+    let first = s.d.app.list_rows().iter().position(|r| matches!(r, Row::Notice(_))).unwrap();
+    s.d.app.focus_list_row(first);
+    let before = s.d.app.tab_titles().len();
+    s.keys("t");
+    assert_eq!(s.d.app.tab_titles().len(), before + 1, "{:?}", s.d.app.tab_titles());
+}
