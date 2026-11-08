@@ -61,6 +61,7 @@ pub(super) fn place(app: &App) -> Option<(Place, Ctx)> {
                 }
             }
             Some(Row::Item(_)) => Place::ListSaved,
+            Some(Row::Notice(_)) => Place::ListNotice,
             Some(_) => Place::ListConversation,
             None => Place::ListEmpty,
         },
@@ -443,8 +444,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
             // Help comes before any other hint, and the place's first key before the rest.
             let needs = |k: usize| (0..n).any(|j| worth(j) == k && !with.contains(&j));
             // A hint of least worth only comes with the others of its place.
-            // The new tab key comes before the other hints but a peek (the way to tabs is taught;
-            // a peek is the row's other way to open).
+            // The new tab key comes before the other hints but a peek (the row's other way in).
             let left_out = |l: Label| (0..n).any(|j| resolved[j].1 == l && !with.contains(&j));
             let tab_left_out = left_out(Label::HintNewTab);
             // The way to the view switcher comes before the next pane, which leads there too.

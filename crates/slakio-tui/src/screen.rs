@@ -61,6 +61,8 @@ pub struct Shape {
     pub list_focused: bool,
     /// There are two tabs or more: the tab bar shows.
     pub tabs: bool,
+    /// The list shows Activity, whose notices read better wide ([`wide_list_width`]).
+    pub wide_list: bool,
 }
 
 /// The width of the list panel on a screen `width` wide: a fifth or so, 30 to 36 cells.
@@ -68,10 +70,21 @@ pub fn list_width(width: u16) -> u16 {
     (width * 22 / 100).clamp(30, 36)
 }
 
+/// The width of the list panel showing Activity on a screen `width` wide: two fifths, up to 64
+/// cells, never under [`list_width`]. With a thread panel open it takes [`list_width`] again.
+pub fn wide_list_width(width: u16) -> u16 {
+    (width * 2 / 5).min(64).max(list_width(width))
+}
+
 /// The areas for a screen of `size`.
 pub fn areas(size: Rect, s: Shape) -> Areas {
     let [body, status] = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(size);
-    let mut list_w = if s.list_hidden { 0 } else { list_width(body.width) };
+    let mut list_w = match (s.list_hidden, s.wide_list) {
+        (true, _) => 0,
+        // Beside a thread panel it takes the room it has elsewhere.
+        (false, true) if !s.thread => wide_list_width(body.width),
+        (false, _) => list_width(body.width),
+    };
     let work_w = body.width.saturating_sub(list_w);
     let squeezed = s.thread && work_w < WORK_WIDE && !s.list_focused;
     if squeezed {

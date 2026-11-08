@@ -86,8 +86,10 @@ impl App {
                 self.last_click = Some((now, at));
                 if let Some(list) = a.list.filter(|l| l.contains(at)) {
                     let rows = screen::list_parts(list, self.nav_rows()).rows;
-                    if !self.nav_click(at, now) && rows.contains(at) {
-                        let row = self.shell.list_top + usize::from(at.y - rows.y);
+                    // Below the rows shown (Activity's end) is not a row.
+                    let row_at = usize::from(at.y.saturating_sub(rows.y));
+                    if !self.nav_click(at, now) && rows.contains(at) && row_at < self.list_height() {
+                        let row = self.shell.list_top + row_at;
                         self.click_list(row, at.x - rows.x, now);
                     }
                 } else if on_tabs {

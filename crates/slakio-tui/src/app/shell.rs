@@ -341,6 +341,10 @@ impl Shell {
         let rows = self.rows(model);
         let max_top = rows.len().saturating_sub(list_height.max(1));
         self.list_top = self.list_top.saturating_add_signed(by).min(max_top);
+        // Activity's list starts on a notice's first row.
+        if self.view == View::Activity {
+            self.list_top -= self.list_top % 2;
+        }
         let bottom = self.list_top + list_height.max(1) - 1;
         let want = self.list_cursor.clamp(self.list_top, bottom.min(rows.len().saturating_sub(1)));
         if want != self.list_cursor {
@@ -413,6 +417,8 @@ impl Shell {
             // opens it in a tab; `Enter` and `l` open it at its message, the app's).
             Some(Row::Notice(i)) => {
                 let (workspace, n) = model.notices.get(*i)?;
+                // As for `Enter`: only a conversation the workspace lists.
+                model.conversations().iter().find(|c| c.workspace == *workspace && c.id == n.conversation)?;
                 let (workspace, conversation) = (workspace.clone(), n.conversation.clone());
                 Some(match n.thread {
                     Some(thread) => Target::Thread { workspace, conversation, thread },
@@ -443,10 +449,20 @@ impl Shell {
     /// Keep the list cursor on screen.
     pub fn scroll(&mut self, height: usize) {
         let height = height.max(1);
+        // In Activity a notice's two rows show together, and the list starts on a first row.
+        let pair = self.view == View::Activity && height > 1;
+        let last = self.list_cursor + usize::from(pair);
         if self.list_cursor < self.list_top {
             self.list_top = self.list_cursor;
-        } else if self.list_cursor >= self.list_top + height {
-            self.list_top = self.list_cursor + 1 - height;
+        } else if last >= self.list_top + height {
+            self.list_top = last + 1 - height;
+        }
+        if pair && self.list_top % 2 == 1 {
+            if last < self.list_top - 1 + height {
+                self.list_top -= 1;
+            } else {
+                self.list_top += 1;
+            }
         }
     }
 

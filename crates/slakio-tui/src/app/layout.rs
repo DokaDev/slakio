@@ -15,6 +15,7 @@ impl App {
             thread: self.work.has_panel() && !self.work.zoomed(),
             list_focused: matches!(self.focus(), Focus::List | Focus::ViewSwitcher),
             tabs: self.work.tabs().len() > 1,
+            wide_list: self.shell.view == super::shell::View::Activity,
         };
         if s.thread {
             let work = screen::areas(self.size, s).work;

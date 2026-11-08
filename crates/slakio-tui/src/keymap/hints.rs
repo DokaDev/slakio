@@ -17,6 +17,8 @@ pub enum Place {
     SignIn,
     /// The list panel on a conversation.
     ListConversation,
+    /// Activity on a notice.
+    ListNotice,
     /// The list panel on a section header.
     ListSection,
     /// The list panel with nothing to list (a view of a later version).
@@ -113,6 +115,15 @@ pub fn entries(place: Place) -> &'static [Hint] {
             One(NEW_TAB, Label::HintNewTab),
             One(NEXT_PANE, Label::HintNextPane),
             One(COMMANDS, Label::HintCommands),
+            VIEWS,
+            One(HELP, Label::HintHelp),
+            Leader(Label::HintMore),
+        ],
+        // A peek before the next pane: in Activity it is how a notice is read without leaving it.
+        Place::ListNotice => &[
+            One(OPEN, Label::HintOpen),
+            One(Action::Shell(ShellAction::ListPeek), Label::HintPeek),
+            One(NEW_TAB, Label::HintNewTab),
             VIEWS,
             One(HELP, Label::HintHelp),
             Leader(Label::HintMore),
@@ -279,6 +290,7 @@ mod tests {
             (Place::Welcome, Ctx::Root),
             (Place::SignIn, Ctx::SignIn),
             (Place::ListConversation, Ctx::List),
+            (Place::ListNotice, Ctx::List),
             (Place::ListSection, Ctx::List),
             (Place::ListEmpty, Ctx::List),
             (Place::ListTodo, Ctx::List),

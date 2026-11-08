@@ -182,3 +182,14 @@ fn panes_split_either_way_share_each_border_once() {
         vec![(a, Rect::new(10, 2, 41, 31)), (b, Rect::new(50, 2, 41, 16)), (c, Rect::new(50, 17, 41, 16)),]
     );
 }
+
+#[test]
+fn activity_widens_the_list_but_beside_a_thread_panel() {
+    let wide = areas(SIZE, Shape { wide_list: true, ..plain() });
+    assert_eq!(wide.list.map(|l| l.width), Some(48), "two fifths of 120");
+    assert_eq!(wide_list_width(200), 64);
+    assert_eq!(wide_list_width(80), 32);
+    assert_eq!(wide_list_width(50), list_width(50), "never narrower than elsewhere");
+    let thread = areas(SIZE, Shape { wide_list: true, thread: true, ..plain() });
+    assert_eq!(thread.list.map(|l| l.width), Some(30), "a thread panel beside: as elsewhere");
+}

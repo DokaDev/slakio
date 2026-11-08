@@ -101,7 +101,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let focused = app.focus() == Focus::List;
-    for (k, &row) in rows.iter().enumerate().skip(app.shell.list_top).take(usize::from(inner.height)) {
+    // Activity keeps its last row for its end (`App::list_height`).
+    let shown = if app.shell.view == View::Activity { app.list_height() } else { usize::from(inner.height) };
+    for (k, &row) in rows.iter().enumerate().skip(app.shell.list_top).take(shown) {
         let y = inner.y + (k - app.shell.list_top) as u16;
         let area = Rect { y, height: 1, ..inner };
         let mark = draw_row(f, app, row, area);
@@ -118,8 +120,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             }
         }
     }
-    // Activity's end: a page on its way, or one that failed, under the last notice.
-    let drawn = rows.len().saturating_sub(app.shell.list_top);
+    // Activity's end: a page on its way, or one that failed, under the last notice (on the row
+    // kept for it when the list fills the panel).
+    let drawn = rows.len().saturating_sub(app.shell.list_top).min(shown);
     if app.shell.view == View::Activity && drawn < usize::from(inner.height) {
         super::activity::foot(f, app, Rect { y: inner.y + drawn as u16, height: 1, ..inner });
     }

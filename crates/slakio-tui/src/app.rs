@@ -250,11 +250,14 @@ impl App {
         }
     }
 
-    /// Rows the list panel shows (or would show, while it is hidden).
-    fn list_height(&self) -> usize {
+    /// Rows the list panel shows (or would show, while it is hidden). Activity keeps its last
+    /// row for what the end of the list says (a page on its way, one that failed).
+    pub(crate) fn list_height(&self) -> usize {
         let a = self.areas();
         let panel = a.list.unwrap_or(a.work);
-        usize::from(screen::list_parts(panel, self.nav_rows()).rows.height).max(1)
+        let h = usize::from(screen::list_parts(panel, self.nav_rows()).rows.height);
+        let foot = usize::from(self.shell.view == shell::View::Activity && h > 2);
+        (h - foot).max(1)
     }
 
     /// Rows of messages the focused pane shows.

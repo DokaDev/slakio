@@ -2,27 +2,27 @@
 source: crates/slakio-tui/tests/activity_flows.rs
 expression: mask_hangul(&screen)
 ---
-╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
-│ ＊                     @24 ││                                                │
-│ DM                     ●11 ││                                                │
-│▎＊＊                   @36 ││                                                │
-│ ＊＊                       ││                                                │
-│ ＊ ＊                    6 ││                                                │
-├─▾──────────────────────────┤│                                                │
-│▌* #general           01:28 ││    ＊＊ ＊＊＊ ＊＊＊＊                        │
-│▌  Alex Morgan: Fine branc… ││    ＊＊＊＊ ＊＊＊ ＊＊＊ Enter＊ ＊＊＊＊.    │
-│▌! #general     01-12 11:43 ││                                                │
-│▌  Sam Rivera: Still cache… ││    Enter    ＊＊                               │
-│▌⤷ #ideas       01-11 16:45 ││    Space h  ＊                                 │
-│▌  ＊＊＊: see https://doc… ││    Space d  DM                                 │
-│▌@ #deploys     01-11 06:10 ││    Ctrl+O   ＊＊ ＊＊＊                        │
-│▌  Alex Morgan: Review loo… ││    ?        ＊ ＊＊＊                          │
-│▌» @Minsu Kim   01-09 07:27 ││    Ctrl+Q   ＊＊                               │
-│▌  Me: Metrics staging das… ││                                                │
-│▌@ #side-proje… 01-07 16:15 ││                                                │
-│▌  ＊＊＊: Broken queue ca… ││                                                │
-│▌+ #alerts      01-07 14:43 ││                                                │
-│▌  Minsu Kim · ＊＊ :eyes:  ││                                                │
-│▌@ #incidents   01-07 03:33 ││                                                │
-╰────────────────────────────╯╰────────────────────────────────────────────────╯
+╭ ▌A company ▾ · B @9 ─────────╮╭──────────────────────────────────────────────╮
+│ ＊                       @24 ││                                              │
+│ DM                       ●11 ││                                              │
+│▎＊＊                     @36 ││                                              │
+│ ＊＊                         ││                                              │
+│ ＊ ＊                      6 ││                                              │
+├─▾────────────────────────────┤│                                              │
+│▌* #general             01:28 ││   ＊＊ ＊＊＊ ＊＊＊＊                       │
+│▌  Alex Morgan: Fine branch…  ││   ＊＊＊＊ ＊＊＊ ＊＊＊ Enter＊ ＊＊＊＊.   │
+│▌! #general       01-12 11:43 ││                                              │
+│▌  Sam Rivera: Still cache b… ││   Enter    ＊＊                              │
+│▌⤷ #ideas         01-11 16:45 ││   Space h  ＊                                │
+│▌  ＊＊＊: see https://docs.… ││   Space d  DM                                │
+│▌@ #deploys       01-11 06:10 ││   Ctrl+O   ＊＊ ＊＊＊                       │
+│▌  Alex Morgan: Review looks… ││   ?        ＊ ＊＊＊                         │
+│▌» @Minsu Kim     01-09 07:27 ││   Ctrl+Q   ＊＊                              │
+│▌  Me: Metrics staging dashb… ││                                              │
+│▌@ #side-project  01-07 16:15 ││                                              │
+│▌  ＊＊＊: Broken queue can…  ││                                              │
+│▌+ #alerts        01-07 14:43 ││                                              │
+│▌  Minsu Kim · ＊＊ :eyes: C… ││                                              │
+│                              ││                                              │
+╰──────────────────────────────╯╰──────────────────────────────────────────────╯
  NORMAL  ▌A company › ＊＊   │ Enter ＊＊ · ? ＊＊＊ · Space ＊＊＊ │ ＊＊ ＊＊

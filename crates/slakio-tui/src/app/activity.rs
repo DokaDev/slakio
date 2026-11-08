@@ -9,10 +9,12 @@
 //! live is listed at once; the newest page is read again for it once things settle
 //! ([`SETTLE`]), and never more often than every [`FRESH`]: so too after the live updates came
 //! back. Nothing is read for Activity while it does not show; a page that failed is asked again
-//! by `r`, never by itself.
+//! by `r`, never by itself. A page reads on by itself only while each one lists something new,
+//! never past [`NOTICES_MAX`] held, nor from a cursor Slack hands back unchanged.
 
 use super::App;
 use super::model::Row;
+use super::model::activity::NOTICES_MAX;
 use super::query::Focus;
 use super::shell::View;
 use crate::permalink::{Place, SlackLink};
@@ -44,6 +46,10 @@ pub(crate) struct Activity {
 struct Part {
     /// The page on its way: its request, and whether it is the newest.
     asked: Option<(Generation, bool)>,
+    /// The cursor the page on its way was asked from.
+    sent: Option<String>,
+    /// A page after the newest is listed: the newest read again keeps them, and where they end.
+    deep: bool,
     /// Where its next page starts, when there is one.
     next: Option<String>,
     /// When its newest page was read last.
@@ -74,11 +80,12 @@ impl App {
 
     /// Nothing of Activity is loaded yet, and why: on its way (`None`), or failed.
     pub fn activity_unloaded(&self) -> Option<Option<FailKind>> {
-        if !self.model.notices.is_empty() || self.activity.feeds.values().any(|f| f.read.is_some()) {
+        let feeds = self.live_feeds();
+        if !self.model.notices.is_empty() || feeds.iter().any(|f| f.read.is_some()) {
             return None;
         }
-        let failed = self.activity.feeds.values().find_map(|f| f.failed.as_ref().map(|(k, _)| k.clone()));
-        let waiting = self.activity.feeds.values().any(|f| f.asked.is_some());
+        let failed = feeds.iter().find_map(|f| f.failed.as_ref().map(|(k, _)| k.clone()));
+        let waiting = feeds.iter().any(|f| f.asked.is_some());
         match failed {
             Some(k) if !waiting => Some(Some(k)),
             _ => Some(None),
@@ -87,11 +94,17 @@ impl App {
 
     /// What the end of Activity's list says.
     pub fn activity_foot(&self) -> Option<Foot> {
-        let feeds = self.activity.feeds.values();
-        if feeds.clone().any(|f| f.asked.is_some()) {
+        let feeds = self.live_feeds();
+        if feeds.iter().any(|f| f.asked.is_some()) {
             return Some(Foot::Loading);
         }
-        feeds.filter_map(|f| f.failed.as_ref()).map(|(k, _)| Foot::Failed(k.clone())).next()
+        feeds.iter().filter_map(|f| f.failed.as_ref()).map(|(k, _)| Foot::Failed(k.clone())).next()
+    }
+
+    /// What was asked of the workspaces Activity reads (not of one gone or signed out since).
+    fn live_feeds(&self) -> Vec<&Part> {
+        let live = self.activity_workspaces();
+        self.activity.feeds.iter().filter(|(w, _)| live.contains(w)).map(|(_, f)| f).collect()
     }
 
     /// The workspaces Activity reads: those whose boot answered in this run, but one Slack
@@ -110,8 +123,8 @@ impl App {
         if feed.asked.is_some_and(|(_, f)| f || !first) {
             return;
         }
-        let id = self.work.requests.ask(Some(ws.clone()), Command::Activity { cursor });
-        (feed.asked, feed.failed) = (Some((id, first)), None);
+        let id = self.work.requests.ask(Some(ws.clone()), Command::Activity { cursor: cursor.clone() });
+        (feed.asked, feed.failed, feed.sent) = (Some((id, first)), None, cursor);
         if first {
             feed.again = None;
         }
@@ -145,11 +158,13 @@ impl App {
     /// one (and has nothing on its way, nor a failure waiting for `r`).
     fn activity_more(&mut self) {
         let rows = self.model.notice_rows().len();
-        if self.shell.list_cursor + NEAR_END < rows {
+        // At the cap an older page would be cut at once: none is asked.
+        if self.shell.list_cursor + NEAR_END < rows || self.model.notices.len() >= NOTICES_MAX {
             return;
         }
+        let live = self.activity_workspaces();
         let more: Vec<(WorkspaceId, String)> = (self.activity.feeds.iter())
-            .filter(|(_, f)| f.asked.is_none() && f.failed.is_none())
+            .filter(|(ws, f)| f.asked.is_none() && f.failed.is_none() && live.contains(ws))
             .filter_map(|(ws, f)| Some((ws.clone(), f.next.clone()?)))
             .collect();
         for (ws, next) in more {
@@ -165,24 +180,56 @@ impl App {
         else {
             return false;
         };
-        let anchor = self.shell.anchor(&self.model);
-        // A page of nothing Activity shows asks for no more by itself (only a key near the end
-        // does): a run of such pages is never read through unasked.
-        let added = !feed.notices.is_empty();
+        let place = self.list_place();
         self.model.add_users(&ws, &feed.users);
-        self.model.notices.put(&ws, first, feed.notices);
+        let f = self.activity.feeds.entry(ws.clone()).or_default();
+        // The newest page read again joins the older ones listed, unless none of its notices is
+        // held (more came since than a page holds): then it starts the list again.
+        let joined = first && f.deep && feed.notices.iter().any(|n| self.model.notices.holds(&ws, &n.key));
+        if first && !joined {
+            f.deep = false;
+            self.model.notices.forget_listed(&ws);
+        }
+        let sent = f.sent.take();
+        let now_ts = self.now_ts();
+        // A page that lists nothing new (empty, all held, or cut at the cap) asks for no more by
+        // itself (only a key near the end does): a run of such pages is never read through unasked.
+        let added = self.model.notices.put(&ws, first, feed.notices, now_ts) > 0;
         let f = self.activity.feeds.entry(ws).or_default();
-        (f.asked, f.failed, f.next) = (None, None, feed.next);
+        (f.asked, f.failed) = (None, None);
+        // The newest page joined to older ones leaves where those end; a cursor Slack hands back
+        // unchanged ends the list.
+        if !joined {
+            f.next = feed.next.filter(|n| Some(n) != sent.as_ref());
+        }
         if first {
             f.read = Some(now);
+        } else {
+            f.deep = true;
         }
-        let h = self.list_height();
-        self.shell.clamp(&self.model, h);
-        self.shell.restore(anchor, &self.model, h);
+        self.keep_place(place);
         if self.activity.shown && added {
             self.activity_more();
         }
         true
+    }
+
+    /// The notice under the cursor and how far down the list it shows (`None`: at the top).
+    fn list_place(&self) -> (Option<super::model::RowKey>, Option<usize>) {
+        let offset = self.shell.list_cursor.saturating_sub(self.shell.list_top);
+        (self.shell.anchor(&self.model), (self.shell.list_top > 0).then_some(offset))
+    }
+
+    /// After Activity's notices changed: the cursor back on its notice, when the list still
+    /// holds it. A list read further down stays as it showed; one at its top shows what is new.
+    fn keep_place(&mut self, (anchor, offset): (Option<super::model::RowKey>, Option<usize>)) {
+        let h = self.list_height();
+        self.shell.clamp(&self.model, h);
+        self.shell.restore(anchor.clone(), &self.model, h);
+        if anchor.is_some() && self.shell.anchor(&self.model) == anchor {
+            self.shell.list_top = offset.map_or(0, |o| self.shell.list_cursor.saturating_sub(o));
+            self.shell.scroll(h);
+        }
     }
 
     /// Request `id` failed: when it is a page of Activity asked for, its end says why; its
@@ -197,7 +244,9 @@ impl App {
     /// `r` in Activity: the pages that failed for a reason that may pass are asked for again.
     /// `false` when none did.
     pub(super) fn retry_activity(&mut self) -> bool {
+        let live = self.activity_workspaces();
         let again: Vec<(WorkspaceId, Option<String>)> = (self.activity.feeds.iter())
+            .filter(|(ws, _)| live.contains(ws))
             .filter(|(_, f)| f.asked.is_none() && f.failed.as_ref().is_some_and(|(k, _)| k.retryable()))
             .map(|(ws, f)| {
                 (ws.clone(), if f.failed.as_ref().is_some_and(|(_, first)| *first) { None } else { f.next.clone() })
@@ -223,7 +272,11 @@ impl App {
         if self.activity.feeds.get(ws).is_none_or(|f| f.read.is_none()) {
             return false;
         }
+        let place = self.list_place();
         let listed = self.model.notices.live(ws, conversation, thread, m);
+        if listed && self.shell.view == View::Activity {
+            self.keep_place(place);
+        }
         self.read_again(ws, now);
         listed
     }
@@ -253,11 +306,17 @@ impl App {
             .filter(|(_, f)| f.again.is_some_and(|a| a <= now))
             .map(|(w, _)| w.clone())
             .collect();
+        let live = self.activity_workspaces();
         for ws in &due {
-            if self.activity.shown {
+            // Taken now, whatever follows: a newest page already on its way is the read due.
+            if let Some(f) = self.activity.feeds.get_mut(ws) {
+                f.again = None;
+                if !self.activity.shown {
+                    f.read = None;
+                }
+            }
+            if self.activity.shown && live.contains(ws) {
                 self.ask_activity(ws, None);
-            } else if let Some(f) = self.activity.feeds.get_mut(ws) {
-                (f.again, f.read) = (None, None);
             }
         }
         !due.is_empty()

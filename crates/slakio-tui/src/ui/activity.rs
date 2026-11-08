@@ -1,15 +1,17 @@
 //! Activity in the list panel: two rows a notice — its mark, where it is and when; then who
 //! and the message's text on one line — unread ones bold (the mark of an unread mention red),
-//! read ones muted. With several workspaces each notice starts with its workspace's stripe.
-//! Before anything is loaded the list says it is loading, or why it could not be; at the end of
-//! the list, a page on its way or one that failed says so.
+//! read ones muted. With several workspaces each notice starts with its workspace's stripe (with
+//! no color, the workspace's initial, or its number where two share one). The list panel is
+//! wider while it shows Activity ([`crate::screen::wide_list_width`]), so a place reads whole
+//! and the text runs on. Before anything is loaded the list says it is loading, or why it could
+//! not be; on the list's last row, a page on its way or one that failed says so.
 //!
 //! ```text
 //! │▌@ #incidents         14:02 │   @ you, ! everyone, & a group, * a word, ⤷ a thread,
 //! │▌  Minsu Kim: the deplo…    │   + a reaction, » a DM
 //! │▌⤷ #long-thr…   11-05 09:14 │
 //! │▌  Jiho Park: looks good    │
-//! │   Loading…                 │   a page on its way
+//! │   Loading…                 │   a page on its way (the panel's last row)
 //! ```
 //!
 //! Every remote text is sanitised to one line before it is drawn.
@@ -52,14 +54,28 @@ fn put(f: &mut Frame, row: Rect, x: u16, w: u16, spans: Vec<Span<'_>>) {
     f.render_widget(Paragraph::new(Line::from(spans)), Rect { x, width: w, ..row });
 }
 
-/// The workspace's stripe in the gutter, when several are signed in to.
+/// The workspace's stripe in the gutter, when several are signed in to. With no color to tell
+/// them apart: its initial, or its number where another workspace has the same initial.
 fn stripe(f: &mut Frame, app: &App, ws: &WorkspaceId, area: Rect) {
-    if app.model.workspaces().len() < 2 {
+    let all = app.model.workspaces();
+    if all.len() < 2 {
         return;
     }
-    if let Some(w) = app.model.workspace(ws) {
+    let Some(w) = app.model.workspace(ws) else { return };
+    if app.theme.kind != crate::theme::Kind::NoColor {
         put(f, area, 0, 1, vec![Span::styled("▌", app.theme.workspace(w.color))]);
+        return;
     }
+    let initial = |w: &slakio_core::model::Workspace| {
+        w.name.line().as_str().chars().next().filter(char::is_ascii_alphanumeric).map(|c| c.to_ascii_uppercase())
+    };
+    let mine = initial(w);
+    let shared = all.iter().any(|o| o.id != w.id && initial(o) == mine);
+    let tag = match mine {
+        Some(c) if !shared => c.to_string(),
+        _ => (all.iter().position(|o| o.id == w.id).unwrap_or(0) % 9 + 1).to_string(),
+    };
+    put(f, area, 0, 1, vec![Span::styled(tag, app.theme.bold())]);
 }
 
 /// A notice's first row: its mark, its conversation, its time at the right.
@@ -122,21 +138,22 @@ pub(super) fn meta(f: &mut Frame, app: &App, i: usize, area: Rect) {
 pub(super) fn foot(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
     let Some(foot) = app.activity_foot() else { return };
-    let room = area.width.saturating_sub(4);
-    let spans = match foot {
-        Foot::Loading => vec![Span::styled(app.i18n.label(Label::ListLoading).to_string(), t.faint())],
+    let cells = area.width.saturating_sub(4);
+    let room = usize::from(cells);
+    let (text, style) = match foot {
+        Foot::Loading => (app.i18n.label(Label::ListLoading).to_string(), t.faint()),
         Foot::Failed(kind) => {
-            let mut s = vec![Span::styled(app.i18n.label(Label::ActivityMoreFailed).to_string(), t.muted())];
-            if let Some(keys) = super::retry_key(app).filter(|_| kind.retryable()) {
+            let hint = super::retry_key(app).filter(|_| kind.retryable()).map(|keys| {
                 let hint = app.i18n.msg(&Msg::RetryHint { keys }).to_string();
-                s.push(Span::styled(format!(" · {hint}"), t.muted()));
-            }
-            s
+                format!(" · {hint}")
+            });
+            // The way to retry stays whole: what failed gives up its end first.
+            let hint = hint.unwrap_or_default();
+            let what = app.i18n.label(Label::ActivityMoreFailed).to_string();
+            (format!("{}{hint}", clip(&what, room.saturating_sub(width(&hint)))), t.muted())
         }
     };
-    let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
-    let style = spans.first().map_or(t.muted(), |s| s.style);
-    put(f, area, 3, room, vec![Span::styled(clip(&text, usize::from(room)), style)]);
+    put(f, area, 3, cells, vec![Span::styled(clip(&text, room), style)]);
 }
 
 /// Where `n` is: the conversation as the list names it, else its id.
