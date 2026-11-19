@@ -11,15 +11,22 @@
 //!   the answer says so; the bytes are counted as they come, and the download stops at `max`.
 //! * An answer that is a web page for a file that is not one (a sign-in page) is not saved.
 //! * How much has come is told at most every [`PROGRESS_BYTES`] or [`PROGRESS_EVERY`].
+//! * The bytes are written, flushed and renamed into place on a thread of their own
+//!   ([`Writer`]): the runtime that reads keys and draws the screen never waits on the disk.
+//! * The user may stop it (`cancel`) while it is asked for and while its bytes come; nothing of
+//!   it is kept then.
 
 use crate::client::Client;
 use crate::error::SlackError;
 use crate::request::Os;
-use slakio_core::download::{Saving, Unsaved};
+use bytes::Bytes;
+use slakio_core::download::{Finished, Saving, Unsaved};
 use slakio_core::model::{FILE_HOST, File};
+use slakio_core::sanitize::Remote;
 use slakio_core::secret::Credentials;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+use tokio::sync::{mpsc, watch};
 
 /// The most redirects a download follows.
 pub const REDIRECTS: usize = 3;
@@ -76,21 +83,27 @@ fn a_page_instead(content_type: Option<&str>, file: &File) -> bool {
 }
 
 /// Download `file` with `client` into `dir`, at most `max` bytes, telling `progress` how much
-/// has come (and of how much, when said). The path it is saved as, and its length.
+/// has come (and of how much, when said), until `cancel` says to stop. The file saved, and its
+/// length.
 pub(crate) async fn download(
     client: &Client,
     file: &File,
     dir: &Path,
     max: u64,
+    mut cancel: watch::Receiver<bool>,
     progress: impl Fn(u64, Option<u64>),
-) -> Result<(PathBuf, u64), SlackError> {
+) -> Result<(Finished, u64), SlackError> {
     let mut url = file.download.as_deref().and_then(address).ok_or_else(|| api("file_not_downloadable"))?;
     if file.size.is_some_and(|s| s > max) {
         return Err(SlackError::TooLarge);
     }
     let mut hops = 0;
     let mut answer = loop {
-        let answer = client.fetch_file(&url).await?;
+        let answer = tokio::select! {
+            biased;
+            () = cancelled(&mut cancel) => return Err(SlackError::Cancelled),
+            answer = client.fetch_file(&url) => answer?,
+        };
         match answer.status {
             200 => break answer,
             301 | 302 | 303 | 307 | 308 if hops < REDIRECTS => {
@@ -115,30 +128,130 @@ pub(crate) async fn download(
         return Err(SlackError::TooLarge);
     }
     let total = answer.length.or(file.size);
-    let mut saving = Saving::start(dir, &file.name, max).map_err(unsaved)?;
-    let (mut told, mut told_at) = (0u64, Instant::now());
-    progress(0, total);
+    let tell = |got| progress(got, total);
+    let mut writer = Writer::start(dir.to_path_buf(), file.name.clone(), max);
+    let came = receive(client, &mut answer, &mut writer, max, &mut cancel, &tell).await;
+    match came {
+        Ok(bytes) => Ok((writer.finish().await?, bytes)),
+        Err(e) => {
+            writer.abandon().await;
+            Err(e)
+        }
+    }
+}
+
+/// Read `answer`'s body into `writer` (at most `max` bytes) until its end, telling `progress`
+/// how much has come; its length.
+async fn receive(
+    client: &Client,
+    answer: &mut crate::http::Fetched,
+    writer: &mut Writer,
+    max: u64,
+    cancel: &mut watch::Receiver<bool>,
+    progress: &impl Fn(u64),
+) -> Result<u64, SlackError> {
+    let (mut got, mut told, mut told_at) = (0u64, 0u64, Instant::now());
+    progress(0);
     loop {
         let chunk = tokio::select! {
             biased;
+            () = cancelled(cancel) => return Err(SlackError::Cancelled),
             () = client.governor().stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
             chunk = answer.chunk() => chunk?,
         };
         let Some(bytes) = chunk else { break };
-        saving.write(&bytes).map_err(unsaved)?;
-        let got = saving.written();
+        got = got.saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        if got > max {
+            return Err(SlackError::TooLarge);
+        }
+        writer.write(bytes).await?;
         if got - told >= PROGRESS_BYTES || told_at.elapsed() >= PROGRESS_EVERY {
             (told, told_at) = (got, Instant::now());
-            progress(got, total);
+            progress(got);
         }
     }
-    let bytes = saving.written();
     // Cut off before the length said: not the whole file.
-    if answer.length.is_some_and(|l| l != bytes) {
+    if answer.length.is_some_and(|l| l != got) {
         return Err(SlackError::Network { detail: "the download was cut off".to_string() });
     }
-    let path = saving.finish().map_err(unsaved)?;
-    Ok((path, bytes))
+    Ok(got)
+}
+
+/// Done once `cancel` says to stop; never when nobody can say so any more.
+async fn cancelled(cancel: &mut watch::Receiver<bool>) {
+    if cancel.wait_for(|stop| *stop).await.is_err() {
+        std::future::pending::<()>().await;
+    }
+}
+
+/// How many pieces of a file wait for the disk at most.
+const QUEUE: usize = 16;
+
+/// A file's bytes on their way to the disk, written by a thread of the blocking pool
+/// ([`Saving`]): the part file is made, written, flushed and renamed there. Its queue closed
+/// without [`Writer::finish`], the part file is removed.
+struct Writer {
+    queue: Option<mpsc::Sender<Option<Bytes>>>,
+    /// The writer's thread, until its end was waited for.
+    task: Option<tokio::task::JoinHandle<Result<Option<Finished>, Unsaved>>>,
+}
+
+impl Writer {
+    fn start(dir: PathBuf, name: Remote, max: u64) -> Self {
+        let (queue, mut pieces) = mpsc::channel::<Option<Bytes>>(QUEUE);
+        let task = tokio::task::spawn_blocking(move || {
+            let mut saving = Saving::start(&dir, &name, max)?;
+            while let Some(piece) = pieces.blocking_recv() {
+                match piece {
+                    Some(bytes) => saving.write(&bytes)?,
+                    None => return saving.finish().map(Some),
+                }
+            }
+            // Stopped: dropping it removes the part file.
+            Ok(None)
+        });
+        Self { queue: Some(queue), task: Some(task) }
+    }
+
+    /// Hand `bytes` on to be written; why not, when the writer stopped.
+    async fn write(&mut self, bytes: Bytes) -> Result<(), SlackError> {
+        let queue = self.queue.as_ref().ok_or_else(|| stopped("no queue"))?;
+        if queue.send(Some(bytes)).await.is_ok() {
+            return Ok(());
+        }
+        self.queue = None;
+        match self.end().await {
+            Some(Ok(Err(e))) => Err(unsaved(e)),
+            _ => Err(stopped("the writer stopped")),
+        }
+    }
+
+    /// Wait for the writer's thread to end (once): how it ended.
+    async fn end(&mut self) -> Option<Result<Result<Option<Finished>, Unsaved>, tokio::task::JoinError>> {
+        Some(self.task.take()?.await)
+    }
+
+    /// Every byte is handed on: the file, flushed and in place.
+    async fn finish(mut self) -> Result<Finished, SlackError> {
+        if let Some(queue) = self.queue.take() {
+            let _ = queue.send(None).await;
+        }
+        match self.end().await {
+            Some(Ok(Ok(Some(done)))) => Ok(done),
+            Some(Ok(Err(e))) => Err(unsaved(e)),
+            _ => Err(stopped("the writer stopped")),
+        }
+    }
+
+    /// Stop: the part file is removed once this returns.
+    async fn abandon(mut self) {
+        self.queue = None;
+        let _ = self.end().await;
+    }
+}
+
+fn stopped(detail: &str) -> SlackError {
+    SlackError::Unsaved { detail: detail.to_string() }
 }
 
 fn api(code: &str) -> SlackError {

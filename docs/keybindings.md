@@ -182,6 +182,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `y` | Copy the selected messages | `pane.copy` |
 | `o` | Open a message's link (or :open &lt;url&gt;) | `pane.open_link` |
 | `f` | Download a file shared in a message | `pane.files` |
+| `F` | Stop the downloads on their way | `pane.files_cancel` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
 | `v` | Split right (thread, else same) | `pane.split_right` |

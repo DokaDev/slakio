@@ -212,10 +212,14 @@ images, and settings. This README only lists what works; it will grow with each 
   click, `Esc`). It is saved in `Downloads/slakio` in your home folder (`downloads` in the
   config names another; `download_max_mb` caps the size, 1024 by default) under a safe name
   (no folders, no hidden or reserved names, never over a file there: `name (2).pdf`), and the
-  status line shows how much has come. On macOS it is marked as downloaded from the internet,
-  as a browser marks its downloads. A document, picture, sound, video or text file is offered
-  to open in your system's app for it once saved (it asks; the safe answer is "Not now");
-  programs, scripts, installers, archives and anything else are only saved. Downloading reads
+  status line shows how much has come; `F` (or `:download cancel`) stops it, and nothing of it
+  is kept. A folder slakio makes for downloads, and the files it saves, are readable by you
+  alone. On macOS and Windows it is marked as downloaded from the internet before it gets its
+  name, as a browser marks its downloads (if that fails it is kept, but not offered to open). A
+  PDF, picture, sound, video or plain text file is offered to open in your system's app for it
+  once saved (it asks; the safe answer is "Not now"); office documents, tables (`.csv`),
+  programs, scripts, installers, archives and anything else are only saved. `--demo` saves its
+  invented files in a temporary folder (`slakio-demo`), never offered to open. Downloading reads
   only: the file comes from Slack's file host (the `files` host of `slack.com`) alone, which is sent your
   session cookie and never your token, and redirects to any other host are refused. Pictures
   are not shown inside slakio yet.
@@ -429,8 +433,9 @@ downloads = ""           # the folder files are saved in ("": Downloads/slakio i
 download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
 ```
 
-`downloads` takes an absolute path or `~/…`; `SLAKIO_DOWNLOAD_DIR` in the environment overrides
-it.
+`downloads` takes an absolute path or `~/…`; `SLAKIO_DOWNLOAD_DIR` in the environment (an
+absolute path) overrides it. A megabyte here is 1,000,000 bytes, the unit file sizes are shown
+in (a file shown as `1.0 GB` is over `download_max_mb = 999`).
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
 is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also

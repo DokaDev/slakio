@@ -6,9 +6,9 @@
 //!
 //! A file downloaded opens the same way ([`open_file`]), only when the user said yes, and only
 //! an absolute path to a plain file (not a link) of a kind a viewer shows
-//! ([`slakio_core::download::openable`]). Before that, as soon as it is saved, it is marked as
-//! downloaded from the internet ([`quarantine`]: on macOS the `com.apple.quarantine` attribute,
-//! set by `/usr/bin/xattr`, so the system checks it as it checks a browser's downloads).
+//! ([`slakio_core::download::openable`]). It was marked as downloaded from the internet before
+//! it got its name ([`slakio_core::download`]), so the system checks it as it checks a
+//! browser's downloads.
 
 use std::io;
 use std::process::{Command, Stdio};
@@ -16,10 +16,6 @@ use std::process::{Command, Stdio};
 /// `SLAKIO_TEST_OPENER`, debug builds only: the program run instead of the system's opener (the
 /// tests record what it is handed; no browser starts).
 const TEST_OPENER: &str = "SLAKIO_TEST_OPENER";
-
-/// `SLAKIO_TEST_XATTR`, debug builds only: the program run instead of `/usr/bin/xattr`; without
-/// it a debug build marks nothing (the tests never change a real file's attributes).
-const TEST_XATTR: &str = "SLAKIO_TEST_XATTR";
 
 /// The longest address opened.
 pub const URL_MAX: usize = 8192;
@@ -191,35 +187,6 @@ fn system_file() -> Command {
     // Every argument but the empty address `system` was given.
     c.args(url.get_args().filter(|a| !a.is_empty()));
     c
-}
-
-/// Mark the file just downloaded at `path` as from the internet: on macOS the quarantine
-/// attribute (`/usr/bin/xattr -w com.apple.quarantine`), as browsers mark their downloads, on a
-/// thread of its own; elsewhere nothing. A debug build runs only `SLAKIO_TEST_XATTR`'s program.
-pub fn quarantine(path: &std::path::Path) -> io::Result<()> {
-    let program = if cfg!(debug_assertions) {
-        match std::env::var_os(TEST_XATTR) {
-            Some(p) => p,
-            None => return Ok(()),
-        }
-    } else if cfg!(target_os = "macos") {
-        "/usr/bin/xattr".into()
-    } else {
-        return Ok(());
-    };
-    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let value = format!("0081;{secs:08x};slakio;");
-    let mut child = Command::new(program)
-        .args(["-w", "com.apple.quarantine", &value])
-        .arg(path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
-    std::thread::spawn(move || {
-        let _ = child.wait();
-    });
-    Ok(())
 }
 
 #[cfg(test)]

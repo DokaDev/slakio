@@ -18,6 +18,7 @@ fn every_command() -> Vec<Command> {
         Command::Activity { cursor: None },
         Command::Activity { cursor: Some("bmV4dA==".into()) },
         Command::Save { item: SavedId::new("S1"), change: SavedChange::Complete },
+        Command::Cancel { request: Generation(2) },
     ]
 }
 

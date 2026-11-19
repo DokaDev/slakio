@@ -88,6 +88,11 @@ pub enum Command {
     /// saved as [`crate::download`] says. While it comes, [`Event::Progress`] says how much has;
     /// answered with [`Event::Downloaded`]. Nothing is opened.
     Download { file: File, dir: PathBuf, max: u64 },
+    /// Stop download `request` (a [`Command::Download`] of the same workspace) while its bytes
+    /// still come: nothing of it is kept, and it is answered `Failed` with
+    /// [`FailKind::Cancelled`]. One already being put in place is saved all the same (its
+    /// answer says so). Answered with [`Event::Cancelled`].
+    Cancel { request: Generation },
 }
 
 impl Command {
@@ -102,7 +107,8 @@ impl Command {
             | Command::Dated { .. }
             | Command::Search { .. }
             | Command::Activity { .. }
-            | Command::Download { .. } => false,
+            | Command::Download { .. }
+            | Command::Cancel { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -259,10 +265,19 @@ pub enum Event {
         total: Option<u64>,
     },
     /// The file a [`Command::Download`] asked for is saved, as `path` (`bytes` long).
+    /// `unmarked`: the system's mark of a file from the internet could not be set on it (it is
+    /// kept; it should not be opened from here).
     Downloaded {
         file: FileId,
         path: PathBuf,
         bytes: u64,
+        unmarked: bool,
+    },
+    /// The answer to a [`Command::Cancel`] of download `request`: `stopping` when it was still
+    /// on its way (its own answer, most likely `Failed` with [`FailKind::Cancelled`], follows).
+    Cancelled {
+        request: Generation,
+        stopping: bool,
     },
 }
 
@@ -321,7 +336,8 @@ impl FailKind {
             | FailKind::CapReached
             | FailKind::Api { .. }
             | FailKind::TooLarge
-            | FailKind::Unsaved => false,
+            | FailKind::Unsaved
+            | FailKind::Cancelled => false,
         }
     }
 }
@@ -348,6 +364,8 @@ pub enum FailKind {
     TooLarge,
     /// A file could not be saved here (the folder cannot be written, the disk is full).
     Unsaved,
+    /// The user stopped it ([`Command::Cancel`]): nothing of it was kept.
+    Cancelled,
     /// Slack answered with an error of its own (`code`, such as `channel_not_found`).
     Api {
         code: String,

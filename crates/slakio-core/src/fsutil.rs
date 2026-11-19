@@ -128,8 +128,10 @@ pub fn create_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// Rename `from` to `to`, never replacing anything at `to` (an `AlreadyExists` error then;
 /// `fs::rename` alone would silently replace a file). A file is hard-linked to its new name
 /// and then unlinked from the old one; a folder, a symbolic link, or a file on a file system
-/// without hard links is renamed after checking that `to` is free (an error while checking is
-/// an error, never "free").
+/// without hard links is renamed by the system's own rename that refuses a taken name
+/// (`renamex_np(RENAME_EXCL)` on macOS, `renameat2(RENAME_NOREPLACE)` on Linux), never by a
+/// check and then a rename. Where there is no such rename (or the file system refuses it), it
+/// fails rather than risk replacing something.
 pub fn rename_new(from: &Path, to: &Path) -> io::Result<()> {
     if fs::symlink_metadata(from)?.is_file() {
         match fs::hard_link(from, to) {
@@ -147,12 +149,24 @@ pub fn rename_new(from: &Path, to: &Path) -> io::Result<()> {
             Err(_) => {}
         }
     }
-    match fs::symlink_metadata(to) {
-        Ok(_) => return Err(io::Error::from(io::ErrorKind::AlreadyExists)),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e),
+    rename_noreplace(from, to)?;
+    if let Some(d) = to.parent() {
+        sync_dir(d);
     }
-    fs::rename(from, to)
+    Ok(())
+}
+
+/// The system's rename that refuses a taken name.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn rename_noreplace(from: &Path, to: &Path) -> io::Result<()> {
+    use rustix::fs::{CWD, RenameFlags, renameat_with};
+    renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE).map_err(io::Error::from)
+}
+
+/// None here: refused.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn rename_noreplace(_from: &Path, _to: &Path) -> io::Result<()> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "no rename that refuses a taken name"))
 }
 
 /// The file a write of `path` goes to: `path` itself, or the file a symbolic link at `path`

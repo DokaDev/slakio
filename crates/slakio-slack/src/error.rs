@@ -31,6 +31,8 @@ pub enum SlackError {
     TooLarge,
     /// A file downloaded could not be saved (`detail`: the folder's error, no name in it).
     Unsaved { detail: String },
+    /// The user stopped a download: nothing of it was kept.
+    Cancelled,
 }
 
 impl SlackError {
@@ -47,6 +49,7 @@ impl SlackError {
             SlackError::Api { code } => FailKind::Api { code: code.clone() },
             SlackError::TooLarge => FailKind::TooLarge,
             SlackError::Unsaved { .. } => FailKind::Unsaved,
+            SlackError::Cancelled => FailKind::Cancelled,
         }
     }
 
@@ -64,6 +67,7 @@ impl SlackError {
             SlackError::Superseded => "superseded by a newer request".to_string(),
             SlackError::TooLarge => "the file is larger than the download cap".to_string(),
             SlackError::Unsaved { detail } => format!("not saved: {detail}"),
+            SlackError::Cancelled => "cancelled".to_string(),
         }
     }
 }

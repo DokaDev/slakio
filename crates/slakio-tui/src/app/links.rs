@@ -56,12 +56,25 @@ impl App {
         let Some((a, b)) = p.range(self.work.timeline(p)) else { return };
         let one = a == b && p.visual.is_none();
         let items = &self.work.timeline(p).items[a..=b];
+        // The names of a message's files follow its text (a paperclip and the name: the copy is
+        // text pasted elsewhere, never drawn here), as they did before the cards.
+        let copied = |m: &super::pane::Shown| {
+            let mut out = m.text.to_string();
+            for f in &m.files {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str("\u{1F4CE} ");
+                out.push_str(f.name.line().as_str());
+            }
+            out
+        };
         let text = if one {
-            items[0].text.to_string()
+            copied(&items[0])
         } else {
             items
                 .iter()
-                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts, &self.zone), m.author, m.text))
+                .map(|m| format!("{}  {}: {}", crate::time::hm(m.ts, &self.zone), m.author, copied(m)))
                 .collect::<Vec<_>>()
                 .join("\n")
         };

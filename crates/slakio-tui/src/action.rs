@@ -169,6 +169,8 @@ pub enum PaneAction {
     OpenLink,
     /// Download a file of the selected message (picked among several).
     Files,
+    /// Stop the downloads on their way (`:download cancel`).
+    FilesCancel,
     /// One step out: VISUAL, the selection, the thread panel, the main pane.
     Escape,
     /// Write in the pane's composer (Insert mode).
@@ -443,6 +445,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Copy, "pane.copy", Label::ActionPaneCopy, &[]),
     pane(PaneAction::OpenLink, "pane.open_link", Label::ActionPaneOpenLink, &["open"]),
     pane(PaneAction::Files, "pane.files", Label::ActionPaneFiles, &["download"]),
+    pane(PaneAction::FilesCancel, "pane.files_cancel", Label::ActionPaneFilesCancel, &[]),
     pane(PaneAction::Escape, "pane.escape", Label::ActionPaneEscape, &[]),
     pane(PaneAction::Left, "pane.left", Label::ActionPaneLeft, &[]),
     pane(PaneAction::Right, "pane.right", Label::ActionPaneRight, &[]),

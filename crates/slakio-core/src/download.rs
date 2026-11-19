@@ -6,13 +6,18 @@
 //!   no leading dot or dash (no hidden file, no `..`, nothing read as an option), no trailing
 //!   dot or space, no reserved Windows name, at most [`NAME_MAX`] bytes with its extension kept.
 //! * The bytes go to a hidden part file in the download folder, made new (never through what is
-//!   there), at most `max` of them ([`Saving::write`]); a part file not finished is removed.
-//! * Finished, it takes the first free name, `name`, `name (2).ext`, `name (3).ext` …, renamed
-//!   without replacing anything ([`crate::fsutil::rename_new`]): nothing is ever written over.
+//!   there) and readable by the user alone, at most `max` of them ([`Saving::write`]); a part
+//!   file not finished is removed, and one a run that is gone left behind is swept ([`sweep`]).
+//!   A download folder slakio makes is the user's alone too.
+//! * Finished, it is marked as downloaded from the internet while it is still the part file
+//!   (macOS: the quarantine attribute on the open file; Windows: the `Zone.Identifier` stream),
+//!   so it never shows under its name unmarked; then it takes the first free name, `name`,
+//!   `name (2).ext`, `name (3).ext` …, renamed without replacing anything
+//!   ([`crate::fsutil::rename_new`]): nothing is ever written over.
 //!
 //! Which saved files the app offers to open is an allowlist of kinds that open in a viewer
-//! ([`openable`]); anything else (a program, a script, an installer, an unknown kind) is only
-//! saved.
+//! ([`openable`]); anything else (a program, a script, an installer, a document that can carry
+//! code or formulas, an unknown kind) is only saved.
 
 use crate::sanitize::Remote;
 use std::fs;
@@ -78,14 +83,16 @@ fn split(name: &str) -> (&str, &str) {
     }
 }
 
-/// A name Windows keeps for a device, with any extension (`CON`, `nul.txt`, `COM1`).
+/// A name Windows keeps for a device, with any extension (`CON`, `nul.txt`, `CONIN$`, `COM1`,
+/// `LPT²`: the superscript digits count as digits there).
 fn reserved(name: &str) -> bool {
-    let stem = name.split('.').next().unwrap_or_default().trim_end().to_ascii_uppercase();
-    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || (stem.len() == 4
-            && (stem.starts_with("COM") || stem.starts_with("LPT"))
-            && stem.as_bytes()[3].is_ascii_digit()
-            && stem.as_bytes()[3] != b'0')
+    let stem = name.split('.').next().unwrap_or_default().trim_end().to_uppercase();
+    let port = |n: &str| {
+        let mut c = n.chars();
+        matches!((c.next(), c.next()), (Some('1'..='9' | '\u{B9}' | '\u{B2}' | '\u{B3}'), None))
+    };
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || stem.strip_prefix("COM").or_else(|| stem.strip_prefix("LPT")).is_some_and(port)
 }
 
 /// The `n`th name tried for `name` (from 1): `name` itself, then `stem (n).ext`.
@@ -124,17 +131,33 @@ pub struct Saving {
     max: u64,
 }
 
+/// A file saved ([`Saving::finish`]): where it is, and whether the system's mark of a file
+/// from the internet could not be set on it (it is kept all the same; it should not be opened
+/// from here then).
+#[derive(Debug)]
+pub struct Finished {
+    pub path: PathBuf,
+    pub unmarked: bool,
+}
+
 impl Saving {
-    /// Start saving the file Slack calls `name` in `dir` (made when missing), at most `max`
-    /// bytes.
+    /// Start saving the file Slack calls `name` in `dir`, at most `max` bytes. A folder that is
+    /// not there is made, the user's alone ([`crate::fsutil::private_dir`]); one that is there is
+    /// left as it is.
     pub fn start(dir: &Path, name: &Remote, max: u64) -> Result<Self, Unsaved> {
-        fs::create_dir_all(dir)?;
+        if !dir.is_dir() {
+            crate::fsutil::private_dir(dir)?;
+        }
         let name = safe_name(name);
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
         let mut n = 0u32;
         let (part, file) = loop {
             n += 1;
             let part = dir.join(format!(".{name}.{}-{n}.part", std::process::id()));
-            match fs::OpenOptions::new().write(true).create_new(true).open(&part) {
+            match opts.open(&part) {
                 Ok(f) => break (part, f),
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists && n < TRIES => {}
                 Err(e) => return Err(e.into()),
@@ -165,15 +188,17 @@ impl Saving {
         Ok(())
     }
 
-    /// Every byte is written: flush it and give it the first free name. The path it has.
-    pub fn finish(mut self) -> Result<PathBuf, Unsaved> {
+    /// Every byte is written: mark it as from the internet ([`mark`]), flush it and give it the
+    /// first free name.
+    pub fn finish(mut self) -> Result<Finished, Unsaved> {
         let file = self.file.take().ok_or_else(|| io::Error::other("already finished"))?;
+        let unmarked = !mark(&file, &self.part);
         file.sync_all()?;
         drop(file);
         for n in 1..=TRIES {
             let to = self.dir.join(nth_name(&self.name, n));
             match crate::fsutil::rename_new(&self.part, &to) {
-                Ok(()) => return Ok(to),
+                Ok(()) => return Ok(Finished { path: to, unmarked }),
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(e) => return Err(e.into()),
             }
@@ -190,19 +215,98 @@ impl Drop for Saving {
     }
 }
 
-/// The kinds of file the app offers to open once saved, by extension: documents, pictures,
-/// sound, video and plain text a viewer shows. Programs, scripts, installers, disk images,
-/// archives, links, web pages, documents that may carry macros or embedded objects (`.doc`,
-/// `.xls`, `.ppt`, `.rtf`, `.docm` …) and anything not listed are only saved.
+/// The kinds of file the app offers to open once saved, by extension: PDF, pictures, sound,
+/// video and plain text a viewer shows. Programs, scripts, installers, disk images, archives,
+/// links, web pages, office documents (they may carry macros, embedded objects or external
+/// references: `.docx`, `.xlsx`, `.pptx`, `.odt`, `.pages` …), tables a spreadsheet reads
+/// formulas from (`.csv`, `.tsv`), `.md` and `.json` (often opened by an editor that runs
+/// code) and anything not listed are only saved.
 const OPENABLE: &[&str] = &[
-    "pdf", "png", "jpg", "jpeg", "gif", "webp", "heic", "bmp", "tif", "tiff", "txt", "md", "csv", "tsv", "log", "json",
-    "docx", "xlsx", "pptx", "pages", "numbers", "key", "odt", "ods", "odp", "mp3", "m4a", "wav", "aac", "flac", "mp4",
-    "mov", "m4v", "webm",
+    "pdf", "png", "jpg", "jpeg", "gif", "webp", "heic", "bmp", "tif", "tiff", "txt", "log", "mp3", "m4a", "wav", "aac",
+    "flac", "mp4", "mov", "m4v", "webm",
 ];
 
 /// A file saved as `path` is of a kind the app offers to open ([`OPENABLE`]).
 pub fn openable(path: &Path) -> bool {
     path.extension().and_then(|e| e.to_str()).is_some_and(|e| OPENABLE.contains(&e.to_ascii_lowercase().as_str()))
+}
+
+/// The mark of a file downloaded from the internet, set on the part file `file` (at `part`)
+/// before it gets its name, so the system checks it as it checks a browser's downloads: macOS's
+/// quarantine attribute, set on the open file (never through a path a link could redirect).
+/// `false` when it could not be set.
+#[cfg(target_os = "macos")]
+fn mark(file: &fs::File, _part: &Path) -> bool {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let value = format!("0081;{secs:08x};slakio;");
+    rustix::fs::fsetxattr(file, QUARANTINE, value.as_bytes(), rustix::fs::XattrFlags::empty()).is_ok()
+}
+
+/// The attribute macOS reads a downloaded file's origin from.
+#[cfg(target_os = "macos")]
+pub const QUARANTINE: &str = "com.apple.quarantine";
+
+/// Windows' mark: the part file's `Zone.Identifier` stream says it came from the internet
+/// zone, as a browser's download says.
+#[cfg(windows)]
+fn mark(_file: &fs::File, part: &Path) -> bool {
+    let mut stream = part.as_os_str().to_owned();
+    stream.push(":Zone.Identifier");
+    fs::write(stream, ZONE_IDENTIFIER).is_ok()
+}
+
+/// What a downloaded file's `Zone.Identifier` stream says (Windows).
+#[cfg(windows)]
+pub const ZONE_IDENTIFIER: &str = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=about:internet\r\n";
+
+/// Elsewhere the system keeps no such mark: nothing to set.
+#[cfg(not(any(target_os = "macos", windows)))]
+fn mark(_file: &fs::File, _part: &Path) -> bool {
+    true
+}
+
+/// A part file not written for this long is left over, whoever wrote it (a download that
+/// stalls fails long before).
+const STALE: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+/// Remove the part files that runs of slakio which are gone left in `dir` (killed, crashed, the
+/// power lost): `.<name>.<pid>-<n>.part`, whose process no longer runs (macOS, Linux) or that
+/// was not written for a day. Nothing else is touched; a folder that is not there is fine.
+pub fn sweep(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let Some(pid) = entry.file_name().to_str().and_then(part_pid) else { continue };
+        let path = entry.path();
+        let Ok(meta) = fs::symlink_metadata(&path) else { continue };
+        let old = meta.modified().ok().and_then(|m| m.elapsed().ok()).is_some_and(|age| age > STALE);
+        if meta.is_file() && (old || !running(pid)) {
+            let _ = fs::remove_file(&path);
+        }
+    }
+}
+
+/// The process id in the name of a part file ([`Saving::start`]): `.<name>.<pid>-<n>.part`.
+fn part_pid(name: &str) -> Option<u32> {
+    let rest = name.strip_prefix('.')?.strip_suffix(".part")?;
+    let (pid, n) = rest.rsplit_once('.')?.1.split_once('-')?;
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    (digits(pid) && digits(n)).then(|| pid.parse().ok()).flatten()
+}
+
+/// Process `pid` runs (this one does; one of another user counts as running).
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn running(pid: u32) -> bool {
+    if pid == std::process::id() {
+        return true;
+    }
+    let Some(p) = i32::try_from(pid).ok().and_then(rustix::process::Pid::from_raw) else { return false };
+    !matches!(rustix::process::test_kill_process(p), Err(rustix::io::Errno::SRCH))
+}
+
+/// Not known here: only the part file's age tells.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn running(_pid: u32) -> bool {
+    true
 }
 
 #[cfg(test)]

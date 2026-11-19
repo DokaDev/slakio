@@ -65,7 +65,8 @@ pub struct Config {
     pub cache: String,
     /// The most messages the cache keeps of a conversation ([`CACHE_MESSAGES`]).
     pub cache_messages: u32,
-    /// The most megabytes the cache may use ([`CACHE_MAX_MB`]).
+    /// The most megabytes (1,000,000 bytes, as file sizes are shown) the cache may use
+    /// ([`CACHE_MAX_MB`]).
     pub cache_max_mb: u32,
     /// A conversation not opened for this many days leaves the cache ([`CACHE_DAYS`]).
     pub cache_days: u32,
@@ -75,7 +76,8 @@ pub struct Config {
     /// The folder files are downloaded to; empty: `Downloads/slakio` in the home directory
     /// ([`crate::paths::downloads`]). A leading `~/` is the home directory.
     pub downloads: String,
-    /// The largest file downloaded, in megabytes ([`DOWNLOAD_MAX_MB`]).
+    /// The largest file downloaded, in megabytes of 1,000,000 bytes, the unit file sizes are
+    /// shown in ([`DOWNLOAD_MAX_MB`]).
     pub download_max_mb: u32,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,

@@ -115,7 +115,9 @@ fn a_file_is_saved_with_its_bytes_and_only_the_cookie_goes_to_the_file_host() {
         let dir = temp_dir("saved");
         let file = r.small_file();
         let events = r.download(file.clone(), &dir, MAX).await;
-        let Some(Event::Downloaded { file: id, path, bytes }) = events.last() else { panic!("{events:?}") };
+        let Some(Event::Downloaded { file: id, path, bytes, unmarked: false }) = events.last() else {
+            panic!("{events:?}")
+        };
         assert_eq!(id, &file.id);
         assert_eq!(path.parent(), Some(dir.as_path()));
         assert_eq!(path.file_name().unwrap().to_string_lossy(), file.name.unsanitized());

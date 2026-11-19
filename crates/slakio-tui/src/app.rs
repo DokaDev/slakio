@@ -523,6 +523,7 @@ impl App {
             PaneAction::Copy => self.copy(now),
             PaneAction::OpenLink => self.open_link(now),
             PaneAction::Files => self.open_files(now),
+            PaneAction::FilesCancel => self.cancel_downloads(now),
             PaneAction::Insert => self.write(now),
             PaneAction::Left => {
                 if !self.focus_toward(Toward::Left, now) && !self.shell.list_hidden {

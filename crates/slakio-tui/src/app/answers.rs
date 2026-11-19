@@ -219,7 +219,9 @@ impl App {
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
             Event::Progress { file, got, total } => self.on_progress(id, &file, got, total, now),
-            Event::Downloaded { path, .. } => self.on_downloaded(id, path, now),
+            Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
+            // A download stopped answers for itself.
+            Event::Cancelled { .. } => false,
         };
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);
@@ -382,6 +384,7 @@ pub(crate) fn failure(kind: &FailKind) -> Label {
         FailKind::Api { .. } => Label::FailApi,
         FailKind::TooLarge => Label::FailTooLarge,
         FailKind::Unsaved => Label::FailUnsaved,
+        FailKind::Cancelled => Label::FailCancelled,
     }
 }
 

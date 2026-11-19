@@ -187,10 +187,12 @@ comes back); people and channels are named from the read model when drawn
   shows OS or parser text. The log redacts each detail (`fault::redact`: tokens, cookies,
   addresses past their host, quoted text), is mode 0600, opened with `O_NOFOLLOW`, its directory
   kept 0700, and rotates at 1 MiB to one `errors.log.1` (both kept 0600).
-- **Files.** A file downloaded is marked as from the internet as soon as it is saved
-  (`Effect::Quarantine`: on macOS `/usr/bin/xattr -w com.apple.quarantine`; debug builds run
-  only `SLAKIO_TEST_XATTR`'s stand-in). Only a kind a viewer shows (`download::openable`, an
-  allowlist: documents without macros, pictures, sound, video, text) is offered to open, by a
+- **Files.** A file downloaded is marked as from the internet while it is still the part file,
+  before it gets its name (`slakio_core::download`: on macOS the `com.apple.quarantine`
+  attribute set on the open file, on Windows the `Zone.Identifier` stream, internet zone); a
+  file that could not be marked is kept but never offered to open, nor is the demo's. Only a
+  kind a viewer shows (`download::openable`, an allowlist: PDF, pictures, sound, video, plain
+  text; no office documents, tables or `.md`/`.json`) is offered to open, by a
   question whose safe answer has the focus; yes hands its absolute path, a plain file and not
   a link, to the same opener as a link (`opener::open_file`). Anything else is only saved.
 - **Links.** `opener::check` lets only `http`/`https` addresses through (at most 8 KiB, a
@@ -294,8 +296,12 @@ sign-in page) is not saved; an answer cut off before its length is not saved. Sa
 core's (`slakio_core::download`): a hidden part file made new in the folder, renamed to the
 first free name (`name (2).ext`) without replacing anything, the name the remote one
 sanitised and made plain (no folders, no leading dot or dash, no reserved Windows name, at
-most 120 bytes, its extension kept); a part file not finished is removed. Progress comes as
-`Event::Progress` (it ends nothing) and the answer is `Event::Downloaded` or `Failed`.
+most 120 bytes, its extension kept); a part file not finished is removed, and those of runs
+that are gone are swept at the start. A folder slakio makes for it is 0700, the part file 0600.
+The bytes are written, flushed and renamed on a blocking-pool thread (`Writer`), never on the
+runtime that draws. Progress comes as `Event::Progress` (it ends nothing) and the answer is
+`Event::Downloaded` or `Failed`. `Command::Cancel` stops a download still receiving (answered
+`Event::Cancelled`; the download itself `Failed(Cancelled)`, nothing kept).
 
 **Live updates** (`live.rs`, `slakio_slack::serve_live`, what the binary runs): once a workspace
 has booted, one WebSocket to the realtime host, opened as the web client opens it (the token in

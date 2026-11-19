@@ -100,6 +100,26 @@ fn create_new_and_rename_new_never_replace_a_file() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn what_is_not_hard_linked_is_renamed_by_a_rename_that_refuses_a_taken_name() {
+    let dir = temp_dir("noreplace");
+    // A folder is never hard-linked: the system's own no-replace rename moves it.
+    fs::create_dir_all(dir.join("from")).unwrap();
+    fs::write(dir.join("from").join("x"), "x").unwrap();
+    fs::create_dir_all(dir.join("taken")).unwrap();
+    assert_eq!(rename_new(&dir.join("from"), &dir.join("taken")).unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+    assert!(dir.join("from").join("x").exists(), "an empty folder in the way is not replaced either");
+    rename_new(&dir.join("from"), &dir.join("free")).unwrap();
+    assert!(dir.join("free").join("x").exists() && !dir.join("from").exists());
+    // Nor is a link: it moves as a link, never onto a name in use.
+    std::os::unix::fs::symlink("free", dir.join("link")).unwrap();
+    fs::write(dir.join("file"), "mine").unwrap();
+    assert_eq!(rename_new(&dir.join("link"), &dir.join("file")).unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read_to_string(dir.join("file")).unwrap(), "mine");
+    let _ = fs::remove_dir_all(&dir);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_link_is_written_through_never_replaced() {

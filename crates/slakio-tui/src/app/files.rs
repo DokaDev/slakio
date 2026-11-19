@@ -6,11 +6,14 @@
 //! for. A file hosted elsewhere, or none, is said. Downloading is a read: nothing changes in
 //! Slack, so a read-only workspace downloads too.
 //!
-//! While a file comes, the status line says how much has; once saved, a file of a kind a viewer
-//! shows ([`slakio_core::download::openable`]) is offered to open (`dialog::Question::File`, the
-//! safe answer focused: nothing opens by itself); any other kind is only saved, and the status
-//! line says so. Every file saved is marked as downloaded from the internet (macOS quarantine,
-//! [`Effect::Quarantine`]) before anything may open it.
+//! While a file comes, the status line says how much has (with two on their way, that two are)
+//! and the key that stops them (`F`, `:download cancel`); a file already on its way is not asked
+//! for again. Once saved, a file of a kind a viewer shows
+//! ([`slakio_core::download::openable`]) is offered to open (`dialog::Question::File`, the safe
+//! answer focused: nothing opens by itself); any other kind is only saved, and the status line
+//! says so. Every file saved was marked as downloaded from the internet before it got its name
+//! ([`slakio_core::download`]); one that could not be marked, and the demo's invented files,
+//! are never offered to open.
 
 use super::dialog::{Dialog, Question};
 use super::picker::{LETTERS, hint_letters, list_rect};
@@ -37,12 +40,15 @@ pub struct Downloads {
     going: Vec<Going>,
     /// The file saved that the question offers to open.
     saved: Option<PathBuf>,
+    /// The downloads on their way were told to stop.
+    stopping: bool,
 }
 
-/// A download asked for: its request, its file and the name said for it.
+/// A download asked for: its request, its workspace, its file and the name said for it.
 #[derive(Clone, Debug)]
 struct Going {
     id: Generation,
+    workspace: WorkspaceId,
     file: FileId,
     name: String,
 }
@@ -100,24 +106,74 @@ impl App {
         (!files.is_empty()).then(|| (p.target.workspace().clone(), files))
     }
 
-    /// Ask the backend for `file` of `workspace`, saved in the downloads folder.
+    /// Ask the backend for `file` of `workspace`, saved in the downloads folder (not again
+    /// while it is on its way).
     fn download(&mut self, workspace: &WorkspaceId, file: &File, now: Instant) {
         let Some(dir) = self.downloads.dir.clone() else {
             return self.warn(Msg::Label(Label::FileNoFolder), now);
         };
+        let name = crate::text::clip(file.name.line().as_str(), NAME_SAID);
+        if self.downloads.going.iter().any(|g| g.file == file.id && &g.workspace == workspace) {
+            return self.info(Msg::FileAlready { name }, now);
+        }
         let command = Command::Download { file: file.clone(), dir, max: self.downloads.max };
         let id = self.work.requests.ask(Some(workspace.clone()), command);
-        let name = crate::text::clip(file.name.line().as_str(), NAME_SAID);
-        self.downloads.going.push(Going { id, file: file.id.clone(), name: name.clone() });
-        self.say_download(Msg::FileDownloading { name }, Level::Info, now);
+        let going = Going { id, workspace: workspace.clone(), file: file.id.clone(), name };
+        self.downloads.going.push(going);
+        self.downloads.stopping = false;
+        self.say_going(None, now);
+    }
+
+    /// Say how the downloads on their way are going: one by its name (and how much of it has
+    /// come, `percent`), several by their number.
+    fn say_going(&mut self, percent: Option<u64>, now: Instant) {
+        let stop = self.stop_key();
+        let msg = match self.downloads.going.as_slice() {
+            [] => return,
+            [one] => match percent {
+                Some(p) => Msg::FileProgress { name: one.name.clone(), percent: p.to_string(), stop },
+                None => Msg::FileDownloading { name: one.name.clone(), stop },
+            },
+            many => Msg::FileDownloadingMany { count: many.len() as u64, stop },
+        };
+        self.say_download(msg, Level::Info, now);
+    }
+
+    /// The key that stops the downloads where the panes' keys work, else the command.
+    fn stop_key(&self) -> String {
+        let action = Action::Pane(crate::action::PaneAction::FilesCancel);
+        crate::keymap::hints::key_label(&self.keymap, action, Ctx::PaneNormal)
+            .unwrap_or_else(|| ":download cancel".to_string())
     }
 
     /// Say `msg` about a download in place of what was said of downloads before.
     fn say_download(&mut self, msg: Msg, level: Level, now: Instant) {
         self.status.forget(now, |m| {
-            matches!(m, Msg::FileDownloading { .. } | Msg::FileProgress { .. } | Msg::FileSaved { .. })
+            matches!(
+                m,
+                Msg::FileDownloading { .. }
+                    | Msg::FileProgress { .. }
+                    | Msg::FileDownloadingMany { .. }
+                    | Msg::FileSaved { .. }
+                    | Msg::Label(Label::FileCancelling)
+            )
         });
         self.status.show(msg, level, now);
+    }
+
+    /// `F`, `:download cancel`: stop every download on its way. Each one's own answer says
+    /// whether it stopped (one already being put in place is saved all the same).
+    pub(super) fn cancel_downloads(&mut self, now: Instant) {
+        if self.downloads.going.is_empty() {
+            return self.info(Msg::Label(Label::FileNoDownload), now);
+        }
+        let asked: Vec<(Generation, WorkspaceId)> =
+            self.downloads.going.iter().map(|g| (g.id, g.workspace.clone())).collect();
+        for (request, workspace) in asked {
+            self.work.requests.ask(Some(workspace), Command::Cancel { request });
+        }
+        self.downloads.stopping = true;
+        self.say_download(Msg::Label(Label::FileCancelling), Level::Info, now);
     }
 
     /// How much of the file download `id` asked for has come.
@@ -129,26 +185,34 @@ impl App {
         total: Option<u64>,
         now: Instant,
     ) -> bool {
-        let Some(g) = self.downloads.going.iter().find(|g| g.id == id && &g.file == file) else { return false };
-        let name = g.name.clone();
-        let msg = match total.filter(|t| *t > 0) {
-            Some(t) => Msg::FileProgress { name, percent: (got.min(t) * 100 / t).to_string() },
-            None => Msg::FileDownloading { name },
-        };
-        self.say_download(msg, Level::Info, now);
+        if !self.downloads.going.iter().any(|g| g.id == id && &g.file == file) {
+            return false;
+        }
+        // Stopping them says so until each one's answer comes.
+        if !self.downloads.stopping {
+            self.say_going(total.filter(|t| *t > 0).map(|t| got.min(t) * 100 / t), now);
+        }
         true
     }
 
-    /// Download `id` saved its file as `path`: it is marked as from the internet, and offered to
-    /// open when it is of a kind a viewer shows (and nothing else is asked or picked now).
-    pub(super) fn on_downloaded(&mut self, id: Generation, path: PathBuf, now: Instant) -> bool {
+    /// Download `id` saved its file as `path`, marked as from the internet unless `unmarked`: it
+    /// is offered to open when it is of a kind a viewer shows, was marked and is not the demo's
+    /// (and nothing else is asked or picked now).
+    pub(super) fn on_downloaded(&mut self, id: Generation, path: PathBuf, unmarked: bool, now: Instant) -> bool {
         let Some(i) = self.downloads.going.iter().position(|g| g.id == id) else { return false };
         let g = self.downloads.going.remove(i);
-        self.effects.push(Effect::Quarantine(path.clone()));
         let saved =
             path.file_name().map_or_else(|| g.name.clone(), |n| crate::text::clip(&n.to_string_lossy(), NAME_SAID));
+        if unmarked {
+            self.say_download(Msg::FileSavedUnmarked { name: saved }, Level::Warning, now);
+            return true;
+        }
         if !slakio_core::download::openable(&path) {
             self.say_download(Msg::FileSavedOnly { name: saved }, Level::Info, now);
+            return true;
+        }
+        if self.backend.is_some_and(|c| c.demo) {
+            self.say_download(Msg::FileSavedDemo { name: saved }, Level::Info, now);
             return true;
         }
         self.say_download(Msg::FileSaved { name: saved }, Level::Info, now);
@@ -163,7 +227,11 @@ impl App {
     /// Request `id` failed: when it was a download, the status line says why. `true` when it was.
     pub(super) fn download_failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
         let Some(i) = self.downloads.going.iter().position(|g| g.id == id) else { return false };
-        self.downloads.going.remove(i);
+        let g = self.downloads.going.remove(i);
+        if *kind == FailKind::Cancelled {
+            self.say_download(Msg::FileCancelled { name: g.name }, Level::Info, now);
+            return true;
+        }
         let why = match kind {
             FailKind::Api { code } if code == "redirected_elsewhere" => Label::FileWhyElsewhere,
             FailKind::Api { code } if code == "not_a_file" => Label::FileWhyPage,

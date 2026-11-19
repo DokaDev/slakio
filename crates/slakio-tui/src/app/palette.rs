@@ -184,16 +184,30 @@ impl App {
     /// the better match first; on a tie, commands in the registry's order (`:theme` after
     /// the help), then the actions. `Quit` comes after everything that matches as well, so with
     /// nothing typed it is last and never the entry `Enter` or a stray click would run.
-    pub fn palette_items(&self) -> Vec<Item> {
-        let line = self.cmdline.text().trim_start();
+    /// The one entry a command line with its argument runs, when it is one of those: `:rename`,
+    /// `:resize`, `:open <url>`, `:download cancel`.
+    fn whole_line(&self, line: &str) -> Option<Item> {
         if rename_arg(line).is_some() && self.backend.is_some() {
-            return vec![Item::Rename];
+            return Some(Item::Rename);
         }
         if resize_arg(line).is_some() && self.backend.is_some() {
-            return vec![Item::Resize];
+            return Some(Item::Resize);
         }
         if open_arg(line).is_some_and(|a| !a.is_empty()) {
-            return vec![Item::Open];
+            return Some(Item::Open);
+        }
+        // `:download cancel`: stop the downloads on their way.
+        if setting_arg(line, "download").is_some_and(|a| !a.is_empty() && "cancel".starts_with(a)) {
+            let stop = Action::Pane(action::PaneAction::FilesCancel);
+            return REGISTRY.iter().position(|a| a.action == stop).map(Item::Action);
+        }
+        None
+    }
+
+    pub fn palette_items(&self) -> Vec<Item> {
+        let line = self.cmdline.text().trim_start();
+        if let Some(item) = self.whole_line(line) {
+            return vec![item];
         }
         if self.backend.is_some() {
             if jump::jump_arg(line).is_some() {

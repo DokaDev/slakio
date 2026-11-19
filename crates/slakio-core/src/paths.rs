@@ -123,17 +123,28 @@ impl Paths {
 /// The folder downloads are saved in, from `env` and the config file's `downloads` (`setting`):
 /// `SLAKIO_DOWNLOAD_DIR`, else the setting (an absolute path, or `~/…` in the home directory),
 /// else `slakio` in the user's `Downloads` folder. `None` without a home directory where one is
-/// needed, or for a relative setting (it would depend on where slakio was started).
+/// needed, or for a relative `SLAKIO_DOWNLOAD_DIR` or setting (it would depend on where slakio
+/// was started).
 pub fn downloads(setting: &str, env: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let var = |k: &str| env(k).filter(|v| !v.is_empty()).map(PathBuf::from);
     let home = || var("HOME").or_else(|| var("USERPROFILE"));
     if let Some(dir) = var("SLAKIO_DOWNLOAD_DIR") {
-        return Some(dir);
+        return Some(dir).filter(|p| p.is_absolute());
     }
     match setting {
         "" => home().map(|h| h.join("Downloads").join("slakio")),
         s if s.starts_with("~/") => home().map(|h| h.join(&s[2..])),
         s => Some(PathBuf::from(s)).filter(|p| p.is_absolute()),
+    }
+}
+
+/// The folder the demo saves its invented files in: `SLAKIO_DOWNLOAD_DIR` (absolute only, as
+/// for [`downloads`]), else `slakio-demo` in the temporary folder `tmp`; never the user's own
+/// downloads.
+pub fn demo_downloads(env: impl Fn(&str) -> Option<String>, tmp: &Path) -> Option<PathBuf> {
+    match env("SLAKIO_DOWNLOAD_DIR").filter(|v| !v.is_empty()) {
+        Some(dir) => Some(PathBuf::from(dir)).filter(|p| p.is_absolute()),
+        None => Some(tmp.join("slakio-demo")),
     }
 }
 

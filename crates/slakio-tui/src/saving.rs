@@ -42,7 +42,6 @@ impl Saved {
         use slakio_tui::app::Effect;
         match effect {
             Effect::OpenLink(url) => self.open(&url, app),
-            Effect::Quarantine(path) => self.quarantine(&path),
             Effect::OpenFile(path) => self.open_file(&path, app),
             _ => {}
         }
@@ -53,13 +52,6 @@ impl Saved {
         if let Err(e) = slakio_tui::opener::open_file(path) {
             ErrorLog::new(self.errors.clone()).record("open file", &slakio_core::fault::Fault::io(&e));
             app.warn(Msg::Label(Label::FileOpenFailed), Instant::now());
-        }
-    }
-
-    /// Mark the file just saved at `path` as downloaded from the internet; a failure is logged.
-    pub fn quarantine(&self, path: &std::path::Path) {
-        if let Err(e) = slakio_tui::opener::quarantine(path) {
-            ErrorLog::new(self.errors.clone()).record("quarantine", &slakio_core::fault::Fault::io(&e));
         }
     }
 }

@@ -11,7 +11,8 @@
 //!
 //! A file is downloaded on a task of its own ([`crate::download`]), at most
 //! [`DOWNLOADS_MAX`] at once (one more is answered `Failed(Busy)`): it tells how much has come
-//! as it comes, and is answered once, with the path it was saved as or why it was not.
+//! as it comes, and is answered once, with the path it was saved as or why it was not. A
+//! `Cancel` tells it to stop (its own answer then says it was cancelled).
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
 //! first: opening it again meanwhile fetches it once.
@@ -37,7 +38,7 @@ use slakio_core::model::{ConversationId, Message, Target, Ts, UserId};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, PoisonError};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::task::{AbortHandle, JoinSet};
 
 /// How many requests, and how many events, wait in the handle's channels at most.
@@ -157,7 +158,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     // The page of Activity on its way: a newer one supersedes it.
     let mut noticing: Option<InFlight> = None;
     // The downloads on their way.
-    let mut downloading: Vec<AbortHandle> = Vec::new();
+    let mut downloading: Vec<Downloading> = Vec::new();
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -216,8 +217,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 }
                 *slot = Some(spawn_once(&mut tasks, tx, id, listed(client, ctx, command)));
             }
-            Command::Download { file, dir, max } => {
-                if !download(&mut tasks, &mut downloading, (client, tx), id, (file, dir, max)).await {
+            command @ (Command::Download { .. } | Command::Cancel { .. }) => {
+                if !downloads(&mut tasks, &mut downloading, (client, tx), id, command).await {
                     return;
                 }
             }
@@ -251,33 +252,76 @@ fn spawn_boot(
     });
 }
 
+/// A download on its way: its request, its task, and what tells it to stop.
+struct Downloading {
+    id: Generation,
+    task: AbortHandle,
+    stop: watch::Sender<bool>,
+}
+
+/// A download asked for, or one told to stop. `false` when the UI is gone.
+async fn downloads(
+    tasks: &mut JoinSet<()>,
+    downloading: &mut Vec<Downloading>,
+    (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
+    id: Generation,
+    command: Command,
+) -> bool {
+    match command {
+        Command::Download { file, dir, max } => download(tasks, downloading, (client, tx), id, (file, dir, max)).await,
+        Command::Cancel { request } => cancel(downloading, &tx, id, request).await,
+        // The other commands have arms of their own in `run`: none comes here.
+        _ => true,
+    }
+}
+
 /// Download `file` into `dir` (at most `max` bytes) on a task of its own, unless
 /// [`DOWNLOADS_MAX`] are on their way already (answered `Busy` then). `false` when the UI is
 /// gone.
 async fn download(
     tasks: &mut JoinSet<()>,
-    downloading: &mut Vec<AbortHandle>,
+    downloading: &mut Vec<Downloading>,
     (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
     id: Generation,
     (file, dir, max): (slakio_core::model::File, std::path::PathBuf, u64),
 ) -> bool {
-    downloading.retain(|t| !t.is_finished());
+    downloading.retain(|d| !d.task.is_finished());
     if downloading.len() >= DOWNLOADS_MAX {
         let e = SlackError::Busy;
         return tx.send(Envelope::failed(id, e.kind(), e.detail())).await.is_ok();
     }
-    downloading.push(tasks.spawn(async move {
+    let (stop, cancel) = watch::channel(false);
+    let task = tasks.spawn(async move {
         let told = tx.clone();
         let progress = |got, total| {
             // Progress ends nothing: when the UI is slow to read, some is not told.
             let event = Event::Progress { file: file.id.clone(), got, total };
             let _ = told.try_send(Envelope { generation: id, event });
         };
-        let saved = crate::download::download(&client, &file, &dir, max, progress).await;
-        let done = saved.map(|(path, bytes)| Event::Downloaded { file: file.id.clone(), path, bytes });
+        let saved = crate::download::download(&client, &file, &dir, max, cancel, progress).await;
+        let done = saved.map(|(done, bytes)| Event::Downloaded {
+            file: file.id.clone(),
+            path: done.path,
+            bytes,
+            unmarked: done.unmarked,
+        });
         answer(&tx, id, done).await;
-    }));
+    });
+    downloading.push(Downloading { id, task, stop });
     true
+}
+
+/// Cancel `request` (`id`): the download it names is told to stop when it is still on its way.
+/// `false` when the UI is gone.
+async fn cancel(
+    downloading: &mut Vec<Downloading>,
+    tx: &mpsc::Sender<Envelope>,
+    id: Generation,
+    request: Generation,
+) -> bool {
+    downloading.retain(|d| !d.task.is_finished());
+    let stopping = downloading.iter().find(|d| d.id == request).is_some_and(|d| d.stop.send(true).is_ok());
+    tx.send(Envelope { generation: id, event: Event::Cancelled { request, stopping } }).await.is_ok()
 }
 
 /// A page of a list the user reads: what a search found, or Activity.

@@ -99,9 +99,24 @@ fn downloads_go_to_the_override_else_the_home_downloads_folder() {
     let srv = if cfg!(windows) { "D:\\srv\\dl" } else { "/srv/dl" };
     assert_eq!(downloads(srv, &at_home), Some(srv.into()));
     assert_eq!(downloads("relative/dl", &at_home), None, "a relative folder depends on where slakio started");
-    let both = env(&[("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", "/scratch/dl")]);
-    assert_eq!(downloads(srv, both), Some("/scratch/dl".into()));
+    let scratch = if cfg!(windows) { "D:\\scratch\\dl" } else { "/scratch/dl" };
+    let pairs = [("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", scratch)];
+    assert_eq!(downloads(srv, env(&pairs)), Some(scratch.into()));
+    // A relative override is no folder, as a relative setting is (not the setting instead).
+    let relative = env(&[("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", "rel/dl")]);
+    assert_eq!(downloads(srv, relative), None, "a relative override depends on where slakio started");
     let windows = env(&[("USERPROFILE", "D:\\Profiles\\u")]);
     assert_eq!(downloads("", windows), Some(PathBuf::from("D:\\Profiles\\u").join("Downloads").join("slakio")));
     assert_eq!(downloads("", env(&[("SLAKIO_DOWNLOAD_DIR", "")])), None, "an empty override is no override");
+}
+
+#[test]
+fn the_demo_saves_in_a_temporary_folder_never_the_users_downloads() {
+    let tmp = PathBuf::from(if cfg!(windows) { "D:\\tmp" } else { "/tmp" });
+    let home = env(&[("HOME", "/home/u")]);
+    assert_eq!(demo_downloads(&home, &tmp), Some(tmp.join("slakio-demo")));
+    let scratch = if cfg!(windows) { "D:\\scratch\\dl" } else { "/scratch/dl" };
+    let pairs = [("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", scratch)];
+    assert_eq!(demo_downloads(env(&pairs), &tmp), Some(scratch.into()));
+    assert_eq!(demo_downloads(env(&[("SLAKIO_DOWNLOAD_DIR", "rel")]), &tmp), None);
 }

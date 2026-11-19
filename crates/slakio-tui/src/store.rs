@@ -78,7 +78,7 @@ impl Local {
     pub(crate) fn new(paths: &Paths, cfg: &Config) -> Self {
         let caps = Caps {
             per_conversation: cfg.cache_messages,
-            max_bytes: u64::from(cfg.cache_max_mb) * 1024 * 1024,
+            max_bytes: u64::from(cfg.cache_max_mb) * 1_000_000,
             max_days: cfg.cache_days,
         };
         Self { on: cfg.cache == "on", caps, paths: paths.clone(), opened: Arc::default() }

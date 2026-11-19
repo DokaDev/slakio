@@ -1,8 +1,10 @@
 //! The files messages share: cards under the text (name, kind, size; one hosted elsewhere says
 //! so); `f` downloads the one file of the selected message at once, or lists several to pick
 //! (letters, `j`/`k` and `Enter`, a click, `Esc`); the status line says how much has come;
-//! a saved file is marked as from the internet and, of a kind a viewer shows, offered to open
-//! (nothing opens until the user says yes; any other kind is only saved); a failure says why.
+//! `F` (or `:download cancel`) stops what is on its way; a file on its way is not asked for
+//! again, and two on their way are said as two. A saved file of a kind a viewer shows, marked as
+//! from the internet, is offered to open (nothing opens until the user says yes; any other kind,
+//! one that could not be marked and the demo's are only saved); a failure says why.
 //! A read-only workspace downloads too (nothing changes in Slack). At 120x40 and 80x24, in
 //! English and Korean; the demo backend saves the demo's files in a scratch folder.
 
@@ -43,6 +45,11 @@ fn file(id: &str, name: &str, kind: &str, size: Option<u64>, download: bool) -> 
 /// Read-only, booted, `deploys` open at `w`×`h` in `lang`, its newest message sharing `files`
 /// and selected; downloads go to `dir`.
 fn shown(files: Vec<File>, w: u16, h: u16, lang: Lang, dir: Option<PathBuf>) -> Scripted {
+    shown_with("the files", files, w, h, lang, dir)
+}
+
+/// [`shown`], the message's text `text`.
+fn shown_with(text: &str, files: Vec<File>, w: u16, h: u16, lang: Lang, dir: Option<PathBuf>) -> Scripted {
     let mut s = Scripted::booted(true, None);
     s.d.app.i18n = I18n::new(lang);
     s.d.app.resize(w, h);
@@ -56,7 +63,7 @@ fn shown(files: Vec<File>, w: u16, h: u16, lang: Lang, dir: Option<PathBuf>) -> 
     page.messages = vec![Message {
         ts: Ts(1_767_603_600_000_000),
         user: author,
-        text: Remote::new("the files"),
+        text: Remote::new(text),
         thread: None,
         reactions: Vec::new(),
         edited: false,
@@ -79,6 +86,11 @@ fn asked(s: &Scripted) -> Option<(slakio_core::backend::Generation, File)> {
 
 fn effects(s: &mut Scripted) -> Vec<Effect> {
     s.d.app.take_effects()
+}
+
+/// The answer of a download saved as `path`; `unmarked`: the system's mark could not be set.
+fn saved(file: FileId, path: &std::path::Path, unmarked: bool) -> Event {
+    Event::Downloaded { file, path: path.to_path_buf(), bytes: 10, unmarked }
 }
 
 #[test]
@@ -113,7 +125,8 @@ fn f_downloads_the_one_file_and_offers_to_open_it_once_saved() {
         assert_eq!(f.id, FileId::new("F1"));
         let Some(Command::Download { dir: to, max, .. }) = s.b.held.last().map(|r| r.command.clone()) else { panic!() };
         assert_eq!((to, max), (dir.clone(), 1024 * 1024 * 1024));
-        let said = i18n.msg(&Msg::FileDownloading { name: "Q3-report.pdf".into() }).to_string();
+        let stop = "F".to_string();
+        let said = i18n.msg(&Msg::FileDownloading { name: "Q3-report.pdf".into(), stop: stop.clone() }).to_string();
         assert!(s.d.status_line().contains(&said), "{at}: {}", s.d.status_line());
         // Half of it came.
         s.b.push(Envelope {
@@ -121,14 +134,15 @@ fn f_downloads_the_one_file_and_offers_to_open_it_once_saved() {
             event: Event::Progress { file: f.id.clone(), got: 1000, total: Some(2000) },
         });
         s.pump();
-        let half = i18n.msg(&Msg::FileProgress { name: "Q3-report.pdf".into(), percent: "50".into() }).to_string();
+        let half =
+            i18n.msg(&Msg::FileProgress { name: "Q3-report.pdf".into(), percent: "50".into(), stop }).to_string();
         assert!(s.d.status_line().contains(&half), "{at}: {}", s.d.status_line());
-        // Saved: marked from the internet, and asked about; nothing opens yet.
+        // Saved (and marked from the internet as it was saved): asked about; nothing opens yet.
         let path = dir.join("Q3-report.pdf");
         s.b.held.retain(|r| r.id != id);
-        s.b.push(Envelope { generation: id, event: Event::Downloaded { file: f.id, path: path.clone(), bytes: 2000 } });
+        s.b.push(Envelope { generation: id, event: saved(f.id, &path, false) });
         s.pump();
-        assert_eq!(effects(&mut s), [Effect::Quarantine(path.clone())], "{at}");
+        assert_eq!(effects(&mut s), [], "{at}");
         assert_eq!(s.d.app.question(), Some(Question::File), "{at}");
         let screen = s.d.screen();
         assert!(screen.contains("Q3-report.pdf"), "{at}:\n{screen}");
@@ -139,7 +153,7 @@ fn f_downloads_the_one_file_and_offers_to_open_it_once_saved() {
         s.keys("f");
         let (id, f) = asked(&s).unwrap();
         s.b.held.retain(|r| r.id != id);
-        s.b.push(Envelope { generation: id, event: Event::Downloaded { file: f.id, path: path.clone(), bytes: 2000 } });
+        s.b.push(Envelope { generation: id, event: saved(f.id, &path, false) });
         s.pump();
         effects(&mut s);
         s.keys("y");
@@ -197,9 +211,9 @@ fn a_kind_a_viewer_does_not_show_is_only_saved() {
     let (id, f) = asked(&s).unwrap();
     let path = PathBuf::from("/downloads/deploy.sh");
     s.b.held.clear();
-    s.b.push(Envelope { generation: id, event: Event::Downloaded { file: f.id, path: path.clone(), bytes: 10 } });
+    s.b.push(Envelope { generation: id, event: saved(f.id, &path, false) });
     s.pump();
-    assert_eq!(effects(&mut s), [Effect::Quarantine(path)]);
+    assert_eq!(effects(&mut s), []);
     assert_eq!(s.d.app.question(), None, "a script is never offered to open");
     let said = s.d.app.i18n.msg(&Msg::FileSavedOnly { name: "deploy.sh".into() }).to_string();
     assert!(s.d.status_line().contains(&said), "{}", s.d.status_line());
@@ -243,7 +257,7 @@ fn a_failed_download_says_why() {
         let why = s.d.app.i18n.label(label).to_string();
         let said = s.d.app.i18n.msg(&Msg::FileFailed { why }).to_string();
         assert!(s.d.status_line().contains(&said), "{kind:?}: {}", s.d.status_line());
-        assert!(effects(&mut s).iter().all(|e| !matches!(e, Effect::OpenFile(_) | Effect::Quarantine(_))));
+        assert!(effects(&mut s).iter().all(|e| !matches!(e, Effect::OpenFile(_))));
     }
 }
 
@@ -279,6 +293,9 @@ fn the_demo_saves_a_file_in_the_folder() {
             std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
         assert_eq!(saved.len(), 1, "{saved:?}");
         assert!(!saved[0].starts_with('.'), "no part file left: {saved:?}");
+        // Invented bytes: never offered to open, whatever their kind.
+        assert_eq!(d.app.question(), None, "{lang:?} {w}x{h}");
+        assert!(d.status_line().contains(&saved[0]), "{}", d.status_line());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
@@ -309,4 +326,90 @@ fn snapshots_of_the_cards_and_the_list() {
         s.keys("f");
         insta::assert_snapshot!(format!("files_list_{w}x{h}"), s.d.snap());
     }
+}
+
+#[test]
+fn a_file_that_could_not_be_marked_is_kept_but_never_offered_to_open() {
+    let mut s = shown(vec![file("F1", "a.pdf", "PDF", Some(10), true)], 120, 40, Lang::En, Some(scratch("unmarked")));
+    s.keys("f");
+    let (id, f) = asked(&s).unwrap();
+    s.b.held.clear();
+    s.b.push(Envelope { generation: id, event: saved(f.id, &PathBuf::from("/downloads/a.pdf"), true) });
+    s.pump();
+    assert_eq!(s.d.app.question(), None, "not marked: not opened from here");
+    let said = s.d.app.i18n.msg(&Msg::FileSavedUnmarked { name: "a.pdf".into() }).to_string();
+    assert!(s.d.status_line().contains(&said), "{}", s.d.status_line());
+    assert!(effects(&mut s).iter().all(|e| !matches!(e, Effect::OpenFile(_))));
+}
+
+#[test]
+fn a_file_on_its_way_is_not_asked_for_again_and_two_are_said_as_two() {
+    for (lang, w, h) in SIZES {
+        let at = format!("{lang:?} {w}x{h}");
+        let files = vec![file("F1", "one.pdf", "PDF", Some(100), true), file("F3", "two.png", "PNG", Some(200), true)];
+        let mut s = shown(files, w, h, lang, Some(scratch("twice")));
+        s.keys("f a");
+        s.keys("f a");
+        let downloads =
+            |s: &Scripted| s.b.held.iter().filter(|r| matches!(r.command, Command::Download { .. })).count();
+        assert_eq!(downloads(&s), 1, "{at}: the same file is not asked for twice");
+        let again = s.d.app.i18n.msg(&Msg::FileAlready { name: "one.pdf".into() }).to_string();
+        assert!(s.d.status_line().contains(&again), "{at}: {}", s.d.status_line());
+        s.keys("f s");
+        assert_eq!(downloads(&s), 2, "{at}");
+        let two = s.d.app.i18n.msg(&Msg::FileDownloadingMany { count: 2, stop: "F".into() }).to_string();
+        assert!(s.d.status_line().contains(&two), "{at}: {}", s.d.status_line());
+        // Progress of either one keeps saying two: the line does not jump between them.
+        let (id, f) = asked(&s).unwrap();
+        s.b.push(Envelope { generation: id, event: Event::Progress { file: f.id, got: 100, total: Some(200) } });
+        s.pump();
+        assert!(s.d.status_line().contains(&two), "{at}: {}", s.d.status_line());
+    }
+}
+
+#[test]
+fn f_shift_stops_the_downloads_on_their_way_and_so_does_the_command() {
+    for how in ["F", ":download cancel"] {
+        let mut s = shown(vec![file("F1", "a.pdf", "PDF", Some(10), true)], 120, 40, Lang::En, Some(scratch("stop")));
+        let i18n = I18n::new(Lang::En);
+        let stop = |s: &mut Scripted| {
+            if how == "F" {
+                s.keys("F");
+            } else {
+                s.keys(":");
+                s.d.type_text(&how[1..]);
+                s.keys("enter");
+            }
+        };
+        stop(&mut s);
+        let none = i18n.label(Label::FileNoDownload).to_string();
+        assert!(s.d.status_line().contains(&none), "{how}: {}", s.d.status_line());
+        s.keys("f");
+        let (id, _) = asked(&s).unwrap();
+        stop(&mut s);
+        let cancel = s.b.held.iter().find(|r| r.command == Command::Cancel { request: id });
+        let cancel = cancel.unwrap_or_else(|| panic!("{how}: a cancel of the download"));
+        assert!(cancel.workspace.is_some(), "{how}: to the download's own workspace");
+        let stopping = i18n.label(Label::FileCancelling).to_string();
+        assert!(s.d.status_line().contains(&stopping), "{how}: {}", s.d.status_line());
+        let i = s.b.held.iter().position(|r| r.id == id).unwrap();
+        s.b.fail(i, FailKind::Cancelled);
+        s.pump();
+        let said = i18n.msg(&Msg::FileCancelled { name: "a.pdf".into() }).to_string();
+        assert!(s.d.status_line().contains(&said), "{how}: {}", s.d.status_line());
+        assert!(effects(&mut s).iter().all(|e| !matches!(e, Effect::OpenFile(_))));
+    }
+}
+
+#[test]
+fn copying_a_message_keeps_the_names_of_its_files() {
+    let files = vec![file("F1", "a.pdf", "PDF", Some(10), true), file("F2", "plan", "Google Docs", None, false)];
+    let mut s = shown_with("", files.clone(), 120, 40, Lang::En, None);
+    s.keys("y");
+    let copied: Vec<Effect> = effects(&mut s).into_iter().filter(|e| matches!(e, Effect::Copy(_))).collect();
+    assert_eq!(copied, [Effect::Copy("\u{1F4CE} a.pdf\n\u{1F4CE} plan".into())], "a file-only message");
+    let mut s = shown_with("see", files, 120, 40, Lang::En, None);
+    s.keys("y");
+    let copied: Vec<Effect> = effects(&mut s).into_iter().filter(|e| matches!(e, Effect::Copy(_))).collect();
+    assert_eq!(copied, [Effect::Copy("see\n\u{1F4CE} a.pdf\n\u{1F4CE} plan".into())]);
 }

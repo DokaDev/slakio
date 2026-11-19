@@ -2,7 +2,8 @@
 //! `slakio-world`, at once and without any network. It is the only backend for now; the
 //! binary's wiring is the one place that names it. A file downloaded is saved with invented
 //! bytes ([`slakio_world::files::content`], at most [`DEMO_FILE_MAX`] of them), as the real
-//! backend saves one.
+//! backend saves one, at once (there is nothing to cancel), in the folder the app names (the
+//! binary gives the demo a temporary one).
 
 use slakio_core::backend::{
     ACTIVITY_PAGE, Backend, Capabilities, Command, Envelope, Event, FailKind, Feed, Found, Hit, Notice, NoticeKind,
@@ -55,10 +56,14 @@ impl Backend for DemoBackend {
                 let event = Event::Progress { file: file.id.clone(), got: 0, total: file.size };
                 self.ready.push_back(Envelope { generation: request.id, event });
                 match save(&file, &dir, max, size) {
-                    Ok((path, bytes)) => Event::Downloaded { file: file.id, path, bytes },
+                    Ok((done, bytes)) => {
+                        Event::Downloaded { file: file.id, path: done.path, bytes, unmarked: done.unmarked }
+                    }
                     Err(kind) => Event::Failed { request: request.id, kind, detail: "demo download".to_string() },
                 }
             }
+            // Every download is answered as it is asked for: none is still on its way.
+            Command::Cancel { request } => Event::Cancelled { request, stopping: false },
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
@@ -80,7 +85,7 @@ fn save(
     dir: &std::path::Path,
     max: u64,
     size: u64,
-) -> Result<(std::path::PathBuf, u64), FailKind> {
+) -> Result<(slakio_core::download::Finished, u64), FailKind> {
     use slakio_core::download::{Saving, Unsaved};
     if file.download.is_none() {
         return Err(FailKind::Api { code: "file_not_downloadable".to_string() });

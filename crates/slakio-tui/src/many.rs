@@ -37,7 +37,8 @@ pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
         | Command::Save { .. }
         | Command::Search { .. }
         | Command::Activity { .. }
-        | Command::Download { .. } => request.workspace.as_ref(),
+        | Command::Download { .. }
+        | Command::Cancel { .. } => request.workspace.as_ref(),
     }
 }
 
@@ -83,6 +84,7 @@ fn ends(event: &Event) -> bool {
             | Event::Activity(_)
             | Event::Saved { .. }
             | Event::Downloaded { .. }
+            | Event::Cancelled { .. }
             | Event::Failed { .. }
     )
 }
