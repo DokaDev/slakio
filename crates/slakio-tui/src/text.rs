@@ -41,6 +41,46 @@ pub fn clip(s: &str, w: usize) -> String {
     out
 }
 
+/// `s` cut to `w` cells by its middle: `#feed-cu…-16`.
+pub fn clip_middle(s: &str, w: usize) -> String {
+    cut_middle(s, w, 0)
+}
+
+/// File name `s` in `w` cells, cut in its middle so that its extension shows
+/// (`Q3-plan-fin…review.pdf`); one without an extension, or with no room for it, is cut at its end.
+pub fn clip_name(s: &str, w: usize) -> String {
+    let ext = s.rfind('.').filter(|&i| i > 0).map_or("", |i| &s[i..]);
+    let ext_w = width(ext);
+    if width(s) <= w || !(2..=EXT_MAX).contains(&ext_w) || ext_w + 2 > w {
+        return clip(s, w);
+    }
+    cut_middle(s, w, ext_w)
+}
+
+/// The widest extension [`clip_name`] keeps, its dot counted.
+const EXT_MAX: usize = 10;
+
+/// `s` in `w` cells: its start with `…`, then as much of its end as fits (at least `tail` cells
+/// of it, else half).
+fn cut_middle(s: &str, w: usize, tail: usize) -> String {
+    if width(s) <= w {
+        return s.to_string();
+    }
+    let head = clip(s, w.saturating_sub(tail.max(w / 2)));
+    let room = w.saturating_sub(width(&head));
+    let mut end: Vec<&str> = Vec::new();
+    let mut acc = 0;
+    for g in s.graphemes(true).rev() {
+        if acc + grapheme_width(g) > room {
+            break;
+        }
+        acc += grapheme_width(g);
+        end.push(g);
+    }
+    end.reverse();
+    format!("{head}{}", end.concat())
+}
+
 /// Wrap `s` into lines of at most `w` columns, keeping its line breaks. Lines break at spaces:
 /// a word keeps the punctuation written against it (`it.`), so a period never starts a line; a
 /// word wider than a line breaks between graphemes, taking the grapheme before a closing mark

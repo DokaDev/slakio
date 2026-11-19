@@ -1,4 +1,5 @@
-use super::{clip_middle, clip_place};
+use super::clip_place;
+use crate::text::clip_middle;
 
 #[test]
 fn a_long_place_is_cut_in_its_middle() {

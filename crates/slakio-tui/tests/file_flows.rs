@@ -110,6 +110,7 @@ fn cards_show_each_file_under_the_text() {
         let card = screen.lines().find(|l| l.contains("Shared plan")).unwrap_or_else(|| panic!("{at}:\n{screen}"));
         assert!(card.contains(&elsewhere), "{at}: {card}");
         assert!(screen.contains('\u{21E9}'), "{at}: a card's mark without icons");
+        assert!(card.contains('\u{21D7}') && !card.contains('\u{21E9}'), "{at}: elsewhere, an arrow out: {card}");
     }
 }
 
@@ -126,7 +127,7 @@ fn f_downloads_the_one_file_and_offers_to_open_it_once_saved() {
         let Some(Command::Download { dir: to, max, .. }) = s.b.held.last().map(|r| r.command.clone()) else { panic!() };
         assert_eq!((to, max), (dir.clone(), 1024 * 1024 * 1024));
         let stop = "F".to_string();
-        let said = i18n.msg(&Msg::FileDownloading { name: "Q3-report.pdf".into(), stop: stop.clone() }).to_string();
+        let said = i18n.msg(&Msg::FileWaiting { name: "Q3-report.pdf".into(), stop: stop.clone() }).to_string();
         assert!(s.d.status_line().contains(&said), "{at}: {}", s.d.status_line());
         // Half of it came.
         s.b.push(Envelope {
@@ -215,7 +216,8 @@ fn a_kind_a_viewer_does_not_show_is_only_saved() {
     s.pump();
     assert_eq!(effects(&mut s), []);
     assert_eq!(s.d.app.question(), None, "a script is never offered to open");
-    let said = s.d.app.i18n.msg(&Msg::FileSavedOnly { name: "deploy.sh".into() }).to_string();
+    let said =
+        s.d.app.i18n.msg(&Msg::FileSavedOnly { name: "deploy.sh".into(), folder: "/downloads".into() }).to_string();
     assert!(s.d.status_line().contains(&said), "{}", s.d.status_line());
 }
 
@@ -242,12 +244,12 @@ fn nothing_to_download_says_so_and_asks_nothing() {
 #[test]
 fn a_failed_download_says_why() {
     for (kind, label) in [
-        (FailKind::TooLarge, Label::FailTooLarge),
         (FailKind::Unsaved, Label::FailUnsaved),
         (FailKind::Api { code: "redirected_elsewhere".into() }, Label::FileWhyElsewhere),
         (FailKind::Api { code: "not_a_file".into() }, Label::FileWhyPage),
         (FailKind::Api { code: "file_not_available".into() }, Label::FileWhyGone),
         (FailKind::Offline, Label::FailOffline),
+        (FailKind::Stalled, Label::FailStalled),
     ] {
         let mut s = shown(vec![file("F1", "a.pdf", "PDF", Some(1), true)], 120, 40, Lang::En, Some(scratch("fail")));
         s.keys("f");
@@ -337,7 +339,8 @@ fn a_file_that_could_not_be_marked_is_kept_but_never_offered_to_open() {
     s.b.push(Envelope { generation: id, event: saved(f.id, &PathBuf::from("/downloads/a.pdf"), true) });
     s.pump();
     assert_eq!(s.d.app.question(), None, "not marked: not opened from here");
-    let said = s.d.app.i18n.msg(&Msg::FileSavedUnmarked { name: "a.pdf".into() }).to_string();
+    let said =
+        s.d.app.i18n.msg(&Msg::FileSavedUnmarked { name: "a.pdf".into(), folder: "/downloads".into() }).to_string();
     assert!(s.d.status_line().contains(&said), "{}", s.d.status_line());
     assert!(effects(&mut s).iter().all(|e| !matches!(e, Effect::OpenFile(_))));
 }
@@ -412,4 +415,151 @@ fn copying_a_message_keeps_the_names_of_its_files() {
     s.keys("y");
     let copied: Vec<Effect> = effects(&mut s).into_iter().filter(|e| matches!(e, Effect::Copy(_))).collect();
     assert_eq!(copied, [Effect::Copy("see\n\u{1F4CE} a.pdf\n\u{1F4CE} plan".into())]);
+}
+
+/// The download held, answered `event` now.
+fn answer(s: &mut Scripted, id: slakio_core::backend::Generation, event: Event) {
+    s.b.held.retain(|r| r.id != id);
+    s.b.push(Envelope { generation: id, event });
+    s.pump();
+}
+
+#[test]
+fn a_download_stays_said_until_it_ends_however_long_it_waits() {
+    for (lang, w, h) in SIZES {
+        let at = format!("{lang:?} {w}x{h}");
+        let i18n = I18n::new(lang);
+        let mut s =
+            shown(vec![file("F1", "roadmap.xlsx", "Excel", Some(98_000), true)], w, h, lang, Some(scratch("long")));
+        s.keys("f");
+        let (id, f) = asked(&s).unwrap();
+        let waiting = i18n.msg(&Msg::FileWaiting { name: "roadmap.xlsx".into(), stop: "F".into() }).to_string();
+        // No byte for 9 s: still waited for, the stop key still shown.
+        s.d.now += std::time::Duration::from_secs(9);
+        assert!(s.d.status_line().contains(&waiting), "{at}: {}", s.d.status_line());
+        // 50 KB of 98 KB, then nothing for a minute: how much stays said.
+        let progress = Event::Progress { file: f.id.clone(), got: 50_000, total: Some(98_000) };
+        s.b.push(Envelope { generation: id, event: progress });
+        s.pump();
+        let half = Msg::FileProgress { name: "roadmap.xlsx".into(), percent: "51".into(), stop: "F".into() };
+        let half = i18n.msg(&half).to_string();
+        s.d.now += std::time::Duration::from_secs(60);
+        assert!(s.d.status_line().contains(&half), "{at}: {}", s.d.status_line());
+        // Another notice covers it for its time; then it is back.
+        s.keys("F");
+        s.d.app.downloads.dir = None;
+        s.keys("f");
+        s.d.now += std::time::Duration::from_secs(10);
+        let stopping = i18n.label(Label::FileCancelling).to_string();
+        assert!(s.d.status_line().contains(&stopping), "{at}: {}", s.d.status_line());
+        // Ended: said once, then gone.
+        s.b.fail(s.b.held.iter().position(|r| r.id == id).unwrap(), FailKind::Cancelled);
+        s.pump();
+        let stopped = i18n.msg(&Msg::FileCancelled { name: "roadmap.xlsx".into() }).to_string();
+        assert!(s.d.status_line().contains(&stopped), "{at}: {}", s.d.status_line());
+        s.d.now += std::time::Duration::from_secs(10);
+        let line = s.d.status_line();
+        assert!(!line.contains(&stopped) && !line.contains(&stopping), "{at}: {line}");
+    }
+}
+
+#[test]
+fn a_file_saved_after_a_failure_is_said_in_its_place_with_its_folder() {
+    for (lang, w, h) in SIZES {
+        let at = format!("{lang:?} {w}x{h}");
+        let i18n = I18n::new(lang);
+        let home = scratch("home");
+        let dir = home.join("Downloads").join("slakio");
+        let files = vec![
+            file("F1", "full-backup.tar", "Tar", Some(54_000_000_000), true),
+            file("F2", "a.pdf", "PDF", Some(10), true),
+        ];
+        let mut s = shown(files, w, h, lang, Some(dir.clone()));
+        s.d.app.downloads.home = Some(home);
+        s.d.app.downloads.max = 1_024_000_000;
+        s.keys("f a");
+        let i = s.b.held.iter().position(|r| matches!(r.command, Command::Download { .. })).unwrap();
+        s.b.fail(i, FailKind::TooLarge);
+        s.pump();
+        // The limit is said.
+        let why = i18n.msg(&Msg::FileWhyTooLarge { limit: "1024".into() }).to_string();
+        let failed = i18n.msg(&Msg::FileFailed { why }).to_string();
+        assert!(s.d.status_line().contains(&failed), "{at}: {}", s.d.status_line());
+        s.keys("f s");
+        let (id, f) = asked(&s).unwrap();
+        answer(&mut s, id, saved(f.id, &dir.join("a.pdf"), false));
+        let folder = format!("~{}Downloads{}slakio", std::path::MAIN_SEPARATOR, std::path::MAIN_SEPARATOR);
+        let said = i18n.msg(&Msg::FileSaved { name: "a.pdf".into(), folder }).to_string();
+        let line = s.d.status_line();
+        assert!(line.contains(&said) && !line.contains(&failed), "{at}: {line}");
+    }
+}
+
+#[test]
+fn downloads_stopped_at_once_are_counted() {
+    let files = vec![file("F1", "one.pdf", "PDF", Some(100), true), file("F3", "two.png", "PNG", Some(200), true)];
+    let mut s = shown(files, 120, 40, Lang::En, Some(scratch("stop-two")));
+    s.keys("f a f s F");
+    for _ in 0..2 {
+        let i = s.b.held.iter().position(|r| matches!(r.command, Command::Download { .. })).unwrap();
+        s.b.fail(i, FailKind::Cancelled);
+        s.pump();
+    }
+    let said = s.d.app.i18n.msg(&Msg::FileCancelledMany { count: 2 }).to_string();
+    assert!(s.d.status_line().contains(&said), "{}", s.d.status_line());
+}
+
+#[test]
+fn a_cut_file_name_keeps_its_extension_and_the_size_is_never_cut() {
+    let long = "2026\u{B144} 3\u{BD84}\u{AE30} \u{B514}\u{C790}\u{C778} \u{B9AC}\u{BDF0} \u{CD5C}\u{C885}\u{BCF8} (\u{C218}\u{C815}\u{BCF8}) \u{BC30}\u{D3EC} \u{C804} \u{AC80}\u{D1A0}\u{C6A9} \u{D68C}\u{C758}\u{B85D}.pdf";
+    for (lang, w, h) in [(Lang::En, 80, 24), (Lang::Ko, 80, 24), (Lang::En, 50, 24)] {
+        let at = format!("{lang:?} {w}x{h}");
+        let files = vec![
+            file("F1", long, "PDF", Some(812), true),
+            file("F2", "roadmap.xlsx", "Excel Spreadsheet", Some(98_000), true),
+            file("F3", "\u{BC1C}\u{D45C}\u{C790}\u{B8CC}.pptx", "Microsoft PowerPoint Presentation", Some(812), true),
+        ];
+        let dir = scratch("long-name");
+        let mut s = shown(files, w, h, lang, Some(dir.clone()));
+        let screen = s.d.screen();
+        let cards: Vec<&str> = screen.lines().filter(|l| l.contains('\u{21E9}')).collect();
+        let card = cards.first().unwrap_or_else(|| panic!("{at}:\n{screen}"));
+        assert!(card.contains("2026") && card.contains(".pdf") && card.contains('…'), "{at}: {card}");
+        // Tight: the name before the size.
+        let card = cards.get(1).unwrap_or_else(|| panic!("{at}:\n{screen}"));
+        assert!(card.contains("roadmap.xlsx") || card.contains("98 KB"), "{at}: {card}");
+        if w == 50 {
+            assert!(card.contains("roadmap.xlsx"), "{at}: {card}");
+        }
+        // The list: the size whole on each row, the kind dropped first.
+        s.keys("f");
+        let screen = s.d.screen();
+        for (name, size) in [(".pdf", "812 B"), ("roadmap.xlsx", "98 KB"), (".pptx", "812 B")] {
+            let row = screen.lines().find(|l| l.contains(name)).unwrap_or_else(|| panic!("{at}:\n{screen}"));
+            assert!(row.contains(size), "{at}: {row}");
+        }
+        // The question names the file with its extension.
+        s.keys("a");
+        let (id, f) = asked(&s).unwrap();
+        answer(&mut s, id, saved(f.id, &dir.join(long), false));
+        assert_eq!(s.d.app.question(), Some(Question::File), "{at}");
+        let screen = s.d.screen();
+        assert!(screen.contains("\u{D68C}\u{C758}\u{B85D}.pdf"), "{at}:\n{screen}");
+        assert!(!screen.contains("…. "), "{at}:\n{screen}");
+    }
+}
+
+#[test]
+fn a_narrow_status_line_keeps_how_much_and_the_stop_key_over_the_name() {
+    for lang in [Lang::En, Lang::Ko] {
+        let i18n = I18n::new(lang);
+        let files = vec![file("F1", "roadmap-for-the-next-quarter.xlsx", "Excel", Some(98_000), true)];
+        let mut s = shown(files, 50, 24, lang, Some(scratch("narrow")));
+        s.keys("f");
+        let (id, f) = asked(&s).unwrap();
+        s.b.push(Envelope { generation: id, event: Event::Progress { file: f.id, got: 40_000, total: Some(98_000) } });
+        s.pump();
+        let short = i18n.msg(&Msg::FileProgressShort { percent: "40".into(), stop: "F".into() }).to_string();
+        assert!(s.d.status_line().contains(&short), "{lang:?}: {}", s.d.status_line());
+    }
 }

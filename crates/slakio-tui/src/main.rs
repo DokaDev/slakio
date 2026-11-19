@@ -148,6 +148,9 @@ fn main() -> ExitCode {
     }
     // Megabytes as file sizes are shown: 1,000,000 bytes.
     app.downloads.max = u64::from(cfg.download_max_mb) * 1_000_000;
+    // A saved file's folder is said from `~` when it is in the home folder.
+    app.downloads.home =
+        env("HOME").or_else(|| env("USERPROFILE")).filter(|h| !h.is_empty()).map(std::path::PathBuf::from);
     // A sign-in piped in (`pbpaste | slakio login`): checked, kept, said, and the program ends.
     if login && !io::stdin().is_terminal() {
         return signin::sign_in_piped(&wiring, &i18n::I18n::new(lang));

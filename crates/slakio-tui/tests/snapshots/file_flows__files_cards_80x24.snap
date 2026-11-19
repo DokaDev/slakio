@@ -21,7 +21,7 @@ expression: s.d.snap()
 │   # big-history            ││     the files                                  │
 │   # long-threads           ││     ⇩ Q3-report.pdf  PDF · 1.2 MB              │
 │                            ││     ⇩ login-screen.png  PNG · 346 KB           │
-│ ▾ Channels                 ││     ⇩ Shared plan  Google Docs · not on Slack  │
+│ ▾ Channels                 ││     ⇗ Shared plan  Google Docs · not on Slack  │
 │   # announcements          │├─ Message #deploys ─────────────────────────────┤
 │   # design-review          ││ › Read only: nothing can be sent               │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯

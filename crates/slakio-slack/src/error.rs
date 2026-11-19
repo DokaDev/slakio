@@ -33,6 +33,8 @@ pub enum SlackError {
     Unsaved { detail: String },
     /// The user stopped a download: nothing of it was kept.
     Cancelled,
+    /// A download's bytes stopped coming for too long.
+    Stalled,
 }
 
 impl SlackError {
@@ -50,6 +52,7 @@ impl SlackError {
             SlackError::TooLarge => FailKind::TooLarge,
             SlackError::Unsaved { .. } => FailKind::Unsaved,
             SlackError::Cancelled => FailKind::Cancelled,
+            SlackError::Stalled => FailKind::Stalled,
         }
     }
 
@@ -68,6 +71,7 @@ impl SlackError {
             SlackError::TooLarge => "the file is larger than the download cap".to_string(),
             SlackError::Unsaved { detail } => format!("not saved: {detail}"),
             SlackError::Cancelled => "cancelled".to_string(),
+            SlackError::Stalled => "the download stalled".to_string(),
         }
     }
 }

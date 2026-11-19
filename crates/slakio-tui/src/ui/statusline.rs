@@ -21,14 +21,14 @@ use crate::app::status::{Level, NOTICE_MAX};
 use crate::app::{App, Mode};
 use crate::keymap::hints::{self, Place};
 use crate::keymap::{Ctx, keys};
-use crate::opener::host_tail;
-use crate::text::{clip, width};
+use crate::text::{clip, clip_middle, width};
+use notice::{fit_notice, named, notice_max};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use slakio_core::i18n::{Label, Msg};
+use slakio_core::i18n::Label;
 use slakio_core::model::Presence;
 use std::time::Instant;
 
@@ -210,7 +210,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     });
     // The notice, or the first keys of a sequence until its popup shows; with the room it takes
     // at most.
-    let notice = app.keys.pending().is_empty().then(|| app.status.notice(now)).flatten();
+    let notice = app.keys.pending().is_empty().then(|| app.notice(now)).flatten();
+    let notice = notice.as_ref();
     let msg: Option<(String, Style)> = if !app.keys.pending().is_empty() {
         (!app.which_key_visible(now)).then(|| (format!("{} …", keys::label(app.keys.pending())), t.bold()))
     } else {
@@ -498,59 +499,6 @@ const DND_WORDS_FROM: usize = 100;
 /// The width from which the mark of live updates the budget holds says why.
 const WHY_FROM: usize = 100;
 
-/// The most of a workspace's name the hints make room for in a notice about it.
-const NOTICE_NAME: usize = 24;
-
-/// The least of a workspace's name a notice about it keeps, however short the line.
-const NOTICE_NAME_KEPT: usize = 8;
-
-/// The name of the workspace notice `msg` is about.
-fn named(msg: &Msg) -> Option<&str> {
-    match msg {
-        Msg::FailWorkspace { workspace, .. } | Msg::FailWorkspaceAuth { workspace } => Some(workspace),
-        _ => None,
-    }
-}
-
-/// Notice `msg` about a workspace, with `name` for the workspace's.
-fn renamed(msg: &Msg, name: String) -> Msg {
-    match msg {
-        Msg::FailWorkspace { why, .. } => Msg::FailWorkspace { workspace: name, why: why.clone() },
-        Msg::FailWorkspaceAuth { .. } => Msg::FailWorkspaceAuth { workspace: name },
-        other => other.clone(),
-    }
-}
-
-/// The room the hints make for notice `msg`: [`NOTICE_MAX`], or more for one about a workspace,
-/// so its whole reason fits beside its name cut to [`NOTICE_NAME`] cells.
-fn notice_max(app: &App, msg: &Msg) -> usize {
-    if let Msg::OpenOpening { host } = msg {
-        return width(&app.i18n.msg(&Msg::OpenOpening { host: host_tail(host, app.host_room()) }));
-    }
-    let Some(name) = named(msg) else { return NOTICE_MAX };
-    NOTICE_MAX.max(width(&app.i18n.msg(&renamed(msg, clip(name, NOTICE_NAME)))))
-}
-
-/// Notice `msg` in `room` cells. One about a workspace always names it: its name is cut with
-/// `…` (never under [`NOTICE_NAME_KEPT`] cells) before the words after it lose their end.
-fn fit_notice(app: &App, msg: &Msg, room: usize) -> String {
-    let whole = app.i18n.msg(msg).to_string();
-    match msg {
-        _ if width(&whole) <= room => return whole,
-        Msg::JumpDateQuiet { .. } => return clip(&app.i18n.label(Label::JumpDateQuietShort).to_string(), room),
-        _ => {}
-    }
-    // A host that opens is cut from its start, to the cells free.
-    if let Msg::OpenOpening { host } = msg {
-        let around = width(&whole).saturating_sub(width(host));
-        return clip(&app.i18n.msg(&Msg::OpenOpening { host: host_tail(host, room.saturating_sub(around)) }), room);
-    }
-    let Some(name) = named(msg) else { return clip(&whole, room) };
-    let around = width(&whole).saturating_sub(width(name));
-    let kept = room.saturating_sub(around).max(NOTICE_NAME_KEPT.min(width(name)));
-    clip(&app.i18n.msg(&renamed(msg, clip(name, kept))), room)
-}
-
 /// `spans` at the right end of `area`, when they fit.
 fn draw_right(f: &mut Frame, area: Rect, spans: Spans) {
     let w = spans_width(&spans) as u16;
@@ -576,25 +524,7 @@ fn clip_place(p: &str, w: usize) -> String {
     }
 }
 
-/// `s` cut to `w` cells by its middle: `#feed-cu…-16`.
-fn clip_middle(s: &str, w: usize) -> String {
-    if width(s) <= w {
-        return s.to_string();
-    }
-    let head = clip(s, w.div_ceil(2));
-    let tail_w = w.saturating_sub(width(&head));
-    let chars: Vec<char> = s.chars().collect();
-    let mut tail = String::new();
-    for c in chars.iter().rev() {
-        let mut next = c.to_string();
-        next.push_str(&tail);
-        if width(&next) > tail_w {
-            break;
-        }
-        tail = next;
-    }
-    format!("{head}{tail}")
-}
+mod notice;
 
 #[cfg(test)]
 mod tests;

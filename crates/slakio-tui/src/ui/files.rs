@@ -1,6 +1,6 @@
 //! The list of a message's files to download (`f`, when it shares several): each row its
 //! letters (faint once the letters typed do not start them), the file's name and its kind and
-//! size after it; the cursor row drawn as the selection. It scrolls with its cursor; when it has
+//! size at its end, short of room cut as on the cards ([`super::timeline::files::fit`]); the cursor row drawn as the selection. It scrolls with its cursor; when it has
 //! more rows than it shows, its title says where the cursor is (`3/30`).
 //!
 //! ```text
@@ -11,9 +11,10 @@
 //! ```
 
 use super::modal;
+use super::timeline::files::fit;
 use crate::app::App;
 use crate::app::files::size_words;
-use crate::text::{clip, width};
+use crate::text::width;
 use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -45,16 +46,11 @@ pub(super) fn draw(f: &mut Frame, app: &App) {
         let hint = p.hints.get(i).cloned().unwrap_or_default();
         let on = hint.starts_with(&p.typed);
         let lead = format!(" {hint:<pad$} ", pad = lead_w - 2);
+        // As on the cards: the name first, then the size, then the kind.
         let kind = file.kind.line();
-        let meta = match (kind.is_empty(), file.size) {
-            (false, Some(s)) => format!("{} · {}", kind.as_str(), size_words(s)),
-            (false, None) => kind.into_string(),
-            (true, Some(s)) => size_words(s),
-            (true, None) => String::new(),
-        };
-        let meta = clip(&meta, w.saturating_sub(lead_w + 12) / 2);
-        let name = clip(file.name.line().as_str(), w.saturating_sub(lead_w + 4 + width(&meta)));
-        let gap = w.saturating_sub(lead_w + 2 + width(&name) + width(&meta)).max(2);
+        let meta = (!kind.is_empty()).then(|| kind.into_string()).into_iter().chain(file.size.map(size_words));
+        let (name, meta) = fit(file.name.line().as_str(), meta.collect(), w.saturating_sub(lead_w + 2));
+        let gap = w.saturating_sub(lead_w + 2 + width(&name) + width(&meta));
         let line = Line::from(vec![
             Span::styled(lead, if on { t.hint() } else { t.faint() }),
             Span::raw(" "),

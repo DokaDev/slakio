@@ -6,9 +6,11 @@
 //! for. A file hosted elsewhere, or none, is said. Downloading is a read: nothing changes in
 //! Slack, so a read-only workspace downloads too.
 //!
-//! While a file comes, the status line says how much has (with two on their way, that two are)
-//! and the key that stops them (`F`, `:download cancel`); a file already on its way is not asked
-//! for again. Once saved, a file of a kind a viewer shows
+//! While a file comes, the status line says so until it ends ([`App::notice`]: a notice covers
+//! it for its time, then it is back): that it is waited for, how much has come (with two on their
+//! way, that two are) and the key that stops them (`F`, `:download cancel`); a file already on its
+//! way is not asked for again. What is said of a download replaces what was said of one before,
+//! a failure too. Once saved, a file of a kind a viewer shows
 //! ([`slakio_core::download::openable`]) is offered to open (`dialog::Question::File`, the safe
 //! answer focused: nothing opens by itself); any other kind is only saved, and the status line
 //! says so. Every file saved was marked as downloaded from the internet before it got its name
@@ -17,10 +19,11 @@
 
 use super::dialog::{Dialog, Question};
 use super::picker::{LETTERS, hint_letters, list_rect};
-use super::status::Level;
+use super::status::{INFO_FOR, Level, Notice};
 use super::{App, Effect};
 use crate::action::{Action, LinksAction};
 use crate::keymap::{Ctx, KeyChord};
+use crate::text::clip_name;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::layout::{Position, Rect};
 use slakio_core::backend::{Command, FailKind, Generation};
@@ -36,12 +39,16 @@ pub struct Downloads {
     pub dir: Option<PathBuf>,
     /// The most bytes of a file.
     pub max: u64,
+    /// The home folder, said `~` where a saved file's folder starts with it.
+    pub home: Option<PathBuf>,
     /// The downloads asked for and not answered yet.
     going: Vec<Going>,
     /// The file saved that the question offers to open.
     saved: Option<PathBuf>,
     /// The downloads on their way were told to stop.
     stopping: bool,
+    /// The names of the downloads stopped, until all of them are said at once.
+    stopped: Vec<String>,
 }
 
 /// A download asked for: its request, its workspace, its file and the name said for it.
@@ -51,6 +58,9 @@ struct Going {
     workspace: WorkspaceId,
     file: FileId,
     name: String,
+    /// The bytes come so far, and how many there are when that is known.
+    got: u64,
+    total: Option<u64>,
 }
 
 /// The files of a message to pick one of, shown as a list.
@@ -112,31 +122,44 @@ impl App {
         let Some(dir) = self.downloads.dir.clone() else {
             return self.warn(Msg::Label(Label::FileNoFolder), now);
         };
-        let name = crate::text::clip(file.name.line().as_str(), NAME_SAID);
+        let name = crate::text::clip_name(file.name.line().as_str(), NAME_SAID);
         if self.downloads.going.iter().any(|g| g.file == file.id && &g.workspace == workspace) {
             return self.info(Msg::FileAlready { name }, now);
         }
         let command = Command::Download { file: file.clone(), dir, max: self.downloads.max };
         let id = self.work.requests.ask(Some(workspace.clone()), command);
-        let going = Going { id, workspace: workspace.clone(), file: file.id.clone(), name };
+        let going = Going { id, workspace: workspace.clone(), file: file.id.clone(), name, got: 0, total: None };
         self.downloads.going.push(going);
         self.downloads.stopping = false;
-        self.say_going(None, now);
+        // What was said of a download before is over: the line of this one shows.
+        self.status.forget(now, about_downloads);
     }
 
-    /// Say how the downloads on their way are going: one by its name (and how much of it has
-    /// come, `percent`), several by their number.
-    fn say_going(&mut self, percent: Option<u64>, now: Instant) {
+    /// The line the status line shows while downloads are on their way: one by its name (waited
+    /// for until its first bytes, then how much of it has come), several by their number, and
+    /// the key that stops them; once told to stop, that they are stopping.
+    fn download_line(&self) -> Option<Msg> {
         let stop = self.stop_key();
-        let msg = match self.downloads.going.as_slice() {
-            [] => return,
-            [one] => match percent {
-                Some(p) => Msg::FileProgress { name: one.name.clone(), percent: p.to_string(), stop },
-                None => Msg::FileDownloading { name: one.name.clone(), stop },
+        Some(match self.downloads.going.as_slice() {
+            [] => return None,
+            _ if self.downloads.stopping => Msg::Label(Label::FileCancelling),
+            [one] => match (one.got, one.total) {
+                (0, _) => Msg::FileWaiting { name: one.name.clone(), stop },
+                (got, Some(t)) if t > 0 => {
+                    Msg::FileProgress { name: one.name.clone(), percent: (got.min(t) * 100 / t).to_string(), stop }
+                }
+                _ => Msg::FileDownloading { name: one.name.clone(), stop },
             },
             many => Msg::FileDownloadingMany { count: many.len() as u64, stop },
-        };
-        self.say_download(msg, Level::Info, now);
+        })
+    }
+
+    /// What the status line's message slot shows at `now`: the notice showing, else while
+    /// downloads are on their way, their line (it stands until the last one ends).
+    pub fn notice(&self, now: Instant) -> Option<Notice> {
+        self.status.notice(now).cloned().or_else(|| {
+            Some(Notice { msg: self.download_line()?, level: Level::Info, until: now + INFO_FOR, about: None })
+        })
     }
 
     /// The key that stops the downloads where the panes' keys work, else the command.
@@ -146,18 +169,13 @@ impl App {
             .unwrap_or_else(|| ":download cancel".to_string())
     }
 
-    /// Say `msg` about a download in place of what was said of downloads before.
+    /// Say `msg` about a download in place of what was said of downloads before (a failure
+    /// too: the latest says how things are); after another warning showing, when there is one.
     fn say_download(&mut self, msg: Msg, level: Level, now: Instant) {
-        self.status.forget(now, |m| {
-            matches!(
-                m,
-                Msg::FileDownloading { .. }
-                    | Msg::FileProgress { .. }
-                    | Msg::FileDownloadingMany { .. }
-                    | Msg::FileSaved { .. }
-                    | Msg::Label(Label::FileCancelling)
-            )
-        });
+        self.status.forget(now, about_downloads);
+        if self.status.notice(now).is_some_and(|n| n.level > level) {
+            return self.status.queue(msg, level, now);
+        }
         self.status.show(msg, level, now);
     }
 
@@ -173,25 +191,16 @@ impl App {
             self.work.requests.ask(Some(workspace), Command::Cancel { request });
         }
         self.downloads.stopping = true;
-        self.say_download(Msg::Label(Label::FileCancelling), Level::Info, now);
+        // Their line says they are stopping.
+        self.status.forget(now, about_downloads);
     }
 
     /// How much of the file download `id` asked for has come.
-    pub(super) fn on_progress(
-        &mut self,
-        id: Generation,
-        file: &FileId,
-        got: u64,
-        total: Option<u64>,
-        now: Instant,
-    ) -> bool {
-        if !self.downloads.going.iter().any(|g| g.id == id && &g.file == file) {
+    pub(super) fn on_progress(&mut self, id: Generation, file: &FileId, got: u64, total: Option<u64>) -> bool {
+        let Some(g) = self.downloads.going.iter_mut().find(|g| g.id == id && &g.file == file) else {
             return false;
-        }
-        // Stopping them says so until each one's answer comes.
-        if !self.downloads.stopping {
-            self.say_going(total.filter(|t| *t > 0).map(|t| got.min(t) * 100 / t), now);
-        }
+        };
+        (g.got, g.total) = (got, total);
         true
     }
 
@@ -201,21 +210,22 @@ impl App {
     pub(super) fn on_downloaded(&mut self, id: Generation, path: PathBuf, unmarked: bool, now: Instant) -> bool {
         let Some(i) = self.downloads.going.iter().position(|g| g.id == id) else { return false };
         let g = self.downloads.going.remove(i);
-        let saved =
-            path.file_name().map_or_else(|| g.name.clone(), |n| crate::text::clip(&n.to_string_lossy(), NAME_SAID));
+        self.downloads.stopped.clear();
+        let name = path.file_name().map_or_else(|| g.name.clone(), |n| clip_name(&n.to_string_lossy(), NAME_SAID));
+        let folder = path.parent().map(|d| self.folder_said(d)).unwrap_or_default();
         if unmarked {
-            self.say_download(Msg::FileSavedUnmarked { name: saved }, Level::Warning, now);
+            self.say_download(Msg::FileSavedUnmarked { name, folder }, Level::Warning, now);
             return true;
         }
         if !slakio_core::download::openable(&path) {
-            self.say_download(Msg::FileSavedOnly { name: saved }, Level::Info, now);
+            self.say_download(Msg::FileSavedOnly { name, folder }, Level::Info, now);
             return true;
         }
         if self.backend.is_some_and(|c| c.demo) {
-            self.say_download(Msg::FileSavedDemo { name: saved }, Level::Info, now);
+            self.say_download(Msg::FileSavedDemo { name, folder }, Level::Info, now);
             return true;
         }
-        self.say_download(Msg::FileSaved { name: saved }, Level::Info, now);
+        self.say_download(Msg::FileSaved { name, folder }, Level::Info, now);
         let free = self.dialog.is_none() && self.layers(None).is_empty() && self.picker.is_none();
         if free {
             self.downloads.saved = Some(path);
@@ -229,7 +239,21 @@ impl App {
         let Some(i) = self.downloads.going.iter().position(|g| g.id == id) else { return false };
         let g = self.downloads.going.remove(i);
         if *kind == FailKind::Cancelled {
-            self.say_download(Msg::FileCancelled { name: g.name }, Level::Info, now);
+            // Those stopped at once are said at once, when the last one has stopped.
+            self.downloads.stopped.push(g.name);
+            if self.downloads.going.is_empty() {
+                let msg = match std::mem::take(&mut self.downloads.stopped).as_slice() {
+                    [one] => Msg::FileCancelled { name: one.clone() },
+                    many => Msg::FileCancelledMany { count: many.len() as u64 },
+                };
+                self.say_download(msg, Level::Info, now);
+            }
+            return true;
+        }
+        self.downloads.stopped.clear();
+        if *kind == FailKind::TooLarge {
+            let why = self.i18n.msg(&Msg::FileWhyTooLarge { limit: (self.downloads.max / 1_000_000).to_string() });
+            self.say_download(Msg::FileFailed { why: why.to_string() }, Level::Warning, now);
             return true;
         }
         let why = match kind {
@@ -242,6 +266,15 @@ impl App {
         let why = self.i18n.label(why).to_string();
         self.say_download(Msg::FileFailed { why }, Level::Warning, now);
         true
+    }
+
+    /// Folder `dir` as the status line says it: the home folder as `~`.
+    fn folder_said(&self, dir: &std::path::Path) -> String {
+        match self.downloads.home.as_deref().and_then(|h| dir.strip_prefix(h).ok()) {
+            Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+            Some(rest) => format!("~{}{}", std::path::MAIN_SEPARATOR, rest.display()),
+            None => dir.display().to_string(),
+        }
     }
 
     /// The answer to "open this file?": yes hands it to the binary.
@@ -354,6 +387,22 @@ impl App {
 
 /// The most cells of a file's name the status line says.
 const NAME_SAID: usize = 24;
+
+/// Notice `m` says how a download went (or that one is on its way, or none is).
+fn about_downloads(m: &Msg) -> bool {
+    matches!(
+        m,
+        Msg::FileAlready { .. }
+            | Msg::FileCancelled { .. }
+            | Msg::FileCancelledMany { .. }
+            | Msg::FileSaved { .. }
+            | Msg::FileSavedOnly { .. }
+            | Msg::FileSavedUnmarked { .. }
+            | Msg::FileSavedDemo { .. }
+            | Msg::FileFailed { .. }
+            | Msg::Label(Label::FileNoDownload)
+    )
+}
 
 #[cfg(test)]
 mod tests;

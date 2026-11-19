@@ -169,3 +169,17 @@ fn wrap_tagged_says_where_each_tagged_run_is_on_its_lines() {
     // blank that ends the first is the run's).
     assert_eq!(spots, [vec![(4, 8, 0)], vec![(0, 7, 0)], vec![(0, 9, 1)]]);
 }
+
+#[test]
+fn a_file_name_is_cut_in_its_middle_and_keeps_its_extension() {
+    assert_eq!(clip_name("Q3-report.pdf", 20), "Q3-report.pdf");
+    assert_eq!(clip_name("very-long-file-name-for-the-cards.pdf", 18), "very-lon…cards.pdf");
+    let ko = "2026\u{B144} 3\u{BD84}\u{AE30} \u{B514}\u{C790}\u{C778} \u{B9AC}\u{BDF0} \u{D68C}\u{C758}\u{B85D}.pdf";
+    let cut = clip_name(ko, 20);
+    assert!(cut.ends_with("\u{D68C}\u{C758}\u{B85D}.pdf") && cut.contains('…') && width(&cut) <= 20, "{cut}");
+    // No extension, or no room for it: cut at its end.
+    assert_eq!(clip_name("very-long-file-name", 10), "very-long…");
+    assert_eq!(clip_name("a.verylongextension", 8), "a.veryl…");
+    assert_eq!(clip_name("abc.pdf", 5), "abc.…");
+    assert_eq!(clip_middle("#feed-customer-16", 10), "#fee…er-16");
+}

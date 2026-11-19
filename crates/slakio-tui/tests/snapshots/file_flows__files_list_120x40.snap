@@ -37,7 +37,7 @@ expression: s.d.snap()
 │   # feed-design-34         ││       the files                                                                        │
 │   # feed-design-83         ││       ⇩ Q3-report.pdf  PDF · 1.2 MB                                                    │
 │   # feed-draft-142         ││       ⇩ login-screen.png  PNG · 346 KB                                                 │
-│   # feed-draft-58          ││       ⇩ Shared plan  Google Docs · not on Slack                                        │
+│   # feed-draft-58          ││       ⇗ Shared plan  Google Docs · not on Slack                                        │
 │   # feed-draft-84          │├─ Message #deploys ─────────────────────────────────────────────────────────────────────┤
 │   # feed-index-199      2  ││ › Read only: nothing can be sent                                                       │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯

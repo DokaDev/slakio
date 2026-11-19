@@ -38,7 +38,7 @@ impl Fetched {
     pub(crate) async fn chunk(&mut self) -> Result<Option<Bytes>, SlackError> {
         loop {
             let frame = match tokio::time::timeout(IDLE, self.body.frame()).await {
-                Err(_) => return Err(net("the download stalled")),
+                Err(_) => return Err(SlackError::Stalled),
                 Ok(None) => return Ok(None),
                 Ok(Some(Err(_))) => return Err(net("the download was cut off")),
                 Ok(Some(Ok(frame))) => frame,

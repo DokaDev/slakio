@@ -25,8 +25,9 @@ use slakio_core::model::{FILE_HOST, File};
 use slakio_core::sanitize::Remote;
 use slakio_core::secret::Credentials;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::{mpsc, watch};
+use tokio::time::Instant;
 
 /// The most redirects a download follows.
 pub const REDIRECTS: usize = 3;
@@ -153,11 +154,23 @@ async fn receive(
     let (mut got, mut told, mut told_at) = (0u64, 0u64, Instant::now());
     progress(0);
     loop {
-        let chunk = tokio::select! {
-            biased;
-            () = cancelled(cancel) => return Err(SlackError::Cancelled),
-            () = client.governor().stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
-            chunk = answer.chunk() => chunk?,
+        let read = answer.chunk();
+        tokio::pin!(read);
+        let chunk = loop {
+            tokio::select! {
+                biased;
+                () = cancelled(cancel) => return Err(SlackError::Cancelled),
+                () = client.governor().stopped() => {
+                    return Err(SlackError::Offline { why: "the network was switched off" });
+                }
+                // Bytes not told yet are told once the next piece is late (the piece still
+                // awaited): a slow or stalled download says how far it got.
+                () = tokio::time::sleep_until(told_at + PROGRESS_EVERY), if got > told => {
+                    (told, told_at) = (got, Instant::now());
+                    progress(got);
+                }
+                chunk = &mut read => break chunk?,
+            }
         };
         let Some(bytes) = chunk else { break };
         got = got.saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));

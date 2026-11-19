@@ -218,7 +218,7 @@ impl App {
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
-            Event::Progress { file, got, total } => self.on_progress(id, &file, got, total, now),
+            Event::Progress { file, got, total } => self.on_progress(id, &file, got, total),
             Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
@@ -385,6 +385,7 @@ pub(crate) fn failure(kind: &FailKind) -> Label {
         FailKind::TooLarge => Label::FailTooLarge,
         FailKind::Unsaved => Label::FailUnsaved,
         FailKind::Cancelled => Label::FailCancelled,
+        FailKind::Stalled => Label::FailStalled,
     }
 }
 

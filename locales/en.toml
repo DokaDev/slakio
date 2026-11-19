@@ -409,6 +409,7 @@
 "fail.too_large" = "larger than download_max_mb"
 "fail.unsaved" = "could not save it in the folder"
 "fail.cancelled" = "stopped"
+"fail.stalled" = "stalled: nothing more came"
 # The unread counts of a workspace could not be read at its start.
 "fail.counts" = "Unread counts not loaded: those shown may be old"
 "fail.counts_none" = "Unread counts not loaded"
@@ -474,21 +475,28 @@
 "file.no_folder" = "No downloads folder: set downloads in the config"
 # {stop}: the key that stops the downloads (or the command that does).
 "file.downloading" = "Downloading {name} · {stop} stop"
-"file.progress" = "Downloading {name} {percent}% · {stop} stop"
+"file.waiting" = "Waiting for {name}… · {stop} stop"
+"file.progress" = "Downloading {name} · {percent}% · {stop} stop"
 "file.downloading_many" = { one = "Downloading {count} file · {stop} stop", other = "Downloading {count} files · {stop} stop" }
+# Short of room: what is left once the name is dropped.
+"file.progress_short" = "{percent}% · {stop} stop"
+"file.stop_short" = "{stop} stop"
+"file.many_short" = { one = "{count} file · {stop} stop", other = "{count} files · {stop} stop" }
 "file.already" = "Already downloading {name}"
 "file.cancelling" = "Stopping the downloads"
 "file.cancelled" = "Stopped {name}: nothing saved"
+"file.cancelled_many" = { one = "Stopped {count} file: nothing saved", other = "Stopped {count} files: nothing saved" }
 "file.no_download" = "No download on its way"
-"file.saved" = "Saved {name}"
-"file.saved_only" = "Saved {name}: this kind is not opened here"
-"file.saved_unmarked" = "Saved {name}, not marked: not opened"
-"file.saved_demo" = "Saved {name} (demo: not opened)"
+"file.saved" = "Saved {name} in {folder}"
+"file.saved_only" = "Saved {name} in {folder}: this kind is not opened here"
+"file.saved_unmarked" = "Saved {name} in {folder}, not marked: not opened"
+"file.saved_demo" = "Saved {name} in {folder} (demo: not opened)"
 "file.failed" = "Not saved: {why}"
 "file.open_failed" = "Could not open the file"
 "file.why_elsewhere" = "sent to another host"
 "file.why_page" = "a page came, not the file"
 "file.why_gone" = "gone, or not yours to read"
+"file.why_too_large" = "larger than {limit} MB (download_max_mb)"
 "dialog.file_title" = "Open this file?"
 "dialog.file_text" = "Saved as {name} in {folder}. It opens in the app your system uses for it."
 "dialog.file_no" = "Not now"

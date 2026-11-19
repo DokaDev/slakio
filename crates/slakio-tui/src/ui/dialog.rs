@@ -11,7 +11,7 @@
 use super::modal;
 use crate::app::App;
 use crate::app::dialog::Question;
-use crate::text::{clip, wrap};
+use crate::text::{clip_name, wrap};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Modifier;
@@ -61,7 +61,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
                     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                     let folder = path.parent().map(|d| d.display().to_string()).unwrap_or_default();
                     let folder = crate::opener::host_tail(&folder, inner_w.saturating_sub(4));
-                    app.i18n.msg(&Msg::DialogFileText { name: clip(&name, inner_w), folder }).to_string()
+                    app.i18n.msg(&Msg::DialogFileText { name: clip_name(&name, inner_w), folder }).to_string()
                 }
                 None => app.i18n.label(text).to_string(),
             },

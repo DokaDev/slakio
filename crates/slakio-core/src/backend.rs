@@ -330,7 +330,11 @@ impl FailKind {
     /// Asking again may work (when the user asks: nothing retries on its own).
     pub fn retryable(&self) -> bool {
         match self {
-            FailKind::Network | FailKind::Offline | FailKind::RateLimited { .. } | FailKind::Busy => true,
+            FailKind::Network
+            | FailKind::Stalled
+            | FailKind::Offline
+            | FailKind::RateLimited { .. }
+            | FailKind::Busy => true,
             FailKind::ReadOnly
             | FailKind::Auth
             | FailKind::CapReached
@@ -348,6 +352,8 @@ pub enum FailKind {
     /// The backend changes nothing ([`Capabilities::read_only`]).
     ReadOnly,
     Network,
+    /// A download's bytes stopped coming for too long: nothing of it was kept.
+    Stalled,
     /// Signed out, or the sign-in is no longer accepted.
     Auth,
     /// Slack asked to slow down, for `retry_after` when it said how long.

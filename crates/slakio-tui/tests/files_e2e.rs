@@ -76,6 +76,13 @@ fn wait_until(what: &str, done: impl Fn() -> bool) {
     }
 }
 
+/// What notice `msg` says up to the file's `name`, its folder (`\u{1}`, cut to the room) left out.
+fn around(i18n: &I18n, msg: Msg, name: &str) -> String {
+    let said = i18n.msg(&msg).to_string();
+    let piece = said.split('\u{1}').find(|p| p.contains(name)).unwrap_or_default();
+    piece[..piece.find(name).unwrap_or_default() + name.len()].to_string()
+}
+
 fn has(t: &str, w: &str) -> bool {
     t.replace(' ', "").contains(&w.replace(' ', ""))
 }
@@ -121,8 +128,9 @@ fn a_file_is_downloaded_into_the_folder_from_the_file_host_only() {
             std::fs::read(&saved).unwrap(),
             slakio_world::files::content(&file.id, file.size.unwrap(), u64::MAX)
         );
-        let said = i18n.msg(&Msg::FileSaved { name: file.name.unsanitized().to_string() }).to_string();
-        let only = i18n.msg(&Msg::FileSavedOnly { name: file.name.unsanitized().to_string() }).to_string();
+        let name = file.name.unsanitized().to_string();
+        let said = around(&i18n, Msg::FileSaved { name: name.clone(), folder: "\u{1}".into() }, &name);
+        let only = around(&i18n, Msg::FileSavedOnly { name: name.clone(), folder: "\u{1}".into() }, &name);
         run.wait_for("saved, said", |t| has(t, &said) || has(t, &only));
         // Only the file host's path was asked, once, with the cookie and without the token.
         let log = m.fake.log()[asked..].to_vec();

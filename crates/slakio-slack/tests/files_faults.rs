@@ -169,7 +169,7 @@ fn switching_the_network_off_while_the_bytes_come_keeps_nothing() {
 }
 
 #[test]
-fn a_stalled_download_ends_after_its_idle_time_and_keeps_nothing() {
+fn a_stalled_download_tells_how_far_it_got_ends_after_its_idle_time_and_keeps_nothing() {
     rt().block_on(async {
         let mut r = Run::new().await;
         let dir = temp_dir("stall");
@@ -180,8 +180,19 @@ fn a_stalled_download_ends_after_its_idle_time_and_keeps_nothing() {
         // running ahead by itself).
         tokio::time::pause();
         tokio::time::advance(Duration::from_secs(31)).await;
-        let (kind, detail) = failed(&r.answer(id).await);
-        assert_eq!((kind, detail.as_str()), (FailKind::Network, "the download stalled"));
+        // What came before it stalled is told before it ends, however little.
+        let mut told = 0;
+        let end = loop {
+            let e = r.next().await;
+            assert_eq!(e.generation, id, "{e:?}");
+            match e.event {
+                Event::Progress { got, .. } => told = got,
+                other => break other,
+            }
+        };
+        assert_eq!(told, 1000, "how far it got");
+        let (kind, detail) = failed(&end);
+        assert_eq!((kind, detail.as_str()), (FailKind::Stalled, "the download stalled"));
         assert!(names(&dir).is_empty(), "{:?}", names(&dir));
     });
 }
