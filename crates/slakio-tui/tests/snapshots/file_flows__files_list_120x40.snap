@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/file_flows.rs
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────────────────────────────────────────────╮
+│▎Home                   @24 ││                                                                                        │
+│ DMs                    ●11 ││                                                                                        │
+│ Activity               @36 ││                                                                                        │
+│ Files                      ││                                                                                        │
+│ To-dos                   6 ││                                                                                        │
+├─▾──────────────────────────┤│                                                                                        │
+│ ▾ Favorites                ││                                                                                        │
+│   # backend                ││                                                                                        │
+│   # incidents           3  ││                                                                                        │
+│                            ││                                                                                        │
+│ ▾ Ops                      ││                                                                                        │
+│▎  # deploys                ││                                                                                        │
+│   # alerts                 ││                                                                                        │
+│   # partner-shared ext     ││                                                                                        │
+│   # hostile-strings        ││                                                                                        │
+│   # big-history            ││                                                                                        │
+│   # long-threads          ╭ Download which file? ────────────────────────────────────────╮                           │
+│                           │ a  Q3-report.pdf                                PDF · 1.2 MB │                           │
+│ ▾ Channels                │ s  login-screen.png                             PNG · 346 KB │                           │
+│   # announcements         ╰────────────────────── j/k move · Enter download · Esc cancel ╯                           │
+│   # design-review          ││                                                                                        │
+│   # feed-alert-134         ││                                                                                        │
+│   # feed-alert-8           ││                                                                                        │
+│   # feed-budget-162        ││                                                                                        │
+│   # feed-budget-33         ││                                                                                        │
+│   # feed-build-50          ││                                                                                        │
+│   # feed-cache-119         ││                                                                                        │
+│   # feed-customer-161      ││                                                                                        │
+│   # feed-customer-167   1  ││                                                                                        │
+│   # feed-dashboard-22      ││ ───────────────────────────────────── 2026-01-05 ───────────────────────────────────── │
+│   # feed-dashboard-41      ││  KN   Kate Nam  09:00                                                                  │
+│   # feed-design-34         ││       the files                                                                        │
+│   # feed-design-83         ││       ⇩ Q3-report.pdf  PDF · 1.2 MB                                                    │
+│   # feed-draft-142         ││       ⇩ login-screen.png  PNG · 346 KB                                                 │
+│   # feed-draft-58          ││       ⇩ Shared plan  Google Docs · not on Slack                                        │
+│   # feed-draft-84          │├─ Message #deploys ─────────────────────────────────────────────────────────────────────┤
+│   # feed-index-199      2  ││ › Read only: nothing can be sent                                                       │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys                                     │ j/k move · Enter download · Esc cancel │ read only

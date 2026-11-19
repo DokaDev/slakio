@@ -16,6 +16,7 @@ fn messages(n: u64, text_len: usize) -> Vec<Message> {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         })
         .collect()
 }

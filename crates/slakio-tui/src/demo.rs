@@ -1,14 +1,19 @@
 //! The demo backend (`slakio --demo`): answers every request from the invented world of
 //! `slakio-world`, at once and without any network. It is the only backend for now; the
-//! binary's wiring is the one place that names it.
+//! binary's wiring is the one place that names it. A file downloaded is saved with invented
+//! bytes ([`slakio_world::files::content`], at most [`DEMO_FILE_MAX`] of them), as the real
+//! backend saves one.
 
 use slakio_core::backend::{
-    ACTIVITY_PAGE, Backend, Capabilities, Command, Envelope, Event, Feed, Found, Hit, Notice, NoticeKind, Page,
-    Request, SEARCH_PAGE,
+    ACTIVITY_PAGE, Backend, Capabilities, Command, Envelope, Event, FailKind, Feed, Found, Hit, Notice, NoticeKind,
+    Page, Request, SEARCH_PAGE,
 };
 use slakio_core::model::{Target, Ts, WorkspaceId};
 use slakio_world::World;
 use std::collections::VecDeque;
+
+/// The most bytes a demo file is saved with, whatever size it says it has.
+pub const DEMO_FILE_MAX: u64 = 4 * 1024 * 1024;
 
 pub struct DemoBackend {
     world: World,
@@ -45,6 +50,15 @@ impl Backend for DemoBackend {
                 let ws = request.workspace.clone().unwrap_or_else(|| self.world.snapshot().workspaces[0].id.clone());
                 self.activity(ws, cursor)
             }
+            Command::Download { file, dir, max } => {
+                let size = file.size.unwrap_or(0);
+                let event = Event::Progress { file: file.id.clone(), got: 0, total: file.size };
+                self.ready.push_back(Envelope { generation: request.id, event });
+                match save(&file, &dir, max, size) {
+                    Ok((path, bytes)) => Event::Downloaded { file: file.id, path, bytes },
+                    Err(kind) => Event::Failed { request: request.id, kind, detail: "demo download".to_string() },
+                }
+            }
             // A change that does not apply changes nothing; the answer is the list as it is.
             Command::Save { item, change } => {
                 self.world.change_saved(&item, change);
@@ -57,6 +71,31 @@ impl Backend for DemoBackend {
     fn poll(&mut self) -> Option<Envelope> {
         self.ready.pop_front()
     }
+}
+
+/// Save `file` (`size` bytes said) in `dir` with invented bytes, as [`slakio_core::download`]
+/// says: refused when it says it is larger than `max`, or has no address.
+fn save(
+    file: &slakio_core::model::File,
+    dir: &std::path::Path,
+    max: u64,
+    size: u64,
+) -> Result<(std::path::PathBuf, u64), FailKind> {
+    use slakio_core::download::{Saving, Unsaved};
+    if file.download.is_none() {
+        return Err(FailKind::Api { code: "file_not_downloadable".to_string() });
+    }
+    if size > max {
+        return Err(FailKind::TooLarge);
+    }
+    let failed = |e: Unsaved| match e {
+        Unsaved::TooLarge => FailKind::TooLarge,
+        Unsaved::Io(_) => FailKind::Unsaved,
+    };
+    let mut saving = Saving::start(dir, &file.name, max).map_err(failed)?;
+    saving.write(&slakio_world::files::content(&file.id, size, DEMO_FILE_MAX)).map_err(failed)?;
+    let bytes = saving.written();
+    Ok((saving.finish().map_err(failed)?, bytes))
 }
 
 impl DemoBackend {

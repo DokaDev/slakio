@@ -37,6 +37,34 @@ impl Saved {
 }
 
 impl Saved {
+    /// What goes outside slakio: a link opened, a file marked as downloaded or opened.
+    pub fn outside(&self, effect: slakio_tui::app::Effect, app: &mut App) {
+        use slakio_tui::app::Effect;
+        match effect {
+            Effect::OpenLink(url) => self.open(&url, app),
+            Effect::Quarantine(path) => self.quarantine(&path),
+            Effect::OpenFile(path) => self.open_file(&path, app),
+            _ => {}
+        }
+    }
+
+    /// Open the downloaded file `path` (the user said yes); a failure is said and logged.
+    pub fn open_file(&self, path: &std::path::Path, app: &mut App) {
+        if let Err(e) = slakio_tui::opener::open_file(path) {
+            ErrorLog::new(self.errors.clone()).record("open file", &slakio_core::fault::Fault::io(&e));
+            app.warn(Msg::Label(Label::FileOpenFailed), Instant::now());
+        }
+    }
+
+    /// Mark the file just saved at `path` as downloaded from the internet; a failure is logged.
+    pub fn quarantine(&self, path: &std::path::Path) {
+        if let Err(e) = slakio_tui::opener::quarantine(path) {
+            ErrorLog::new(self.errors.clone()).record("quarantine", &slakio_core::fault::Fault::io(&e));
+        }
+    }
+}
+
+impl Saved {
     /// Save setting `key` as `value` in the config file; `true` when that failed (the app says so).
     pub fn save(&self, key: &str, value: &str, app: &mut App) -> bool {
         let result = match &self.config {

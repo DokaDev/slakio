@@ -160,3 +160,14 @@ fn restoring_the_last_layout_is_on_unless_turned_off() {
         assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
     }
 }
+
+#[test]
+fn the_download_settings_are_read_within_their_ranges() {
+    let d = Config::default();
+    assert_eq!((d.downloads.as_str(), d.download_max_mb), ("", 1024));
+    let cfg = parse("downloads = \"~/Saved\"\ndownload_max_mb = 50\n").unwrap();
+    assert_eq!((cfg.downloads.as_str(), cfg.download_max_mb), ("~/Saved", 50));
+    for bad in ["download_max_mb = 0", "download_max_mb = 100001", "downloads = 3"] {
+        assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
+    }
+}

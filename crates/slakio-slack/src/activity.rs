@@ -78,7 +78,7 @@ pub(crate) async fn activity(client: &Client, ctx: &Session, cursor: Option<&str
     let (texts, bots) = texts(client, &notices, me.as_ref()).await?;
     for n in &mut notices {
         if let Some(m) = texts.get(&(n.conversation.clone(), n.ts)) {
-            n.text = Some(m.text.clone());
+            n.text = Some(crate::messages::summary(m));
             // A reaction names who reacted; the others the message's author.
             if n.kind != NoticeKind::Reaction && (n.user.as_str().is_empty() || bots.contains_key(m.user.as_str())) {
                 n.user = m.user.clone();

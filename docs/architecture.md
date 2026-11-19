@@ -78,7 +78,8 @@ in `app/tabs.rs`, the bar's geometry in `tabbar.rs`), the list panel's workspace
 (`app/nav.rs`; their geometry in `navbar.rs`, where a Nerd Font glyph always takes two cells) — with its panes (`app/pane.rs`: views only — selection, VISUAL range, Insert mode, anchor,
 rows drawn, the thread panel it opened: a pane's role is this relation, never its place in the tree; its own
 back/forward history), the messages of each target a pane shows, held once however many panes show it
-(`app/timelines.rs`), and what is being written to it (`app/drafts.rs`, composers of
+(`app/timelines.rs`), the files of a message downloaded and offered to open (`app/files.rs`),
+and what is being written to it (`app/drafts.rs`, composers of
 `app/composer.rs`); every request to the backend gets its id from one allocator
 (`app/requests.rs`), the read model of the workspaces (`app/model.rs`), To-dos' filter and
 order and the changes to saved items it waits for (`app/todos.rs`), the
@@ -186,6 +187,12 @@ comes back); people and channels are named from the read model when drawn
   shows OS or parser text. The log redacts each detail (`fault::redact`: tokens, cookies,
   addresses past their host, quoted text), is mode 0600, opened with `O_NOFOLLOW`, its directory
   kept 0700, and rotates at 1 MiB to one `errors.log.1` (both kept 0600).
+- **Files.** A file downloaded is marked as from the internet as soon as it is saved
+  (`Effect::Quarantine`: on macOS `/usr/bin/xattr -w com.apple.quarantine`; debug builds run
+  only `SLAKIO_TEST_XATTR`'s stand-in). Only a kind a viewer shows (`download::openable`, an
+  allowlist: documents without macros, pictures, sound, video, text) is offered to open, by a
+  question whose safe answer has the focus; yes hands its absolute path, a plain file and not
+  a link, to the same opener as a link (`opener::open_file`). Anything else is only saved.
 - **Links.** `opener::check` lets only `http`/`https` addresses through (at most 8 KiB, a
   plain ASCII host within the DNS limits, no user or password, no host that reads as a number
   but a dotted IPv4 address) and hands over a normalised form (scheme and host lower case,
@@ -259,9 +266,10 @@ every rail sits in the transport, below the backend, so no caller can go around 
    above stay shared by all of them). A request given up while it waits frees its place.
 5. **Hosts.** TLS (rustls with the OS's certificate verifier, HTTP/2 when offered) to the
    signed-in workspace's own host (`<name>.slack.com`) and the edge cache's
-   (`edgeapi.slack.com`), and for the live updates the realtime host (`wss-primary.slack.com`,
-   HTTP/1.1 only), nothing else: the host is checked where the socket opens, so no file,
-   image or other host is ever reached. The tests reach a loopback address over plain HTTP.
+   (`edgeapi.slack.com`), for the live updates the realtime host (`wss-primary.slack.com`,
+   HTTP/1.1 only), and for a file the user downloads Slack's file host (`model::FILE_HOST`, the `files` host of `slack.com`),
+   nothing else: the host is checked where the socket opens, so no image or other host is
+   ever reached. The tests reach a loopback address over plain HTTP.
 6. **Format.** Requests look like the official web client's (the browser's header set in its
    order, no `Referer`, the token in the form body and never in a header, the client's `_x_*`
    parameters in its order; an edge lookup is sorted JSON as text). Golden tests hold the exact
@@ -271,6 +279,23 @@ every rail sits in the transport, below the backend, so no caller can go around 
    `FailKind` (`Auth`, `RateLimited { retry_after }`, `Network`, `Offline`, `Busy`, `CapReached`,
    `Api { code }`); the error log gets the method, the code or the status, never a body, a token
    or a message.
+
+**Downloads** (`download.rs`, `http/fetch.rs`): a file a message shares is downloaded only
+when the user asks (`Command::Download`), at most two at once a workspace. Only an address
+on the file host is fetched (`https://` + `FILE_HOST` + a plain path; `download::address`):
+one `GET` with the browser's headers for a download (no `Origin`, the web client as
+`Referer`) and the session's cookie, never the token. A redirect is followed (at most 3) only
+to another address on the file host; one anywhere else fails without being followed, so the
+cookie never leaves that host. Each step passes the kill switch and counts as a request the
+user waits for (`Governor::fetch`); the bytes do not count. A file that says it is larger than
+the cap (`download_max_mb`) is not asked for, an answer that says so is not read, and the
+bytes are counted as they come and stop at the cap; a web page where a file was asked for (a
+sign-in page) is not saved; an answer cut off before its length is not saved. Saving is the
+core's (`slakio_core::download`): a hidden part file made new in the folder, renamed to the
+first free name (`name (2).ext`) without replacing anything, the name the remote one
+sanitised and made plain (no folders, no leading dot or dash, no reserved Windows name, at
+most 120 bytes, its extension kept); a part file not finished is removed. Progress comes as
+`Event::Progress` (it ends nothing) and the answer is `Event::Downloaded` or `Failed`.
 
 **Live updates** (`live.rs`, `slakio_slack::serve_live`, what the binary runs): once a workspace
 has booted, one WebSocket to the realtime host, opened as the web client opens it (the token in
@@ -323,8 +348,10 @@ nothing older in it ends the paging. Slack pages a thread forward only (`convers
 by cursor), so its newest page reads it from its start (200 a request, 15 requests at most) and
 keeps it for the session (64 threads); its older pages come from what was kept. A message whose
 blocks are more than rich text (a bot's sections, headers, context) or whose text is empty is
-written out as Slack markup from its blocks; attachments and file names follow the text
-(`blocks.rs`); a bot is named as it posts. A read-only backend offers no composer: nothing is
+written out as Slack markup from its blocks; attachments follow the text (`blocks.rs`); the
+files it shares are its own (`Message::files`: id, name, kind, size, and the download address
+when it is on the file host and the file is hosted there, not deleted or hidden); a bot is
+named as it posts. A read-only backend offers no composer: nothing is
 ever shown as sent. The binary runs one for
 each signed-in workspace, behind one handle (`slakio_tui::many`, below); the tests run it
 against `slakio-fake` (one fake per workspace, `FakeSlack::start_team`). The HTTP stack is chosen in [ADR 0001](architecture/0001-http-stack.md).
@@ -336,7 +363,9 @@ boot; a workspace it no longer lists leaves the cache with it) and the newest me
 conversation and thread opened (each page the backend answers is the truth for the span of time
 it covers: what the cache held there and the page lacks is gone; a thread is a place of its own,
 `<conversation>:<thread>`, capped and aged as a conversation is). Remote text is kept as it came and read
-back as `Remote`, so it still reaches the screen only through the sanitiser. No secret is kept.
+back as `Remote`, so it still reaches the screen only through the sanitiser. A message's files
+are kept as the message lists them (name, kind, size, address), never their bytes. No secret is
+kept.
 
 - **Schema.** `schema_version` holds the number of migrations applied (`schema.rs`, appended to
   only); each one runs in a transaction. A cache of a newer version, or one that is not a

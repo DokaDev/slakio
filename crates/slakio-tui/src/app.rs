@@ -33,6 +33,7 @@ pub mod composer;
 pub mod dialog;
 pub(crate) mod drafts;
 mod effects;
+pub mod files;
 mod focus;
 pub mod help;
 pub mod jump;
@@ -153,6 +154,10 @@ pub struct App {
     jumps: jump::Jumps,
     /// The links of a message being picked (`o`), while they are.
     picker: Option<picker::Picker>,
+    /// The files of a message being picked (`f`), while they are.
+    file_picker: Option<files::FilePicker>,
+    /// Where files are downloaded to, and the downloads on their way.
+    pub downloads: files::Downloads,
     /// The search popup: open or not, its words and results.
     pub(crate) search: search::Search,
     /// What was asked of each workspace's Activity.
@@ -206,6 +211,8 @@ impl App {
             opening: None,
             jumps: jump::Jumps::default(),
             picker: None,
+            file_picker: None,
+            downloads: files::Downloads::default(),
             search: search::Search::default(),
             activity: activity::Activity::default(),
             backend: None,
@@ -350,6 +357,9 @@ impl App {
     fn feed(&mut self, key: KeyChord, now: Instant) {
         if self.picker.is_some() {
             return self.pick_key(key, now);
+        }
+        if self.file_picker.is_some() {
+            return self.file_key(key, now);
         }
         let ctx = self.key_context();
         // While a sequence waits, `Backspace` takes its last key back (the popup goes up a
@@ -512,6 +522,7 @@ impl App {
             PaneAction::Escape => self.escape(main_target),
             PaneAction::Copy => self.copy(now),
             PaneAction::OpenLink => self.open_link(now),
+            PaneAction::Files => self.open_files(now),
             PaneAction::Insert => self.write(now),
             PaneAction::Left => {
                 if !self.focus_toward(Toward::Left, now) && !self.shell.list_hidden {

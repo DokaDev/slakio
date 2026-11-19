@@ -39,6 +39,7 @@ fn shown(texts: &[&str], w: u16, h: u16, lang: Lang) -> Scripted {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         })
         .collect();
     page.complete = true;
@@ -412,6 +413,7 @@ fn the_thread_pane_picks_its_replies_links_too() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         };
         page.messages = vec![message(1_767_603_600_000_000, "the root"), message(1_767_603_700_000_000, MIXED)];
         page.complete = true;
@@ -593,8 +595,15 @@ fn edit(s: &mut Scripted, ts: Ts, text: &str) {
     use slakio_core::backend::{Envelope, Generation, Live};
     let c = s.d.app.model.conversations().iter().find(|c| c.name == "deploys").unwrap().clone();
     let user = s.d.pane(slakio_tui::app::PaneKind::Conversation).unwrap().messages()[0].user.clone();
-    let message =
-        Message { ts, user, text: Remote::new(text.to_string()), thread: None, reactions: Vec::new(), edited: true };
+    let message = Message {
+        ts,
+        user,
+        text: Remote::new(text.to_string()),
+        thread: None,
+        reactions: Vec::new(),
+        edited: true,
+        files: Vec::new(),
+    };
     let live = Live::Message {
         workspace: c.workspace,
         conversation: c.id,

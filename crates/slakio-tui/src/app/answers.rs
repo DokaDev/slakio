@@ -218,6 +218,8 @@ impl App {
             Event::Saved { items, taken } => self.on_saved(id, items, taken, now),
             Event::Failed { request, kind, detail } => self.on_failed(request, kind, &detail, now),
             Event::Live(live) => self.on_live(*live, now),
+            Event::Progress { file, got, total } => self.on_progress(id, &file, got, total, now),
+            Event::Downloaded { path, .. } => self.on_downloaded(id, path, now),
         };
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);
@@ -290,6 +292,11 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
         self.jump_answered(id, Some(&kind));
+        if self.download_failed(id, &kind, now) {
+            let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
+            self.effects.push(Effect::Record { context: "download", fault });
+            return true;
+        }
         // A search's failure is said in its popup, Activity's at its end (and kept in the error
         // log); refused for the sign-in, its workspace is signed out as for any other request.
         if let Some(ws) = self.search_failed(id, &kind, now).or_else(|| self.activity_failed(id, &kind)) {
@@ -373,6 +380,8 @@ pub(crate) fn failure(kind: &FailKind) -> Label {
         FailKind::Offline => Label::FailOffline,
         FailKind::Busy => Label::FailBusy,
         FailKind::Api { .. } => Label::FailApi,
+        FailKind::TooLarge => Label::FailTooLarge,
+        FailKind::Unsaved => Label::FailUnsaved,
     }
 }
 

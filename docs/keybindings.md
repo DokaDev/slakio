@@ -181,6 +181,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `a` | Write in the composer | `pane.insert` |
 | `y` | Copy the selected messages | `pane.copy` |
 | `o` | Open a message's link (or :open &lt;url&gt;) | `pane.open_link` |
+| `f` | Download a file shared in a message | `pane.files` |
 | `V` | Select a range of messages (VISUAL) | `pane.visual` |
 | `t` | Open in a new tab (a message: its thread) | `tab.open` |
 | `v` | Split right (thread, else same) | `pane.split_right` |
@@ -342,6 +343,7 @@ Type `:` and the command, then `Enter`.
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
 | `:open` |  | Open a message's link (or :open &lt;url&gt;) |
+| `:download` |  | Download a file shared in a message |
 | `:vsplit` | `:vs` | Split right (thread, else same) |
 | `:split` | `:sp` | Split below (thread, else same) |
 | `:zoom` |  | Zoom the pane, or show every pane again |

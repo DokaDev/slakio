@@ -11,7 +11,7 @@
 use super::modal;
 use crate::app::App;
 use crate::app::dialog::Question;
-use crate::text::wrap;
+use crate::text::{clip, wrap};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Modifier;
@@ -40,6 +40,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         Question::Browser => {
             (Label::DialogBrowserTitle, Label::DialogBrowserTitle, Label::DialogBrowserNo, Label::DialogBrowserYes)
         }
+        Question::File => (Label::DialogFileTitle, Label::DialogFileTitle, Label::DialogFileNo, Label::DialogFileYes),
     };
     let (no, yes) = (app.i18n.label(no).to_string(), app.i18n.label(yes).to_string());
     let w = area.width.saturating_sub(4).min(60);
@@ -54,7 +55,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
         // A Slack link that does not open here: why not.
         None => match app.offered().filter(|_| d.question == Question::Browser) {
             Some(o) => app.i18n.msg(&o.why).to_string(),
-            None => app.i18n.label(text).to_string(),
+            // A file just saved: its name and its folder (the folder's end kept).
+            None => match app.saved_file().filter(|_| d.question == Question::File) {
+                Some(path) => {
+                    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    let folder = path.parent().map(|d| d.display().to_string()).unwrap_or_default();
+                    let folder = crate::opener::host_tail(&folder, inner_w.saturating_sub(4));
+                    app.i18n.msg(&Msg::DialogFileText { name: clip(&name, inner_w), folder }).to_string()
+                }
+                None => app.i18n.label(text).to_string(),
+            },
         },
     };
     let mut lines: Vec<Line> = wrap(&text, inner_w, 6).0.into_iter().map(|l| Line::styled(l, t.text())).collect();

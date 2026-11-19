@@ -17,6 +17,7 @@ pub(crate) fn msg(ts: u64) -> Shown {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        files: Vec::new(),
     }
 }
 

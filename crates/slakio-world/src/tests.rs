@@ -298,3 +298,27 @@ fn a_saved_change_applies_as_slack_would_and_only_where_it_applies() {
     assert_eq!(w.saved().len(), n - 1);
     assert!(!w.change_saved(&id, SavedChange::Reopen), "gone");
 }
+
+#[test]
+fn some_messages_share_files_the_same_every_run() {
+    let w = world();
+    let s = w.snapshot();
+    let c = s.conversations.iter().find(|c| c.name == files::FILES_CHANNEL).unwrap();
+    let all: Vec<slakio_core::model::File> =
+        (0..w.message_count(&c.id)).flat_map(|i| w.message(&c.id, i).unwrap().files).collect();
+    assert!(all.len() >= 5, "{}", all.len());
+    assert!(all.iter().any(|f| f.download.is_none()), "one hosted elsewhere");
+    for f in all.iter().filter_map(|f| f.download.as_deref()) {
+        assert!(f.starts_with(&format!("https://{}/files-pri/", slakio_core::model::FILE_HOST)), "{f}");
+    }
+    let hostile = s.conversations.iter().find(|c| c.name == names::HOSTILE).unwrap();
+    let files = w.message(&hostile.id, 0).unwrap().files;
+    assert!(files.iter().any(|f| f.name.unsanitized().contains("..")));
+    assert!(w.message(&hostile.id, 1).unwrap().files.is_empty());
+    let general = s.conversations.iter().find(|c| c.name == "general").unwrap();
+    assert!((0..20).all(|i| w.message(&general.id, i).unwrap().files.is_empty()), "files only where planned");
+    assert_eq!(world().message(&c.id, 3).unwrap().files, w.message(&c.id, 3).unwrap().files);
+    let id = &all[0].id;
+    assert_eq!(files::content(id, 100, 10).len(), 10);
+    assert_eq!(files::content(id, 100, 1000).len(), 100);
+}

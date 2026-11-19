@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/file_flows.rs
+expression: s.d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌#deploys ─────────────────────────────────────╮
+│▎Home                   @24 ││                                                │
+│ DMs                    ●11 ││                                                │
+│ Activity               @36 ││                                                │
+│ Files                      ││                                                │
+│ To-dos                   6 ││                                                │
+├─▾──────────────────────────┤│                                                │
+│ ▾ Favorites                ││                                                │
+│   # backend                ││                                                │
+│   # incidents           3  ││                                                │
+│                            ││                                                │
+│ ▾ Ops                      ││                                                │
+│▎  # deploys                ││                                                │
+│   # alerts                 ││                                                │
+│   # partner-shared ext     ││ ───────────────── 2026-01-05 ───────────────── │
+│   # hostile-strings        ││ KN  Kate Nam  09:00                            │
+│   # big-history            ││     the files                                  │
+│   # long-threads           ││     ⇩ Q3-report.pdf  PDF · 1.2 MB              │
+│                            ││     ⇩ login-screen.png  PNG · 346 KB           │
+│ ▾ Channels                 ││     ⇩ Shared plan  Google Docs · not on Slack  │
+│   # announcements          │├─ Message #deploys ─────────────────────────────┤
+│   # design-review          ││ › Read only: nothing can be sent               │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A company › #deploys  │ Enter thread · t new tab · ? help │ read only

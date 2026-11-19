@@ -5,7 +5,7 @@
 
 use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Envelope, Event, Generation, Page, Request, Snapshot};
-use slakio_core::model::{ConversationKind, Org, Presence, Target, Ts};
+use slakio_core::model::{ConversationKind, FILE_HOST, Org, Presence, Target, Ts};
 use slakio_core::secret::Credentials;
 use slakio_fake::{FakeSlack, Fault};
 use slakio_slack::Client;
@@ -484,13 +484,24 @@ fn block_kit_and_bots_are_read_as_text_and_names() {
              "text": "fallback only",
              "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": "*CPU* high on <https://grafana.example|web-1>"}}]},
             {"type": "message", "ts": "1700000000.000200", "user": "UDEMOA001", "text": "",
-             "files": [{"name": "report.pdf"}]},
+             "files": [{"id": "F1", "name": "report.pdf", "pretty_type": "PDF", "size": 12,
+                        "url_private_download": format!("https://{FILE_HOST}/files-pri/T1-F1/download/report.pdf")},
+                       {"name": "no id"},
+                       {"id": "F2", "title": "elsewhere", "mode": "external",
+                        "url_private_download": format!("https://{FILE_HOST}/files-pri/T1-F2/download/x")},
+                       {"id": "F3", "name": "evil", "url_private_download": "https://evil.example/files-pri/x"}]},
         ]}, "users": []});
         r.fake.fail_next("conversations.view", Fault::Answer(answer));
         let p = r.page(&target, None).await;
         assert_eq!(p.messages[0].text.unsanitized(), "*CPU* high on <https://grafana.example|web-1>");
         assert!(p.messages[0].user.as_str().starts_with("BALERT"), "{}", p.messages[0].user.as_str());
-        assert_eq!(p.messages[1].text.unsanitized(), "📎 report.pdf");
+        assert_eq!(p.messages[1].text.unsanitized(), "", "files are the message's own, not text");
+        let files = &p.messages[1].files;
+        assert_eq!(files.len(), 3, "a file without an id is left out");
+        assert_eq!((files[0].name.unsanitized(), files[0].kind.unsanitized(), files[0].size), ("report.pdf", "PDF", Some(12)));
+        assert_eq!(files[0].download.as_deref(), Some(format!("https://{FILE_HOST}/files-pri/T1-F1/download/report.pdf").as_str()));
+        assert_eq!((files[1].name.unsanitized(), files[1].download.as_deref()), ("elsewhere", None), "hosted elsewhere");
+        assert_eq!(files[2].download, None, "only the file host is downloaded from");
         let bot = p.users.iter().find(|u| u.id == p.messages[0].user).expect("the bot, by the name it posts as");
         assert!(bot.bot && bot.display_name.unsanitized() == "Grafana");
         assert_eq!(bot.org, Org::Own);

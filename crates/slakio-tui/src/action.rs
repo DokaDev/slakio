@@ -167,6 +167,8 @@ pub enum PaneAction {
     Copy,
     /// Open the selected message's (first) link in the browser.
     OpenLink,
+    /// Download a file of the selected message (picked among several).
+    Files,
     /// One step out: VISUAL, the selection, the thread panel, the main pane.
     Escape,
     /// Write in the pane's composer (Insert mode).
@@ -440,6 +442,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     pane(PaneAction::Visual, "pane.visual", Label::ActionPaneVisual, &[]),
     pane(PaneAction::Copy, "pane.copy", Label::ActionPaneCopy, &[]),
     pane(PaneAction::OpenLink, "pane.open_link", Label::ActionPaneOpenLink, &["open"]),
+    pane(PaneAction::Files, "pane.files", Label::ActionPaneFiles, &["download"]),
     pane(PaneAction::Escape, "pane.escape", Label::ActionPaneEscape, &[]),
     pane(PaneAction::Left, "pane.left", Label::ActionPaneLeft, &[]),
     pane(PaneAction::Right, "pane.right", Label::ActionPaneRight, &[]),

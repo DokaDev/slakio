@@ -9,6 +9,10 @@
 //! page of Activity. When the UI is gone
 //! the task ends, and what it had in flight with it.
 //!
+//! A file is downloaded on a task of its own ([`crate::download`]), at most
+//! [`DOWNLOADS_MAX`] at once (one more is answered `Failed(Busy)`): it tells how much has come
+//! as it comes, and is answered once, with the path it was saved as or why it was not.
+//!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
 //! first: opening it again meanwhile fetches it once.
 //!
@@ -45,6 +49,9 @@ pub const PAGE_MAX: u32 = 28;
 /// How long an open waits before its conversation is fetched: opening it again meanwhile
 /// fetches it once.
 pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// The most files downloaded at once.
+pub const DOWNLOADS_MAX: usize = 2;
 
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };
@@ -149,6 +156,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut searching: Option<InFlight> = None;
     // The page of Activity on its way: a newer one supersedes it.
     let mut noticing: Option<InFlight> = None;
+    // The downloads on their way.
+    let mut downloading: Vec<AbortHandle> = Vec::new();
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -162,15 +171,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         opened(&session, &command);
         let dated = matches!(command, Command::Dated { .. });
         match command {
-            Command::Boot => {
-                tasks.spawn(async move {
-                    let booted = boot(&client, &ctx.me, &ctx.people).await;
-                    if booted.is_ok() {
-                        ctx.booted.notify_one();
-                    }
-                    answer(&tx, id, booted).await;
-                });
-            }
+            Command::Boot => spawn_boot(&mut tasks, client, ctx, (tx, id)),
             Command::Catchup { target, limit } => {
                 let work =
                     async move { catch_up(&client, &ctx, target, limit).await.map(|p| Event::History(Box::new(p))) };
@@ -215,6 +216,11 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 }
                 *slot = Some(spawn_once(&mut tasks, tx, id, listed(client, ctx, command)));
             }
+            Command::Download { file, dir, max } => {
+                if !download(&mut tasks, &mut downloading, (client, tx), id, (file, dir, max)).await {
+                    return;
+                }
+            }
             // A change never gets here (refused above); answered all the same.
             Command::Save { .. } => {
                 let refused = Envelope::failed(id, slakio_core::backend::FailKind::ReadOnly, "");
@@ -227,6 +233,51 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         searching = searching.filter(|f| !f.task.is_finished());
         noticing = noticing.filter(|f| !f.task.is_finished());
     }
+}
+
+/// Start the workspace on a task of its own; a boot that succeeds is told to the live updates.
+fn spawn_boot(
+    tasks: &mut JoinSet<()>,
+    client: Arc<Client>,
+    ctx: Arc<Session>,
+    (tx, id): (mpsc::Sender<Envelope>, Generation),
+) {
+    tasks.spawn(async move {
+        let booted = boot(&client, &ctx.me, &ctx.people).await;
+        if booted.is_ok() {
+            ctx.booted.notify_one();
+        }
+        answer(&tx, id, booted).await;
+    });
+}
+
+/// Download `file` into `dir` (at most `max` bytes) on a task of its own, unless
+/// [`DOWNLOADS_MAX`] are on their way already (answered `Busy` then). `false` when the UI is
+/// gone.
+async fn download(
+    tasks: &mut JoinSet<()>,
+    downloading: &mut Vec<AbortHandle>,
+    (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
+    id: Generation,
+    (file, dir, max): (slakio_core::model::File, std::path::PathBuf, u64),
+) -> bool {
+    downloading.retain(|t| !t.is_finished());
+    if downloading.len() >= DOWNLOADS_MAX {
+        let e = SlackError::Busy;
+        return tx.send(Envelope::failed(id, e.kind(), e.detail())).await.is_ok();
+    }
+    downloading.push(tasks.spawn(async move {
+        let told = tx.clone();
+        let progress = |got, total| {
+            // Progress ends nothing: when the UI is slow to read, some is not told.
+            let event = Event::Progress { file: file.id.clone(), got, total };
+            let _ = told.try_send(Envelope { generation: id, event });
+        };
+        let saved = crate::download::download(&client, &file, &dir, max, progress).await;
+        let done = saved.map(|(path, bytes)| Event::Downloaded { file: file.id.clone(), path, bytes });
+        answer(&tx, id, done).await;
+    }));
+    true
 }
 
 /// A page of a list the user reads: what a search found, or Activity.

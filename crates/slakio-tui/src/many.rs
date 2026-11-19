@@ -33,9 +33,11 @@ pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
         | Command::Catchup { target, .. }
         | Command::Around { target, .. }
         | Command::Dated { target, .. } => Some(target.workspace()),
-        Command::Boot | Command::Save { .. } | Command::Search { .. } | Command::Activity { .. } => {
-            request.workspace.as_ref()
-        }
+        Command::Boot
+        | Command::Save { .. }
+        | Command::Search { .. }
+        | Command::Activity { .. }
+        | Command::Download { .. } => request.workspace.as_ref(),
     }
 }
 
@@ -80,6 +82,7 @@ fn ends(event: &Event) -> bool {
             | Event::Found(_)
             | Event::Activity(_)
             | Event::Saved { .. }
+            | Event::Downloaded { .. }
             | Event::Failed { .. }
     )
 }

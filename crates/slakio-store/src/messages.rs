@@ -16,7 +16,7 @@ use crate::db::Store;
 use crate::snapshot::{put_user, user};
 use rusqlite::{Row, params};
 use slakio_core::backend::Page;
-use slakio_core::model::{Message, Reaction, Target, ThreadSummary, Ts, UserId};
+use slakio_core::model::{File, FileId, Message, Reaction, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Remote;
 
 fn reactions(rs: &[Reaction]) -> String {
@@ -47,6 +47,44 @@ fn unreactions(text: &str) -> rusqlite::Result<Vec<Reaction>> {
         .collect()
 }
 
+/// The files of a message: five parts each (id, name, kind, size or empty, address or empty).
+fn files(fs: &[File]) -> String {
+    let parts: Vec<String> = fs
+        .iter()
+        .flat_map(|f| {
+            [
+                f.id.as_str().to_string(),
+                f.name.unsanitized().to_string(),
+                f.kind.unsanitized().to_string(),
+                f.size.map(|n| n.to_string()).unwrap_or_default(),
+                f.download.clone().unwrap_or_default(),
+            ]
+        })
+        .collect();
+    pack(&parts)
+}
+
+fn unfiles(text: &str) -> rusqlite::Result<Vec<File>> {
+    let damaged = || rusqlite::Error::InvalidColumnName("damaged files".to_string());
+    let parts = unpack(text).ok_or_else(damaged)?;
+    if parts.len() % 5 != 0 {
+        return Err(damaged());
+    }
+    parts
+        .chunks(5)
+        .map(|c| {
+            let size = if c[3].is_empty() { None } else { Some(c[3].parse().map_err(|_| damaged())?) };
+            Ok(File {
+                id: FileId::new(c[0].clone()),
+                name: Remote::new(c[1].clone()),
+                kind: Remote::new(c[2].clone()),
+                size,
+                download: Some(c[4].clone()).filter(|d| !d.is_empty()),
+            })
+        })
+        .collect()
+}
+
 fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
     let thread = match (r.get::<_, Option<i64>>("replies")?, r.get::<_, Option<i64>>("last_reply")?) {
         (Some(n), Some(last)) => Some(ThreadSummary { replies: count(n)?, last_reply: Ts(uint(last)?) }),
@@ -59,6 +97,7 @@ fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
         thread,
         reactions: unreactions(&r.get::<_, String>("reactions")?)?,
         edited: r.get("edited")?,
+        files: unfiles(&r.get::<_, String>("files")?)?,
     })
 }
 
@@ -90,8 +129,9 @@ impl Store {
         }
         for m in &page.messages {
             tx.execute(
-                "INSERT OR REPLACE INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                "INSERT OR REPLACE INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited,
+                     files)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     ws,
                     conv,
@@ -101,7 +141,8 @@ impl Store {
                     m.thread.map(|t| t.replies),
                     m.thread.map(|t| int(t.last_reply.0)).transpose()?,
                     reactions(&m.reactions),
-                    m.edited
+                    m.edited,
+                    files(&m.files)
                 ],
             )?;
         }

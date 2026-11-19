@@ -35,6 +35,7 @@ fn shown(texts: &[String], w: u16, h: u16) -> Scripted {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         })
         .collect();
     page.complete = true;

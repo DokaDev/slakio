@@ -252,7 +252,7 @@ impl std::fmt::Debug for Prepared {
 
 /// The browser's headers of an API request (`Fetch` from `app.slack.com`), in order. No
 /// `Referer`, no `Accept-Encoding`.
-fn browser_headers(os: Os) -> Vec<(&'static str, String)> {
+pub(crate) fn browser_headers(os: Os) -> Vec<(&'static str, String)> {
     let hint =
         format!("\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"{CHROME_MAJOR}\", \"Google Chrome\";v=\"{CHROME_MAJOR}\"");
     vec![

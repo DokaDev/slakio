@@ -18,6 +18,7 @@
 pub mod activity;
 mod dialog;
 mod empty;
+mod files;
 mod guide;
 mod help;
 mod list;
@@ -108,6 +109,10 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
             Layer::Links => {
                 app.theme.dim_area(f.buffer_mut(), body);
                 picker::draw(f, app, body);
+            }
+            Layer::Files => {
+                app.theme.dim_area(f.buffer_mut(), body);
+                files::draw(f, app);
             }
             Layer::WhichKey | Layer::Palette | Layer::Search | Layer::Switcher => {}
         }

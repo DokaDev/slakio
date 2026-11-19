@@ -88,3 +88,18 @@ fn a_notices_file_that_cannot_be_read_is_never_written_over() {
     assert_eq!(std::fs::read_to_string(dir.join("notices.toml")).unwrap(), "a = true\nb = [\n");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn downloads_go_to_the_override_else_the_home_downloads_folder() {
+    let home = PathBuf::from("/home/u");
+    let at_home = env(&[("HOME", "/home/u")]);
+    assert_eq!(downloads("", &at_home), Some(home.join("Downloads").join("slakio")));
+    assert_eq!(downloads("~/Saved/files", &at_home), Some(home.join("Saved/files")));
+    assert_eq!(downloads("/srv/dl", &at_home), Some("/srv/dl".into()));
+    assert_eq!(downloads("relative/dl", &at_home), None, "a relative folder depends on where slakio started");
+    let both = env(&[("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", "/scratch/dl")]);
+    assert_eq!(downloads("/srv/dl", both), Some("/scratch/dl".into()));
+    let windows = env(&[("USERPROFILE", "D:\\Profiles\\u")]);
+    assert_eq!(downloads("", windows), Some(PathBuf::from("D:\\Profiles\\u").join("Downloads").join("slakio")));
+    assert_eq!(downloads("", env(&[("SLAKIO_DOWNLOAD_DIR", "")])), None, "an empty override is no override");
+}

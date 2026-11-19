@@ -20,6 +20,17 @@ fn the_newest_messages_come_back_as_they_were_kept_oldest_first() {
         Reaction { name: Remote::new("3:odd:name"), count: 1, mine: false },
     ];
     p.messages[2].edited = true;
+    // Files: one with every field (a separator in its name), one with none it may leave out.
+    p.messages[3].files = vec![
+        File {
+            id: FileId::new("F1"),
+            name: Remote::new("5:odd:name.pdf"),
+            kind: Remote::new("PDF"),
+            size: Some(1234),
+            download: Some(format!("https://{}/files-pri/T-F1/download/x.pdf", slakio_core::model::FILE_HOST)),
+        },
+        File { id: FileId::new("F2"), name: Remote::new(""), kind: Remote::new(""), size: None, download: None },
+    ];
     p.users = vec![world.snapshot().users[0].clone()];
     store.put_page(&p, None, 1_000).unwrap();
     let back = store.newest_page(&t, 28).unwrap().unwrap();
@@ -172,4 +183,12 @@ fn a_thread_is_kept_apart_from_its_conversation() {
     assert_eq!(store.newest_page(&th, 28).unwrap().unwrap().messages.len(), 4);
     // Another thread of the conversation has nothing kept.
     assert_eq!(store.newest_page(&thread_of(&t, Ts(1)), 28).unwrap(), None);
+}
+
+#[test]
+fn damaged_files_are_damage_not_none() {
+    assert_eq!(unfiles("").unwrap(), Vec::new());
+    assert!(unfiles("2:F1").is_err(), "too few parts");
+    assert!(unfiles("2:F14:name3:PDF3:abc0:").is_err(), "a size that is not a number");
+    assert!(unfiles("9:F").is_err(), "not packed");
 }

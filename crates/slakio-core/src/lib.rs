@@ -5,7 +5,7 @@
 //! * [`backend`] — the command/event protocol between the UI and a backend.
 //! * [`layout`] — the work area's panes as a tree, and where each one goes.
 //! * [`paths`] — the config, data, state and cache directories; [`fsutil`] — atomic file writes.
-//! * [`config`] — the config file.
+//! * [`config`] — the config file; [`download`] — saving a downloaded file safely.
 //! * [`secret`] — the secret store interface, its in-memory implementation and the
 //!   `SLAKIO_SECRET_STORE` switch.
 //! * [`sanitize`] — the terminal-escape sanitiser and the [`sanitize::Remote`] text type that
@@ -18,6 +18,7 @@
 
 pub mod backend;
 pub mod config;
+pub mod download;
 pub mod fault;
 pub mod fsutil;
 pub mod i18n;

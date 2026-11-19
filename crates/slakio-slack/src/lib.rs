@@ -11,6 +11,7 @@
 //!   HTTP to a server on this machine (the tests' fake Slack);
 //! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
 //!   the names of the people messages and DMs name, looked up in batches and kept;
+//! * [`download`] — a file a message shares, from Slack's file host only, saved safely;
 //! * [`search`] — a workspace's messages a query finds, a page at a time; [`activity`] — the
 //!   user's Activity, a page at a time;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
@@ -40,6 +41,7 @@ pub mod blocks;
 pub(crate) mod boot;
 pub mod client;
 pub(crate) mod dated;
+pub mod download;
 pub mod error;
 pub mod governor;
 pub(crate) mod http;

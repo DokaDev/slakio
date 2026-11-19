@@ -13,11 +13,15 @@
 //! names things: a person's display name (and so a DM's name), a section's name, a reaction's
 //! name. All of it is [`slakio_core::sanitize::Remote`] text, drawn only through the sanitiser.
 //!
+//! Some messages share files ([`files`]): documents, pictures, one too large, one hosted
+//! elsewhere, and in the hostile channel files whose names attack a file system.
+//!
 //! Saved messages and to-dos ([`saved`]) come with it, with a clock of the world's own (the
 //! snapshot's `taken`) so a reminder is overdue or upcoming the same way on every run; so does
 //! the user's Activity ([`activity`]).
 
 pub mod activity;
+pub mod files;
 mod hostile;
 mod rng;
 mod saved;
@@ -70,6 +74,9 @@ enum History {
 /// How a conversation's messages are generated.
 #[derive(Clone, Debug)]
 struct Plan {
+    /// The workspace's id and the conversation's name (which messages share files).
+    team: String,
+    name: String,
     count: usize,
     history: History,
     posters: Vec<UserId>,
@@ -284,7 +291,9 @@ impl World {
         if plan.history == History::Hostile && index == 0 {
             reactions.push(Reaction { name: HOSTILE_REACTION.into(), count: 2, mine: false });
         }
-        Some(Message { ts, user, text, thread, reactions, edited: r.chance(5) })
+        let edited = r.chance(5);
+        let files = files::of(self.seed, &plan.team, conversation.as_str(), &plan.name, index);
+        Some(Message { ts, user, text, thread, reactions, edited, files })
     }
 
     /// The index of the message of `conversation` written at `ts`, if there is one.
@@ -384,6 +393,7 @@ impl World {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         })
     }
 
@@ -528,6 +538,7 @@ impl World {
         }
         let mentions = if unread > 0 && r.chance(30) { 1 + r.below(u64::from(unread.min(3))) as u32 } else { 0 };
         let external = name == names::SHARED;
+        let (team, plan_name) = (ws.as_str().to_string(), name.unsanitized().to_string());
         let muted = !external && history == History::Normal && r.chance(10);
         self.snapshot.conversations.push(Conversation {
             id: id.clone(),
@@ -540,7 +551,7 @@ impl World {
             unread,
             mentions,
         });
-        self.plans.insert(id, Plan { count, history, posters, start, step });
+        self.plans.insert(id, Plan { team, name: plan_name, count, history, posters, start, step });
     }
 }
 

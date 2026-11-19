@@ -27,6 +27,10 @@ pub enum SlackError {
     CapReached { why: &'static str },
     /// Slack answered `ok: false` with `code`.
     Api { code: String },
+    /// A file is larger than the most a download takes.
+    TooLarge,
+    /// A file downloaded could not be saved (`detail`: the folder's error, no name in it).
+    Unsaved { detail: String },
 }
 
 impl SlackError {
@@ -41,6 +45,8 @@ impl SlackError {
             SlackError::Busy | SlackError::Superseded => FailKind::Busy,
             SlackError::CapReached { .. } => FailKind::CapReached,
             SlackError::Api { code } => FailKind::Api { code: code.clone() },
+            SlackError::TooLarge => FailKind::TooLarge,
+            SlackError::Unsaved { .. } => FailKind::Unsaved,
         }
     }
 
@@ -56,6 +62,8 @@ impl SlackError {
             SlackError::Offline { why } | SlackError::CapReached { why } => (*why).to_string(),
             SlackError::Busy => "too many requests waiting".to_string(),
             SlackError::Superseded => "superseded by a newer request".to_string(),
+            SlackError::TooLarge => "the file is larger than the download cap".to_string(),
+            SlackError::Unsaved { detail } => format!("not saved: {detail}"),
         }
     }
 }

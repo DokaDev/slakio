@@ -10,6 +10,10 @@
 //! It also opens the live updates' socket ([`FakeSlack::push`] and the controls beside it); its
 //! opening requests are kept apart from the API's ([`FakeSlack::upgrades`]).
 //!
+//! It serves the files the world's messages share at their download addresses' paths
+//! (`/files-pri/…`, [`FILES`] for their faults), the bytes [`slakio_world::files::content`]
+//! makes, so a download is tested end to end.
+//!
 //! A session token can be revoked ([`FakeSlack::revoke`]), as when the user signs out of the
 //! workspace elsewhere: every request carrying it is answered `invalid_auth` (and still logged),
 //! a socket opened with it is refused `401`.
@@ -41,6 +45,9 @@ pub struct Logged {
 impl Logged {
     /// The method: the last part of an `/api/` path, or the edge cache's `kind/name`.
     pub fn method(&self) -> &str {
+        if self.path.starts_with("/files-pri/") {
+            return FILES;
+        }
         match self.path.strip_prefix("/api/") {
             Some(m) => m,
             None => self.path.splitn(4, '/').nth(3).unwrap_or(&self.path),
@@ -69,7 +76,16 @@ pub enum Fault {
     Answer(serde_json::Value),
     /// The world's own answer: a place in the queue, so the fault after it is the next request's.
     Pass,
+    /// This status, these headers (a `location`, a `content-type`, a `content-length` that may
+    /// lie) and these bytes, as they are.
+    Raw { status: u16, headers: Vec<(String, String)>, body: Vec<u8> },
 }
+
+/// The name file downloads go by in [`FakeSlack::fail_next`] and [`Logged::method`].
+pub const FILES: &str = "files";
+
+/// The most bytes of a file the fake serves.
+const FILE_SERVED_MAX: u64 = 8 * 1024 * 1024;
 
 #[derive(Default)]
 struct Shared {
@@ -252,6 +268,9 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
     }
+    if logged.method() == FILES {
+        return serve_file(stream, &world, &logged, fault).await;
+    }
     let (status, extra, body) = match fault {
         Some(Fault::Hang) => {
             let mut byte = [0u8; 1];
@@ -266,6 +285,9 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         Some(Fault::Api(code)) => (200, String::new(), serde_json::json!({"ok": false, "error": code}).to_string()),
         Some(Fault::Malformed) => (200, String::new(), "{\"ok\": tr".to_string()),
         Some(Fault::Answer(v)) => (200, String::new(), v.to_string()),
+        Some(Fault::Raw { status, headers, body }) => {
+            return write_raw(stream, status, &headers, &body).await;
+        }
         None | Some(Fault::Pass) => (200, String::new(), shapes::answer(&world, team, &logged).to_string()),
     };
     let head = format!(
@@ -274,6 +296,43 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     );
     let _ = stream.write_all(head.as_bytes()).await;
     let _ = stream.write_all(body.as_bytes()).await;
+    let _ = stream.shutdown().await;
+}
+
+/// Answer a file's download: the world's file its path names (`/files-pri/<team>-<id>/…`),
+/// or `fault`.
+async fn serve_file(stream: TcpStream, world: &World, logged: &Logged, fault: Option<Fault>) {
+    if let Some(Fault::Raw { status, headers, body }) = fault {
+        return write_raw(stream, status, &headers, &body).await;
+    }
+    if let Some(Fault::Status { status, .. }) = fault {
+        return write_raw(stream, status, &[], b"<html>error</html>").await;
+    }
+    let id = logged.path.split('/').nth(2).and_then(|s| s.split_once('-')).map(|(_, id)| id.to_string());
+    let file = id.and_then(|id| shapes::file_of(world, &id));
+    match file {
+        Some(f) => {
+            let body = slakio_world::files::content(&f.id, f.size.unwrap_or(0), FILE_SERVED_MAX);
+            let headers = [("content-type".to_string(), "application/octet-stream".to_string())];
+            write_raw(stream, 200, &headers, &body).await;
+        }
+        None => write_raw(stream, 404, &[], b"<html>not found</html>").await,
+    }
+}
+
+/// An answer of `status`, `headers` (a `content-length` among them is used as it is, else the
+/// body's own) and `body`.
+async fn write_raw(mut stream: TcpStream, status: u16, headers: &[(String, String)], body: &[u8]) {
+    let mut head = format!("HTTP/1.1 {status} FAKE\r\n");
+    for (k, v) in headers {
+        head.push_str(&format!("{k}: {v}\r\n"));
+    }
+    if !headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("content-length")) {
+        head.push_str(&format!("content-length: {}\r\n", body.len()));
+    }
+    head.push_str("connection: close\r\n\r\n");
+    let _ = stream.write_all(head.as_bytes()).await;
+    let _ = stream.write_all(body).await;
     let _ = stream.shutdown().await;
 }
 

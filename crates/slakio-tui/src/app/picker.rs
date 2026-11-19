@@ -218,6 +218,9 @@ impl App {
     /// The keys the status line offers while a link is picked: the next letters (three at most),
     /// the list, a letter taken back once one is typed, stop.
     pub fn picker_hints(&self) -> Option<Vec<(String, Label)>> {
+        if let Some(hints) = self.file_hints() {
+            return Some(hints);
+        }
         let p = self.picker.as_ref()?;
         let esc = ("Esc".to_string(), Label::HintCancel);
         if p.list.is_some() {

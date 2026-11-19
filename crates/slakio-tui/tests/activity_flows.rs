@@ -209,6 +209,7 @@ fn a_live_mention_is_listed_at_once_and_activity_is_read_again_once() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         };
         push(
             &mut s,
@@ -250,6 +251,7 @@ fn a_live_mention_is_listed_at_once_and_activity_is_read_again_once() {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        files: Vec::new(),
     };
     push(
         &mut s,
@@ -525,6 +527,7 @@ fn reading_the_newest_page_again_keeps_the_older_pages_and_the_cursor() {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        files: Vec::new(),
     };
     let live = Live::Message {
         workspace: ws.clone(),
@@ -696,6 +699,7 @@ fn at_the_top_of_the_list_a_live_mention_shows_above_the_cursor() {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        files: Vec::new(),
     };
     push(
         &mut s,

@@ -17,6 +17,8 @@
 //! cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
 //! cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
 //! restore = "on"           # "off": the tabs and panes of the last run are not opened again
+//! downloads = ""           # the folder files are saved in ("": Downloads/slakio in your home)
+//! download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -70,6 +72,11 @@ pub struct Config {
     /// `off`: the tabs and panes are neither saved at the end of a run nor opened again at the
     /// start of the next ([`RESTORE`]).
     pub restore: String,
+    /// The folder files are downloaded to; empty: `Downloads/slakio` in the home directory
+    /// ([`crate::paths::downloads`]). A leading `~/` is the home directory.
+    pub downloads: String,
+    /// The largest file downloaded, in megabytes ([`DOWNLOAD_MAX_MB`]).
+    pub download_max_mb: u32,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -93,6 +100,8 @@ impl Default for Config {
             cache_max_mb: 500,
             cache_days: 30,
             restore: "on".to_string(),
+            downloads: String::new(),
+            download_max_mb: 1024,
             path: None,
             retired: Vec::new(),
         }
@@ -154,6 +163,9 @@ pub const CACHE_MAX_MB: std::ops::RangeInclusive<u32> = 10..=100_000;
 
 /// The range of `cache_days`.
 pub const CACHE_DAYS: std::ops::RangeInclusive<u32> = 1..=3650;
+
+/// The range of `download_max_mb`.
+pub const DOWNLOAD_MAX_MB: std::ops::RangeInclusive<u32> = 1..=100_000;
 
 /// Keys an older version had: ignored, never an error ([`Config::retired`]).
 pub const RETIRED: &[&str] = &["rail_expand"];
@@ -224,6 +236,10 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             }
             "cache_max_mb" => cfg.cache_max_mb = within(item, &CACHE_MAX_MB).ok_or_else(|| bad(span(&CACHE_MAX_MB)))?,
             "cache_days" => cfg.cache_days = within(item, &CACHE_DAYS).ok_or_else(|| bad(span(&CACHE_DAYS)))?,
+            "downloads" => cfg.downloads = item.as_str().ok_or_else(|| bad("a folder".to_string()))?.to_string(),
+            "download_max_mb" => {
+                cfg.download_max_mb = within(item, &DOWNLOAD_MAX_MB).ok_or_else(|| bad(span(&DOWNLOAD_MAX_MB)))?
+            }
             "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
             "icons" => {
                 cfg.icons = match item.as_bool() {

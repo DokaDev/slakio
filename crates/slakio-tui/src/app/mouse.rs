@@ -28,6 +28,9 @@ impl App {
             Some(Overlay::Switcher) => return self.switcher_mouse(m),
             _ => {}
         }
+        if let Some(redraw) = self.file_mouse(m.kind, Position { x: m.column, y: m.row }, now) {
+            return redraw;
+        }
         let picking = self.picker.is_some();
         if let Some(redraw) = self.pick_mouse(m.kind, Position { x: m.column, y: m.row }, now) {
             return redraw;

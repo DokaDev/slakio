@@ -7,7 +7,7 @@
 //! HTTP/2 when the server offers it as browsers use it, else HTTP/1.1); and, for the tests' fake
 //! Slack, a loopback address over plain HTTP. The host of every request is checked again here,
 //! where the socket opens. The live updates' socket opens here too, to the realtime host only
-//! ([`socket`]).
+//! ([`socket`]); a file's download goes to Slack's file host only ([`fetch`]).
 
 use crate::error::SlackError;
 use crate::request::{EDGE_HOST, Endpoints, Opening, Prepared, SOCKET_HOST, Server, workspace_host};
@@ -18,6 +18,9 @@ use hyper_util::rt::{TokioExecutor, TokioIo};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::net::TcpStream;
+
+mod fetch;
+pub(crate) use fetch::{Fetched, get as fetch};
 
 /// The longest a request may take, from connecting to the end of the answer.
 pub const TIMEOUT: Duration = Duration::from_secs(30);

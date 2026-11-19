@@ -20,8 +20,8 @@
 //! Compact: the columns of IRC clients — the chip and the name beside the text, the time on the
 //! right ([`compact`]).
 //!
-//! In both: a message block is its header, its text, the "N replies" link, its reactions as
-//! chips. One blank row separates groups, and a message with reactions is followed by one too,
+//! In both: a message block is its header, its text, its files as cards ([`super::files`]), the
+//! "N replies" link, its reactions as chips. One blank row separates groups, and a message with reactions is followed by one too,
 //! so its chips never read as the next message's; never two, and none at the end. A date
 //! separator keeps its own row. A pane narrower than [`STACKED_BELOW`] shrinks the picture to the
 //! 2-cell chip, and below [`NO_PICTURE_BELOW`] leaves it out.
@@ -391,6 +391,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
             Vec::new(),
         ));
     }
+    out.extend(super::files::cards(app, m, indent_w, w));
     if let Some(th) = m.thread.filter(|_| !pane.is_thread()) {
         let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply, &app.zone) };
         let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));

@@ -136,6 +136,8 @@ fn main() -> ExitCode {
     // Times in the user's zone, read once; "today" from this machine's clock.
     app.zone = slakio_tui::time::Zone::from_env(env);
     app.clock = Some(slakio_tui::time::now);
+    app.downloads.dir = slakio_core::paths::downloads(&cfg.downloads, env);
+    app.downloads.max = u64::from(cfg.download_max_mb) * 1024 * 1024;
     // A sign-in piped in (`pbpaste | slakio login`): checked, kept, said, and the program ends.
     if login && !io::stdin().is_terminal() {
         return signin::sign_in_piped(&wiring, &i18n::I18n::new(lang));
@@ -494,7 +496,7 @@ async fn run(
                 Effect::SignInAgain(team) if scanning.is_none() => scanning = inapp::offer(&mut app, wiring, team),
                 Effect::SignInAgain(_) => {}
                 Effect::Save { key, value } => redraw |= saved.save(key, &value, &mut app),
-                Effect::OpenLink(url) => saved.open(&url, &mut app),
+                e @ (Effect::OpenLink(_) | Effect::Quarantine(_) | Effect::OpenFile(_)) => saved.outside(e, &mut app),
             }
         }
         saved.keep_layout(&app, false);

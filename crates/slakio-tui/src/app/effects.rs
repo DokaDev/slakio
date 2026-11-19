@@ -27,4 +27,9 @@ pub enum Effect {
     SignInAgain(Option<String>),
     /// Open this web address in the browser (checked: `http` or `https`); nothing goes to Slack.
     OpenLink(String),
+    /// Mark this file, just saved, as downloaded from the internet (macOS quarantine).
+    Quarantine(std::path::PathBuf),
+    /// Open this file, saved and of a kind a viewer shows, in the app the system uses for it
+    /// (the user said yes).
+    OpenFile(std::path::PathBuf),
 }

@@ -270,11 +270,21 @@ pub struct BotProfile {
     pub team_id: Option<String>,
 }
 
-/// A file shared with a message: the client reads its name only.
+/// A file shared with a message: what its card shows, and where it is downloaded from.
 #[derive(Debug, Deserialize)]
 pub struct File {
+    pub id: Option<String>,
     pub name: Option<String>,
     pub title: Option<String>,
+    /// Its kind in words (`PDF`), else its short kind (`pdf`).
+    pub pretty_type: Option<String>,
+    pub filetype: Option<String>,
+    /// A number of bytes (anything else is left unsaid).
+    pub size: Option<serde_json::Value>,
+    pub url_private_download: Option<String>,
+    /// `hosted`, `snippet`, `external`, `tombstone` (deleted), `hidden_by_limit`, …
+    pub mode: Option<String>,
+    pub is_external: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

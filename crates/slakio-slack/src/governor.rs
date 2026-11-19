@@ -505,6 +505,16 @@ impl Governor {
         self.count(Priority::Background, Some(lane))
     }
 
+    /// A file may be downloaded now (or a download follow a redirect): the network is on and
+    /// the caps have room. It counts as one request the user waits for; the bytes that come
+    /// afterwards are not counted.
+    pub fn fetch(&self) -> Result<(), SlackError> {
+        if !self.is_on() {
+            return Err(SlackError::Offline { why: "the network is switched off" });
+        }
+        self.count(Priority::User, None)
+    }
+
     /// Requests let through so far.
     pub fn sent(&self) -> u32 {
         self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).total

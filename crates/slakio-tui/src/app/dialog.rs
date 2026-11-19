@@ -1,6 +1,6 @@
 //! A question with two answers, over the screen: quit (with a message not sent, or after a
 //! click), use Nerd
-//! Font icons (asked once), or clear a saved item. The safe answer has the focus, so `Enter` alone never does the risky
+//! Font icons (asked once), clear a saved item, or open a file just downloaded. The safe answer has the focus, so `Enter` alone never does the risky
 //! thing; `y` and `n` answer directly.
 
 use super::{App, Effect};
@@ -21,6 +21,8 @@ pub enum Question {
     Open,
     /// A Slack link that does not open here: open it in the browser?
     Browser,
+    /// A file just saved: open it?
+    File,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,6 +67,7 @@ impl App {
             Question::Clear => self.answer_clear(yes),
             Question::Open => self.answer_open(yes, now),
             Question::Browser => self.answer_browser(yes, now),
+            Question::File => self.answer_file(yes),
             Question::Icons => {
                 self.settings.icons = yes;
                 self.effects.push(Effect::Save { key: "icons", value: if yes { "on" } else { "off" }.to_string() });

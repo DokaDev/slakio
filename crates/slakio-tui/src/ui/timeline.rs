@@ -12,6 +12,7 @@
 //! at most twice the rows the area shows, however long the history.
 
 pub mod body;
+pub mod files;
 pub mod message;
 
 use super::highlight;

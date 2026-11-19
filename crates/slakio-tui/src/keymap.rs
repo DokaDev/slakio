@@ -278,6 +278,7 @@ pub const DEFAULTS: &[Binding] = &[
     pane(Ctx::PaneNormal, "a", PaneAction::Insert),
     pane(Ctx::PaneNormal, "y", PaneAction::Copy),
     pane(Ctx::PaneNormal, "o", PaneAction::OpenLink),
+    pane(Ctx::PaneNormal, "f", PaneAction::Files),
     pane(Ctx::PaneNormal, "V", PaneAction::Visual),
     tab(Ctx::PaneNormal, "t", TabAction::Open),
     pane(Ctx::PaneNormal, "v", PaneAction::SplitRight),

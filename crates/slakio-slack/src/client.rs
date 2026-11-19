@@ -129,6 +129,20 @@ impl Client {
         socket
     }
 
+    /// Ask the file host for `url` (an address on it, [`crate::download::address`]): past the
+    /// kill switch and the cap (each ask counts as one request), with the session's cookie and
+    /// never the token. Switching the network off while it is asked ends it.
+    pub(crate) async fn fetch_file(&self, url: &str) -> Result<crate::http::Fetched, SlackError> {
+        self.still_signed_in()?;
+        self.governor.fetch()?;
+        let headers = crate::download::headers(&self.credentials, Os::current());
+        tokio::select! {
+            biased;
+            () = self.governor.stopped() => Err(SlackError::Offline { why: "the network was switched off" }),
+            fetched = crate::http::fetch(&self.endpoints, url, &headers) => fetched,
+        }
+    }
+
     /// The process's rails.
     pub(crate) fn governor(&self) -> &Governor {
         &self.governor

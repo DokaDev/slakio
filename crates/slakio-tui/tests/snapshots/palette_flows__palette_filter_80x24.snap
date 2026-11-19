@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/palette_flows.rs
-assertion_line: 69
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -10,10 +9,10 @@ expression: d.snap()
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │ To-dos  │ : dm                                                     │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
-│ ▾ Favori│  :dms     Show DMs                               Space d │         │
-│   # back│  :filter  Filter To-dos by state or reminder           f │er.      │
-│   # inci╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
-│                            ││     Enter    Open                              │
+│ ▾ Favori│  :dms       Show DMs                             Space d │         │
+│   # back│  :download  Download a file shared in a message          │er.      │
+│   # inci│  :filter    Filter To-dos by state or reminder         f │         │
+│         ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
 │ ▾ Ops                      ││     Space h  Home                              │
 │   # deploys                ││     Space d  DMs                               │
 │   # alerts                 ││     Ctrl+O   Back to the last one              │

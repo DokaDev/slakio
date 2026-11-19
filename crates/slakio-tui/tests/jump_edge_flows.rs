@@ -333,6 +333,7 @@ fn the_picker_names_a_reply_link_apart_from_a_message_link() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         });
         s.b.push(e);
         s.pump();
@@ -389,6 +390,7 @@ fn every_link_of_a_long_message_gets_its_letters() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            files: Vec::new(),
         });
         s.b.push(e);
         s.pump();

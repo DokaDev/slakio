@@ -3,7 +3,8 @@
 //! top is always what the keys and the mouse go to.
 //!
 //! From the top: a question ([`super::dialog`]), the list of links to pick ([`super::links`],
-//! which takes its keys before any context), the keyboard help, the command palette, the
+//! which takes its keys before any context), the list of files to pick ([`super::files`], the
+//! same), the keyboard help, the command palette, the
 //! search popup ([`super::search`]), the workspace switcher ([`super::nav`]), the which-key popup. The palette and the which-key popup are drawn only on top; the help stays
 //! visible under a question.
 
@@ -16,6 +17,7 @@ use std::time::Instant;
 pub enum Layer {
     Dialog,
     Links,
+    Files,
     Help,
     Palette,
     Search,
@@ -30,6 +32,7 @@ impl App {
         let up = [
             (Layer::Dialog, self.dialog.is_some()),
             (Layer::Links, self.picker.as_ref().is_some_and(|p| p.list.is_some())),
+            (Layer::Files, self.file_picker.is_some()),
             (Layer::Help, self.help.is_some()),
             (Layer::Palette, self.cmdline.is_open()),
             (Layer::Search, self.search.open),
@@ -47,7 +50,7 @@ impl App {
             Layer::Palette => Some(Overlay::Palette),
             Layer::Search => Some(Overlay::Search),
             Layer::Switcher => Some(Overlay::Switcher),
-            Layer::Links | Layer::WhichKey => None,
+            Layer::Links | Layer::Files | Layer::WhichKey => None,
         }
     }
 }

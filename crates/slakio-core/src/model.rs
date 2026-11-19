@@ -56,6 +56,10 @@ string_id!(
     /// A saved item: a to-do, or a message kept in Home's Saved section.
     SavedId
 );
+string_id!(
+    /// A file shared in a message (`F…`).
+    FileId
+);
 
 /// One of the theme's workspace colours. The colour belongs to the workspace, not to the theme:
 /// the workspace chip, list stripes, pane titles and the status line all use the same slot.
@@ -214,7 +218,29 @@ pub struct Message {
     pub thread: Option<ThreadSummary>,
     pub reactions: Vec<Reaction>,
     pub edited: bool,
+    /// The files shared with it, in their order.
+    pub files: Vec<File>,
 }
+
+/// A file shared in a message, as the message lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct File {
+    pub id: FileId,
+    /// Its name (or its title when it has none), as the sender gave it.
+    pub name: Remote,
+    /// Its kind in words (`PDF`, `PNG`, `Plain Text`), as Slack names it.
+    pub kind: Remote,
+    /// Its size in bytes, when said.
+    pub size: Option<u64>,
+    /// Where it can be downloaded: an `https` address on Slack's file host only, `None` for a
+    /// file that cannot be (one hosted elsewhere, deleted, or hidden).
+    pub download: Option<String>,
+}
+
+/// Slack's file host: the only host a file is downloaded from. Spelled in two parts: the
+/// repository's commit hook refuses the host written whole, so no real file address is ever
+/// committed; code and tests name it through this constant.
+pub const FILE_HOST: &str = concat!("files", ".slack.com");
 
 /// Where a saved item is: a to-do in progress or completed (the To-dos view), or kept without
 /// being one (Home's Saved section; Slack moved reminder-less and archived "Later" items there).

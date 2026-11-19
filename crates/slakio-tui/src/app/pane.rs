@@ -90,6 +90,8 @@ pub struct Shown {
     pub thread: Option<ThreadSummary>,
     pub reactions: Vec<ShownReaction>,
     pub edited: bool,
+    /// The files it shares (their names sanitised where drawn).
+    pub files: Vec<slakio_core::model::File>,
 }
 
 impl Shown {
@@ -110,6 +112,7 @@ impl Shown {
                 .map(|r| ShownReaction { name: r.name.line(), count: r.count, mine: r.mine })
                 .collect(),
             edited: m.edited,
+            files: m.files.clone(),
         }
     }
 }
@@ -367,7 +370,18 @@ pub enum Landed {
 pub fn echo(items: &mut Vec<Shown>, user: UserId, author: Safe, text: Safe) {
     let ts = items.last().map_or(Ts(0), |m| Ts(m.ts.0 + 1_000_000));
     let body = crate::mrkdwn::parse(text.as_str());
-    items.push(Shown { ts, user, author, own: true, text, body, thread: None, reactions: Vec::new(), edited: false });
+    items.push(Shown {
+        ts,
+        user,
+        author,
+        own: true,
+        text,
+        body,
+        thread: None,
+        reactions: Vec::new(),
+        edited: false,
+        files: Vec::new(),
+    });
 }
 
 #[cfg(test)]

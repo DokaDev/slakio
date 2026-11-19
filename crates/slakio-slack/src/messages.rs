@@ -2,7 +2,9 @@
 //! that posted named by the name they posted as.
 
 use crate::wire;
-use slakio_core::model::{Message, Org, Presence, Reaction, ThreadSummary, Ts, User, UserId, WorkspaceId};
+use slakio_core::model::{
+    File, FileId, Message, Org, Presence, Reaction, ThreadSummary, Ts, User, UserId, WorkspaceId,
+};
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
 
@@ -99,10 +101,8 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
             Reaction { name: Remote::new(r.name), count, mine }
         })
         .collect();
-    let files: Vec<String> =
-        m.files.unwrap_or_default().into_iter().filter_map(|f| f.name.or(f.title)).filter(|n| !n.is_empty()).collect();
-    let text =
-        crate::blocks::text(m.text.as_deref().unwrap_or_default(), m.blocks.as_ref(), m.attachments.as_ref(), &files);
+    let files: Vec<File> = m.files.unwrap_or_default().into_iter().filter_map(file).collect();
+    let text = crate::blocks::text(m.text.as_deref().unwrap_or_default(), m.blocks.as_ref(), m.attachments.as_ref());
     Some(Message {
         ts,
         user: UserId::new(m.user.or(m.bot_id).unwrap_or_default()),
@@ -110,5 +110,32 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
         thread,
         reactions,
         edited: m.edited.is_some(),
+        files,
     })
+}
+
+/// A file Slack lists with a message, when it has an id: named (its title when it has no
+/// name), its kind in words, its size, and where it is downloaded from when it can be (a file
+/// hosted on Slack's file host, not deleted, hidden or hosted elsewhere).
+fn file(f: wire::File) -> Option<File> {
+    let id = f.id.filter(|id| !id.is_empty())?;
+    let name = f.name.filter(|n| !n.is_empty()).or(f.title).unwrap_or_default();
+    let kind = f.pretty_type.filter(|k| !k.is_empty()).or(f.filetype).unwrap_or_default();
+    let gone = matches!(f.mode.as_deref(), Some("tombstone" | "hidden_by_limit" | "external"));
+    let download = f
+        .url_private_download
+        .filter(|_| !gone && f.is_external != Some(true))
+        .and_then(|u| crate::download::address(&u));
+    let size = f.size.as_ref().and_then(serde_json::Value::as_u64);
+    Some(File { id: FileId::new(id), name: Remote::new(name), kind: Remote::new(kind), size, download })
+}
+
+/// What a message lists in words where only its text is shown (Activity): its text, or the
+/// names of its files when it has no text.
+pub(crate) fn summary(m: &Message) -> Remote {
+    if !m.text.unsanitized().trim().is_empty() || m.files.is_empty() {
+        return m.text.clone();
+    }
+    let names: Vec<&str> = m.files.iter().map(|f| f.name.unsanitized()).collect();
+    Remote::new(format!("\u{1F4CE} {}", names.join(", ")))
 }

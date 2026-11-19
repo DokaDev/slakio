@@ -25,6 +25,8 @@ counts follow (live updates, over one connection per workspace that only receive
 line says when it drops and comes back, and the conversations and threads open and the unread
 counts are read again then, also after the computer slept);
 reactions show when a conversation is opened again, and who is typing or online is not shown.
+The files a message shares show as cards and can be downloaded ([What works](#what-works));
+pictures are not shown inside slakio yet.
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
@@ -204,6 +206,19 @@ images, and settings. This README only lists what works; it will grow with each 
   when a link's text names another host than the one it goes to, slakio shows the real host
   and asks first.
   Nothing is sent to Slack for it, so it works in read-only mode too.
+- Files: the files a message shares show as cards under its text (name, kind, size; a file
+  hosted elsewhere, such as a linked document, says so). `f` (or `:download`) on a selected
+  message downloads its file, or lists its files to pick one (letters, `j`/`k` and `Enter`, a
+  click, `Esc`). It is saved in `Downloads/slakio` in your home folder (`downloads` in the
+  config names another; `download_max_mb` caps the size, 1024 by default) under a safe name
+  (no folders, no hidden or reserved names, never over a file there: `name (2).pdf`), and the
+  status line shows how much has come. On macOS it is marked as downloaded from the internet,
+  as a browser marks its downloads. A document, picture, sound, video or text file is offered
+  to open in your system's app for it once saved (it asks; the safe answer is "Not now");
+  programs, scripts, installers, archives and anything else are only saved. Downloading reads
+  only: the file comes from Slack's file host (the `files` host of `slack.com`) alone, which is sent your
+  session cookie and never your token, and redirects to any other host are refused. Pictures
+  are not shown inside slakio yet.
 - Slack's own links (a message's, a reply's, a channel's, `…slack.com/archives/…`) open inside
   slakio instead (marked `↳` in the list of links): the conversation opens, or the pane showing
   it is focused, and the message is selected and marked for a moment; a message not loaded is
@@ -410,7 +425,12 @@ cache_messages = 200     # the most messages kept a conversation (10 to 10000)
 cache_max_mb = 500       # the most megabytes the cache may use (10 to 100000)
 cache_days = 30          # a conversation not opened for this many days is dropped (1 to 3650)
 restore = "on"           # "off": the tabs and panes of the last run are not opened again
+downloads = ""           # the folder files are saved in ("": Downloads/slakio in your home)
+download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
 ```
+
+`downloads` takes an absolute path or `~/…`; `SLAKIO_DOWNLOAD_DIR` in the environment overrides
+it.
 
 `theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
 is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also

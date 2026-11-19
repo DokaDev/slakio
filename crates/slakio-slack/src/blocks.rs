@@ -6,7 +6,7 @@
 //! - a message whose blocks are rich text only is its `text` (the same words), unless that is
 //!   empty: then its blocks are written out;
 //! - any other block (a section, header, context…) is written out in place of the fallback;
-//! - attachments are added after the text, and the names of the files shared after them.
+//! - attachments are added after the text (the files shared are the message's own, not text).
 //!
 //! What is written is text as Slack would write it: `&`, `<` and `>` escaped, styles as marks,
 //! people, channels and links as `<…>`. Unknown kinds of blocks and elements are left out (their
@@ -18,8 +18,8 @@ use serde_json::Value;
 /// How deep blocks are read inside one another (a list in a quote in a list…).
 const DEPTH: usize = 8;
 
-/// The text to show for a message of `text`, `blocks`, `attachments` and the names of `files`.
-pub fn text(text: &str, blocks: Option<&Value>, attachments: Option<&Value>, files: &[String]) -> String {
+/// The text to show for a message of `text`, `blocks` and `attachments`.
+pub fn text(text: &str, blocks: Option<&Value>, attachments: Option<&Value>) -> String {
     let blocks = blocks.and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
     let rich_only = blocks.iter().all(|b| kind(b) == "rich_text");
     let mut parts: Vec<String> = Vec::new();
@@ -34,7 +34,6 @@ pub fn text(text: &str, blocks: Option<&Value>, attachments: Option<&Value>, fil
     for a in attachments.and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default() {
         parts.push(attachment(a));
     }
-    parts.extend(files.iter().map(|f| format!("📎 {}", escape(f))));
     parts.retain(|p| !p.trim().is_empty());
     parts.join("\n")
 }

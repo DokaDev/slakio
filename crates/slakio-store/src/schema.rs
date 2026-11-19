@@ -78,6 +78,9 @@ pub const MIGRATIONS: &[&str] = &[
      INSERT INTO meta (key, value) SELECT 'owner:' || substr(value, 1, instr(value, ' ') - 1),
          substr(value, instr(value, ' ') + 1) FROM meta WHERE key = 'owner' AND instr(value, ' ') > 1;
      DELETE FROM meta WHERE key IN ('snapshot.taken', 'snapshot.saved', 'owner');",
+    // 3: the files a message shares (packed: id, name, kind, size, address; each file five
+    // parts); a message kept before has none.
+    "ALTER TABLE messages ADD COLUMN files TEXT NOT NULL DEFAULT '';",
 ];
 
 /// Where a database stands against `migrations`.

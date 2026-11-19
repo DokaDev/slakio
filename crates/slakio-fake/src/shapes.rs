@@ -164,11 +164,45 @@ fn message(m: &Message, n: usize) -> Value {
     if m.edited {
         v["edited"] = json!({"user": m.user.as_str(), "ts": m.ts.to_string()});
     }
+    if !m.files.is_empty() {
+        let files: Vec<Value> = m.files.iter().map(file).collect();
+        v["files"] = json!(files);
+    }
     // Some messages carry blocks the client does not read.
     if n % 4 == 1 {
         v["blocks"] = json!([{"type": "rich_text", "elements": []}]);
     }
     v
+}
+
+/// A file as a message lists it: hosted on the file host when it can be downloaded, else
+/// hosted elsewhere (no address).
+fn file(f: &slakio_core::model::File) -> Value {
+    let mut v = json!({
+        "id": f.id.as_str(),
+        "name": f.name.unsanitized(),
+        "title": f.name.unsanitized(),
+        "pretty_type": f.kind.unsanitized(),
+        "filetype": "binary",
+        "mimetype": "application/octet-stream",
+        "size": f.size,
+        "mode": if f.download.is_some() { "hosted" } else { "external" },
+    });
+    if let Some(url) = &f.download {
+        v["url_private_download"] = json!(url);
+        v["url_private"] = json!(url);
+    }
+    v
+}
+
+/// The file of the world whose id is `id` (`F<conversation><index:5><k>`).
+pub(crate) fn file_of(world: &World, id: &str) -> Option<slakio_core::model::File> {
+    let rest = id.strip_prefix('F')?;
+    let (conversation, place) = rest.split_at(rest.len().checked_sub(6)?);
+    let index: usize = place.get(..5)?.parse().ok()?;
+    let k: usize = place.get(5..)?.parse().ok()?;
+    let m = world.message(&ConversationId::new(conversation), index)?;
+    m.files.get(k).cloned()
 }
 
 fn channel(request: &Logged) -> Option<ConversationId> {

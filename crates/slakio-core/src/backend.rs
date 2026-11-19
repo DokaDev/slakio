@@ -7,8 +7,10 @@
 //! late, or never). Only one wiring file of the UI names a concrete backend.
 
 use crate::model::{
-    Conversation, ConversationId, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace, WorkspaceId,
+    Conversation, ConversationId, File, FileId, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace,
+    WorkspaceId,
 };
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
@@ -82,6 +84,10 @@ pub enum Command {
     /// A page of the request's workspace's Activity: the newest when `cursor` is `None`, else
     /// the one after the page whose [`Feed::next`] it is. Answered with [`Event::Activity`].
     Activity { cursor: Option<String> },
+    /// Download `file` of the request's workspace into the folder `dir` (at most `max` bytes),
+    /// saved as [`crate::download`] says. While it comes, [`Event::Progress`] says how much has;
+    /// answered with [`Event::Downloaded`]. Nothing is opened.
+    Download { file: File, dir: PathBuf, max: u64 },
 }
 
 impl Command {
@@ -95,7 +101,8 @@ impl Command {
             | Command::Around { .. }
             | Command::Dated { .. }
             | Command::Search { .. }
-            | Command::Activity { .. } => false,
+            | Command::Activity { .. }
+            | Command::Download { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -244,6 +251,19 @@ pub enum Event {
     /// Something that happened in a workspace, as it happened (no request asked for it; its
     /// envelope carries [`Generation::PUSHED`]).
     Live(Box<Live>),
+    /// How much of the file a [`Command::Download`] asked for has come: `got` bytes of `total`
+    /// (when said). It ends nothing: [`Event::Downloaded`] or `Failed` still comes.
+    Progress {
+        file: FileId,
+        got: u64,
+        total: Option<u64>,
+    },
+    /// The file a [`Command::Download`] asked for is saved, as `path` (`bytes` long).
+    Downloaded {
+        file: FileId,
+        path: PathBuf,
+        bytes: u64,
+    },
 }
 
 /// What a backend's live updates tell of a workspace.
@@ -296,7 +316,12 @@ impl FailKind {
     pub fn retryable(&self) -> bool {
         match self {
             FailKind::Network | FailKind::Offline | FailKind::RateLimited { .. } | FailKind::Busy => true,
-            FailKind::ReadOnly | FailKind::Auth | FailKind::CapReached | FailKind::Api { .. } => false,
+            FailKind::ReadOnly
+            | FailKind::Auth
+            | FailKind::CapReached
+            | FailKind::Api { .. }
+            | FailKind::TooLarge
+            | FailKind::Unsaved => false,
         }
     }
 }
@@ -319,6 +344,10 @@ pub enum FailKind {
     Offline,
     /// The backend has more requests waiting than it takes: nothing was sent; try again.
     Busy,
+    /// A file is larger than the most a download takes: nothing more of it was kept.
+    TooLarge,
+    /// A file could not be saved here (the folder cannot be written, the disk is full).
+    Unsaved,
     /// Slack answered with an error of its own (`code`, such as `channel_not_found`).
     Api {
         code: String,

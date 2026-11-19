@@ -121,3 +121,18 @@ fn a_version_one_cache_keeps_its_snapshot_per_workspace_and_its_owner() {
     assert_eq!(store.snapshot(&[slakio_core::model::WorkspaceId::new("T2")]).unwrap(), None);
     assert!(store.snapshot(&[slakio_core::model::WorkspaceId::new("T1")]).unwrap().is_some());
 }
+
+#[test]
+fn a_message_kept_before_files_were_has_none() {
+    let mut conn = memory();
+    migrate(&mut conn, &MIGRATIONS[..2]).unwrap();
+    conn.execute(
+        "INSERT INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited)
+         VALUES ('T', 'C', 1, 'U', 'old', NULL, NULL, '', 0)",
+        [],
+    )
+    .unwrap();
+    migrate(&mut conn, MIGRATIONS).unwrap();
+    let files: String = conn.query_row("SELECT files FROM messages", [], |r| r.get(0)).unwrap();
+    assert_eq!(files, "");
+}
