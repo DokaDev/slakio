@@ -59,7 +59,7 @@ keyring-core = "1"
 # (SQLite, on a temp copy), the per-workspace tokens from its Local Storage (a Chromium
 # LevelDB), and decrypting the `d` cookie (AES-128-CBC with a PBKDF2-SHA1 key).
 # The local cache (slakio-store) is a SQLite file too, on every OS.
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 # The cache's files opened without following a symbolic link (`O_NOFOLLOW`, Unix).
 libc = "0.2"
 rusty-leveldb = { version = "3", default-features = false, features = ["fs"] }
