@@ -32,6 +32,8 @@ proptest.workspace = true
 rcgen.workspace = true
 slakio-fake.workspace = true
 slakio-world.workspace = true
+# A paused clock: a stalled download's idle timeout without waiting for it.
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

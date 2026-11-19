@@ -79,6 +79,10 @@ pub enum Fault {
     /// This status, these headers (a `location`, a `content-type`, a `content-length` that may
     /// lie) and these bytes, as they are.
     Raw { status: u16, headers: Vec<(String, String)>, body: Vec<u8> },
+    /// A file's answer that says it is `length` bytes, sends `body` (fewer), then neither sends
+    /// more nor closes until the client does: a download stalled in the middle (an API method
+    /// is not answered at all, as [`Fault::Hang`]).
+    Partial { length: u64, body: Vec<u8> },
 }
 
 /// The name file downloads go by in [`FakeSlack::fail_next`] and [`Logged::method`].
@@ -272,7 +276,7 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         return serve_file(stream, &world, &logged, fault).await;
     }
     let (status, extra, body) = match fault {
-        Some(Fault::Hang) => {
+        Some(Fault::Hang | Fault::Partial { .. }) => {
             let mut byte = [0u8; 1];
             while stream.read(&mut byte).await.is_ok_and(|n| n > 0) {}
             shared.lock().unwrap_or_else(PoisonError::into_inner).hangs_closed += 1;
@@ -307,6 +311,17 @@ async fn serve_file(stream: TcpStream, world: &World, logged: &Logged, fault: Op
     }
     if let Some(Fault::Status { status, .. }) = fault {
         return write_raw(stream, status, &[], b"<html>error</html>").await;
+    }
+    if let Some(Fault::Partial { length, body }) = fault {
+        let mut stream = stream;
+        let head =
+            format!("HTTP/1.1 200 FAKE\r\ncontent-type: application/octet-stream\r\ncontent-length: {length}\r\n\r\n");
+        let _ = stream.write_all(head.as_bytes()).await;
+        let _ = stream.write_all(&body).await;
+        let _ = stream.flush().await;
+        let mut byte = [0u8; 1];
+        while stream.read(&mut byte).await.is_ok_and(|n| n > 0) {}
+        return;
     }
     let id = logged.path.split('/').nth(2).and_then(|s| s.split_once('-')).map(|(_, id)| id.to_string());
     let file = id.and_then(|id| shapes::file_of(world, &id));

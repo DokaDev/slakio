@@ -292,6 +292,29 @@ fn signing_out_of_one_workspace_removes_its_part_only() {
 }
 
 #[test]
+fn a_write_waits_for_another_connections_write_lock_instead_of_failing() {
+    let store = Store::open(&scratch("busy").join("cache")).unwrap().store;
+    let path = store.dir.join(FILE);
+    let other = Connection::open(&path).unwrap();
+    other.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let held = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(300));
+        other.execute_batch("COMMIT").unwrap();
+    });
+    // Without the busy timeout this fails at once (`SQLITE_BUSY`); with it, it waits its turn.
+    let started = std::time::Instant::now();
+    store.set_meta("busy", "1").unwrap();
+    assert!(started.elapsed() >= Duration::from_millis(200), "{:?}", started.elapsed());
+    held.join().unwrap();
+    assert_eq!(store.meta("busy").unwrap().as_deref(), Some("1"));
+    // Held past the timeout, the write fails rather than waiting for good.
+    let other = Connection::open(&path).unwrap();
+    other.execute_batch("BEGIN IMMEDIATE").unwrap();
+    assert!(store.set_meta("busy", "2").is_err());
+    other.execute_batch("ROLLBACK").unwrap();
+}
+
+#[test]
 fn the_journal_is_wal_and_a_file_system_without_it_is_not_used() {
     let store = Store::open(&scratch("wal").join("cache")).unwrap().store;
     let mode: String = store.conn.query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap();
