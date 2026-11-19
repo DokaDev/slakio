@@ -95,10 +95,12 @@ fn downloads_go_to_the_override_else_the_home_downloads_folder() {
     let at_home = env(&[("HOME", "/home/u")]);
     assert_eq!(downloads("", &at_home), Some(home.join("Downloads").join("slakio")));
     assert_eq!(downloads("~/Saved/files", &at_home), Some(home.join("Saved/files")));
-    assert_eq!(downloads("/srv/dl", &at_home), Some("/srv/dl".into()));
+    // An absolute folder of this system's own kind.
+    let srv = if cfg!(windows) { "D:\\srv\\dl" } else { "/srv/dl" };
+    assert_eq!(downloads(srv, &at_home), Some(srv.into()));
     assert_eq!(downloads("relative/dl", &at_home), None, "a relative folder depends on where slakio started");
     let both = env(&[("HOME", "/home/u"), ("SLAKIO_DOWNLOAD_DIR", "/scratch/dl")]);
-    assert_eq!(downloads("/srv/dl", both), Some("/scratch/dl".into()));
+    assert_eq!(downloads(srv, both), Some("/scratch/dl".into()));
     let windows = env(&[("USERPROFILE", "D:\\Profiles\\u")]);
     assert_eq!(downloads("", windows), Some(PathBuf::from("D:\\Profiles\\u").join("Downloads").join("slakio")));
     assert_eq!(downloads("", env(&[("SLAKIO_DOWNLOAD_DIR", "")])), None, "an empty override is no override");
