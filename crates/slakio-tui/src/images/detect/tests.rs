@@ -12,7 +12,7 @@ fn auto(pairs: &[(&str, &str)]) -> bool {
 #[test]
 fn kitty_and_ghostty_draw_pictures() {
     assert!(auto(&[("TERM", "xterm-kitty")]));
-    assert!(auto(&[("TERM", "xterm-256color"), ("KITTY_WINDOW_ID", "1")]));
+    assert!(auto(&[("TERM", "xterm-kitty"), ("KITTY_WINDOW_ID", "1")]));
     assert!(auto(&[("TERM", "xterm-ghostty")]));
     assert!(auto(&[("TERM", "xterm-256color"), ("TERM_PROGRAM", "ghostty")]));
 }
@@ -71,4 +71,21 @@ fn the_demo_draws_pictures_only_when_asked() {
     assert!(!images_on(&env(&kitty), "auto", true));
     assert!(images_on(&env(&[("TERM", "xterm-kitty"), (IMAGES_ENV, "on")]), "auto", true));
     assert!(images_on(&env(&kitty), "on", true));
+}
+
+#[test]
+fn a_terminal_inside_the_terminal_draws_text() {
+    for (what, env) in [
+        ("kitty's window id with another TERM", &[("TERM", "xterm-256color"), ("KITTY_WINDOW_ID", "1")][..]),
+        ("ghostty's program with an odd TERM", &[("TERM", "vt100"), ("TERM_PROGRAM", "ghostty")]),
+        ("Neovim's terminal", &[("TERM", "xterm-ghostty"), ("NVIM", "/tmp/nvim.sock")]),
+        ("Neovim's terminal in kitty", &[("TERM", "xterm-kitty"), ("NVIM", "/tmp/nvim.sock")]),
+        ("Emacs' terminal", &[("TERM", "xterm-256color"), ("TERM_PROGRAM", "ghostty"), ("INSIDE_EMACS", "29.1,vterm")]),
+        ("dvtm", &[("TERM", "dvtm-256color"), ("KITTY_WINDOW_ID", "1")]),
+        ("zellij by its program", &[("TERM", "xterm-ghostty"), ("TERM_PROGRAM", "zellij")]),
+        ("screen by its program", &[("TERM", "xterm-kitty"), ("TERM_PROGRAM", "screen")]),
+    ] {
+        assert!(!auto(env), "{what}");
+    }
+    assert!(auto(&[("TERM", "xterm"), ("TERM_PROGRAM", "ghostty")]), "Ghostty without its own entry");
 }

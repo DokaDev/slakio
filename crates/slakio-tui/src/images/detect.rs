@@ -3,12 +3,15 @@
 //! environment alone ([`Env`], a snapshot of it), never by asking the terminal (the answer would
 //! come on standard input, behind the keys' reader).
 //!
-//! * kitty (`TERM=xterm-kitty`, or `KITTY_WINDOW_ID`) and Ghostty (`TERM=xterm-ghostty`, or
-//!   `TERM_PROGRAM=ghostty`) draw them; nothing else counts (`GHOSTTY_RESOURCES_DIR` leaks into
-//!   the shells of a multiplexer running in Ghostty, so it says nothing).
-//! * Inside a multiplexer (tmux, screen, Zellij, herdr: [`MULTIPLEXER_VARS`],
-//!   [`MULTIPLEXER_TERMS`], [`MULTIPLEXER_PROGRAMS`]) the escapes would reach it, not the
-//!   terminal: text cards, whatever terminal is outside.
+//! * kitty (`TERM=xterm-kitty`, with or without `KITTY_WINDOW_ID`) and Ghostty
+//!   (`TERM=xterm-ghostty`, or `TERM_PROGRAM=ghostty` with `TERM` `xterm-256color` or `xterm`,
+//!   what Ghostty sets where its own entry is missing) draw them; nothing else counts. A variable
+//!   of theirs alone says nothing: a program inside them that is a terminal of its own (a
+//!   multiplexer, Neovim's or Emacs' terminal) passes them on (`GHOSTTY_RESOURCES_DIR`,
+//!   `KITTY_WINDOW_ID` with another `TERM`).
+//! * Inside a multiplexer or another terminal in a terminal (tmux, screen, Zellij, herdr, dvtm,
+//!   Neovim, Emacs: [`MULTIPLEXER_VARS`], [`MULTIPLEXER_TERMS`], [`MULTIPLEXER_PROGRAMS`]) the
+//!   escapes would reach it, not the terminal: text cards, whatever terminal is outside.
 //! * The setting `images` (`auto`, the default; `on`; `off`) and [`IMAGES_ENV`] (the same
 //!   values; it wins over the setting) override that: `on` draws pictures even where slakio is
 //!   not sure (the user's choice), `off` never does. A value of the variable not understood is
@@ -17,10 +20,14 @@
 /// The environment variable that overrides the `images` setting: `auto`, `on` or `off`.
 pub const IMAGES_ENV: &str = "SLAKIO_IMAGES";
 
-/// The variables a multiplexer sets in the shells it runs.
-pub const MULTIPLEXER_VARS: &[&str] = &["TMUX", "STY", "ZELLIJ", "ZELLIJ_SESSION_NAME", "HERDR_ENV"];
+/// The variables a multiplexer (or an editor's terminal) sets in the shells it runs.
+pub const MULTIPLEXER_VARS: &[&str] =
+    &["TMUX", "STY", "ZELLIJ", "ZELLIJ_SESSION_NAME", "HERDR_ENV", "NVIM", "INSIDE_EMACS"];
 /// The starts of the `TERM` values a multiplexer sets.
-pub const MULTIPLEXER_TERMS: &[&str] = &["screen", "tmux"];
+pub const MULTIPLEXER_TERMS: &[&str] = &["screen", "tmux", "dvtm"];
+/// The `TERM` values Ghostty runs a shell with (its own, or the common ones where its own entry
+/// is missing).
+const GHOSTTY_TERMS: &[&str] = &["xterm-ghostty", "xterm-256color", "xterm"];
 /// The `TERM_PROGRAM` values a multiplexer sets.
 pub const MULTIPLEXER_PROGRAMS: &[&str] = &["tmux", "screen", "zellij", "herdr"];
 
@@ -59,8 +66,9 @@ impl Env {
 
     /// The terminal surely draws kitty graphics placeholders: kitty or Ghostty, no multiplexer.
     pub fn terminal_draws(&self) -> bool {
-        let kitty = self.term == "xterm-kitty" || self.kitty_window;
-        let ghostty = self.term == "xterm-ghostty" || self.term_program.eq_ignore_ascii_case("ghostty");
+        let kitty = self.term == "xterm-kitty";
+        let ghostty = self.term == "xterm-ghostty"
+            || (self.term_program.eq_ignore_ascii_case("ghostty") && GHOSTTY_TERMS.contains(&self.term.as_str()));
         (kitty || ghostty) && !self.multiplexed()
     }
 }
