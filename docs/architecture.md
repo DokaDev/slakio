@@ -293,11 +293,17 @@ photo (`User::avatar`, only on an avatar host) with no cookie, no token, no `Ori
 `Referer`. Both are `https` only, checked when Slack's answer is read and again before the
 request (`images::Source::checked`); a copy follows redirects only on the file host, a photo
 none. Each ask counts as a background request of the workspace's lane (`Governor::picture`);
-at most four at once a workspace. Only an answer whose type is `image/…` is read, at most
-`images::BYTES_MAX` bytes (said or counted). The UI decodes it on a blocking task, the size read
+at most four at once a workspace, each within 25 s in all (`picture::DEADLINE`, however its
+bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
+bytes (said or counted). The UI decodes it on a blocking task, the size read
 from the header first and refused over `images::SIDE_MAX` a side or `images::PIXELS_MAX`
 pixels, makes it smaller and sends it to the terminal once as a kitty graphics virtual
-placement; it is drawn as placeholder cells, so whatever is drawn over it replaces it.
+placement (the base64 is made on that task too; only the write is the loop's); it is drawn as
+placeholder cells, so whatever is drawn over it replaces it, and no pass over the screen (the
+dim under a popup, the selection bar) changes their colour, which names the picture. A panic in
+the decoder is caught with the panic hook told so (`terminal::catching`): the terminal is left
+as it is. Turning pictures off removes each by its id, then all; the way out removes every id
+sent (a range), then all.
 
 **Downloads** (`download.rs`, `http/fetch.rs`): a file a message shares is downloaded only
 when the user asks (`Command::Download`), at most two at once a workspace. Only an address
