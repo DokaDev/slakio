@@ -266,3 +266,34 @@ fn copies_come_from_the_file_host_and_photos_from_the_avatar_hosts_only() {
         assert_eq!(photo("UPIC3"), None);
     });
 }
+
+#[test]
+fn a_picture_that_trickles_ends_at_its_deadline() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let (thumb, _) = r.sources();
+        r.fake.fail_next(PICTURES, Fault::Partial { length: 100_000, body: vec![b'x'; 100] });
+        r.id += 1;
+        let id = Generation(r.id);
+        r.handle
+            .send(Request { id, workspace: None, command: Command::Image { source: thumb, max: BYTES_MAX } })
+            .unwrap();
+        // Its first bytes came: then the clock runs by itself (paused, it jumps to each timer).
+        for _ in 0..500 {
+            if !r.picture_requests().is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::pause();
+        let e = r.handle.rx.recv().await.unwrap();
+        assert_eq!(e.generation, id);
+        match e.event {
+            Event::Failed { kind, detail, .. } => {
+                assert_eq!((kind, detail.as_str()), (FailKind::Network, "the picture took too long"));
+            }
+            other => panic!("{other:?}"),
+        }
+    });
+}

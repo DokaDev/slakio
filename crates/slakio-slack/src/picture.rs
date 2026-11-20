@@ -10,13 +10,18 @@
 //!   on the file host; a photo follows none. Each ask passes the kill switch and counts as one
 //!   background request of the workspace.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
-//!   a larger one, said or counted, is refused.
+//!   a larger one, said or counted, is refused; all of it within [`DEADLINE`].
 
 use crate::client::Client;
 use crate::error::SlackError;
 use crate::request::Os;
 use slakio_core::images::Source;
 use slakio_core::secret::Credentials;
+use std::time::Duration;
+
+/// The longest one picture may take, from asking to its last byte, however its bytes come (one
+/// that keeps a host's answer trickling never holds a place for longer).
+pub const DEADLINE: Duration = Duration::from_secs(25);
 
 fn api(code: &str) -> SlackError {
     SlackError::Api { code: code.to_string() }
@@ -53,8 +58,15 @@ pub(crate) fn avatar_headers(os: Os) -> Vec<(&'static str, String)> {
     ]
 }
 
-/// The bytes of the picture at `source`, at most `max` of them.
+/// The bytes of the picture at `source`, at most `max` of them, within [`DEADLINE`].
 pub(crate) async fn picture(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, SlackError> {
+    match tokio::time::timeout(DEADLINE, read(client, source, max)).await {
+        Ok(read) => read,
+        Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
+    }
+}
+
+async fn read(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, SlackError> {
     let mut url = source.checked().ok_or_else(|| api("not_a_picture_address"))?;
     let mut hops = 0;
     let mut answer = loop {

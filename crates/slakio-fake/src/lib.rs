@@ -349,6 +349,15 @@ async fn serve_file(stream: TcpStream, world: &World, logged: &Logged, fault: Op
 async fn serve_picture(stream: TcpStream, logged: &Logged, fault: Option<Fault>) {
     match fault {
         Some(Fault::Raw { status, headers, body }) => write_raw(stream, status, &headers, &body).await,
+        Some(Fault::Partial { length, body }) => {
+            let mut stream = stream;
+            let head = format!("HTTP/1.1 200 FAKE\r\ncontent-type: image/png\r\ncontent-length: {length}\r\n\r\n");
+            let _ = stream.write_all(head.as_bytes()).await;
+            let _ = stream.write_all(&body).await;
+            let _ = stream.flush().await;
+            let mut byte = [0u8; 1];
+            while stream.read(&mut byte).await.is_ok_and(|n| n > 0) {}
+        }
         Some(Fault::Status { status, retry_after }) => {
             let headers: Vec<(String, String)> =
                 retry_after.map(|r| ("retry-after".to_string(), r)).into_iter().collect();
