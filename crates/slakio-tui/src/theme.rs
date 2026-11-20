@@ -495,7 +495,9 @@ impl Theme {
             (Kind::NoColor, Selection::Unfocused) => None,
             (Kind::NoColor, _) => {
                 for x in row.left()..row.right() {
-                    buf[(x, row.y)].modifier.insert(Modifier::REVERSED);
+                    if !crate::images::graphics::is_placeholder(buf[(x, row.y)].symbol()) {
+                        buf[(x, row.y)].modifier.insert(Modifier::REVERSED);
+                    }
                 }
                 None
             }
@@ -509,8 +511,12 @@ impl Theme {
             let code = (self.kind == Kind::Truecolor).then(|| (self.code_bg(), self.code_on(bg)));
             for x in row.left()..row.right() {
                 let cell = &mut buf[(x, row.y)];
-                // A pill and an avatar chip keep their background.
-                if (cell.bg == self.error && self.error != Color::Reset) || self.chip_bg(cell.bg) {
+                // A pill and an avatar chip keep their background; a picture its cells (their
+                // colour says which picture).
+                if (cell.bg == self.error && self.error != Color::Reset)
+                    || self.chip_bg(cell.bg)
+                    || crate::images::graphics::is_placeholder(cell.symbol())
+                {
                     continue;
                 }
                 cell.bg = match code {

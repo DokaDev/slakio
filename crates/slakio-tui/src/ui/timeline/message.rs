@@ -234,9 +234,14 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
         app.model.user(pane.target.workspace(), &m.user).map(|u| u.name.line().as_str().to_string()).unwrap_or_default()
     }));
     let art_style = t.avatar(avatar::slot(&m.user));
+    let photo = slot.and_then(|s| photo(app, pane, m, s));
     let picture = |k: usize| -> Vec<Span<'static>> {
-        match slot {
-            Some(s) if k < s.rows => vec![Span::styled(art.row(s, k), art_style), Span::raw("  ")],
+        match (slot, photo) {
+            (Some(s), Some(id)) if k < s.rows => {
+                let cells = crate::images::graphics::row(k as u16, s.cols as u16);
+                vec![Span::styled(cells, Style::default().fg(crate::images::graphics::color(id))), Span::raw("  ")]
+            }
+            (Some(s), None) if k < s.rows => vec![Span::styled(art.row(s, k), art_style), Span::raw("  ")],
             _ => vec![Span::raw(" ".repeat(indent))],
         }
     };
@@ -261,6 +266,24 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
         out.push((Line::from(spans), Kind::Content, shifted(on, indent)));
     }
     out
+}
+
+/// The picture id of `m`'s author's profile photo for `slot`, when photos are on and it is in
+/// the terminal (the comfortable layout's slot only; initials stand in for it until then).
+fn photo(app: &App, pane: &Pane, m: &Shown, slot: Slot) -> Option<u32> {
+    if !app.settings.photos || slot != avatar::BLOCK {
+        return None;
+    }
+    let ws = pane.target.workspace();
+    let address = app.model.user(ws, &m.user)?.avatar.clone()?;
+    match app.images.look(ws, &slakio_core::images::Source::Avatar(address)) {
+        crate::images::Look::Ready { id, cols, rows }
+            if usize::from(cols) == slot.cols && usize::from(rows) == slot.rows =>
+        {
+            Some(id)
+        }
+        _ => None,
+    }
 }
 
 /// The compact rows of message `i`: the chip and the name in a column beside the text, the time
@@ -391,7 +414,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
             Vec::new(),
         ));
     }
-    out.extend(super::files::cards(app, m, indent_w, w));
+    out.extend(super::files::cards(app, pane.target.workspace(), m, indent_w, w));
     if let Some(th) = m.thread.filter(|_| !pane.is_thread()) {
         let msg = Msg::MessageReplies { count: u64::from(th.replies), time: time::hm(th.last_reply, &app.zone) };
         let text = clip(&format!("⤷ {}", app.i18n.msg(&msg)), w.saturating_sub(indent_w));

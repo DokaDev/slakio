@@ -91,6 +91,12 @@ pub fn size_words(bytes: u64) -> String {
 }
 
 impl App {
+    /// After a frame: ask the backend for the pictures it would have shown and does not have
+    /// ([`crate::images::Images::ask`]). `true` when something was asked.
+    pub fn ask_images(&mut self, now: Instant) -> bool {
+        self.images.ask(&mut self.work.requests, now)
+    }
+
     /// `f`: download a file of the selected message (the one it has, or the one picked).
     pub(super) fn open_files(&mut self, now: Instant) {
         let Some((workspace, files)) = self.selected_files() else {

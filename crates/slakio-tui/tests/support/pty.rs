@@ -37,6 +37,15 @@ pub fn dirs(cmd: &mut Command, dir: &Path) {
         // Times on screen in UTC, whatever this machine's zone (a test may name another).
         .env("SLAKIO_TZ", "UTC")
         .env("TERM", "xterm-256color")
+        // No picture is ever sent to the test's terminal unless a test asks for them.
+        .env("SLAKIO_IMAGES", "off")
+        .env_remove("KITTY_WINDOW_ID")
+        .env_remove("TERM_PROGRAM")
+        // No multiplexer of the machine running the tests decides what the binary draws.
+        .env_remove("STY")
+        .env_remove("ZELLIJ")
+        .env_remove("ZELLIJ_SESSION_NAME")
+        .env_remove("HERDR_ENV")
         .env_remove("TMUX")
         .env_remove("SLAKIO_NETWORK");
 }

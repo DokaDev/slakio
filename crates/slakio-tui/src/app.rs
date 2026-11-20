@@ -109,13 +109,16 @@ pub struct Settings {
     pub icons: bool,
     /// People are pictured by an initials chip (`avatars = "initials"`, the default).
     pub avatars: bool,
+    /// People are pictured by their profile photo where pictures are drawn (`avatars =
+    /// "image"`; initials elsewhere and until it comes).
+    pub photos: bool,
     /// Messages in compact columns instead of the comfortable layout (`density`).
     pub compact: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { icons: false, avatars: true, compact: false }
+        Self { icons: false, avatars: true, photos: false, compact: false }
     }
 }
 
@@ -158,6 +161,8 @@ pub struct App {
     file_picker: Option<files::FilePicker>,
     /// Where files are downloaded to, and the downloads on their way.
     pub downloads: files::Downloads,
+    /// The pictures shown, asked for and held by the terminal.
+    pub images: crate::images::Images,
     /// The search popup: open or not, its words and results.
     pub(crate) search: search::Search,
     /// What was asked of each workspace's Activity.
@@ -213,6 +218,7 @@ impl App {
             picker: None,
             file_picker: None,
             downloads: files::Downloads::default(),
+            images: crate::images::Images::default(),
             search: search::Search::default(),
             activity: activity::Activity::default(),
             backend: None,

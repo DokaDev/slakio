@@ -262,7 +262,7 @@ fn colon_avatars_turns_them_off_and_on_and_asks_to_save_it() {
     d.type_text("avatars ");
     let rows = d.app.palette_rows();
     let named: Vec<(&str, &str)> = rows.iter().map(|r| (r.name.as_str(), r.keys.as_str())).collect();
-    assert_eq!(named, [("initials", ""), ("off", "current")]);
+    assert_eq!(named, [("initials", ""), ("image", ""), ("off", "current")]);
     d.keys("enter");
     assert!(d.app.settings.avatars, "Enter picks the selected value");
     // A value it does not take changes nothing and says which ones it takes.
@@ -271,7 +271,7 @@ fn colon_avatars_turns_them_off_and_on_and_asks_to_save_it() {
     d.keys("enter");
     assert_eq!(d.app.mode(), Mode::Command);
     let s = d.screen();
-    assert!(s.contains("Unknown avatars setting photo") && s.contains("initials, off"), "{s}");
+    assert!(s.contains("Unknown avatars setting photo") && s.contains("initials, image, off"), "{s}");
     assert!(d.app.settings.avatars);
     assert_eq!(saved(&mut d), ["initials"]);
 }

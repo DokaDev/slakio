@@ -2,6 +2,7 @@
 
 mod cli;
 mod inapp;
+mod pictures;
 mod saving;
 mod signin;
 mod stats;
@@ -128,10 +129,15 @@ fn main() -> ExitCode {
     app.theme_setting.clone_from(&cfg.theme);
     app.settings = Settings {
         icons: cfg.icons == "on",
-        // `image` (photos) comes later; until then it draws initials.
         avatars: cfg.avatars != "off",
+        // Photos where pictures are drawn; initials elsewhere.
+        photos: cfg.avatars == "image",
         compact: cfg.density == "compact",
     };
+    // Pictures: the environment (read once), the setting, the demo; `:images` changes the setting.
+    app.images.env = slakio_tui::images::detect::Env::read(env);
+    (app.images.setting, app.images.demo, app.images.tty) = (cfg.images.clone(), demo, io::stdout().is_terminal());
+    app.images.resolve();
     app.fold_views(cfg.nav_rows == "collapsed");
     // Times in the user's zone, read once; "today" from this machine's clock.
     app.zone = slakio_tui::time::Zone::from_env(env);
@@ -468,6 +474,27 @@ impl Wiring {
     }
 }
 
+/// Draw a frame: the cursor's shape and what the terminal is sent first (pictures). `true` when
+/// it asked for pictures it would have shown.
+fn frame(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    app: &mut App,
+    cursor: &mut Cursor,
+    stats: &mut Option<stats::Stats>,
+    panic_after_frame: bool,
+) -> io::Result<bool> {
+    cursor.apply(&mut io::stdout(), cursor_shape(app))?;
+    pictures::write(app)?;
+    terminal.draw(|f| ui::draw(f, app, Instant::now()))?;
+    if let Some(s) = stats.as_mut() {
+        s.drawn();
+    }
+    if panic_after_frame {
+        panic!("SLAKIO_DEBUG_PANIC: a panic after the first frame");
+    }
+    Ok(app.ask_images(Instant::now()))
+}
+
 /// The event loop: draw when something changed, then sleep until the next input event, signal,
 /// backend event or deadline of the app. With nothing to do it never wakes up.
 async fn run(
@@ -484,6 +511,7 @@ async fn run(
     let mut signals = term::Signals::new()?;
     let mut cursor = Cursor::default();
     let mut redraw = true;
+    let mut decodes = pictures::Pictures::new();
     // A paste being checked with Slack; the desktop app's workspaces being read for `:login`.
     let mut signing_in: inapp::Signing = None;
     let mut scanning: Option<inapp::Scan> = None;
@@ -510,18 +538,15 @@ async fn run(
                 Effect::SignInAgain(_) => {}
                 Effect::Save { key, value } => redraw |= saved.save(key, &value, &mut app),
                 e @ (Effect::OpenLink(_) | Effect::OpenFile(_)) => saved.outside(e, &mut app),
+                Effect::Decode(job) => decodes.start(job),
             }
         }
         saved.keep_layout(&app, false);
-        if redraw {
-            cursor.apply(&mut io::stdout(), cursor_shape(&app))?;
-            terminal.draw(|f| ui::draw(f, &app, Instant::now()))?;
-            if let Some(s) = stats.as_mut() {
-                s.drawn();
-            }
-            if panic_after_frame {
-                panic!("SLAKIO_DEBUG_PANIC: a panic after the first frame");
-            }
+        // The pictures a frame would have shown are asked for at once (the backend's turn
+        // comes first again).
+        if redraw && frame(terminal, &mut app, &mut cursor, stats, panic_after_frame)? {
+            redraw = false;
+            continue;
         }
         if let Some(s) = stats.as_mut() {
             s.woke();
@@ -541,6 +566,10 @@ async fn run(
                 None => break,
             },
             _ = timer => app.on_tick(Instant::now()),
+            (source, result) = decodes.next() => {
+                app.images.decoded(source, result);
+                true
+            }
             // An answer that came later than its turn: it wakes the loop like a key.
             envelope = exchange::next(backend.as_mut()) => app.on_backend(envelope, Instant::now()),
             done = async { signing_in.as_mut().expect("guarded").await }, if signing_in.is_some() => {

@@ -22,6 +22,11 @@ pub(crate) fn restore_terminal() {
     let _ = STATE.restore(&mut io::stdout(), raw_off);
 }
 
+/// Pictures may be sent to the terminal from now on: the restore removes them.
+pub(crate) fn pictures_on() {
+    STATE.pictures_on();
+}
+
 /// Restores the terminal when dropped. Made before the terminal is set up, so a setup that
 /// fails part way is undone as well.
 pub(crate) type Guard = terminal::Guard<'static, Stdout, fn() -> Stdout>;

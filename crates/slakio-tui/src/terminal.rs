@@ -77,11 +77,23 @@ pub struct TermState {
     entered: AtomicBool,
     /// The kitty keyboard flags were pushed and must be popped.
     keys: AtomicBool,
+    /// Pictures may have been sent to the terminal (kitty graphics): they are removed.
+    pictures: AtomicBool,
 }
 
 impl TermState {
     pub const fn new() -> Self {
-        Self { raw: AtomicBool::new(false), entered: AtomicBool::new(false), keys: AtomicBool::new(false) }
+        Self {
+            raw: AtomicBool::new(false),
+            entered: AtomicBool::new(false),
+            keys: AtomicBool::new(false),
+            pictures: AtomicBool::new(false),
+        }
+    }
+
+    /// Pictures may be sent to the terminal from now on: [`TermState::restore`] removes them all.
+    pub fn pictures_on(&self) {
+        self.pictures.store(true, Ordering::SeqCst);
     }
 
     /// Raw mode was turned on.
@@ -106,7 +118,7 @@ impl TermState {
     }
 
     /// Undo what was turned on, once (later calls do nothing until it is turned on again):
-    /// `raw_off` for raw mode, then on `out` the kitty flags popped, bracketed paste and mouse
+    /// `raw_off` for raw mode, then on `out` the pictures sent removed, the kitty flags popped, bracketed paste and mouse
     /// capture off, the cursor shown in the user's default shape and the main screen. Every step is tried
     /// even when one fails; the first failure comes back.
     pub fn restore(&self, out: &mut impl Write, raw_off: impl FnOnce()) -> io::Result<()> {
@@ -116,6 +128,10 @@ impl TermState {
         if !self.entered.swap(false, Ordering::SeqCst) {
             return Ok(());
         }
+        let cleared = match self.pictures.load(Ordering::SeqCst) {
+            true => out.write_all(crate::images::graphics::delete_all().as_bytes()),
+            false => Ok(()),
+        };
         let popped = match self.keys.swap(false, Ordering::SeqCst) {
             true => out.write_all(kitty::pop_sequence().as_bytes()),
             false => Ok(()),
@@ -129,7 +145,7 @@ impl TermState {
             LeaveAlternateScreen
         );
         let flushed = out.flush();
-        popped.and(rest).and(flushed)
+        cleared.and(popped).and(rest).and(flushed)
     }
 }
 
@@ -162,7 +178,7 @@ pub fn osc52(text: &str) -> String {
 }
 
 /// Standard base64 with padding.
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

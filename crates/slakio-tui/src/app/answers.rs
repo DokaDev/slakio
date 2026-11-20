@@ -222,8 +222,12 @@ impl App {
             Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
-            // Pictures are not drawn yet.
-            Event::Image { .. } => false,
+            Event::Image { bytes } => {
+                if let Some(job) = self.images.answered(id, bytes) {
+                    self.effects.push(Effect::Decode(job));
+                }
+                false
+            }
         };
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);
@@ -296,6 +300,10 @@ impl App {
     /// the error log gets the backend's detail.
     fn on_failed(&mut self, id: Generation, mut kind: FailKind, detail: &str, now: Instant) -> bool {
         self.jump_answered(id, Some(&kind));
+        // A picture that failed says so on its card (never in the status line or the log).
+        if self.images.failed(id, &kind, now) {
+            return true;
+        }
         if self.download_failed(id, &kind, now) {
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));
             self.effects.push(Effect::Record { context: "download", fault });

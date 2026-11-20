@@ -53,6 +53,9 @@ pub enum AppAction {
     Retry,
     /// Picture people by their initials chip, or not (`:avatars`); saved in the config file.
     ToggleAvatars,
+    /// Pictures drawn or not (`:images auto|on|off`; alone: off, or back to `auto`); saved in
+    /// the config file.
+    ToggleImages,
     /// Nerd Font icons, or text instead (`:icons`); saved in the config file.
     ToggleIcons,
     /// Messages comfortable or compact (`:density`); saved in the config file.
@@ -374,6 +377,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::Retry, "app.retry", Label::ActionRetry, &["retry"]),
     help(HelpAction::Open, "help.open", Label::ActionHelpOpen, &["help"]),
     app(AppAction::ToggleAvatars, "avatars.toggle", Label::ActionAvatars, &["avatars"]),
+    app(AppAction::ToggleImages, "images.toggle", Label::ActionImages, &["images"]),
     app(AppAction::ToggleIcons, "icons.toggle", Label::ActionIcons, &["icons"]),
     app(AppAction::ToggleDensity, "density.toggle", Label::ActionDensity, &["density"]),
     app(AppAction::ToggleNetwork, "net.toggle", Label::ActionNet, &["net"]),

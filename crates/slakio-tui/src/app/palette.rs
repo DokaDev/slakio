@@ -33,7 +33,8 @@ use crate::theme::NAMES;
 pub use net::NET_VALUES;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-pub use settings::{AVATAR_VALUES, avatars_arg, theme_arg};
+use settings::unknown;
+pub use settings::{AVATAR_VALUES, IMAGE_VALUES, avatars_arg, theme_arg};
 use slakio_core::i18n::{Label, Msg};
 use std::time::Instant;
 
@@ -59,6 +60,8 @@ pub enum Item {
     Theme(usize),
     /// A value for `:avatars <value>` (index into [`AVATAR_VALUES`]).
     Avatars(usize),
+    /// A value for `:images <value>` (index into [`IMAGE_VALUES`]).
+    Images(usize),
     /// `:rename <name>`: name the tab shown that (nothing: after what it shows).
     Rename,
     /// `:open <address>`: the address typed.
@@ -101,6 +104,7 @@ fn offered(a: Action, backend: bool) -> bool {
             AppAction::ChooseWorkspace
             | AppAction::Retry
             | AppAction::ToggleAvatars
+            | AppAction::ToggleImages
             | AppAction::ToggleIcons
             | AppAction::ToggleDensity
             | AppAction::ToggleNetwork
@@ -233,22 +237,13 @@ impl App {
             return ranked(NET_VALUES, arg).into_iter().map(Item::Net).collect();
         }
         if let Some(arg) = icons_arg(line) {
-            let mut hits: Vec<(u8, i32, usize)> = ICON_VALUES
-                .iter()
-                .enumerate()
-                .filter_map(|(i, v)| action::rank(arg, &[], &[v]).map(|(t, s)| (t, -s, i)))
-                .collect();
-            hits.sort_unstable();
-            return hits.into_iter().map(|(.., i)| Item::Icons(i)).collect();
+            return ranked(ICON_VALUES, arg).into_iter().map(Item::Icons).collect();
         }
         if let Some(arg) = avatars_arg(line) {
-            let mut hits: Vec<(u8, i32, usize)> = AVATAR_VALUES
-                .iter()
-                .enumerate()
-                .filter_map(|(i, v)| action::rank(arg, &[], &[v]).map(|(t, s)| (t, -s, i)))
-                .collect();
-            hits.sort_unstable();
-            return hits.into_iter().map(|(.., i)| Item::Avatars(i)).collect();
+            return ranked(AVATAR_VALUES, arg).into_iter().map(Item::Avatars).collect();
+        }
+        if let Some(arg) = setting_arg(line, "images") {
+            return ranked(IMAGE_VALUES, arg).into_iter().map(Item::Images).collect();
         }
         let word = line.trim_end();
         if word.contains(char::is_whitespace) {
@@ -311,13 +306,18 @@ impl App {
                     keys: if NAMES[i] == self.theme_setting { label(Label::PaletteCurrent) } else { String::new() },
                 },
                 Item::Avatars(i) => {
-                    let on = AVATAR_VALUES[i] == "initials";
+                    let (words, current) = match AVATAR_VALUES[i] {
+                        "initials" => (Label::AvatarsInitials, self.settings.avatars && !self.settings.photos),
+                        "image" => (Label::AvatarsImage, self.settings.avatars && self.settings.photos),
+                        _ => (Label::AvatarsOff, !self.settings.avatars),
+                    };
                     Row {
                         name: AVATAR_VALUES[i].to_string(),
-                        label: label(if on { Label::AvatarsInitials } else { Label::AvatarsOff }),
-                        keys: if on == self.settings.avatars { label(Label::PaletteCurrent) } else { String::new() },
+                        label: label(words),
+                        keys: if current { label(Label::PaletteCurrent) } else { String::new() },
                     }
                 }
+                Item::Images(i) => self.images_row(i),
                 Item::Action(i) => {
                     Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
                 }
@@ -435,6 +435,10 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(Item::Images(i)) => {
+                self.cmdline.close();
+                self.set_images(IMAGE_VALUES[i], now);
+            }
             Some(Item::Icons(i)) => {
                 self.cmdline.close();
                 if let Err(msg) = self.set_icons(ICON_VALUES[i], now) {
@@ -515,44 +519,11 @@ impl App {
     }
 }
 
-/// Why `text` (a command line that matches no entry) runs nothing.
-fn unknown(text: String) -> Msg {
-    match (theme_arg(&text), avatars_arg(&text), icons_arg(&text)) {
-        (Some(name), ..) => Msg::ThemeUnknown { name: name.to_string(), names: NAMES.join(", ") },
-        (_, Some(name), _) => Msg::AvatarsUnknown { name: name.to_string(), names: AVATAR_VALUES.join(", ") },
-        (.., Some(name)) => Msg::IconsUnknown { name: name.to_string(), names: ICON_VALUES.join(", ") },
-        _ if setting_arg(&text, "density").is_some() => Msg::DensityUnknown {
-            name: setting_arg(&text, "density").unwrap_or_default().to_string(),
-            names: DENSITY_VALUES.join(", "),
-        },
-        _ if setting_arg(&text, "filter").is_some() => Msg::FilterUnknown {
-            name: setting_arg(&text, "filter").unwrap_or_default().to_string(),
-            names: FILTER_VALUES.join(", "),
-        },
-        _ if setting_arg(&text, "sort").is_some() => Msg::SortUnknown {
-            name: setting_arg(&text, "sort").unwrap_or_default().to_string(),
-            names: SORT_VALUES.join(", "),
-        },
-        _ if setting_arg(&text, "net").is_some() => Msg::NetUnknown {
-            name: setting_arg(&text, "net").unwrap_or_default().to_string(),
-            names: NET_VALUES.join(", "),
-        },
-        _ => {
-            let word = text.split_whitespace().next().unwrap_or_default().to_string();
-            if action::by_command(&word).is_some() {
-                Msg::CommandNoArgs { name: word }
-            } else {
-                Msg::CommandUnknown { name: text }
-            }
-        }
-    }
-}
-
 /// The values `:density` takes.
 pub const DENSITY_VALUES: &[&str] = &["comfortable", "compact"];
 
 /// The value of `:<key> <value>` (also `:set <key>=<value>`).
-fn setting_arg<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+pub(super) fn setting_arg<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     let line = line.trim_start();
     let (word, rest) = line.split_once(char::is_whitespace)?;
     match word {

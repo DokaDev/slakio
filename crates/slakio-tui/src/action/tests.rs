@@ -151,6 +151,7 @@ fn every_action_is_registered() {
             ChooseWorkspace,
             Retry,
             ToggleAvatars,
+            ToggleImages,
             ToggleIcons,
             ToggleDensity,
             ToggleNetwork,
