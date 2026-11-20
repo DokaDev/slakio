@@ -26,11 +26,12 @@ line says when it drops and comes back, and the conversations and threads open a
 counts are read again then, also after the computer slept);
 reactions show when a conversation is opened again, and who is typing or online is not shown.
 The files a message shares show as cards and can be downloaded ([What works](#what-works));
-pictures are not shown inside slakio yet.
+in kitty and Ghostty, pictures show as previews under their cards and people can be pictured
+by their profile photos ([Pictures](#pictures)).
 What it fetched is kept in a local
 cache ([Local cache](#local-cache)), so the next start shows it at once and then refreshes. The rest of the interface runs on invented data
 (`slakio --demo`). Releases have binaries for macOS, Linux and Windows and a Homebrew formula
-([Install](#install)); 0.0.20 shows file cards under messages; `f` downloads a file (with several, you pick one) into the downloads folder (`~/Downloads/slakio` by default), with a standing progress line and `F` to stop. It never overwrites a file, and downloaded files are marked as coming from the internet (macOS quarantine, Windows Mark of the Web). Only viewer kinds (PDF, images, audio, video, text) can be opened, after a yes; office files, CSV, scripts and apps are only saved. Image previews are not there yet, and it is still read-only. 0.0.19 showed real Slack data in Activity: mentions, thread replies, reactions and direct messages of all signed-in workspaces in one list; Enter opened the message, or the reply's thread, and live mentions appeared at once. Nothing was ever marked as read. 0.0.18 searched messages (`/` or `Space s`, with Slack's own search words; Enter opened the message, or the reply thread), jumped to a day with `:jump <day>` (today, yesterday, 2026-11-01, -3d, weekdays; Korean words too), and fixed the time zone: all times and days were shown in UTC and are now shown in your local time zone, and `SLAKIO_TZ` overrides it. 0.0.17 opened Slack message, reply and channel links inside slakio (it jumped to the message, read around it if needed, and showed the thread beside it for replies; links for other workspaces offered the browser), and fixed a restored split so that it loaded every pane (0.0.16 loaded only the last one). 0.0.16 resized panes (`Space w >` / `<` / `+` / `-`, or a border
+([Install](#install)); 0.0.20 shows file cards under messages; `f` downloads a file (with several, you pick one) into the downloads folder (`~/Downloads/slakio` by default), with a standing progress line and `F` to stop. It never overwrites a file, and downloaded files are marked as coming from the internet (macOS quarantine, Windows Mark of the Web). Only viewer kinds (PDF, images, audio, video, text) can be opened, after a yes; office files, CSV, scripts and apps are only saved. It showed no image previews yet, and it is still read-only. 0.0.19 showed real Slack data in Activity: mentions, thread replies, reactions and direct messages of all signed-in workspaces in one list; Enter opened the message, or the reply's thread, and live mentions appeared at once. Nothing was ever marked as read. 0.0.18 searched messages (`/` or `Space s`, with Slack's own search words; Enter opened the message, or the reply thread), jumped to a day with `:jump <day>` (today, yesterday, 2026-11-01, -3d, weekdays; Korean words too), and fixed the time zone: all times and days were shown in UTC and are now shown in your local time zone, and `SLAKIO_TZ` overrides it. 0.0.17 opened Slack message, reply and channel links inside slakio (it jumped to the message, read around it if needed, and showed the thread beside it for replies; links for other workspaces offered the browser), and fixed a restored split so that it loaded every pane (0.0.16 loaded only the last one). 0.0.16 resized panes (`Space w >` / `<` / `+` / `-`, or a border
 dragged with the mouse); neighbouring panes share one border, and the layout (tabs, splits, what each pane shows, zoom,
 focus) comes back after a restart (`restore = "off"` stops that). 0.0.15 split the screen into panes: `v` splits beside, `s` splits under, Ctrl+H/J/K/L move between
 panes, `z` zooms one pane, `Space w =` gives them even room, and Ctrl+W closes one. A thread panel splits off into its own
@@ -190,7 +191,8 @@ images, and settings. This README only lists what works; it will grow with each 
   and saves it; the first run asks once, showing the icons.
 - People are pictured by their initials on a color of their own: before a sender's name, before
   a DM in the list (with whether they are around at its corner) and in a DM's title;
-  `:avatars` turns them off and on and saves it. Profile photos are not shown yet.
+  `:avatars` turns them off and on and saves it; `:avatars image` pictures people by their
+  profile photos where pictures are drawn ([Pictures](#pictures)), and by initials elsewhere.
 - Themes: the terminal's own colors, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
   `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
@@ -221,8 +223,8 @@ images, and settings. This README only lists what works; it will grow with each 
   programs, scripts, installers, archives and anything else are only saved. `--demo` saves its
   invented files in a temporary folder (`slakio-demo`), never offered to open. Downloading reads
   only: the file comes from Slack's file host (the `files` host of `slack.com`) alone, which is sent your
-  session cookie and never your token, and redirects to any other host are refused. Pictures
-  are not shown inside slakio yet.
+  session cookie and never your token, and redirects to any other host are refused. A picture's
+  card has a small preview of it under it where pictures are drawn ([Pictures](#pictures)).
 - Slack's own links (a message's, a reply's, a channel's, `…slack.com/archives/…`) open inside
   slakio instead (marked `↳` in the list of links): the conversation opens, or the pane showing
   it is focused, and the message is selected and marked for a moment; a message not loaded is
@@ -265,6 +267,39 @@ images, and settings. This README only lists what works; it will grow with each 
   `$XDG_STATE_HOME/slakio`, or the platform's equivalent), readable by you only. It never holds
   a token, a cookie, a request's address past its host or message text, and it is kept small:
   past 1 MiB it is renamed `errors.log.1` (replacing the one before) and a new one starts.
+
+### Pictures
+
+Where the terminal surely draws pictures, a picture a message shares (PNG, JPEG or GIF; a GIF
+shows its first frame) has a preview under its card, at most 36 × 10 cells, and with
+`avatars = "image"` (or `:avatars image`) the comfortable layout shows people's profile photos
+in place of their initials. Elsewhere, and until a picture has come, the text card and the
+initials show as before; a picture that cannot be shown says why on its card (too large, no
+preview, not loaded). Nothing of it ever blocks the screen: pictures are fetched in the
+background and decoded off the screen's thread.
+
+- Terminals: kitty and Ghostty (the kitty graphics protocol, drawn as ordinary cells, so a
+  popup, a split, scrolling or a closed pane never leaves a picture behind). slakio tells them
+  from `TERM` (`xterm-kitty`, `xterm-ghostty`), `KITTY_WINDOW_ID` or `TERM_PROGRAM=ghostty`, and
+  never asks the terminal. Inside a multiplexer (tmux, screen, Zellij, herdr) or any other
+  terminal it draws text, unless told otherwise.
+- `images = "auto"` (the default) in the config, `"on"` to draw pictures whatever slakio can
+  tell (inside a multiplexer that passes the kitty graphics protocol through, for example), or
+  `"off"` never to fetch or draw them. `:images auto|on|off` changes it while slakio runs (off
+  removes every picture from the screen at once; `:images` alone switches between off and
+  auto) and saves it in the config file. `SLAKIO_IMAGES=auto|on|off` in the environment wins
+  over both (slakio says so when you choose otherwise), and `:images on` says when slakio cannot
+  tell that the terminal shows pictures. `slakio --demo` draws its invented pictures only with
+  `SLAKIO_IMAGES=on` (or `images = "on"`).
+- What is fetched: the smaller copy Slack makes of a picture (never the original), from Slack's
+  file host with your session cookie and never your token, as a file's download; and profile
+  photos from Slack's avatar host (`avatars.slack` + `-edge.com`) or `secure.gravatar.com`, over
+  `https` only, with no cookie and no token, and no redirect followed. Only an answer that says
+  it is an image is read, at most 2 MB of it; a picture larger than 4096 pixels a side or 4.2
+  million pixels is refused from its header, before it is decoded. Each picture fetched counts
+  as a background request against the request cap, and the network switches stop it.
+- slakio keeps at most 64 pictures (24 MiB) in the terminal at once, the least recently shown
+  going first; nothing of them is written to disk.
 
 ## Keys
 
@@ -431,6 +466,7 @@ cache_days = 30          # a conversation not opened for this many days is dropp
 restore = "on"           # "off": the tabs and panes of the last run are not opened again
 downloads = ""           # the folder files are saved in ("": Downloads/slakio in your home)
 download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
+images = "auto"          # pictures where the terminal surely draws them, "on" always, "off" never
 ```
 
 `downloads` takes an absolute path or `~/…`; `SLAKIO_DOWNLOAD_DIR` in the environment (an
@@ -441,8 +477,8 @@ in (a file shown as `1.0 GB` is over `download_max_mb = 999`).
 is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also
 `:colorscheme`, or `:set theme=<name>`) switches the theme while slakio runs and saves it here,
 keeping your comments. `:avatars` (or `:set avatars=off`) does the same for `avatars`;
-`avatars = "image"` is kept for profile photos, which come in a later version, and draws
-initials until then. With `icons = "ask"`, `slakio
+`avatars = "image"` shows profile photos where pictures are drawn, and initials elsewhere
+([Pictures](#pictures)). With `icons = "ask"`, `slakio
 --demo` asks once whether your font shows the icons (the view switcher previews the answer) and saves
 the answer in the config file; `:icons on|off` changes it later. `rail_expand`, a setting of the
 left rail (later the top bar, now the view switcher), is ignored (the status line says it can be removed).
