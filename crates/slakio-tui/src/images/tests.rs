@@ -13,8 +13,14 @@ fn on() -> Images {
     Images { on: true, ..Images::default() }
 }
 
-fn decoded(png: usize) -> Decoded {
-    Decoded { png: vec![0; png], cols: 3, rows: 2 }
+/// `job` made ready as a picture of `png` bytes, 3 × 2 cells.
+fn ready(job: &Job, png: usize) -> Prepared {
+    let bytes = vec![0; png];
+    Prepared { id: job.id, cols: 3, rows: 2, bytes: png, transmit: graphics::transmit(job.id, 3, 2, &bytes) }
+}
+
+fn key(job: &Job) -> (Source, Generation) {
+    (job.source.clone(), job.request)
 }
 
 /// `source` drawn, asked for and answered: its job.
@@ -44,7 +50,7 @@ fn a_picture_drawn_is_asked_for_once_decoded_and_sent_to_the_terminal() {
     // Drawn again while it comes: not asked again.
     assert_eq!(images.look(&ws(), &thumb(1)), Look::Pending);
     assert!(!images.ask(&mut requests, Instant::now()));
-    images.decoded(thumb(1), Ok(decoded(10)));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
     let sent = images.take_graphics();
     assert!(sent.starts_with("\x1b_Ga=T,U=1,f=100,t=d,i=1,c=3,r=2,q=2"), "{sent:?}");
     assert_eq!(images.take_graphics(), "", "sent once");
@@ -89,7 +95,7 @@ fn a_failure_says_why_and_only_a_passing_one_is_asked_again_later() {
 fn a_refused_picture_is_never_asked_again() {
     let (mut images, mut requests) = (on(), Requests::default());
     let job = fetch(&mut images, &mut requests, &thumb(1));
-    images.decoded(job.source, Err(Refused::TooLarge));
+    images.decoded(key(&job), Err(Refused::TooLarge));
     assert_eq!(images.look(&ws(), &thumb(1)), Look::Failed(Why::TooLarge));
     assert!(!images.ask(&mut requests, Instant::now() + RETRY_AFTER * 2));
     assert_eq!(images.take_graphics(), "");
@@ -100,7 +106,7 @@ fn the_terminal_holds_at_most_so_many_pictures_and_bytes() {
     let (mut images, mut requests) = (on(), Requests::default());
     for n in 0..ENTRIES_MAX + 3 {
         let job = fetch(&mut images, &mut requests, &thumb(n));
-        images.decoded(job.source, Ok(decoded(100)));
+        images.decoded(key(&job), Ok(ready(&job, 100)));
     }
     assert_eq!(images.held().0, ENTRIES_MAX);
     let out = images.take_graphics();
@@ -109,7 +115,7 @@ fn the_terminal_holds_at_most_so_many_pictures_and_bytes() {
     assert_eq!(images.look(&ws(), &thumb(0)), Look::Pending, "gone: fetched again when drawn");
     // Bytes: a large one pushes the others out, never itself.
     let job = fetch(&mut images, &mut requests, &thumb(1000));
-    images.decoded(job.source, Ok(decoded(BYTES_CAP)));
+    images.decoded(key(&job), Ok(ready(&job, BYTES_CAP)));
     assert_eq!(images.held(), (1, BYTES_CAP));
 }
 
@@ -118,14 +124,14 @@ fn the_least_recently_drawn_goes_first() {
     let (mut images, mut requests) = (on(), Requests::default());
     for n in 0..ENTRIES_MAX {
         let job = fetch(&mut images, &mut requests, &thumb(n));
-        images.decoded(job.source, Ok(decoded(10)));
+        images.decoded(key(&job), Ok(ready(&job, 10)));
     }
     images.take_graphics();
     // The first one is drawn again: the second is now the oldest.
     images.look(&ws(), &thumb(0));
     images.ask(&mut requests, Instant::now());
     let job = fetch(&mut images, &mut requests, &thumb(999));
-    images.decoded(job.source, Ok(decoded(10)));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
     let out = images.take_graphics();
     assert!(out.contains("a=d,d=I,i=2,q=2"), "{out:?}");
     assert!(matches!(images.look(&ws(), &thumb(0)), Look::Ready { .. }));
@@ -135,11 +141,12 @@ fn the_least_recently_drawn_goes_first() {
 fn a_late_or_unknown_answer_changes_nothing() {
     let (mut images, mut requests) = (on(), Requests::default());
     assert!(images.answered(Generation(5), vec![1]).is_none());
-    images.decoded(thumb(1), Ok(decoded(10)));
+    let stray = Job { source: thumb(1), request: Generation(77), id: 9, bytes: Vec::new(), shape: Shape::Preview };
+    images.decoded(key(&stray), Ok(ready(&stray, 10)));
     assert_eq!(images.take_graphics(), "", "never asked: not sent");
     let job = fetch(&mut images, &mut requests, &thumb(2));
-    images.decoded(job.source.clone(), Ok(decoded(10)));
-    images.decoded(job.source, Ok(decoded(10)));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
     assert_eq!(images.held().0, 1, "decoded twice: held once");
 }
 
@@ -161,11 +168,15 @@ fn turned_off_every_picture_leaves_the_terminal_at_once() {
     assert!(images.on);
     let mut requests = Requests::default();
     let job = fetch(&mut images, &mut requests, &thumb(1));
-    images.decoded(job.source, Ok(decoded(10)));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
     images.take_graphics();
     assert_eq!(images.choose("off"), Chosen::Done);
     assert!(!images.on);
-    assert_eq!(images.take_graphics(), "\x1b_Ga=d,d=A,q=2\x1b\\", "all of them, at once");
+    assert_eq!(
+        images.take_graphics(),
+        "\x1b_Ga=d,d=I,i=1,q=2\x1b\\\x1b_Ga=d,d=A,q=2\x1b\\",
+        "each by its id (a virtual placement may outlive a delete of all), then all"
+    );
     assert_eq!(images.look(&ws(), &thumb(1)), Look::Pending);
     assert!(!images.ask(&mut requests, Instant::now()), "nothing asked while off");
     assert_eq!(images.held(), (0, 0));
@@ -198,11 +209,106 @@ fn leaving_photos_removes_them_from_the_terminal_and_keeps_previews() {
     let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
     for s in [thumb(1), photo.clone()] {
         let job = fetch(&mut images, &mut requests, &s);
-        images.decoded(job.source, Ok(decoded(10)));
+        images.decoded(key(&job), Ok(ready(&job, 10)));
     }
     images.take_graphics();
     images.forget_photos();
     assert_eq!(images.take_graphics(), "\x1b_Ga=d,d=I,i=2,q=2\x1b\\");
     assert_eq!(images.held(), (1, 10));
     assert!(matches!(images.look(&ws(), &thumb(1)), Look::Ready { .. }));
+}
+
+#[test]
+fn a_result_for_a_request_no_longer_waited_for_changes_nothing() {
+    let mut images = Images { env: kitty(), setting: "auto".into(), tty: true, ..Images::default() };
+    images.resolve();
+    let mut requests = Requests::default();
+    let old = fetch(&mut images, &mut requests, &thumb(1));
+    images.choose("off");
+    images.choose("auto");
+    images.take_graphics();
+    let new = fetch(&mut images, &mut requests, &thumb(1));
+    assert_ne!(old.request, new.request);
+    images.decoded(key(&old), Ok(ready(&old, 10)));
+    assert_eq!(images.take_graphics(), "", "the old request's picture is not sent");
+    assert_eq!(images.look(&ws(), &thumb(1)), Look::Pending);
+    images.decoded(key(&new), Ok(ready(&new, 10)));
+    assert!(matches!(images.look(&ws(), &thumb(1)), Look::Ready { id, .. } if id == new.id));
+}
+
+#[test]
+fn what_a_frame_only_laid_out_is_neither_asked_for_nor_drawn() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let held = fetch(&mut images, &mut requests, &thumb(0));
+    images.decoded(key(&held), Ok(ready(&held, 10)));
+    images.look(&ws(), &thumb(1));
+    let from = images.mark();
+    // A message measured above the screen: its pictures are only laid out.
+    images.look(&ws(), &thumb(2));
+    images.look(&ws(), &thumb(0));
+    images.not_shown(from, images.mark());
+    images.look(&ws(), &thumb(3));
+    images.ask(&mut requests, Instant::now());
+    let asked: Vec<Source> = requests
+        .take()
+        .into_iter()
+        .filter_map(|r| match r.command {
+            Command::Image { source, .. } => Some(source),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(asked, [thumb(1), thumb(3)]);
+}
+
+#[test]
+fn a_busy_or_offline_backend_is_asked_again_soon() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let now = Instant::now();
+    for (n, kind) in [(1, FailKind::Busy), (2, FailKind::Offline)] {
+        images.look(&ws(), &thumb(n));
+        images.ask(&mut requests, now);
+        let r = requests.take().pop().unwrap();
+        images.failed(r.id, &kind, now);
+        images.look(&ws(), &thumb(n));
+        assert!(!images.ask(&mut requests, now + RETRY_SOON / 2), "{kind:?}");
+        images.look(&ws(), &thumb(n));
+        assert!(images.ask(&mut requests, now + RETRY_SOON), "{kind:?}: in seconds, not a minute");
+        requests.take();
+    }
+}
+
+#[test]
+fn failures_kept_are_bounded() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let now = Instant::now();
+    for n in 0..2000 {
+        images.look(&ws(), &thumb(n));
+        images.ask(&mut requests, now);
+        let r = requests.take().pop().unwrap();
+        images.failed(r.id, &FailKind::TooLarge, now);
+    }
+    assert_eq!(images.failures(), FAILED_MAX);
+    assert!(images.entries.len() <= FAILED_MAX);
+    assert_eq!(images.look(&ws(), &thumb(1999)), Look::Failed(Why::TooLarge), "the newest are kept");
+}
+
+#[test]
+fn photos_on_their_way_are_not_waited_for_once_photos_are_off() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().unwrap();
+    images.forget_photos();
+    assert!(images.answered(r.id, vec![1]).is_none(), "its answer is dropped");
+    assert_eq!(images.held(), (0, 0));
+}
+
+#[test]
+fn auto_where_the_terminal_shows_no_pictures_says_so() {
+    let plain = detect::Env { term: "xterm-256color".into(), ..detect::Env::default() };
+    let mut images = Images { env: plain, setting: "off".into(), tty: true, ..Images::default() };
+    images.resolve();
+    assert_eq!(images.choose("auto"), Chosen::NotHere);
+    assert!(!images.on);
 }

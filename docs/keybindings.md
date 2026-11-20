@@ -326,7 +326,7 @@ Type `:` and the command, then `Enter`.
 | `:workspace` |  | Switch workspace |
 | `:retry` |  | Retry what could not be loaded |
 | `:help` |  | Keyboard help |
-| `:avatars` |  | Show or hide avatars (initials) |
+| `:avatars` |  | Show or hide avatars (initials or photos) |
 | `:images` |  | Show or hide picture previews and profile photos |
 | `:icons` |  | Show Nerd Font icons, or text instead |
 | `:density` |  | Comfortable or compact messages |

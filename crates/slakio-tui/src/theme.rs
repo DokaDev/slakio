@@ -541,12 +541,16 @@ impl Theme {
     }
 
     /// Dim what is drawn in `area`, so a dialog drawn on top of it stands out while the screen
-    /// below stays readable. Symbols are kept.
+    /// below stays readable. Symbols are kept, and a picture's cells as they are: their colour
+    /// says which picture they show.
     pub fn dim_area(&self, buf: &mut Buffer, area: Rect) {
         let area = area.intersection(buf.area);
         for y in area.top()..area.bottom() {
             for x in area.left()..area.right() {
                 let cell = &mut buf[(x, y)];
+                if crate::images::graphics::is_placeholder(cell.symbol()) {
+                    continue;
+                }
                 match self.dim {
                     Dim::Blend { .. } => {
                         cell.fg = self.dimmed(cell.fg, self.fg);

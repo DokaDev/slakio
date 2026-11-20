@@ -19,6 +19,7 @@ use super::highlight;
 use crate::action::{Action, PaneAction};
 use crate::app::App;
 use crate::app::pane::{Hit, LinkSpot, Pane};
+use crate::images::Mark;
 use crate::keymap::Ctx;
 use crate::theme::Selection;
 use message::{Kind, Laid};
@@ -83,8 +84,13 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let selected = pane.selected_index(tl);
     let range = pane.range(tl);
     let selected_one = selected;
+    // What pictures each message laid out notes, so those of a message only measured (never
+    // shown) are not asked for.
+    let noted: std::cell::RefCell<HashMap<usize, (Mark, Mark)>> = std::cell::RefCell::default();
     let rows = |i: usize| {
+        let from = app.images.mark();
         let out = message::rows(app, pane, tl, i, w, selected == Some(i) && range.is_none_or(|(a, b)| a == b));
+        noted.borrow_mut().insert(i, (from, app.images.mark()));
         LAID_OUT.with(|c| c.set(c.get() + out.len() as u64));
         out
     };
@@ -171,6 +177,11 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         total += rows.len();
         shown.push((i, rows));
         i += 1;
+    }
+    for (i, (from, to)) in noted.take() {
+        if !shown.iter().any(|(j, _)| *j == i) {
+            app.images.not_shown(from, to);
+        }
     }
     let how = |i: usize| match (focused, pane.visual.is_some()) {
         (_, true) if selected != Some(i) => Selection::Visual,

@@ -127,7 +127,9 @@ fn pictures_come_from_their_hosts_are_drawn_and_removed_on_the_way_out() {
         at = end;
     }
     run.quit();
-    assert!(contains(&m.written(), b"\x1b_Ga=d,d=A,q=2\x1b\\"), "every picture removed on the way out");
+    let written = m.written();
+    assert!(contains(&written, b"\x1b_Ga=d,d=R,x=1,y="), "every id sent removed with its data on the way out");
+    assert!(contains(&written, b"\x1b_Ga=d,d=A,q=2\x1b\\"), "every picture removed on the way out");
 }
 
 #[test]
@@ -181,4 +183,31 @@ fn images_off_from_the_palette_clears_them_and_is_kept_for_the_next_run() {
     run.quit();
     assert_eq!(m.fake.log().iter().filter(|l| l.method() == PICTURES).count(), fetched, "nothing fetched");
     assert!(!contains(&m.written(), b"\x1b_Ga=T"));
+}
+
+#[test]
+fn a_decoder_panic_leaves_the_screen_as_it_is_and_the_app_goes_on() {
+    let m = Machine::new("panic");
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty"), ("SLAKIO_DEBUG_DECODE_PANIC", "1")];
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(300));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("a picture fetched", || m.fake.log().iter().any(|l| l.method() == PICTURES));
+    run.wait_for("the card says there is no preview", |t| t.contains("no preview"));
+    let written = m.written();
+    assert!(!contains(&written, b"\x1b[?1049l"), "the alternate screen was not left");
+    assert!(!contains(&written, b"panicked at"), "no panic message on the screen");
+    assert!(!contains(&written, b"\x1b_Ga=T"), "nothing sent for it");
+    // Keys still work: the help opens and closes.
+    run.type_bytes(b"?");
+    run.wait_for("the help", |t| t.contains("Keys —"));
+    run.type_bytes(b"\x1b");
+    run.wait_for("the help closed", |t| !t.contains("Keys —"));
+    run.quit();
+    let log = std::fs::read_to_string(m.dir.join("state").join("slakio").join("errors.log")).unwrap_or_default();
+    assert!(log.contains("the picture decoder panicked"), "{log}");
+    assert!(!log.contains("https://") && !log.contains("files-tmb") && !log.contains("avatars/"), "{log}");
 }

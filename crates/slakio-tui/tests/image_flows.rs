@@ -17,8 +17,8 @@ use slakio_core::images::Source;
 use slakio_core::model::{FILE_HOST, File, FileId, Message, Ts, UserId};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::Effect;
-use slakio_tui::images::decode::decode;
 use slakio_tui::images::graphics::is_placeholder;
+use slakio_tui::images::prepare;
 
 const THUMB: &str = "files-tmb/T-F1/shot_360.png";
 
@@ -80,8 +80,8 @@ fn deliver(s: &mut Scripted, id: Generation, bytes: Vec<u8>) {
     s.pump();
     for effect in s.d.app.take_effects() {
         if let Effect::Decode(job) = effect {
-            let result = decode(&job.bytes, job.shape, Some((9, 18)));
-            s.d.app.images.decoded(job.source, result);
+            let result = prepare(&job, Some((9, 18)));
+            s.d.app.images.decoded((job.source, job.request), result);
         }
     }
 }
@@ -237,7 +237,11 @@ fn images_off_clears_every_picture_at_once_and_sends_nothing_more() {
     palette(&mut s, "images off");
     assert!(!s.d.app.images.on);
     assert_eq!(saved(&mut s), [("images".to_string(), "off".to_string())], "kept in the config file");
-    assert_eq!(s.d.app.images.take_graphics(), "\x1b_Ga=d,d=A,q=2\x1b\\", "every picture removed at once");
+    assert_eq!(
+        s.d.app.images.take_graphics(),
+        "\x1b_Ga=d,d=I,i=1,q=2\x1b\\\x1b_Ga=d,d=A,q=2\x1b\\",
+        "every picture removed at once, each by its id, then all"
+    );
     assert_eq!(placeholders(&s), 0, "text cards again");
     assert!(s.d.screen().contains("shot.png  PNG · 346 KB"));
     assert!(s.d.status_line().contains("Images: off"), "{}", s.d.status_line());
@@ -306,4 +310,142 @@ fn leaving_avatars_image_removes_the_photos() {
     palette(&mut s, "avatars initials");
     assert!(s.d.app.images.take_graphics().contains("a=d,d=I,"), "the photo leaves the terminal");
     assert_eq!(placeholders(&s), 0, "initials again");
+}
+
+/// Every picture cell on screen and the colour (the picture's id) it is drawn in.
+fn picture_cells(s: &Scripted) -> Vec<ratatui::style::Color> {
+    s.d.buffer().content().iter().filter(|c| is_placeholder(c.symbol())).map(|c| c.fg).collect()
+}
+
+#[test]
+fn a_dialog_s_dim_keeps_every_picture_s_colour_its_id() {
+    for theme in ["high-contrast", "tokyo-night", "dark", "light"] {
+        let mut s = kitty_shown();
+        s.d.app.set_theme(theme, s.d.now).unwrap();
+        let asked = frame(&mut s);
+        for (id, _) in &asked {
+            deliver(&mut s, *id, slakio_world::pictures::png("x", 360, 240));
+        }
+        // More pictures held, so a changed colour could name another one.
+        for n in 0..6 {
+            let extra = Source::Thumb(format!("https://{FILE_HOST}/files-tmb/T-X{n}/x.png"));
+            let ws = s.d.app.model.workspaces()[0].id.clone();
+            s.d.app.images.look(&ws, &extra);
+            s.d.app.ask_images(s.d.now);
+            s.pump();
+            let ids: Vec<Generation> =
+                s.b.held.iter().filter(|r| matches!(r.command, Command::Image { .. })).map(|r| r.id).collect();
+            for id in ids {
+                deliver(&mut s, id, slakio_world::pictures::png("y", 100, 100));
+            }
+        }
+        let ws = s.d.app.model.workspaces()[0].id.clone();
+        let slakio_tui::images::Look::Ready { id, .. } =
+            s.d.app.images.look(&ws, &Source::Thumb(format!("https://{FILE_HOST}/{THUMB}")))
+        else {
+            panic!("{theme}: the preview is held")
+        };
+        let want = slakio_tui::images::graphics::color(id);
+        assert!(picture_cells(&s).iter().all(|c| *c == want), "{theme}: before");
+        // The palette dims the whole screen around it.
+        s.keys(":");
+        let cells = picture_cells(&s);
+        assert!(!cells.is_empty(), "{theme}: some picture cells are around the palette");
+        assert!(cells.iter().all(|c| *c == want), "{theme}: a dimmed picture cell names another picture: {cells:?}");
+        s.keys("esc");
+    }
+}
+
+/// Booted, `deploys` open at 120×40 with pictures on (kitty), its `n` messages each `lines` rows
+/// of text and a picture of its own (`shot<k>.png`).
+fn tall_shown(n: usize, lines: usize) -> Scripted {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.images.env = slakio_tui::images::detect::Env { term: "xterm-kitty".into(), ..Default::default() };
+    (s.d.app.images.setting, s.d.app.images.tty) = ("auto".into(), true);
+    s.d.app.images.resolve();
+    s.d.list_cursor_on("deploys");
+    s.keys("enter");
+    let mut e = s.b.reply(0);
+    let Event::History(page) = &mut e.event else { panic!("a page") };
+    let author = page.messages[0].user.clone();
+    page.messages = (0..n)
+        .map(|k| Message {
+            ts: Ts(1_767_603_600_000_000 + k as u64 * 3_600_000_000),
+            user: author.clone(),
+            text: Remote::new((0..lines).map(|l| format!("line {l} of {k}")).collect::<Vec<_>>().join("\n")),
+            thread: None,
+            reactions: Vec::new(),
+            edited: false,
+            files: vec![File {
+                id: FileId::new(format!("F{k}")),
+                name: Remote::new(format!("shot{k}.png")),
+                kind: Remote::new("PNG"),
+                size: Some(1000),
+                download: Some(format!("https://{FILE_HOST}/files-pri/T-F{k}/download/shot{k}.png")),
+                thumb: Some(format!("https://{FILE_HOST}/files-tmb/T-F{k}/shot{k}_360.png")),
+            }],
+        })
+        .collect();
+    page.complete = true;
+    s.b.push(e);
+    s.pump();
+    s
+}
+
+#[test]
+fn pictures_of_messages_only_measured_off_screen_are_not_asked_for() {
+    let mut s = tall_shown(12, 5);
+    // The newest four are asked for; the newest fails for the network, the others come.
+    let first = frame(&mut s);
+    assert_eq!(first.len(), slakio_tui::images::IN_FLIGHT_MAX);
+    let newest = first.iter().find(|(_, src)| src.address().contains("shot11")).unwrap().0;
+    let i = s.b.held.iter().position(|r| r.id == newest).unwrap();
+    s.b.fail(i, FailKind::Network);
+    s.pump();
+    for (id, _) in first.iter().filter(|(id, _)| *id != newest) {
+        deliver(&mut s, *id, slakio_world::pictures::png("x", 36, 18));
+    }
+    // Its wait is over; the selection goes up past the top of the view: the view where the
+    // newest are is measured to see whether it still fits, then the view moves up.
+    s.d.now += slakio_tui::images::RETRY_AFTER * 2;
+    s.keys("k k k k k k k");
+    let screen = s.d.screen();
+    assert!(!screen.contains("shot11.png"), "the newest is off screen:\n{screen}");
+    let asked = frame(&mut s);
+    for (_, source) in &asked {
+        let name = source.address().rsplit('/').next().unwrap().replace("_360", "");
+        assert!(screen.contains(&name), "{name} was asked for but is not on screen:\n{screen}");
+    }
+}
+
+#[test]
+fn alone_images_and_avatars_go_back_to_what_was_on() {
+    let (mut s, _) = shown(120, 40, false);
+    s.d.app.images.env = slakio_tui::images::detect::Env { term: "xterm-kitty".into(), ..Default::default() };
+    (s.d.app.images.setting, s.d.app.images.tty) = ("on".into(), true);
+    s.d.app.images.resolve();
+    palette(&mut s, "images");
+    assert_eq!(s.d.app.images.setting, "off");
+    palette(&mut s, "images");
+    assert_eq!(s.d.app.images.setting, "on", "back to what it was, not auto");
+    palette(&mut s, "avatars image");
+    palette(&mut s, "avatars");
+    assert!(!s.d.app.settings.avatars);
+    palette(&mut s, "avatars");
+    assert!(s.d.app.settings.avatars && s.d.app.settings.photos, "back to photos, not initials");
+}
+
+#[test]
+fn auto_in_a_terminal_that_shows_no_pictures_says_so() {
+    let (mut s, _) = shown(120, 40, false);
+    s.d.app.images.env = slakio_tui::images::detect::Env {
+        term: "xterm-256color".into(),
+        term_program: "herdr".into(),
+        ..Default::default()
+    };
+    (s.d.app.images.setting, s.d.app.images.tty) = ("off".into(), true);
+    s.d.app.images.resolve();
+    palette(&mut s, "images auto");
+    assert!(!s.d.app.images.on);
+    assert!(s.d.status_line().contains("does not show them"), "{}", s.d.status_line());
 }

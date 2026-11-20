@@ -17,8 +17,9 @@ use ratatui::crossterm::cursor::{SetCursorStyle, Show};
 use ratatui::crossterm::event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture};
 use ratatui::crossterm::queue;
 use ratatui::crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use std::cell::Cell;
 use std::io::{self, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// A shape of the terminal's cursor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -79,6 +80,8 @@ pub struct TermState {
     keys: AtomicBool,
     /// Pictures may have been sent to the terminal (kitty graphics): they are removed.
     pictures: AtomicBool,
+    /// The highest picture id sent: every id up to it is removed (with its data).
+    highest: AtomicU32,
 }
 
 impl TermState {
@@ -88,12 +91,18 @@ impl TermState {
             entered: AtomicBool::new(false),
             keys: AtomicBool::new(false),
             pictures: AtomicBool::new(false),
+            highest: AtomicU32::new(0),
         }
     }
 
     /// Pictures may be sent to the terminal from now on: [`TermState::restore`] removes them all.
     pub fn pictures_on(&self) {
         self.pictures.store(true, Ordering::SeqCst);
+    }
+
+    /// Pictures up to id `highest` may have been sent.
+    pub fn pictures_sent(&self, highest: u32) {
+        self.highest.fetch_max(highest, Ordering::SeqCst);
     }
 
     /// Raw mode was turned on.
@@ -128,9 +137,12 @@ impl TermState {
         if !self.entered.swap(false, Ordering::SeqCst) {
             return Ok(());
         }
-        let cleared = match self.pictures.load(Ordering::SeqCst) {
-            true => out.write_all(crate::images::graphics::delete_all().as_bytes()),
-            false => Ok(()),
+        let cleared = match (self.pictures.load(Ordering::SeqCst), self.highest.load(Ordering::SeqCst)) {
+            (true, 0) => out.write_all(crate::images::graphics::delete_all().as_bytes()),
+            (true, highest) => out
+                .write_all(crate::images::graphics::delete_range(1, highest).as_bytes())
+                .and_then(|()| out.write_all(crate::images::graphics::delete_all().as_bytes())),
+            (false, _) => Ok(()),
         };
         let popped = match self.keys.swap(false, Ordering::SeqCst) {
             true => out.write_all(kitty::pop_sequence().as_bytes()),
@@ -147,6 +159,37 @@ impl TermState {
         let flushed = out.flush();
         cleared.and(popped).and(rest).and(flushed)
     }
+}
+
+thread_local! {
+    /// A panic on this thread is being caught ([`catching`]).
+    static CAUGHT: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Run `f`, a panic in it caught (`Err`): meanwhile the panic hook leaves the terminal as it is
+/// ([`on_panic`]). The mark is taken off afterwards whatever happened, as the thread may run
+/// other work later (a blocking pool's threads are reused).
+pub fn catching<R>(f: impl FnOnce() -> R + std::panic::UnwindSafe) -> std::thread::Result<R> {
+    CAUGHT.with(|c| c.set(true));
+    let result = std::panic::catch_unwind(f);
+    CAUGHT.with(|c| c.set(false));
+    result
+}
+
+/// A panic on this thread now would be caught ([`catching`]).
+pub fn caught() -> bool {
+    CAUGHT.with(Cell::get)
+}
+
+/// What the panic hook does with `state`: a panic that is caught (`caught`) leaves the terminal
+/// as it is and is not reported; any other restores it on `out` (`raw_off` for raw mode) first.
+/// `true` when the panic is to be reported.
+pub fn on_panic(state: &TermState, caught: bool, out: &mut impl Write, raw_off: impl FnOnce()) -> bool {
+    if caught {
+        return false;
+    }
+    let _ = state.restore(out, raw_off);
+    true
 }
 
 /// Restores a [`TermState`] when dropped: a normal return, an error returned with `?`, or a

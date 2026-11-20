@@ -14,7 +14,7 @@ expression: d.snap()
 │   # incidents         │  :workspace            Switch workspace                      Space W │                       │
 │                       │  :help                 Keyboard help                          ? · F1 │                       │
 │ ▾ Ops                 │  :theme <theme>        Change the color theme                        │                       │
-│   # deploys           │  :avatars              Show or hide avatars (initials)               │                       │
+│   # deploys           │  :avatars              Show or hide avatars (initials or photos)     │                       │
 │   # alerts            │  :images               Show or hide picture previews and profile ph… │                       │
 │   # partner-shared ext│  :icons                Show Nerd Font icons, or text instead         │                       │
 │   # hostile-strings   │  :density              Comfortable or compact messages               │                       │

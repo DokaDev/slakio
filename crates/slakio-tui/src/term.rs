@@ -17,14 +17,16 @@ fn raw_off() {
     let _ = disable_raw_mode();
 }
 
-/// Restore the terminal now (the panic hook, before the message is printed).
-pub(crate) fn restore_terminal() {
-    let _ = STATE.restore(&mut io::stdout(), raw_off);
+/// The panic hook's part: the terminal restored, unless the panic is being caught on its thread
+/// ([`terminal::catching`]); `true` when the panic is to be reported.
+pub(crate) fn on_panic() -> bool {
+    terminal::on_panic(&STATE, terminal::caught(), &mut io::stdout(), raw_off)
 }
 
 /// Pictures may be sent to the terminal from now on: the restore removes them.
-pub(crate) fn pictures_on() {
+pub(crate) fn pictures_on(highest: u32) {
     STATE.pictures_on();
+    STATE.pictures_sent(highest);
 }
 
 /// Restores the terminal when dropped. Made before the terminal is set up, so a setup that

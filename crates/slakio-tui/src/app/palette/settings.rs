@@ -35,8 +35,11 @@ impl App {
             return Err(Msg::AvatarsUnknown { name: value, names: AVATAR_VALUES.join(", ") });
         }
         self.settings.avatars = value != "off";
-        self.settings.photos = value == "image";
-        if !self.settings.photos {
+        // Off keeps which kind was on, for `:avatars` alone to bring it back.
+        if value != "off" {
+            self.settings.photos = value == "image";
+        }
+        if !self.settings.photos || !self.settings.avatars {
             self.images.forget_photos();
         }
         self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
@@ -49,9 +52,13 @@ impl App {
     pub(in crate::app) fn toggle(&mut self, a: AppAction, now: Instant) {
         let s = self.settings;
         let done = match a {
-            AppAction::ToggleAvatars => self.set_avatars(if s.avatars { "off" } else { "initials" }, now),
+            AppAction::ToggleAvatars => {
+                let back = if s.photos { "image" } else { "initials" };
+                self.set_avatars(if s.avatars { "off" } else { back }, now)
+            }
             AppAction::ToggleImages => {
-                return self.set_images(if self.images.on { "off" } else { "auto" }, now);
+                let back = self.images.last_on.clone().unwrap_or_else(|| "auto".to_string());
+                return self.set_images(if self.images.setting == "off" { &back } else { "off" }, now);
             }
             AppAction::ToggleDensity => self.set_density(if s.compact { "comfortable" } else { "compact" }, now),
             AppAction::ToggleNetwork => return self.set_net(self.offline(), now),
@@ -105,6 +112,7 @@ impl App {
         self.effects.push(Effect::Save { key: "images", value: value.clone() });
         match self.images.choose(&value) {
             Chosen::Done => self.info(Msg::ImagesChanged { name: value }, now),
+            Chosen::NotHere => self.warn(Msg::Label(Label::ImagesNotHere), now),
             Chosen::Forced => self.warn(Msg::Label(Label::ImagesForced), now),
             Chosen::Pinned(pinned) => {
                 self.warn(Msg::ImagesPinned { name: value, env: IMAGES_ENV.to_string(), value: pinned }, now);

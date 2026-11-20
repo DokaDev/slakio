@@ -207,11 +207,12 @@ fn main() -> ExitCode {
         }
     };
     // Every thread's panic comes here (the hook is process-wide): the terminal is restored
-    // before the message is printed.
+    // before the message is printed; one being caught (a picture's decoder) leaves it as it is.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        term::restore_terminal();
-        default_hook(info);
+        if term::on_panic() {
+            default_hook(info);
+        }
     }));
     let result = rt.block_on(async {
         // Restores the terminal however this block ends (also a setup that fails part way).
@@ -511,7 +512,7 @@ async fn run(
     let mut signals = term::Signals::new()?;
     let mut cursor = Cursor::default();
     let mut redraw = true;
-    let mut decodes = pictures::Pictures::new();
+    let mut decodes = pictures::Pictures::new(saved.errors.clone());
     // A paste being checked with Slack; the desktop app's workspaces being read for `:login`.
     let mut signing_in: inapp::Signing = None;
     let mut scanning: Option<inapp::Scan> = None;
@@ -566,8 +567,8 @@ async fn run(
                 None => break,
             },
             _ = timer => app.on_tick(Instant::now()),
-            (source, result) = decodes.next() => {
-                app.images.decoded(source, result);
+            (job, result) = decodes.next() => {
+                app.images.decoded(job, result);
                 true
             }
             // An answer that came later than its turn: it wakes the loop like a key.

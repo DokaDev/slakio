@@ -1,21 +1,35 @@
-//! The binary's part of the pictures ([`slakio_tui::images`]): decoding them off the loop's
-//! thread (a blocking task each; the app asks for at most a few at once) and writing what the
-//! terminal is sent before a frame is drawn.
+//! The binary's part of the pictures ([`slakio_tui::images`]): making them ready off the loop's
+//! thread (a blocking task each, decode and the commands that send them; the app asks for at
+//! most a few at once) and writing those commands before a frame is drawn, the only part left on
+//! the loop's thread.
+//!
+//! A panic in the decoder is caught there ([`slakio_tui::terminal::catching`]: the panic hook
+//! leaves the terminal as it is): the picture is not shown, and the error log says so in one
+//! line that names no address.
 
 use ratatui::crossterm::terminal::window_size;
+use slakio_core::backend::Generation;
+use slakio_core::fault::{ErrorLog, Fault};
 use slakio_core::images::Source;
 use slakio_tui::app::App;
-use slakio_tui::images::Job;
-use slakio_tui::images::decode::{Decoded, Refused, decode};
+use slakio_tui::images::decode::Refused;
+use slakio_tui::images::{Job, Prepared, prepare};
 use std::io::{self, Write};
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 
-type Done = (Source, Result<Decoded, Refused>);
+/// A job's picture and request, and what came of it.
+type Done = ((Source, Generation), Result<Prepared, Refused>);
 
 /// The decodes on their way, and their results.
 pub(crate) struct Pictures {
-    tx: mpsc::UnboundedSender<Done>,
-    rx: mpsc::UnboundedReceiver<Done>,
+    tx: mpsc::UnboundedSender<(Done, bool)>,
+    rx: mpsc::UnboundedReceiver<(Done, bool)>,
+    /// The error log.
+    errors: Option<PathBuf>,
+    /// Debug builds only (`SLAKIO_DEBUG_DECODE_PANIC=1`): the decoder panics, for the test that
+    /// a panic there leaves the terminal as it is.
+    panic: bool,
 }
 
 /// A cell's size in pixels, when the terminal says the window's (an `ioctl`, not a question on
@@ -26,26 +40,38 @@ fn cell() -> Option<(u16, u16)> {
 }
 
 impl Pictures {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(errors: Option<PathBuf>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        Self { tx, rx }
+        let panic = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_DECODE_PANIC").is_some_and(|v| v == "1");
+        Self { tx, rx, errors, panic }
     }
 
-    /// Decode `job` on a blocking task; its result comes from [`Pictures::next`].
+    /// Make `job` ready on a blocking task; its result comes from [`Pictures::next`].
     pub(crate) fn start(&self, job: Job) {
-        let (tx, cell) = (self.tx.clone(), cell());
+        let (tx, cell, panic) = (self.tx.clone(), cell(), self.panic);
         tokio::task::spawn_blocking(move || {
-            // A panic in the decoder is a picture that is not shown, never the app's end.
-            let result =
-                std::panic::catch_unwind(|| decode(&job.bytes, job.shape, cell)).unwrap_or(Err(Refused::Unreadable));
-            let _ = tx.send((job.source, result));
+            let made = slakio_tui::terminal::catching(|| {
+                assert!(!panic, "SLAKIO_DEBUG_DECODE_PANIC: a panic in the decoder");
+                prepare(&job, cell)
+            });
+            let (result, panicked) = match made {
+                Ok(result) => (result, false),
+                Err(_) => (Err(Refused::Unreadable), true),
+            };
+            let _ = tx.send((((job.source, job.request), result), panicked));
         });
     }
 
-    /// The next decode that ended.
+    /// The next job that ended.
     pub(crate) async fn next(&mut self) -> Done {
         match self.rx.recv().await {
-            Some(done) => done,
+            Some((done, panicked)) => {
+                if panicked {
+                    let fault = Fault::other("the picture decoder panicked; the picture is not shown");
+                    ErrorLog::new(self.errors.clone()).record("picture", &fault);
+                }
+                done
+            }
             // Never: this end holds a sender.
             None => std::future::pending().await,
         }
@@ -56,12 +82,14 @@ impl Pictures {
 pub(crate) fn write(app: &mut App) -> io::Result<()> {
     if app.images.on {
         // From the first time pictures are on, the way out removes them.
-        crate::term::pictures_on();
+        crate::term::pictures_on(app.images.highest);
     }
     let graphics = app.images.take_graphics();
     if graphics.is_empty() {
         return Ok(());
     }
+    // Sent after the ids it names were noted: the way out removes them too.
+    crate::term::pictures_on(app.images.highest);
     let mut out = io::stdout();
     out.write_all(graphics.as_bytes())?;
     out.flush()

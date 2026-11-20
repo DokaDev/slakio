@@ -74,6 +74,11 @@ pub fn delete(id: u32) -> String {
     format!("\x1b_Ga=d,d=I,i={id},q=2\x1b\\")
 }
 
+/// The command that removes the pictures with ids `from` to `to` and frees their data.
+pub fn delete_range(from: u32, to: u32) -> String {
+    format!("\x1b_Ga=d,d=R,x={from},y={to},q=2\x1b\\")
+}
+
 /// The command that removes every picture and frees their data.
 pub fn delete_all() -> &'static str {
     "\x1b_Ga=d,d=A,q=2\x1b\\"

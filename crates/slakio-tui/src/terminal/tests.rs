@@ -241,3 +241,49 @@ fn osc52_puts_base64_text_on_the_clipboard() {
     assert_eq!(base64("\u{D55C}".as_bytes()), "7ZWc");
     assert_eq!(osc52("hi"), "\x1b]52;c;aGk=\x07");
 }
+
+/// A panic being caught (a picture's decoder) leaves the terminal as it is: nothing written, it
+/// stays entered and raw, and the panic is not reported; any other panic restores it.
+#[test]
+fn a_caught_panic_leaves_the_terminal_and_another_restores_it() {
+    let (state, mut screen) = (TermState::new(), Screen::default());
+    state.raw_on();
+    state.enter(&mut screen, true).unwrap();
+    let before = screen.text();
+    let raw = RAW_OFFS.with(Cell::get);
+    assert!(!on_panic(&state, true, &mut screen, raw_off), "not reported");
+    assert_eq!(screen.text(), before, "nothing written");
+    assert_eq!(RAW_OFFS.with(Cell::get), raw, "still raw");
+    assert!(on_panic(&state, false, &mut screen, raw_off), "reported");
+    assert!(screen.text().ends_with(&restore_sequence()), "restored");
+    assert_eq!(RAW_OFFS.with(Cell::get), raw + 1);
+}
+
+#[test]
+fn catching_marks_the_thread_only_while_it_runs() {
+    assert!(!caught());
+    let inside = catching(caught);
+    assert_eq!(inside.ok(), Some(true));
+    assert!(!caught(), "taken off after it ends");
+    let quiet = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let panicked: std::thread::Result<()> = catching(|| panic!("a decoder bug"));
+    std::panic::set_hook(quiet);
+    assert!(panicked.is_err());
+    assert!(!caught(), "taken off after a panic too: the thread runs other work later");
+}
+
+#[test]
+fn the_way_out_removes_every_picture_id_sent_then_all() {
+    let (state, mut screen) = (TermState::new(), Screen::default());
+    state.raw_on();
+    state.enter(&mut screen, false).unwrap();
+    state.pictures_on();
+    state.pictures_sent(7);
+    state.pictures_sent(3);
+    state.restore(&mut screen, raw_off).unwrap();
+    let text = screen.text();
+    let range = text.find("\x1b_Ga=d,d=R,x=1,y=7,q=2\x1b\\").expect("every id up to the highest");
+    let all = text.find("\x1b_Ga=d,d=A,q=2\x1b\\").expect("then all");
+    assert!(range < all && all < text.find(LEAVE).unwrap(), "{text:?}");
+}
