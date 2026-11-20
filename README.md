@@ -280,12 +280,13 @@ background and decoded off the screen's thread.
 
 - Terminals: kitty and Ghostty (the kitty graphics protocol, drawn as ordinary cells, so a
   popup, a split, scrolling or a closed pane never leaves a picture behind). slakio tells them
-  from `TERM` (`xterm-kitty`, `xterm-ghostty`), `KITTY_WINDOW_ID` or `TERM_PROGRAM=ghostty`, and
-  never asks the terminal. Inside a multiplexer (tmux, screen, Zellij, herdr) or any other
-  terminal it draws text, unless told otherwise.
-- `images = "auto"` (the default) in the config, `"on"` to draw pictures whatever slakio can
-  tell (inside a multiplexer that passes the kitty graphics protocol through, for example), or
-  `"off"` never to fetch or draw them. `:images auto|on|off` changes it while slakio runs (off
+  from `TERM` (`xterm-kitty`, `xterm-ghostty`, or `TERM_PROGRAM=ghostty` with `TERM` `xterm` or
+  `xterm-256color`), and never asks the terminal. Inside a multiplexer (tmux, screen, Zellij,
+  herdr, dvtm), Neovim's or Emacs' terminal, or any other terminal it draws text, unless told
+  otherwise.
+- `images = "auto"` (the default) in the config, `"on"` to send pictures whatever slakio can
+  tell (inside tmux, screen or Zellij they will not show: slakio does not wrap them for a
+  multiplexer), or `"off"` never to fetch or draw them. `:images auto|on|off` changes it while slakio runs (off
   removes every picture from the screen at once; `:images` alone switches between off and
   auto) and saves it in the config file. `SLAKIO_IMAGES=auto|on|off` in the environment wins
   over both (slakio says so when you choose otherwise), and `:images on` says when slakio cannot
@@ -297,7 +298,9 @@ background and decoded off the screen's thread.
   `https` only, with no cookie and no token, and no redirect followed. Only an answer that says
   it is an image is read, at most 2 MB of it; a picture larger than 4096 pixels a side or 4.2
   million pixels is refused from its header, before it is decoded. Each picture fetched counts
-  as a background request against the request cap, and the network switches stop it.
+  as a background request against the request cap, and the network switches stop it. With
+  `avatars = "image"`, people whose photo is on Gravatar are fetched from `secure.gravatar.com`,
+  a service outside Slack: it sees your IP address and which photos you look at.
 - slakio keeps at most 64 pictures (24 MiB) in the terminal at once, the least recently shown
   going first; nothing of them is written to disk.
 
