@@ -10,7 +10,9 @@
 # Raised from 8.0: CI's x86_64 Linux build measured 8 371 472 bytes (7.98 MiB) with the bundled
 # SQLite cache and several workspaces, then 8 401 520 bytes (8.01 MiB) with the fixes that keep
 # each workspace's slot, waiting places, keychain entries and cache part its own.
-binary_mib_max = 8.5
+# Raised from 8.5 for picture previews and profile photos: the `image` decoder (PNG, JPEG, GIF)
+# measured about +0.29 MiB on aarch64 macOS, CI's x86_64 Linux build 8.24 MiB before it.
+binary_mib_max = 9.0
 
 [idle]
 # The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
