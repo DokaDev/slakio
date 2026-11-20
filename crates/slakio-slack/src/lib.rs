@@ -12,6 +12,7 @@
 //! * [`login`] — whether credentials sign in (one `client.userBoot`); `people` (crate-private) —
 //!   the names of the people messages and DMs name, looked up in batches and kept;
 //! * [`download`] — a file a message shares, from Slack's file host only, saved safely;
+//!   [`picture`] — a picture's bytes (a file's smaller copy, a profile photo), not saved;
 //! * [`search`] — a workspace's messages a query finds, a page at a time; [`activity`] — the
 //!   user's Activity, a page at a time;
 //! * [`client`] — one workspace's calls through all of the above; [`adapter`] — the backend
@@ -50,6 +51,7 @@ pub mod login;
 pub(crate) mod messages;
 pub mod method;
 pub(crate) mod people;
+pub mod picture;
 pub mod request;
 pub mod response;
 pub mod search;

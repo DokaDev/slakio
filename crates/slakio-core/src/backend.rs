@@ -93,6 +93,10 @@ pub enum Command {
     /// [`FailKind::Cancelled`]. One already being put in place is saved all the same (its
     /// answer says so). Answered with [`Event::Cancelled`].
     Cancel { request: Generation },
+    /// The picture at `source` (a thumbnail or a profile photo of the request's workspace), at
+    /// most `max` bytes of it, as it came: answered with [`Event::Image`]. Read in the
+    /// background; nothing is saved.
+    Image { source: crate::images::Source, max: u64 },
 }
 
 impl Command {
@@ -108,7 +112,8 @@ impl Command {
             | Command::Search { .. }
             | Command::Activity { .. }
             | Command::Download { .. }
-            | Command::Cancel { .. } => false,
+            | Command::Cancel { .. }
+            | Command::Image { .. } => false,
             Command::Save { .. } => true,
         }
     }
@@ -278,6 +283,10 @@ pub enum Event {
     Cancelled {
         request: Generation,
         stopping: bool,
+    },
+    /// The bytes of the picture a [`Command::Image`] asked for, as they came (not decoded).
+    Image {
+        bytes: Vec<u8>,
     },
 }
 

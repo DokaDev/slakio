@@ -76,6 +76,7 @@ pub(crate) fn bot(ws: &str, id: String, b: Bot) -> User {
         org,
         bot: true,
         presence: Presence::Unknown,
+        avatar: None,
     }
 }
 
@@ -116,9 +117,11 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
 
 /// A file Slack lists with a message, when it has an id: named (its title when it has no
 /// name), its kind in words, its size, and where it is downloaded from when it can be (a file
-/// hosted on Slack's file host, not deleted, hidden or hosted elsewhere).
+/// hosted on Slack's file host, not deleted, hidden or hosted elsewhere); for a picture that
+/// can be, the smaller copy it is previewed by ([`thumb`]).
 fn file(f: wire::File) -> Option<File> {
-    let id = f.id.filter(|id| !id.is_empty())?;
+    let id = f.id.clone().filter(|id| !id.is_empty())?;
+    let thumb = thumb(&f);
     let name = f.name.filter(|n| !n.is_empty()).or(f.title).unwrap_or_default();
     let kind = f.pretty_type.filter(|k| !k.is_empty()).or(f.filetype).unwrap_or_default();
     let gone = matches!(f.mode.as_deref(), Some("tombstone" | "hidden_by_limit" | "external"));
@@ -127,7 +130,19 @@ fn file(f: wire::File) -> Option<File> {
         .filter(|_| !gone && f.is_external != Some(true))
         .and_then(|u| crate::download::address(&u));
     let size = f.size.as_ref().and_then(serde_json::Value::as_u64);
-    Some(File { id: FileId::new(id), name: Remote::new(name), kind: Remote::new(kind), size, download })
+    let thumb = thumb.filter(|_| download.is_some());
+    Some(File { id: FileId::new(id), name: Remote::new(name), kind: Remote::new(kind), size, download, thumb })
+}
+
+/// The smaller copy a picture (PNG, JPEG, GIF) is previewed by, on the file host: the 480-pixel
+/// one, else the 360, the 720 or the 160; never the original.
+fn thumb(f: &wire::File) -> Option<String> {
+    if !f.filetype.as_deref().is_some_and(slakio_core::images::previewed) {
+        return None;
+    }
+    [&f.thumb_480, &f.thumb_360, &f.thumb_720, &f.thumb_160]
+        .into_iter()
+        .find_map(|t| t.as_deref().and_then(slakio_core::images::thumb_address))
 }
 
 /// What a message lists in words where only its text is shown (Activity): its text, or the

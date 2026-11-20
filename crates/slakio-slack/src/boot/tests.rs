@@ -79,6 +79,7 @@ fn only_a_channel_shared_with_another_organization_is_slack_connect() {
         org: Org::External(Remote::new("T9")),
         bot: false,
         presence: Presence::Unknown,
+        avatar: None,
     };
     let s = snapshot(boot(json!({}), json!(null)), None, vec![peer], NOW);
     assert!(find(&s, "D1").external);

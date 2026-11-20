@@ -269,6 +269,7 @@ fn an_address_elsewhere_or_none_is_not_asked() {
                 kind: "Plain Text".into(),
                 size: Some(1),
                 download: url.map(str::to_string),
+                thumb: None,
             };
             assert_eq!(failed(&r.download(file, &dir, MAX).await), api("file_not_downloadable"), "{url:?}");
         }

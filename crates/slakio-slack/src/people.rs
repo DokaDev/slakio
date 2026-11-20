@@ -101,6 +101,7 @@ fn user(p: &wire::Person, team: &str) -> Option<User> {
         org,
         bot: p.is_bot == Some(true),
         presence: Presence::Unknown,
+        avatar: p.profile.as_ref().and_then(wire::Profile::avatar),
     })
 }
 

@@ -64,15 +64,29 @@ fn files(fs: &[File]) -> String {
     pack(&parts)
 }
 
-fn unfiles(text: &str) -> rusqlite::Result<Vec<File>> {
+/// The thumbnails of a message's files: one part each, in their order (empty for none).
+fn thumbs(fs: &[File]) -> String {
+    if fs.iter().all(|f| f.thumb.is_none()) {
+        return String::new();
+    }
+    pack(&fs.iter().map(|f| f.thumb.clone().unwrap_or_default()).collect::<Vec<_>>())
+}
+
+/// The files of `text` with the thumbnails of `thumbs` (empty: none, as kept before they were).
+fn unfiles(text: &str, thumbs: &str) -> rusqlite::Result<Vec<File>> {
     let damaged = || rusqlite::Error::InvalidColumnName("damaged files".to_string());
     let parts = unpack(text).ok_or_else(damaged)?;
     if parts.len() % 5 != 0 {
         return Err(damaged());
     }
+    let thumbs = if thumbs.is_empty() { Vec::new() } else { unpack(thumbs).ok_or_else(damaged)? };
+    if !thumbs.is_empty() && thumbs.len() != parts.len() / 5 {
+        return Err(damaged());
+    }
     parts
         .chunks(5)
-        .map(|c| {
+        .enumerate()
+        .map(|(i, c)| {
             let size = if c[3].is_empty() { None } else { Some(c[3].parse().map_err(|_| damaged())?) };
             Ok(File {
                 id: FileId::new(c[0].clone()),
@@ -80,6 +94,7 @@ fn unfiles(text: &str) -> rusqlite::Result<Vec<File>> {
                 kind: Remote::new(c[2].clone()),
                 size,
                 download: Some(c[4].clone()).filter(|d| !d.is_empty()),
+                thumb: thumbs.get(i).filter(|t| !t.is_empty()).cloned(),
             })
         })
         .collect()
@@ -97,7 +112,7 @@ fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
         thread,
         reactions: unreactions(&r.get::<_, String>("reactions")?)?,
         edited: r.get("edited")?,
-        files: unfiles(&r.get::<_, String>("files")?)?,
+        files: unfiles(&r.get::<_, String>("files")?, &r.get::<_, String>("thumbs")?)?,
     })
 }
 
@@ -130,8 +145,8 @@ impl Store {
         for m in &page.messages {
             tx.execute(
                 "INSERT OR REPLACE INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited,
-                     files)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                     files, thumbs)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     ws,
                     conv,
@@ -142,7 +157,8 @@ impl Store {
                     m.thread.map(|t| int(t.last_reply.0)).transpose()?,
                     reactions(&m.reactions),
                     m.edited,
-                    files(&m.files)
+                    files(&m.files),
+                    thumbs(&m.files)
                 ],
             )?;
         }

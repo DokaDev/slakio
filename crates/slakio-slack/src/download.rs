@@ -51,7 +51,7 @@ pub fn address(url: &str) -> Option<String> {
 
 /// Where redirect `location` goes, when it may be fetched: an address on the file
 /// host, or a path on it.
-fn redirect(location: &str) -> Option<String> {
+pub(crate) fn redirect(location: &str) -> Option<String> {
     if location.starts_with('/') && !location.starts_with("//") {
         return address(&format!("https://{FILE_HOST}{location}"));
     }

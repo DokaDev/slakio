@@ -222,6 +222,8 @@ impl App {
             Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
+            // Pictures are not drawn yet.
+            Event::Image { .. } => false,
         };
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);

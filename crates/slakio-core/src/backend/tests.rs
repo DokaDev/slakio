@@ -60,6 +60,7 @@ fn a_snapshot_cut_to_one_workspace_keeps_its_part_only() {
         org: Org::Own,
         bot: false,
         presence: Presence::Unknown,
+        avatar: None,
     };
     let ws = |id: &str| Workspace {
         id: WorkspaceId::new(id),

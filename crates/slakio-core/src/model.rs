@@ -109,6 +109,9 @@ pub struct User {
     pub org: Org,
     pub bot: bool,
     pub presence: Presence,
+    /// Their profile photo: an `https` address on a host of [`crate::images::AVATAR_HOSTS`]
+    /// ([`crate::images::avatar_address`]); `None` when Slack gave none there.
+    pub avatar: Option<String>,
 }
 
 /// What a sidebar section holds, which decides where new conversations land and how the
@@ -235,6 +238,10 @@ pub struct File {
     /// Where it can be downloaded: an `https` address on Slack's file host only, `None` for a
     /// file that cannot be (one hosted elsewhere, deleted, or hidden).
     pub download: Option<String>,
+    /// A smaller copy of a picture to preview it by: an `https` address on Slack's file host
+    /// ([`crate::images::thumb_address`]), `None` for a file that is no picture (PNG, JPEG,
+    /// GIF), cannot be downloaded, or has no such copy.
+    pub thumb: Option<String>,
 }
 
 /// Slack's file host: the only host a file is downloaded from. Spelled in two parts: the

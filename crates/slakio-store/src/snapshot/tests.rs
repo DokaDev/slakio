@@ -147,3 +147,15 @@ fn counts_slack_could_not_tell_keep_those_kept_before() {
         .unwrap();
     assert_eq!(store.snapshot(&ids(&s)).unwrap().unwrap().conversations[0].unread, 0);
 }
+
+#[test]
+fn a_photo_kept_on_another_host_is_none_when_read() {
+    let mut store = writer("snap-avatar");
+    let mut s = World::new(5).snapshot().clone();
+    assert!(s.users.iter().any(|u| u.avatar.is_some()), "the world has photos");
+    s.users[0].avatar = Some("https://evil.example/x.png".to_string());
+    store.put_snapshot(&s).unwrap();
+    let back = store.snapshot(&ids(&s)).unwrap().unwrap();
+    let u = back.users.iter().find(|u| u.id == s.users[0].id).unwrap();
+    assert_eq!(u.avatar, None);
+}

@@ -48,6 +48,9 @@ impl Logged {
         if self.path.starts_with("/files-pri/") {
             return FILES;
         }
+        if self.path.starts_with("/files-tmb/") || self.path.starts_with("/avatars/") {
+            return PICTURES;
+        }
         match self.path.strip_prefix("/api/") {
             Some(m) => m,
             None => self.path.splitn(4, '/').nth(3).unwrap_or(&self.path),
@@ -87,6 +90,10 @@ pub enum Fault {
 
 /// The name file downloads go by in [`FakeSlack::fail_next`] and [`Logged::method`].
 pub const FILES: &str = "files";
+
+/// The name the pictures go by (files' smaller copies, `/files-tmb/…`, and profile photos,
+/// `/avatars/…`, both made by [`slakio_world::pictures`]).
+pub const PICTURES: &str = "pictures";
 
 /// The most bytes of a file the fake serves.
 const FILE_SERVED_MAX: u64 = 8 * 1024 * 1024;
@@ -275,6 +282,9 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     if logged.method() == FILES {
         return serve_file(stream, &world, &logged, fault).await;
     }
+    if logged.method() == PICTURES {
+        return serve_picture(stream, &logged, fault).await;
+    }
     let (status, extra, body) = match fault {
         Some(Fault::Hang | Fault::Partial { .. }) => {
             let mut byte = [0u8; 1];
@@ -332,6 +342,22 @@ async fn serve_file(stream: TcpStream, world: &World, logged: &Logged, fault: Op
             write_raw(stream, 200, &headers, &body).await;
         }
         None => write_raw(stream, 404, &[], b"<html>not found</html>").await,
+    }
+}
+
+/// Answer a picture: the world's PNG its path names, or `fault` (a status, or a raw answer).
+async fn serve_picture(stream: TcpStream, logged: &Logged, fault: Option<Fault>) {
+    match fault {
+        Some(Fault::Raw { status, headers, body }) => write_raw(stream, status, &headers, &body).await,
+        Some(Fault::Status { status, retry_after }) => {
+            let headers: Vec<(String, String)> =
+                retry_after.map(|r| ("retry-after".to_string(), r)).into_iter().collect();
+            write_raw(stream, status, &headers, b"<html>error</html>").await;
+        }
+        _ => match slakio_world::pictures::served(&logged.path) {
+            Some(png) => write_raw(stream, 200, &[("content-type".to_string(), "image/png".to_string())], &png).await,
+            None => write_raw(stream, 404, &[], b"<html>not found</html>").await,
+        },
     }
 }
 

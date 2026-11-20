@@ -28,8 +28,16 @@ fn the_newest_messages_come_back_as_they_were_kept_oldest_first() {
             kind: Remote::new("PDF"),
             size: Some(1234),
             download: Some(format!("https://{}/files-pri/T-F1/download/x.pdf", slakio_core::model::FILE_HOST)),
+            thumb: Some(format!("https://{}/files-tmb/T-F1/x_360.png", slakio_core::model::FILE_HOST)),
         },
-        File { id: FileId::new("F2"), name: Remote::new(""), kind: Remote::new(""), size: None, download: None },
+        File {
+            id: FileId::new("F2"),
+            name: Remote::new(""),
+            kind: Remote::new(""),
+            size: None,
+            download: None,
+            thumb: None,
+        },
     ];
     p.users = vec![world.snapshot().users[0].clone()];
     store.put_page(&p, None, 1_000).unwrap();
@@ -187,8 +195,17 @@ fn a_thread_is_kept_apart_from_its_conversation() {
 
 #[test]
 fn damaged_files_are_damage_not_none() {
-    assert_eq!(unfiles("").unwrap(), Vec::new());
-    assert!(unfiles("2:F1").is_err(), "too few parts");
-    assert!(unfiles("2:F14:name3:PDF3:abc0:").is_err(), "a size that is not a number");
-    assert!(unfiles("9:F").is_err(), "not packed");
+    assert_eq!(unfiles("", "").unwrap(), Vec::new());
+    assert!(unfiles("2:F1", "").is_err(), "too few parts");
+    assert!(unfiles("2:F14:name3:PDF3:abc0:", "").is_err(), "a size that is not a number");
+    assert!(unfiles("9:F", "").is_err(), "not packed");
+}
+
+#[test]
+fn thumbnails_follow_their_files_and_damaged_ones_are_damage() {
+    let one = "2:F14:name3:PNG1:20:";
+    assert_eq!(unfiles(one, "").unwrap()[0].thumb, None, "kept before thumbnails were: none");
+    assert_eq!(unfiles(one, "0:").unwrap()[0].thumb, None, "an empty one is none");
+    assert!(unfiles(one, "0:0:").is_err(), "more thumbnails than files");
+    assert!(unfiles(one, "9:x").is_err(), "not packed");
 }

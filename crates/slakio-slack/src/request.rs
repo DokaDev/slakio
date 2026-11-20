@@ -122,7 +122,7 @@ impl Os {
         }
     }
 
-    fn user_agent(self) -> String {
+    pub(crate) fn user_agent(self) -> String {
         let platform = match self {
             Os::Mac => "Macintosh; Intel Mac OS X 10_15_7",
             Os::Windows => "Windows NT 10.0; Win64; x64",

@@ -106,6 +106,7 @@ fn a_person_listed_by_two_workspaces_is_kept_as_each_one_sees_them() {
         org,
         bot: false,
         presence: slakio_core::model::Presence::Unknown,
+        avatar: None,
     };
     let mut m = Model::default();
     m.add_users(&a, &[peer(&a, Org::Own)]);
@@ -322,6 +323,7 @@ fn a_bot_s_names_kept_as_people_are_capped() {
         org: slakio_core::model::Org::Own,
         bot: true,
         presence: slakio_core::model::Presence::Unknown,
+        avatar: None,
     };
     for i in 0..1000 {
         m.add_users(&w, &[bot(i)]);

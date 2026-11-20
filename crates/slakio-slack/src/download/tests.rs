@@ -60,6 +60,7 @@ fn a_web_page_is_a_file_only_when_one_was_asked_for() {
         kind: "".into(),
         size: None,
         download: None,
+        thumb: None,
     };
     assert!(a_page_instead(Some("text/html; charset=utf-8"), &file("a.pdf")));
     assert!(a_page_instead(Some(" TEXT/HTML"), &file("a")));

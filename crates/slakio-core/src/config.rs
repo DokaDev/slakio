@@ -7,7 +7,7 @@
 //!                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
 //!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
-//! avatars = "initials"     # a person's initials on a colored chip, or "off"
+//! avatars = "initials"     # a person's initials on a colored chip, "image" (profile photos), or "off"
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
 //! nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" to the view shown
 //! network = "on"           # "off": nothing is sent to Slack at all (also SLAKIO_NETWORK=off)
@@ -19,15 +19,19 @@
 //! restore = "on"           # "off": the tabs and panes of the last run are not opened again
 //! downloads = ""           # the folder files are saved in ("": Downloads/slakio in your home)
 //! download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
+//! images = "auto"          # pictures where the terminal surely draws them; "on" always, "off" never
+//!                          # (SLAKIO_IMAGES=auto|on|off wins over it)
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
 //! terminal's own colors. A family takes its light or its dark variant by the terminal's
 //! background. `:theme <name>` changes it while the app runs and saves it here (comments kept).
 //!
-//! `avatars = "image"` is kept for profile photos, which come in a later version; until then it
-//! draws initials, as it will where a terminal cannot show images. `:avatars` changes the
-//! setting while the app runs and saves it here too.
+//! `avatars = "image"` shows people's profile photos where the terminal can draw images (the
+//! kitty graphics protocol: kitty, Ghostty) and `images` lets them; elsewhere it draws initials.
+//! `:avatars` changes the setting while the app runs and saves it here too. `images`
+//! (the default `"auto"`) shows previews of the pictures messages share in such a terminal, never
+//! inside a multiplexer; `"on"` sends them whatever the terminal, `"off"` never.
 //!
 //! `rail_expand` was a setting of the left rail (later the top bar, now the view switcher): a
 //! file that still has it is used as it is, and the app says the key can go
@@ -50,7 +54,8 @@ pub struct Config {
     pub theme: String,
     /// Nerd Font icons instead of letters: `on`, `off`, or `ask` (asked once, the answer saved).
     pub icons: String,
-    /// How a person is pictured: `initials`, `off`, or `image` (initials for now) ([`AVATARS`]).
+    /// How a person is pictured: `initials`, `off`, or `image` (a photo where the terminal draws
+    /// images, else initials) ([`AVATARS`]).
     pub avatars: String,
     /// How messages are laid out: `comfortable` or `compact` ([`DENSITIES`]).
     pub density: String,
@@ -79,6 +84,9 @@ pub struct Config {
     /// The largest file downloaded, in megabytes of 1,000,000 bytes, the unit file sizes are
     /// shown in ([`DOWNLOAD_MAX_MB`]).
     pub download_max_mb: u32,
+    /// Pictures (previews, photos): `auto` where the terminal surely draws them, `on`, `off`
+    /// ([`IMAGES`]).
+    pub images: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -104,6 +112,7 @@ impl Default for Config {
             restore: "on".to_string(),
             downloads: String::new(),
             download_max_mb: 1024,
+            images: "auto".to_string(),
             path: None,
             retired: Vec::new(),
         }
@@ -153,6 +162,9 @@ pub const LIVE: &[&str] = &["on", "off"];
 
 /// The values `cache` takes.
 pub const CACHE: &[&str] = &["on", "off"];
+
+/// The values `images` takes.
+pub const IMAGES: &[&str] = &["auto", "on", "off"];
 
 /// The values `restore` takes.
 pub const RESTORE: &[&str] = &["on", "off"];
@@ -232,6 +244,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "network" => cfg.network = one_of(item, NETWORK).ok_or_else(|| bad(NETWORK.join(", ")))?,
             "live" => cfg.live = one_of(item, LIVE).ok_or_else(|| bad(LIVE.join(", ")))?,
             "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,
+            "images" => cfg.images = one_of(item, IMAGES).ok_or_else(|| bad(IMAGES.join(", ")))?,
             "restore" => cfg.restore = one_of(item, RESTORE).ok_or_else(|| bad(RESTORE.join(", ")))?,
             "cache_messages" => {
                 cfg.cache_messages = within(item, &CACHE_MESSAGES).ok_or_else(|| bad(span(&CACHE_MESSAGES)))?

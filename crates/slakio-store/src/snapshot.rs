@@ -84,10 +84,10 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
     };
     let ord = ord.map(|o| int(o as u64)).transpose()?;
     tx.execute(
-        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence, avatar)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT (workspace, id) DO UPDATE SET ord = COALESCE(?3, ord), name = ?4, display_name = ?5,
-             org = ?6, bot = ?7, presence = ?8",
+             org = ?6, bot = ?7, presence = ?8, avatar = ?9",
         params![
             u.workspace.as_str(),
             u.id.as_str(),
@@ -96,7 +96,8 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
             u.display_name.unsanitized(),
             org,
             u.bot,
-            presence_code(u.presence)
+            presence_code(u.presence),
+            u.avatar.as_deref().unwrap_or_default()
         ],
     )?;
     Ok(())
@@ -114,6 +115,8 @@ pub(crate) fn user(r: &Row<'_>) -> rusqlite::Result<User> {
         },
         bot: r.get("bot")?,
         presence: presence(r.get("presence")?)?,
+        // Kept as it came; checked again, as a backend's would be.
+        avatar: slakio_core::images::avatar_address(&r.get::<_, String>("avatar")?),
     })
 }
 

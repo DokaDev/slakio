@@ -81,6 +81,10 @@ pub const MIGRATIONS: &[&str] = &[
     // 3: the files a message shares (packed: id, name, kind, size, address; each file five
     // parts); a message kept before has none.
     "ALTER TABLE messages ADD COLUMN files TEXT NOT NULL DEFAULT '';",
+    // 4: the smaller copies pictures are previewed by (packed: one address or empty per file, in
+    // the files' order) and people's profile photos ('' for none); kept before: none.
+    "ALTER TABLE messages ADD COLUMN thumbs TEXT NOT NULL DEFAULT '';
+     ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';",
 ];
 
 /// Where a database stands against `migrations`.

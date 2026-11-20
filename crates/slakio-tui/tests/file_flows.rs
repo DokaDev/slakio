@@ -39,6 +39,7 @@ fn file(id: &str, name: &str, kind: &str, size: Option<u64>, download: bool) -> 
         kind: Remote::new(kind),
         size,
         download: download.then(|| format!("https://{}/files-pri/T-{id}/download/x", slakio_core::model::FILE_HOST)),
+        thumb: None,
     }
 }
 

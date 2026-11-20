@@ -136,3 +136,25 @@ fn a_message_kept_before_files_were_has_none() {
     let files: String = conn.query_row("SELECT files FROM messages", [], |r| r.get(0)).unwrap();
     assert_eq!(files, "");
 }
+
+#[test]
+fn a_message_and_a_person_kept_before_pictures_were_have_none() {
+    let mut conn = memory();
+    migrate(&mut conn, &MIGRATIONS[..3]).unwrap();
+    conn.execute(
+        "INSERT INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited, files)
+         VALUES ('T', 'C', 1, 'U', 'old', NULL, NULL, '', 0, '')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence)
+         VALUES ('T', 'U', 0, 'u', 'U', NULL, 0, 0)",
+        [],
+    )
+    .unwrap();
+    migrate(&mut conn, MIGRATIONS).unwrap();
+    let thumbs: String = conn.query_row("SELECT thumbs FROM messages", [], |r| r.get(0)).unwrap();
+    let avatar: String = conn.query_row("SELECT avatar FROM users", [], |r| r.get(0)).unwrap();
+    assert_eq!((thumbs.as_str(), avatar.as_str()), ("", ""));
+}

@@ -200,6 +200,7 @@ fn thread_cut_at(w: u16, h: u16) {
         org: slakio_core::model::Org::Own,
         bot: true,
         presence: Presence::Unknown,
+        avatar: None,
     });
     s.b.push(e);
     s.pump();
@@ -242,6 +243,7 @@ fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
             org: Org::External(Remote::new("TPARTNER".to_string())),
             bot: true,
             presence: Presence::Unknown,
+            avatar: None,
         });
         s.b.push(e);
         s.pump();

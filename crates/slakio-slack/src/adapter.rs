@@ -12,7 +12,8 @@
 //! A file is downloaded on a task of its own ([`crate::download`]), at most
 //! [`DOWNLOADS_MAX`] at once (one more is answered `Failed(Busy)`): it tells how much has come
 //! as it comes, and is answered once, with the path it was saved as or why it was not. A
-//! `Cancel` tells it to stop (its own answer then says it was cancelled).
+//! `Cancel` tells it to stop (its own answer then says it was cancelled). A picture
+//! ([`crate::picture`]) is read on a task of its own too, at most [`PICTURES_MAX`] at once.
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
 //! first: opening it again meanwhile fetches it once.
@@ -53,6 +54,10 @@ pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(
 
 /// The most files downloaded at once.
 pub const DOWNLOADS_MAX: usize = 2;
+
+/// The most pictures read at once by one workspace's backend (one more is answered
+/// `Failed(Busy)`).
+pub const PICTURES_MAX: usize = 4;
 
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };
@@ -157,8 +162,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     let mut searching: Option<InFlight> = None;
     // The page of Activity on its way: a newer one supersedes it.
     let mut noticing: Option<InFlight> = None;
-    // The downloads on their way.
-    let mut downloading: Vec<Downloading> = Vec::new();
+    // The downloads and the pictures on their way.
+    let (mut downloading, mut pictures): (Vec<Downloading>, Vec<InFlight>) = (Vec::new(), Vec::new());
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -217,8 +222,8 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 }
                 *slot = Some(spawn_once(&mut tasks, tx, id, listed(client, ctx, command)));
             }
-            command @ (Command::Download { .. } | Command::Cancel { .. }) => {
-                if !downloads(&mut tasks, &mut downloading, (client, tx), id, command).await {
+            command @ (Command::Download { .. } | Command::Cancel { .. } | Command::Image { .. }) => {
+                if !downloads(&mut tasks, (&mut downloading, &mut pictures), (client, tx), id, command).await {
                     return;
                 }
             }
@@ -252,6 +257,27 @@ fn spawn_boot(
     });
 }
 
+/// Read the picture at `source` (at most `max` bytes, and never more than
+/// [`slakio_core::images::BYTES_MAX`]) on a task of its own, unless [`PICTURES_MAX`] are on
+/// their way already (answered `Busy` then). `false` when the UI is gone.
+async fn picture(
+    tasks: &mut JoinSet<()>,
+    pictures: &mut Vec<InFlight>,
+    (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
+    id: Generation,
+    (source, max): (slakio_core::images::Source, u64),
+) -> bool {
+    pictures.retain(|p| !p.task.is_finished());
+    if pictures.len() >= PICTURES_MAX {
+        let e = SlackError::Busy;
+        return tx.send(Envelope::failed(id, e.kind(), e.detail())).await.is_ok();
+    }
+    let max = max.min(slakio_core::images::BYTES_MAX);
+    let work = async move { crate::picture::picture(&client, &source, max).await.map(|bytes| Event::Image { bytes }) };
+    pictures.push(spawn_once(tasks, tx, id, work));
+    true
+}
+
 /// A download on its way: its request, its task, and what tells it to stop.
 struct Downloading {
     id: Generation,
@@ -259,10 +285,10 @@ struct Downloading {
     stop: watch::Sender<bool>,
 }
 
-/// A download asked for, or one told to stop. `false` when the UI is gone.
+/// A download asked for, one told to stop, or a picture. `false` when the UI is gone.
 async fn downloads(
     tasks: &mut JoinSet<()>,
-    downloading: &mut Vec<Downloading>,
+    (downloading, pictures): (&mut Vec<Downloading>, &mut Vec<InFlight>),
     (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
     id: Generation,
     command: Command,
@@ -270,6 +296,7 @@ async fn downloads(
     match command {
         Command::Download { file, dir, max } => download(tasks, downloading, (client, tx), id, (file, dir, max)).await,
         Command::Cancel { request } => cancel(downloading, &tx, id, request).await,
+        Command::Image { source, max } => picture(tasks, pictures, (client, tx), id, (source, max)).await,
         // The other commands have arms of their own in `run`: none comes here.
         _ => true,
     }

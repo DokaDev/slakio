@@ -62,6 +62,18 @@ impl Backend for DemoBackend {
                     Err(kind) => Event::Failed { request: request.id, kind, detail: "demo download".to_string() },
                 }
             }
+            // The world's invented pictures, by their addresses' paths.
+            Command::Image { source, max } => {
+                let path = source.address().split_once(".com").map_or("", |(_, p)| p);
+                match slakio_world::pictures::served(path).filter(|b| b.len() as u64 <= max) {
+                    Some(bytes) => Event::Image { bytes },
+                    None => Event::Failed {
+                        request: request.id,
+                        kind: FailKind::Api { code: "file_not_available".to_string() },
+                        detail: "demo picture".to_string(),
+                    },
+                }
+            }
             // Every download is answered as it is asked for: none is still on its way.
             Command::Cancel { request } => Event::Cancelled { request, stopping: false },
             // A change that does not apply changes nothing; the answer is the list as it is.

@@ -23,6 +23,7 @@
 pub mod activity;
 pub mod files;
 mod hostile;
+pub mod pictures;
 mod rng;
 mod saved;
 mod search;
@@ -407,6 +408,7 @@ impl World {
             me: UserId::new(format!("UDEMO{}000", &spec.id[5..])),
         });
         let user = |id: String, name: &str, display: &str, org: Org, bot: bool| User {
+            avatar: crate::pictures::avatar(&ws, &id, bot),
             id: UserId::new(id),
             workspace: ws.clone(),
             name: name.into(),

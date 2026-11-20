@@ -49,7 +49,8 @@ fn address(team: &str, id: &FileId, name: &str) -> String {
 fn file(team: &str, id: String, (name, kind, size): (&str, &str, u64), download: bool) -> File {
     let id = FileId::new(id);
     let download = download.then(|| address(team, &id, name));
-    File { id, name: name.into(), kind: kind.into(), size: Some(size), download }
+    let thumb = download.as_ref().and_then(|_| crate::pictures::thumb(team, id.as_str(), name));
+    File { id, name: name.into(), kind: kind.into(), size: Some(size), download, thumb }
 }
 
 /// The files message `index` of `conversation` (named `name`, of workspace `team`) shares.

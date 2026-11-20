@@ -179,6 +179,7 @@ fn a_bot_s_names_no_message_names_go() {
         org: slakio_core::model::Org::Own,
         bot: true,
         presence: slakio_core::model::Presence::Unknown,
+        avatar: None,
     };
     let mut kept_msgs = messages(3, 5);
     kept_msgs[2].user = UserId::new("BHOOK~0000000000000002");

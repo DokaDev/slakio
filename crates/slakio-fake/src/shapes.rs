@@ -192,6 +192,13 @@ fn file(f: &slakio_core::model::File) -> Value {
         v["url_private_download"] = json!(url);
         v["url_private"] = json!(url);
     }
+    if let Some(thumb) = &f.thumb {
+        v["filetype"] = json!("png");
+        v["mimetype"] = json!("image/png");
+        v["thumb_360"] = json!(thumb);
+        v["thumb_360_w"] = json!(slakio_world::pictures::THUMB_SIZE.0);
+        v["thumb_360_h"] = json!(slakio_world::pictures::THUMB_SIZE.1);
+    }
     v
 }
 
@@ -296,6 +303,14 @@ fn person(world: &World, id: &str) -> Option<Value> {
     let mut profile = json!({"real_name": u.display_name.unsanitized()});
     if id.len().is_multiple_of(2) {
         profile["display_name"] = json!(u.display_name.unsanitized());
+    }
+    if let Some(photo) = &u.avatar {
+        profile["image_72"] = json!(photo);
+    }
+    // The hostile person (`…666`) has a photo where no photo may come from: never fetched.
+    if id.ends_with("666") {
+        profile["image_72"] = json!("https://evil.example/avatar.png");
+        profile["image_48"] = json!("http://evil.example/avatar.png");
     }
     Some(json!({
         "id": id,

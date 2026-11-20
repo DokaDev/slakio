@@ -167,6 +167,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
             org: Org::Own,
             bot: false,
             presence,
+            avatar: None,
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
         .collect(),

@@ -515,6 +515,16 @@ impl Governor {
         self.count(Priority::User, None)
     }
 
+    /// A picture (a file's smaller copy, a profile photo) may be fetched now: the network is
+    /// on and the caps have room. It counts as one background request of `lane` (pictures are
+    /// read for the screen, not asked for): the user's own requests keep their share.
+    pub fn picture(&self, lane: &Lane) -> Result<(), SlackError> {
+        if !self.is_on() {
+            return Err(SlackError::Offline { why: "the network is switched off" });
+        }
+        self.count(Priority::Background, Some(lane))
+    }
+
     /// Requests let through so far.
     pub fn sent(&self) -> u32 {
         self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).total

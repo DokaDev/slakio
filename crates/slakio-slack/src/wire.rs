@@ -184,6 +184,18 @@ pub struct Person {
 pub struct Profile {
     pub display_name: Option<String>,
     pub real_name: Option<String>,
+    /// The profile photo, 72 and 48 pixels square.
+    pub image_72: Option<String>,
+    pub image_48: Option<String>,
+}
+
+impl Profile {
+    /// The profile photo, when it is on an avatar host ([`slakio_core::images::avatar_address`]).
+    pub fn avatar(&self) -> Option<String> {
+        [&self.image_72, &self.image_48]
+            .into_iter()
+            .find_map(|i| i.as_deref().and_then(slakio_core::images::avatar_address))
+    }
 }
 
 impl Person {
@@ -285,6 +297,12 @@ pub struct File {
     /// `hosted`, `snippet`, `external`, `tombstone` (deleted), `hidden_by_limit`, …
     pub mode: Option<String>,
     pub is_external: Option<bool>,
+    /// Smaller copies of a picture, on the file host (`thumb_480` is 480 pixels on its longer
+    /// side, at most).
+    pub thumb_160: Option<String>,
+    pub thumb_360: Option<String>,
+    pub thumb_480: Option<String>,
+    pub thumb_720: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
