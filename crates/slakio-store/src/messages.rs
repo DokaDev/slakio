@@ -94,7 +94,8 @@ fn unfiles(text: &str, thumbs: &str) -> rusqlite::Result<Vec<File>> {
                 kind: Remote::new(c[2].clone()),
                 size,
                 download: Some(c[4].clone()).filter(|d| !d.is_empty()),
-                thumb: thumbs.get(i).filter(|t| !t.is_empty()).cloned(),
+                // Kept as it came; checked again, as a backend's would be.
+                thumb: thumbs.get(i).and_then(|t| slakio_core::images::thumb_address(t)),
             })
         })
         .collect()

@@ -209,3 +209,12 @@ fn thumbnails_follow_their_files_and_damaged_ones_are_damage() {
     assert!(unfiles(one, "0:0:").is_err(), "more thumbnails than files");
     assert!(unfiles(one, "9:x").is_err(), "not packed");
 }
+
+#[test]
+fn a_thumbnail_kept_on_another_host_is_none_when_read() {
+    let one = "2:F14:name3:PNG1:20:";
+    let packed = pack(&["https://evil.example/x.png".to_string()]);
+    assert_eq!(unfiles(one, &packed).unwrap()[0].thumb, None);
+    let good = format!("https://{}/files-tmb/T-F1/x_360.png", slakio_core::model::FILE_HOST);
+    assert_eq!(unfiles(one, &pack(std::slice::from_ref(&good))).unwrap()[0].thumb, Some(good));
+}

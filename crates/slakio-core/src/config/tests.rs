@@ -171,3 +171,20 @@ fn the_download_settings_are_read_within_their_ranges() {
         assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn a_saved_setting_is_the_user_s_alone() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = scratch("private");
+    let path = dir.join("slakio").join("config.toml");
+    set(&path, "images", "off").unwrap();
+    let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(&path), 0o600, "the file");
+    assert_eq!(mode(path.parent().unwrap()), 0o700, "the folder made for it");
+    // A file there already, readable by others, is the user's alone once written.
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    set(&path, "images", "auto").unwrap();
+    assert_eq!(mode(&path), 0o600);
+    let _ = std::fs::remove_dir_all(&dir);
+}

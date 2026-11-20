@@ -302,10 +302,12 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
         *new.decor_mut() = old.decor().clone();
     }
     doc[key] = item;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| Fault::io_at(&e, dir))?;
+    // The settings are the user's own: a folder made for them here and the file are theirs
+    // alone (a folder there already is left as it is: `--config` may name a file anywhere).
+    if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty() && !d.exists()) {
+        crate::fsutil::private_dir(dir).map_err(|e| Fault::io_at(&e, dir))?;
     }
-    crate::fsutil::atomic_write(path, doc.to_string().as_bytes()).map_err(|e| Fault::io_at(&e, path))
+    crate::fsutil::atomic_write_private(path, doc.to_string().as_bytes()).map_err(|e| Fault::io_at(&e, path))
 }
 
 #[cfg(test)]
