@@ -320,6 +320,9 @@ const SAME_IN_KO: &[&str] = &[
     // workspace's name and host in the list `slakio logout` prints.
     "fail.workspace",
     "logout.listed",
+    // Only placeholders and punctuation: a theme file's path, the line and what is wrong there.
+    "theme_file.at_line",
+    "theme_file.in_file",
 ];
 
 #[test]

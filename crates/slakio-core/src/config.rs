@@ -5,7 +5,8 @@
 //! language = "auto"        # "auto" (from LC_ALL / LC_MESSAGES / LANG), "en" or "ko"
 //! theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast", "nord",
 //!                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
-//!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
+//!                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark),
+//!                          # or the name of a theme file (themes/<name>.toml, next to this file)
 //! icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true/false work too)
 //! avatars = "initials"     # a person's initials on a colored chip, "image" (profile photos), or "off"
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
@@ -50,7 +51,8 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     /// The UI language setting: `auto`, `en` or `ko` ([`crate::i18n::detect_lang`]).
     pub language: String,
-    /// The color theme: `auto` or a built-in ([`THEMES`]).
+    /// The color theme: `auto`, a built-in ([`THEMES`]) or a theme file's name
+    /// ([`crate::theme_file`]).
     pub theme: String,
     /// Nerd Font icons instead of letters: `on`, `off`, or `ask` (asked once, the answer saved).
     pub icons: String,
@@ -122,7 +124,8 @@ impl Default for Config {
 /// The values `language` takes.
 pub const LANGUAGES: &[&str] = &["auto", "en", "ko"];
 
-/// The values `theme` takes (the UI's built-in themes).
+/// The built-in values `theme` takes (the UI's built-in themes); a theme file's name is taken
+/// too ([`theme_name`]).
 pub const THEMES: &[&str] = &[
     "auto",
     "terminal",
@@ -255,7 +258,12 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "download_max_mb" => {
                 cfg.download_max_mb = within(item, &DOWNLOAD_MAX_MB).ok_or_else(|| bad(span(&DOWNLOAD_MAX_MB)))?
             }
-            "theme" => cfg.theme = one_of(item, THEMES).ok_or_else(|| bad(THEMES.join(", ")))?,
+            "theme" => {
+                cfg.theme = item
+                    .as_str()
+                    .and_then(theme_name)
+                    .ok_or_else(|| bad(format!("{}, or a theme file's name", THEMES.join(", "))))?
+            }
             "icons" => {
                 cfg.icons = match item.as_bool() {
                     Some(true) => "on".to_string(),
@@ -272,6 +280,17 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
 /// The string value of `item` when it is one of `allowed` (case ignored), lowercased.
 fn one_of(item: &toml_edit::Item, allowed: &[&str]) -> Option<String> {
     item.as_str().map(str::to_ascii_lowercase).filter(|v| allowed.contains(&v.as_str()))
+}
+
+/// The `theme` setting `value` stands for: a built-in ([`THEMES`], case ignored, lowercased) or
+/// a theme file's name ([`crate::theme_file::valid_name`], kept as it is). Whether the file is
+/// there is checked when the theme is loaded.
+pub fn theme_name(value: &str) -> Option<String> {
+    let lower = value.to_ascii_lowercase();
+    if THEMES.contains(&lower.as_str()) {
+        return Some(lower);
+    }
+    crate::theme_file::valid_name(value).then(|| value.to_string())
 }
 
 /// The whole number `item` when it is in `range`.

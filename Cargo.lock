@@ -2461,6 +2461,7 @@ dependencies = [
  "libc",
  "proptest",
  "rustix",
+ "serde",
  "tokio",
  "toml",
  "toml_edit",

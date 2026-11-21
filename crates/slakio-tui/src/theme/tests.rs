@@ -162,7 +162,16 @@ fn auto_takes_tokyo_night_on_a_truecolor_terminal_and_its_variant_by_the_backgro
     for n in NAMES {
         let _ = resolve(n, true, Background::Unknown);
     }
-    assert_eq!(slakio_core::config::THEMES, NAMES, "the config file accepts exactly the theme names");
+    // The config file takes every built-in by its name (and theme files' names besides).
+    let builtins = slakio_core::config::THEMES;
+    assert_eq!(builtins.len(), NAMES.len(), "the config's built-in list is the UI's");
+    for n in builtins {
+        assert!(NAMES.contains(n), "{n}: a built-in of the config is a theme of the UI");
+    }
+    for n in NAMES {
+        assert_eq!(slakio_core::config::theme_name(n).as_deref(), Some(*n), "{n}: accepted as it is");
+        assert!(slakio_core::theme_file::shadows(n), "{n}: no theme file may take its name");
+    }
 }
 
 #[test]

@@ -65,6 +65,29 @@
 "config.bad_value" = "{key} = {value} is not valid (expected {allowed}); using the defaults"
 "config.save_failed" = "The setting could not be saved in the config file"
 
+# Theme files (themes/<name>.toml next to the config file): why one cannot be used.
+"theme_file.at_line" = "{path}:{line}: {problem}"
+"theme_file.in_file" = "{path}: {problem}"
+"theme_file.bad_name" = "{name} is not a theme file's name (1 to 64 letters, digits, - and _)"
+"theme_file.builtin_name" = "{name} is the name of a built-in theme"
+"theme_file.missing" = "Unknown theme {name}: there is no {path}"
+"theme_file.no_dir" = "Unknown theme {name}: there is no config folder for theme files"
+"theme_file.shadows" = "{path} has the name of a built-in theme and is not read"
+"theme_file.symlink" = "{path} is a symbolic link"
+"theme_file.not_plain" = "{path} is not a plain file"
+"theme_file.too_large" = "{path} is larger than 64 KiB"
+"theme_file.read_failed" = "{path} could not be read"
+"theme_file.not_text" = "not UTF-8 text"
+"theme_file.unknown_token" = "{name} is not a theme token"
+"theme_file.not_a_color" = "{name} is a style: it goes under [styles]"
+"theme_file.not_a_style" = "{name} is not a style: it goes under [colors]"
+"theme_file.bad_color" = "{value} is not a colour (#rrggbb, an ANSI name or default)"
+"theme_file.bad_modifier" = "{value} is not a modifier (bold, dim, italic, underlined, reversed or crossed-out)"
+"theme_file.unknown_base" = "extends names no built-in theme: {name}"
+"theme_file.bad_palette" = "{name} needs a list of 1 to 16 colours"
+"theme_file.bad_percent" = "{name} needs a whole number from 0 to 100"
+"theme_file.bad_dim" = "dim needs \"modifier\" or a table of toward (#rrggbb) and keep (0 to 100)"
+
 # The empty work area without a backend.
 
 # The views (the view switcher, the first rows of the list panel).

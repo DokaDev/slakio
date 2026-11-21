@@ -13,6 +13,7 @@
 //!   makes it mandatory for anything remote.
 //! * [`fault`] — failures as data (a kind the UI words, a detail for the error log).
 //! * [`i18n`] — the embedded en/ko message catalogs.
+//! * [`theme_file`] — theme files (`themes/<name>.toml`), read and checked strictly.
 //!
 //! This crate must never depend on a UI crate (ratatui/crossterm), a network or database crate,
 //! or another slakio crate.
@@ -29,3 +30,4 @@ pub mod model;
 pub mod paths;
 pub mod sanitize;
 pub mod secret;
+pub mod theme_file;

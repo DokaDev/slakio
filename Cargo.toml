@@ -107,7 +107,7 @@ serde_json = "1.0.151"
 # variant; asked once at startup, before the event stream reads stdin.
 terminal-colorsaurus = "1.0.3"
 tokio = "1"
-# Reading the locale catalogs in build.rs and the budgets of the bench crate.
+# Reading the locale catalogs in build.rs, theme files and the budgets of the bench crate.
 toml = "1.1.6"
 # The config file and the one-time notices file: read and written keeping comments and order.
 toml_edit = "0.25"

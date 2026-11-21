@@ -66,7 +66,26 @@ fn a_bad_value_names_the_allowed_ones() {
         parse("icons = \"yes\""),
         Err(ConfigError::Value { key: "icons".into(), value: "\"yes\"".into(), allowed: "on, off, ask".into() })
     );
-    assert!(matches!(parse("theme = \"solarized\""), Err(ConfigError::Value { .. })));
+}
+
+#[test]
+fn the_theme_is_a_built_in_or_a_theme_file_name() {
+    let theme = |t: &str| parse(t).map(|c| c.theme);
+    assert_eq!(theme("theme = \"mine\""), Ok("mine".to_string()), "a theme file's name");
+    assert_eq!(theme("theme = \"My_Theme-2\""), Ok("My_Theme-2".to_string()), "kept as written");
+    assert_eq!(theme("theme = \"Dark\""), Ok("dark".to_string()), "a built-in, ignoring case");
+    let allowed = format!("{}, or a theme file's name", THEMES.join(", "));
+    for bad in ["../x", "a.b", "", "x/y"] {
+        let text = format!("theme = \"{bad}\"");
+        assert_eq!(
+            parse(&text),
+            Err(ConfigError::Value { key: "theme".into(), value: format!("\"{bad}\""), allowed: allowed.clone() }),
+            "{text}"
+        );
+    }
+    assert!(parse("theme = 3").is_err());
+    assert_eq!(theme_name("NORD").as_deref(), Some("nord"));
+    assert_eq!(theme_name(&"x".repeat(65)), None);
 }
 
 #[test]
