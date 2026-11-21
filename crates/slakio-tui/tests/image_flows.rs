@@ -281,7 +281,7 @@ fn images_on_where_it_cannot_tell_says_so_and_the_variable_says_it_decides() {
     s.d.app.images.resolve();
     palette(&mut s, "images on");
     assert!(s.d.app.images.on, "the user's choice");
-    assert!(s.d.status_line().contains("Images forced on"), "{}", s.d.status_line());
+    assert!(s.d.status_line().contains("Images on: this terminal may not show them"), "{}", s.d.status_line());
     let mut pinned = kitty_shown();
     pinned.d.app.images.env.images = Some("off".into());
     pinned.d.app.images.resolve();
@@ -447,5 +447,134 @@ fn auto_in_a_terminal_that_shows_no_pictures_says_so() {
     s.d.app.images.resolve();
     palette(&mut s, "images auto");
     assert!(!s.d.app.images.on);
-    assert!(s.d.status_line().contains("does not show them"), "{}", s.d.status_line());
+    assert!(s.d.status_line().contains("Images auto: none here · :images on forces"), "{}", s.d.status_line());
+}
+
+/// [`shown`] in `lang` at `w`×`h`, pictures decided by `env` (inside herdr unless told), the
+/// setting `setting`.
+fn notices_shown(lang: slakio_core::i18n::Lang, w: u16, h: u16, env: slakio_tui::images::detect::Env) -> Scripted {
+    let (mut s, _) = shown(w, h, false);
+    s.d.app.i18n = slakio_core::i18n::I18n::new(lang);
+    s.d.app.images.env = env;
+    (s.d.app.images.setting, s.d.app.images.tty) = ("off".into(), true);
+    s.d.app.images.resolve();
+    s
+}
+
+fn herdr() -> slakio_tui::images::detect::Env {
+    slakio_tui::images::detect::Env {
+        term: "xterm-256color".into(),
+        term_program: "herdr".into(),
+        ..Default::default()
+    }
+}
+
+const NOTICE_SIZES: [(slakio_core::i18n::Lang, u16, u16); 4] = [
+    (slakio_core::i18n::Lang::En, 80, 24),
+    (slakio_core::i18n::Lang::En, 120, 40),
+    (slakio_core::i18n::Lang::Ko, 80, 24),
+    (slakio_core::i18n::Lang::Ko, 120, 40),
+];
+
+/// What `lang` says for `msg`: English as the gate read it (exact), Korean from its catalog.
+fn words(lang: slakio_core::i18n::Lang, en: &str, msg: slakio_core::i18n::Msg) -> String {
+    match lang {
+        slakio_core::i18n::Lang::En => {
+            assert_eq!(slakio_core::i18n::I18n::new(lang).msg(&msg).to_string(), en, "the English text");
+            en.to_string()
+        }
+        _ => slakio_core::i18n::I18n::new(lang).msg(&msg).to_string(),
+    }
+}
+
+fn label(l: slakio_core::i18n::Label) -> slakio_core::i18n::Msg {
+    slakio_core::i18n::Msg::Label(l)
+}
+
+#[test]
+fn a_later_picture_notice_replaces_the_forced_warning() {
+    use slakio_core::i18n::{Label, Msg};
+    for (lang, w, h) in NOTICE_SIZES {
+        let forced = words(lang, "Images on: this terminal may not show them", label(Label::ImagesForced));
+        let off = words(lang, "Images: off", Msg::ImagesChanged { name: "off".into() });
+        let avatars = words(lang, "Avatars: initials", Msg::AvatarsChanged { name: "initials".into() });
+        let mut s = notices_shown(lang, w, h, herdr());
+        palette(&mut s, "images on");
+        assert!(s.d.status_line().contains(&forced), "{lang:?} {w}: {}", s.d.status_line());
+        palette(&mut s, "images off");
+        let line = s.d.status_line();
+        assert!(line.contains(&off) && !line.contains(&forced), "{lang:?} {w}: {line}");
+        palette(&mut s, "images on");
+        palette(&mut s, "avatars initials");
+        let line = s.d.status_line();
+        assert!(line.contains(&avatars) && !line.contains(&forced), "{lang:?} {w}: {line}");
+        // The `auto` notice goes the same way.
+        palette(&mut s, "images auto");
+        palette(&mut s, "images off");
+        let line = s.d.status_line();
+        assert!(line.contains(&off), "{lang:?} {w}: {line}");
+    }
+}
+
+#[test]
+fn every_picture_notice_shows_whole_with_its_hint() {
+    use slakio_core::i18n::{Label, Msg};
+    for (lang, w, h) in NOTICE_SIZES {
+        let mut s = notices_shown(lang, w, h, herdr());
+        palette(&mut s, "images on");
+        let want = words(lang, "Images on: this terminal may not show them", label(Label::ImagesForced));
+        assert!(s.d.status_line().contains(&want), "{lang:?} {w}: {}", s.d.status_line());
+        palette(&mut s, "images auto");
+        let want = words(lang, "Images auto: none here · :images on forces", label(Label::ImagesNotHere));
+        assert!(s.d.status_line().contains(&want), "{lang:?} {w}: {}", s.d.status_line());
+        let pinned = slakio_tui::images::detect::Env { images: Some("off".into()), ..herdr() };
+        let mut s = notices_shown(lang, w, h, pinned);
+        palette(&mut s, "images on");
+        let msg = Msg::ImagesPinned { name: "on".into(), env: "SLAKIO_IMAGES".into(), value: "off".into() };
+        let want = words(lang, "Images: on saved; SLAKIO_IMAGES=off wins now", msg);
+        assert!(s.d.status_line().contains(&want), "{lang:?} {w}: {}", s.d.status_line());
+    }
+}
+
+/// Type `:text` in the command palette, not run.
+fn typed(s: &mut Scripted, text: &str) {
+    use ratatui::crossterm::event::{Event as Term, KeyCode, KeyEvent, KeyModifiers};
+    s.keys(":");
+    for c in text.chars() {
+        s.d.app.handle_event(Term::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)), s.d.now);
+    }
+}
+
+#[test]
+fn the_palette_s_images_values_show_whole() {
+    use slakio_core::i18n::Label;
+    for (lang, w, h) in NOTICE_SIZES {
+        let mut s = notices_shown(lang, w, h, herdr());
+        s.d.app.images.setting = "auto".into();
+        typed(&mut s, "images ");
+        let screen = s.d.screen();
+        for (value, en, l) in [
+            ("auto", "Where pictures surely show (default)", Label::ImagesAuto),
+            ("on", "Always (the terminal may not show them)", Label::ImagesOn),
+            ("off", "No pictures: text cards and initials only", Label::ImagesOff),
+        ] {
+            let want = words(lang, en, label(l));
+            let row = screen
+                .lines()
+                .find(|row| row.contains(&format!(" {value}  ")))
+                .unwrap_or_else(|| panic!("{lang:?} {w} {value}:\n{screen}"));
+            assert!(row.contains(&want), "{lang:?} {w}: {row}");
+        }
+        let current = words(lang, "current", label(Label::PaletteCurrent));
+        let row = screen.lines().find(|row| row.contains(" auto  ")).unwrap();
+        assert!(row.contains(&current), "{lang:?} {w}: {row}");
+        s.keys("esc");
+        // `:avatars image` shows whole too.
+        typed(&mut s, "avatars ");
+        let screen = s.d.screen();
+        let want = words(lang, "Photos where pictures show, else initials", label(Label::AvatarsImage));
+        let row =
+            screen.lines().find(|row| row.contains(" image  ")).unwrap_or_else(|| panic!("{lang:?} {w}:\n{screen}"));
+        assert!(row.contains(&want), "{lang:?} {w}: {row}");
+    }
 }

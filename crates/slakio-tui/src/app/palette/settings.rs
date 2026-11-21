@@ -3,6 +3,7 @@
 
 use super::{DENSITY_VALUES, ICON_VALUES, NET_VALUES, Row, icons_arg, setting_arg};
 use crate::action::{self, AppAction};
+use crate::app::status::Level;
 use crate::app::todos::{FILTER_VALUES, SORT_VALUES};
 use crate::app::{App, Effect};
 use crate::images::Chosen;
@@ -43,8 +44,15 @@ impl App {
             self.images.forget_photos();
         }
         self.effects.push(Effect::Save { key: "avatars", value: value.clone() });
-        self.info(Msg::AvatarsChanged { name: value }, now);
+        self.say_picture(Msg::AvatarsChanged { name: value }, Level::Info, now);
         Ok(())
+    }
+
+    /// Say `msg` about the pictures or the avatars in place of what was said of them before
+    /// (a warning too: what it said is no longer so).
+    fn say_picture(&mut self, msg: Msg, level: Level, now: Instant) {
+        self.status.forget(now, about_pictures);
+        self.status.show(msg, level, now);
     }
 
     /// `:avatars`, `:density`, `:icons` alone: the other value of the setting, saved; `:net`
@@ -111,11 +119,12 @@ impl App {
         }
         self.effects.push(Effect::Save { key: "images", value: value.clone() });
         match self.images.choose(&value) {
-            Chosen::Done => self.info(Msg::ImagesChanged { name: value }, now),
-            Chosen::NotHere => self.warn(Msg::Label(Label::ImagesNotHere), now),
-            Chosen::Forced => self.warn(Msg::Label(Label::ImagesForced), now),
+            Chosen::Done => self.say_picture(Msg::ImagesChanged { name: value }, Level::Info, now),
+            Chosen::NotHere => self.say_picture(Msg::Label(Label::ImagesNotHere), Level::Warning, now),
+            Chosen::Forced => self.say_picture(Msg::Label(Label::ImagesForced), Level::Warning, now),
             Chosen::Pinned(pinned) => {
-                self.warn(Msg::ImagesPinned { name: value, env: IMAGES_ENV.to_string(), value: pinned }, now);
+                let msg = Msg::ImagesPinned { name: value, env: IMAGES_ENV.to_string(), value: pinned };
+                self.say_picture(msg, Level::Warning, now);
             }
         }
     }
@@ -134,6 +143,17 @@ impl App {
             keys: if current { self.i18n.label(Label::PaletteCurrent).to_string() } else { String::new() },
         }
     }
+}
+
+/// `msg` is a notice about the pictures or the avatars settings.
+fn about_pictures(msg: &Msg) -> bool {
+    matches!(
+        msg,
+        Msg::ImagesChanged { .. }
+            | Msg::ImagesPinned { .. }
+            | Msg::AvatarsChanged { .. }
+            | Msg::Label(Label::ImagesForced | Label::ImagesNotHere)
+    )
 }
 
 /// The values `:images` takes.
