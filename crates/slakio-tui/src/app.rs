@@ -55,6 +55,7 @@ pub mod signin;
 mod splits;
 pub mod status;
 mod tabs;
+mod themes;
 pub(crate) mod timelines;
 pub mod todos;
 mod typing;
@@ -140,6 +141,8 @@ pub struct App {
     /// drawn here; `:theme` changes the one and keeps the other.
     pub theme_setting: String,
     pub look: Look,
+    /// Where theme files are read from (`themes/` next to the config file; none without one).
+    pub theme_dir: Option<std::path::PathBuf>,
     pub settings: Settings,
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
@@ -204,6 +207,7 @@ impl App {
             theme,
             theme_setting: "auto".to_string(),
             look: Look::default(),
+            theme_dir: None,
             settings: Settings::default(),
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),

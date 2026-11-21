@@ -196,7 +196,8 @@ images, and settings. This README only lists what works; it will grow with each 
 - Themes: the terminal's own colors, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
   `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
-  colors.
+  colors. Your own theme: a file in `themes/` next to the config file
+  ([Theme files](#theme-files)).
 - Links: `o` on a selected message opens its link in your browser. With several links, each
   one that opens gets a letter or two drawn over its start (`a`, `s`, `d` …, never `j`, `k` or
   `o`): type them to open that one (any case; `Backspace` takes a letter back), `Esc` to stop.
@@ -498,6 +499,16 @@ it does for its own apps, even when slakio sits idle. `live = "off"` opens no su
 
 A config file that cannot be used is never overwritten: slakio starts with the defaults and
 says why in the status line.
+
+### Theme files
+
+`theme = "<name>"` (or `:theme <name>`) also takes a theme of your own,
+`<config dir>/themes/<name>.toml`: a built-in theme it `extends`, with the colours and styles
+you change. A file that cannot be used (an unknown token, a bad colour, a symbolic link) is not
+fatal: slakio draws with `terminal`, says `Theme not used: <path>:<line>: <problem>` in the
+status line and keeps the name in the config file. The file format, every token and its rules
+are in [docs/themes.md](docs/themes.md). There is no command yet that writes a theme file for
+you.
 
 ## Development
 

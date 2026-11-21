@@ -15,6 +15,7 @@
 "command.unknown" = "Not a command: {name}"
 "theme.changed" = "Theme: {name}"
 "theme.unknown" = "Unknown theme {name} (use {names})"
+"theme.not_used" = "Theme not used: {why}"
 "action.avatars" = "Show or hide avatars (initials or photos)"
 "action.images" = "Show or hide picture previews and profile photos"
 "avatars.changed" = "Avatars: {name}"

@@ -19,7 +19,7 @@ use slakio_tui::theme::{BUILTINS, Background, Kind, Theme, resolve};
 
 /// Every built-in theme (the terminal's colors on a dark background), and none.
 fn themes() -> Vec<Theme> {
-    let mut out: Vec<Theme> = BUILTINS.iter().map(|t| resolve(t.name, true, Background::Dark)).collect();
+    let mut out: Vec<Theme> = BUILTINS.iter().map(|t| resolve(&t.name, true, Background::Dark)).collect();
     out.push(Theme::no_color());
     out
 }

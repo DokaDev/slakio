@@ -23,9 +23,14 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use slakio_core::model::Presence;
+use std::borrow::Cow;
 
 mod builtins;
+mod custom;
+mod tokens;
 pub use builtins::*;
+pub use custom::load;
+pub use tokens::Styles;
 
 /// `c` with `keep` percent of its brightness (toward black).
 fn darken(c: Color, keep: u16) -> Color {
@@ -94,7 +99,7 @@ impl Look {
 /// The tokens of a theme.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Theme {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub kind: Kind,
     /// The app's background.
     pub bg: Color,
@@ -132,14 +137,16 @@ pub struct Theme {
     pub mode_fg: Color,
     /// Workspace colors, by [`slakio_core::model::WorkspaceColor`] slot (wrapping around), less
     /// those near `accent` ([`Theme::workspace`]).
-    pub workspaces: &'static [Color],
+    pub workspaces: Cow<'static, [Color]>,
     /// Avatar chips, a person's by a slot of their id ([`crate::avatar::slot`]), under
     /// [`Self::mode_fg`] text.
-    pub avatars: &'static [Color],
+    pub avatars: Cow<'static, [Color]>,
     /// Percent of an avatar hue mixed into the background for its chip, the hue drawing the
     /// initials (a dark theme: a quiet chip); `0` draws the hue solid under [`Self::mode_fg`].
     pub avatar_tint: u16,
     pub dim: Dim,
+    /// The overrides of computed roles a theme file sets (`[styles]`); none in a built-in.
+    pub styles: Styles,
 }
 
 /// The gutter mark of a selection drawn without a background.
@@ -160,10 +167,10 @@ impl Theme {
     /// No color at all (`NO_COLOR`): shapes only.
     pub fn no_color() -> Self {
         Self {
-            name: "no-color",
+            name: Cow::Borrowed("no-color"),
             kind: Kind::NoColor,
-            workspaces: &[Color::Reset],
-            avatars: &[Color::Reset],
+            workspaces: Cow::Borrowed(&[Color::Reset]),
+            avatars: Cow::Borrowed(&[Color::Reset]),
             avatar_tint: 0,
             dim: Dim::Modifier,
             ..TERMINAL
@@ -262,7 +269,7 @@ impl Theme {
     }
 
     /// The count pill of mentions and unread DMs.
-    pub fn badge(&self) -> Style {
+    fn badge_role(&self) -> Style {
         if self.plain() {
             return Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD);
         }
@@ -307,7 +314,7 @@ impl Theme {
     }
 
     /// The current workspace or view.
-    pub fn current(&self) -> Style {
+    fn current_role(&self) -> Style {
         if self.plain() { self.bold() } else { self.accent().add_modifier(Modifier::BOLD) }
     }
 
@@ -338,13 +345,13 @@ impl Theme {
     }
 
     /// The "N replies" row of a message with a thread, and a link in a message.
-    pub fn link(&self) -> Style {
+    fn link_role(&self) -> Style {
         self.accent()
     }
 
     /// A person, channel or group named in a message: bold, in the accent; the user named (or
     /// everyone, `@here`) in the warm color, as GUI Slack marks a mention of the user.
-    pub fn mention(&self, of_me: bool) -> Style {
+    fn mention_role(&self, of_me: bool) -> Style {
         match (self.plain(), of_me) {
             (true, _) => self.bold(),
             (false, true) => self.warm().add_modifier(Modifier::BOLD),
@@ -356,7 +363,7 @@ impl Theme {
     /// ([`Self::code_bg`]; never the warm color of a mention of the user); in the 16-color theme, green on
     /// no background; plain without color. Where there is no tint, inline code keeps its
     /// backticks ([`Self::code_marks`]).
-    pub fn code(&self) -> Style {
+    fn code_role(&self) -> Style {
         match self.kind {
             Kind::Truecolor => self.text().bg(self.code_bg()),
             Kind::Ansi => Style::new().fg(Color::Green),
@@ -378,13 +385,13 @@ impl Theme {
     /// The letters that pick a link (`o` on a message with several): bold on the warning
     /// color, as a mode badge is drawn (reversed without color), so they stand out from the
     /// link they sit on and from the text.
-    pub fn hint(&self) -> Style {
+    fn hint_role(&self) -> Style {
         self.mode(self.warning)
     }
 
     /// A reaction chip: a pill on the raised background (the cursor line's color on a dark
     /// theme, [`Self::raised`]), never darker than the background there; body text on it.
-    pub fn reaction(&self) -> Style {
+    fn reaction_role(&self) -> Style {
         match self.kind {
             Kind::Truecolor => self.text().bg(self.raised()),
             _ => self.muted(),
@@ -393,7 +400,7 @@ impl Theme {
 
     /// The user's own reaction: a pill filled with the accent (the background's color on it),
     /// bold; without truecolor the accent on no background.
-    pub fn reaction_mine(&self) -> Style {
+    fn reaction_mine_role(&self) -> Style {
         match self.kind {
             Kind::Truecolor => Style::new().fg(self.bg).bg(self.accent).add_modifier(Modifier::BOLD),
             _ => self.reaction().fg(self.accent).add_modifier(Modifier::BOLD),
@@ -506,6 +513,7 @@ impl Theme {
             (Kind::Truecolor, Selection::Visual) => Some(self.range),
             _ => Some(self.selection),
         };
+        let bg = self.selection_style(how).and_then(|s| s.bg).or(bg);
         if let Some(bg) = bg {
             // Code keeps a tint of its own, apart from the bar.
             let code = (self.kind == Kind::Truecolor).then(|| (self.code_bg(), self.code_on(bg)));
@@ -528,6 +536,7 @@ impl Theme {
                 }
             }
         }
+        self.paint_over(buf, row, how);
         let gutter = match (self.kind, how) {
             (Kind::Truecolor, _) | (_, Selection::Focused) => None,
             (_, Selection::Unfocused) => Some(self.muted()),

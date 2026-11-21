@@ -1,7 +1,8 @@
 //! The built-in themes and how the `theme` setting picks one.
 
-use super::{Background, Dim, Kind, Theme, rgb};
+use super::{Background, Dim, Kind, Styles, Theme, rgb};
 use ratatui::style::Color;
+use std::borrow::Cow;
 
 /// Workspace colors of the dark truecolor themes: twelve that read on a dark background and stay
 /// apart from each other. Workspaces take them in sign-in order, so the first is a blue, never a
@@ -79,7 +80,7 @@ pub const ANSI_AVATARS: [Color; 5] =
 /// The terminal's own 16 colors, so it follows the user's palette. Muted text is ANSI 7 on a
 /// dark background; [`resolve`] makes it ANSI 8 on a light one.
 pub const TERMINAL: Theme = Theme {
-    name: "terminal",
+    name: Cow::Borrowed("terminal"),
     kind: Kind::Ansi,
     bg: Color::Reset,
     surface: Color::Reset,
@@ -101,15 +102,16 @@ pub const TERMINAL: Theme = Theme {
     mode_visual: Color::Magenta,
     mode_command: Color::Yellow,
     mode_fg: Color::Black,
-    workspaces: &ANSI_WORKSPACE_COLORS,
-    avatars: &ANSI_AVATARS,
+    workspaces: Cow::Borrowed(&ANSI_WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&ANSI_AVATARS),
     avatar_tint: 0,
     dim: Dim::Modifier,
+    styles: Styles::NONE,
 };
 
 /// The dark truecolor theme.
 pub const DARK: Theme = Theme {
-    name: "dark",
+    name: Cow::Borrowed("dark"),
     kind: Kind::Truecolor,
     bg: rgb(0x14161B),
     surface: rgb(0x1B1E25),
@@ -131,16 +133,17 @@ pub const DARK: Theme = Theme {
     mode_visual: rgb(0xC678DD),
     mode_command: rgb(0xE5935A),
     mode_fg: rgb(0x14161B),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x0B0C10), keep: 55 },
+    styles: Styles::NONE,
 };
 
 // Tokyo Night (github.com/folke/tokyonight.nvim, Apache-2.0).
 /// Tokyo Night, the night style.
 pub const TOKYO_NIGHT_NIGHT: Theme = Theme {
-    name: "tokyo-night-night",
+    name: Cow::Borrowed("tokyo-night-night"),
     kind: Kind::Truecolor,
     bg: rgb(0x1A1B26),
     surface: rgb(0x1F2335),
@@ -162,16 +165,17 @@ pub const TOKYO_NIGHT_NIGHT: Theme = Theme {
     mode_visual: rgb(0xBB9AF7),
     mode_command: rgb(0xFF9E64),
     mode_fg: rgb(0x15161E),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x0E0F15), keep: 60 },
+    styles: Styles::NONE,
 };
 
 /// Tokyo Night, the day style. Text and marks are moved from the palette so they keep their
 /// contrast on the light background.
 pub const TOKYO_NIGHT_DAY: Theme = Theme {
-    name: "tokyo-night-day",
+    name: Cow::Borrowed("tokyo-night-day"),
     kind: Kind::Truecolor,
     bg: rgb(0xE1E2E7),
     surface: rgb(0xECEEF3),
@@ -193,15 +197,16 @@ pub const TOKYO_NIGHT_DAY: Theme = Theme {
     mode_visual: rgb(0xB1055A),
     mode_command: rgb(0x884A0A),
     mode_fg: rgb(0xE1E2E7),
-    workspaces: &WORKSPACE_COLORS_LIGHT,
-    avatars: &AVATARS_DEEP,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS_LIGHT),
+    avatars: Cow::Borrowed(&AVATARS_DEEP),
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 79 },
+    styles: Styles::NONE,
 };
 
 /// Light: dark text on an off-white background.
 pub const LIGHT: Theme = Theme {
-    name: "light",
+    name: Cow::Borrowed("light"),
     kind: Kind::Truecolor,
     bg: rgb(0xFBFBFC),
     surface: rgb(0xF1F3F6),
@@ -223,15 +228,16 @@ pub const LIGHT: Theme = Theme {
     mode_visual: rgb(0x8250DF),
     mode_command: rgb(0xBC4C00),
     mode_fg: rgb(0xFFFFFF),
-    workspaces: &WORKSPACE_COLORS_LIGHT,
-    avatars: &AVATARS_DEEP,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS_LIGHT),
+    avatars: Cow::Borrowed(&AVATARS_DEEP),
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 55 },
+    styles: Styles::NONE,
 };
 
 /// White text on black, saturated marks, a strong selection.
 pub const HIGH_CONTRAST: Theme = Theme {
-    name: "high-contrast",
+    name: Cow::Borrowed("high-contrast"),
     kind: Kind::Truecolor,
     bg: rgb(0x0A0A0A),
     surface: rgb(0x1C1C1C),
@@ -253,16 +259,17 @@ pub const HIGH_CONTRAST: Theme = Theme {
     mode_visual: rgb(0xFF66FF),
     mode_command: rgb(0xFFB000),
     mode_fg: rgb(0x000000),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x000000), keep: 55 },
+    styles: Styles::NONE,
 };
 
 // Catppuccin (github.com/catppuccin/catppuccin, MIT): the palettes of Mocha and Latte.
 /// Catppuccin Mocha, the dark flavor.
 pub const CATPPUCCIN_MOCHA: Theme = Theme {
-    name: "catppuccin-mocha",
+    name: Cow::Borrowed("catppuccin-mocha"),
     kind: Kind::Truecolor,
     bg: rgb(0x1E1E2E),
     surface: rgb(0x313244),
@@ -284,17 +291,18 @@ pub const CATPPUCCIN_MOCHA: Theme = Theme {
     mode_visual: rgb(0xCBA6F7),
     mode_command: rgb(0xFAB387),
     mode_fg: rgb(0x11111B),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x101019), keep: 57 },
+    styles: Styles::NONE,
 };
 
 /// Catppuccin Latte, the light flavor. Moved from the palette so text and marks keep their
 /// contrast: `warning` (palette `#DF8E1D`), `success` (palette `#40A02B`), `accent_warm`
 /// (palette `#FE640B`), `error` (palette `#D20F39`, lightened for the count pills).
 pub const CATPPUCCIN_LATTE: Theme = Theme {
-    name: "catppuccin-latte",
+    name: Cow::Borrowed("catppuccin-latte"),
     kind: Kind::Truecolor,
     bg: rgb(0xEFF1F5),
     surface: rgb(0xE6E9EF),
@@ -316,17 +324,18 @@ pub const CATPPUCCIN_LATTE: Theme = Theme {
     mode_visual: rgb(0xEA76CB),
     mode_command: rgb(0xFE640B),
     mode_fg: rgb(0x11111B),
-    workspaces: &WORKSPACE_COLORS_LIGHT,
-    avatars: &AVATARS_DEEP,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS_LIGHT),
+    avatars: Cow::Borrowed(&AVATARS_DEEP),
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x808080), keep: 78 },
+    styles: Styles::NONE,
 };
 
 // Gruvbox (github.com/morhetz/gruvbox, MIT).
 /// Gruvbox dark (medium contrast). `error` is lightened from the palette's `#FB4934` for the
 /// count pills.
 pub const GRUVBOX_DARK: Theme = Theme {
-    name: "gruvbox-dark",
+    name: Cow::Borrowed("gruvbox-dark"),
     kind: Kind::Truecolor,
     bg: rgb(0x282828),
     surface: rgb(0x32302F),
@@ -348,16 +357,17 @@ pub const GRUVBOX_DARK: Theme = Theme {
     mode_visual: rgb(0xD3869B),
     mode_command: rgb(0xFE8019),
     mode_fg: rgb(0x282828),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 20,
     dim: Dim::Blend { toward: rgb(0x161616), keep: 57 },
+    styles: Styles::NONE,
 };
 
 /// Gruvbox light (medium contrast). Moved from the palette so text and marks keep their
 /// contrast: `warning` (palette `#B57614`), `mode_insert` (palette `#79740E`).
 pub const GRUVBOX_LIGHT: Theme = Theme {
-    name: "gruvbox-light",
+    name: Cow::Borrowed("gruvbox-light"),
     kind: Kind::Truecolor,
     bg: rgb(0xFBF1C7),
     surface: rgb(0xF2E5BC),
@@ -379,17 +389,18 @@ pub const GRUVBOX_LIGHT: Theme = Theme {
     mode_visual: rgb(0x8F3F71),
     mode_command: rgb(0xAF3A03),
     mode_fg: rgb(0xFBF1C7),
-    workspaces: &WORKSPACE_COLORS_LIGHT,
-    avatars: &AVATARS_DEEP,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS_LIGHT),
+    avatars: Cow::Borrowed(&AVATARS_DEEP),
     avatar_tint: 15,
     dim: Dim::Blend { toward: rgb(0x606060), keep: 60 },
+    styles: Styles::NONE,
 };
 
 // Nord (nordtheme.com, MIT).
 /// Nord. Moved from the palette so text and marks keep their contrast: `error` (palette
 /// `#BF616A`), `mode_fg` (palette `#2E3440`).
 pub const NORD: Theme = Theme {
-    name: "nord",
+    name: Cow::Borrowed("nord"),
     kind: Kind::Truecolor,
     bg: rgb(0x2E3440),
     surface: rgb(0x3B4252),
@@ -411,16 +422,17 @@ pub const NORD: Theme = Theme {
     mode_visual: rgb(0xB48EAD),
     mode_command: rgb(0xD08770),
     mode_fg: rgb(0x22262F),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 14,
     dim: Dim::Blend { toward: rgb(0x191D23), keep: 61 },
+    styles: Styles::NONE,
 };
 
 // Dracula (draculatheme.com, github.com/dracula/dracula-theme, MIT).
 /// Dracula.
 pub const DRACULA: Theme = Theme {
-    name: "dracula",
+    name: Cow::Borrowed("dracula"),
     kind: Kind::Truecolor,
     bg: rgb(0x282A36),
     surface: rgb(0x343746),
@@ -442,10 +454,11 @@ pub const DRACULA: Theme = Theme {
     mode_visual: rgb(0xFF79C6),
     mode_command: rgb(0xFFB86C),
     mode_fg: rgb(0x282A36),
-    workspaces: &WORKSPACE_COLORS,
-    avatars: &AVATARS_BRIGHT,
+    workspaces: Cow::Borrowed(&WORKSPACE_COLORS),
+    avatars: Cow::Borrowed(&AVATARS_BRIGHT),
     avatar_tint: 18,
     dim: Dim::Blend { toward: rgb(0x16171E), keep: 55 },
+    styles: Styles::NONE,
 };
 
 /// The built-in themes by name.

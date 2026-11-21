@@ -10,21 +10,36 @@ use crate::images::Chosen;
 use crate::images::detect::IMAGES_ENV;
 use crate::theme::{self, NAMES};
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::theme_file::ThemeError;
 use std::time::Instant;
 
 impl App {
-    /// `:theme <name>`: draw with theme `name` from now on and save it in the config file. A
-    /// name the setting does not take changes nothing and says which ones it takes.
+    /// `:theme <name>`: draw with theme `name` (built-in, or a theme file) from now on and save
+    /// it in the config file. A name the setting does not take, or no such file, changes nothing
+    /// and says which built-in ones there are; a theme file that cannot be used says why.
     pub fn set_theme(&mut self, name: &str, now: Instant) -> Result<(), Msg> {
-        let name = name.trim().to_ascii_lowercase();
-        if !theme::NAMES.contains(&name.as_str()) {
-            return Err(Msg::ThemeUnknown { name, names: theme::NAMES.join(", ") });
-        }
-        self.theme = self.look.theme(&name);
+        let typed = name.trim();
+        let unknown = || Msg::ThemeUnknown { name: typed.to_ascii_lowercase(), names: theme::NAMES.join(", ") };
+        let name = slakio_core::config::theme_name(typed).ok_or_else(unknown)?;
+        self.theme = match self.theme_named(&name) {
+            Ok(t) => t,
+            Err(ThemeError::Unknown { .. }) => return Err(unknown()),
+            Err(e) => return Err(self.theme_problem(&e)),
+        };
         self.theme_setting.clone_from(&name);
         self.effects.push(Effect::Save { key: "theme", value: name.clone() });
         self.info(Msg::ThemeChanged { name }, now);
         Ok(())
+    }
+
+    /// `:theme <name>` naming a theme file: used and saved (the palette closes), or why it cannot
+    /// be used said in the palette.
+    pub(super) fn theme_typed(&mut self, text: &str, now: Instant) {
+        let name = theme_arg(text).unwrap_or_default().to_string();
+        match self.set_theme(&name, now) {
+            Ok(()) => self.cmdline.close(),
+            Err(msg) => self.cmdline.error = Some(msg),
+        }
     }
 
     /// `:avatars <initials|image|off>`: picture people by their initials chip, their profile

@@ -10,6 +10,7 @@
 "command.unknown" = "없는 명령: {name}"
 "theme.changed" = "테마: {name}"
 "theme.unknown" = "알 수 없는 테마 {name} ({names} 중 하나)"
+"theme.not_used" = "테마를 쓰지 않음: {why}"
 "action.avatars" = "아바타(이니셜이나 사진) 보이기/숨기기"
 "action.images" = "그림 미리 보기와 프로필 사진 보이기/숨기기"
 "avatars.changed" = "아바타: {name}"

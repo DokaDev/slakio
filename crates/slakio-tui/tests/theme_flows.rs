@@ -26,7 +26,7 @@ fn colon_theme_switches_at_once_and_asks_to_save_it() {
     let mut d = Demo::new(120, 40);
     assert_eq!(d.app.theme.name, "terminal");
     d.command("theme nord");
-    assert_eq!((d.app.theme.name, d.app.theme_setting.as_str()), ("nord", "nord"));
+    assert_eq!((d.app.theme.name.as_ref(), d.app.theme_setting.as_str()), ("nord", "nord"));
     assert_eq!(saved(&mut d), ["nord"]);
     assert!(d.status_line().contains("Theme: nord"), "{}", d.status_line());
     d.command("colo dracula");

@@ -418,6 +418,8 @@ impl App {
             {
                 self.run_jump(&text, now)
             }
+            // A theme file named whole wins over a built-in theme its name matches in part.
+            _ if theme_arg(&text).is_some_and(|n| self.theme_file_there(n)) => self.theme_typed(&text, now),
             Some(Item::Command(i) | Item::Action(i)) => {
                 self.cmdline.close();
                 self.dispatch(REGISTRY[i].action, now);

@@ -245,7 +245,7 @@ fn snippet(app: &App, ws: Option<&WorkspaceId>, runs: &[(String, bool)], w: usiz
         }
         let s = clip(&s, room);
         room = room.saturating_sub(width(&s));
-        let style = if matched { t.key_warm().add_modifier(Modifier::UNDERLINED) } else { t.text() };
+        let style = if matched { t.search_match() } else { t.text() };
         spans.push(Span::styled(s, style));
     }
     Line::from(spans)

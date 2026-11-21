@@ -125,8 +125,7 @@ fn main() -> ExitCode {
     let look = Look::from_env(env, background);
     let mut app = App::new(lang, look.theme(&cfg.theme));
     app.model.net.locked = !network;
-    app.look = look;
-    app.theme_setting.clone_from(&cfg.theme);
+    app.load_at_start(look, &cfg.theme, config_path.as_deref(), Instant::now());
     app.settings = Settings {
         icons: cfg.icons == "on",
         avatars: cfg.avatars != "off",

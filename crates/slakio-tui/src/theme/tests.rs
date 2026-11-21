@@ -39,7 +39,7 @@ fn colors(t: &Theme) -> Vec<Color> {
         t.mode_command,
         t.mode_fg,
     ];
-    v.extend(t.workspaces);
+    v.extend(t.workspaces.iter().copied());
     v
 }
 
@@ -59,7 +59,7 @@ fn dark(t: &Theme) -> bool {
 fn every_truecolor_theme_keeps_text_readable() {
     assert!(truecolor().count() >= 11, "every built-in but the terminal's own colors");
     for t in truecolor() {
-        let n = t.name;
+        let n = &t.name;
         for bg in [t.bg, t.surface, t.surface_alt, t.selection, t.cursor_line, t.range] {
             assert!(contrast(t.fg, bg) >= 4.5, "{n}: body text on {bg:?} {:.2}", contrast(t.fg, bg));
         }
@@ -84,7 +84,7 @@ fn workspace_colors_read_on_every_theme() {
     for t in truecolor() {
         let want: &[Color] = if dark(t) { &WORKSPACE_COLORS } else { &WORKSPACE_COLORS_LIGHT };
         assert_eq!(t.workspaces, want, "{}", t.name);
-        for c in t.workspaces {
+        for c in t.workspaces.iter() {
             for bg in [t.bg, t.surface, t.surface_alt] {
                 assert!(contrast(*c, bg) >= 3.0, "{}: {c:?} on {bg:?} {:.2}", t.name, contrast(*c, bg));
             }
@@ -119,8 +119,8 @@ fn a_family_takes_its_variant_by_the_background() {
         assert_eq!(resolve(name, true, Background::Unknown).name, dark_t.name, "dark when not known");
     }
     for t in BUILTINS {
-        assert!(NAMES.contains(&t.name), "{} is a name the setting takes", t.name);
-        assert_eq!(resolve(t.name, true, Background::Light).name, t.name, "a theme named is a theme taken");
+        assert!(NAMES.contains(&t.name.as_ref()), "{} is a name the setting takes", t.name);
+        assert_eq!(resolve(&t.name, true, Background::Light).name, t.name, "a theme named is a theme taken");
     }
 }
 
@@ -307,7 +307,7 @@ fn hue(c: Color) -> (f64, f64) {
 #[test]
 fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
     for t in truecolor() {
-        let n = t.name;
+        let n = &t.name;
         assert!(t.avatars.len() >= 6, "{n}");
         assert!(TERMINAL.avatars.len() >= 5);
         let mut bgs = Vec::new();
@@ -348,7 +348,7 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
     }
     // The 16-color theme: colored bold initials without a background (a solid block is a
     // pill), never red or magenta (it reads pink).
-    for c in TERMINAL.avatars {
+    for c in TERMINAL.avatars.iter() {
         assert!(!matches!(c, Color::Red | Color::LightRed | Color::Magenta | Color::LightMagenta), "{c:?}");
         assert!(!matches!(c, Color::Black | Color::DarkGray | Color::Reset), "{c:?}");
         let t = &TERMINAL;
@@ -379,7 +379,7 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
 #[test]
 fn reaction_chips_stand_off_the_background_and_their_text_reads() {
     for t in truecolor() {
-        let (n, chip) = (t.name, t.raised());
+        let (n, chip) = (&t.name, t.raised());
         assert!(contrast(chip, t.bg) >= 1.15, "{n}: chip {chip:?} on bg {:.2}", contrast(chip, t.bg));
         if dark(t) {
             assert!(luminance(chip) > luminance(t.bg), "{n}: a dark theme's chip is lighter than its bg");
@@ -421,7 +421,7 @@ fn links_code_and_mentions_read_apart_in_every_theme() {
 #[test]
 fn code_is_tinted_apart_from_its_row_also_when_selected() {
     for t in truecolor() {
-        let n = t.name;
+        let n = &t.name;
         for (what, row) in
             [("bg", t.bg), ("selection", t.selection), ("cursor line", t.cursor_line), ("range", t.range)]
         {

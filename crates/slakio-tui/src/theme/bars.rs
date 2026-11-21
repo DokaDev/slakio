@@ -13,6 +13,9 @@ impl Theme {
     /// A tab's title (and the spaces of its label): the one shown on the raised surface, in
     /// bold; the others muted.
     pub fn tab(&self, shown: bool) -> Style {
+        if let Some(style) = self.styles.tab_active.filter(|_| shown) {
+            return style;
+        }
         match (self.kind, shown) {
             (Kind::Truecolor, true) => self.bold().bg(self.raised()),
             (_, true) => Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD),
@@ -49,6 +52,9 @@ impl Theme {
 
     /// A tab's unread count (`●3`, `@3`): a mention's color when one mentions the user.
     pub fn tab_badge(&self, shown: bool, mention: bool) -> Style {
+        if let Some(style) = self.styles.tab_badge {
+            return style;
+        }
         let dot = self.dot(mention);
         match self.tab(shown).bg {
             Some(bg) => dot.bg(bg),

@@ -114,7 +114,7 @@ pub(super) fn badge(f: &mut Frame, app: &App, area: Rect) {
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let t = &app.theme;
     let w = usize::from(area.width);
-    f.buffer_mut().set_style(area, t.surface());
+    f.buffer_mut().set_style(area, t.status_line());
     let badge = badge_spans(app);
     let sep = || Span::styled(" │ ", t.divider());
 
