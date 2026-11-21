@@ -29,6 +29,11 @@ fn saved(d: &mut Demo) -> Vec<String> {
         .collect()
 }
 
+/// `text` with the paths written as this system writes them (`themes\x` on Windows).
+fn native(text: &str) -> String {
+    text.replace("themes/", &format!("themes{}", std::path::MAIN_SEPARATOR))
+}
+
 fn booted(w: u16, h: u16, lang: Lang) -> Demo {
     let mut d = Demo::with(w, h, lang, Settings::default());
     let (cfg, err) = slakio_core::config::load(Some(Path::new("config.toml")));
@@ -60,7 +65,7 @@ fn theme_files_at_launch_and_while_running() {
         assert!(saved(&mut d).is_empty(), "nothing is saved");
         lines.push(demo::mask_hangul(d.status_line().trim_end()));
     }
-    assert_eq!(lines, want, "the status line at 80 and 120 columns, in English and Korean");
+    assert_eq!(lines, want.map(native), "the status line at 80 and 120 columns, in English and Korean");
     assert_eq!(std::fs::read_to_string("config.toml").unwrap(), CONFIG, "the config file is untouched");
 
     // A missing file is said too, by its path.
@@ -69,7 +74,7 @@ fn theme_files_at_launch_and_while_running() {
     d.app.load_at_start(TRUECOLOR, "gone", Some(Path::new("config.toml")), d.now);
     assert_eq!(d.app.theme.name, "terminal");
     assert!(
-        d.status_line().contains("Theme not used: Unknown theme gone: there is no themes/gone.toml"),
+        d.status_line().contains(&native("Theme not used: Unknown theme gone: there is no themes/gone.toml")),
         "{}",
         d.status_line()
     );
@@ -85,7 +90,7 @@ fn theme_files_at_launch_and_while_running() {
     assert_eq!(d.app.theme.name, "mine", "nothing changes");
     assert!(saved(&mut d).is_empty());
     let why = d.app.palette_error(d.app.size).join(" ");
-    assert!(why.starts_with("Theme not used: themes/broken.toml:3: #12345 is not a colour"), "{why}");
+    assert!(why.starts_with(&native("Theme not used: themes/broken.toml:3: #12345 is not a colour")), "{why}");
     d.keys("esc");
     d.command("set theme=nord");
     d.command("set theme=mine");
