@@ -255,3 +255,17 @@ fn every_fixed_row_takes_the_config_file_s_values_and_the_palette_suggests_them(
         assert_eq!(names(key), palette, "{key}: the palette suggests the row's values");
     }
 }
+
+#[test]
+fn a_paste_goes_into_the_input_open_and_nowhere_else() {
+    use ratatui::crossterm::event::Event;
+    let mut a = app();
+    a.handle_event(Event::Paste("/tmp/x".to_string()), Instant::now());
+    assert!(!a.cmdline.is_open() && a.cmdline.text().is_empty(), "no input open: the paste goes nowhere");
+    select(&mut a, "downloads");
+    key(&mut a, "enter ctrl+u");
+    a.handle_event(Event::Paste("/tmp/x\n".to_string()), Instant::now());
+    assert_eq!(a.prefs.screen.as_ref().unwrap().folder.as_ref().map(|f| f.0.as_str()), Some("/tmp/x"));
+    key(&mut a, "enter");
+    assert_eq!(saved(&mut a), [("downloads", "/tmp/x".to_string())]);
+}

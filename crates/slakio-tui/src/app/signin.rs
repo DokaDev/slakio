@@ -314,7 +314,7 @@ impl App {
 
     /// Text pasted (bracketed paste) where the keyboard is: a sign-in on the paste screen or the
     /// desktop picker (a request copied first is taken there too), else typed into the composer,
-    /// the help filter or the command line.
+    /// the help filter, the settings screen's input or the command line.
     pub(super) fn paste(&mut self, text: String) {
         match self.key_context() {
             // Checking (over the app, the keyboard is the sign-in screen's then too): one at a time.
@@ -338,6 +338,14 @@ impl App {
                 if let Some(h) = self.help.as_mut() {
                     h.filter.extend(text.chars().filter(|c| !c.is_control()));
                     h.cursor = 0;
+                }
+            }
+            // Into the folder or the name typed; with neither open, nowhere.
+            Ctx::Settings => {
+                let s = self.prefs.screen.as_mut();
+                if let Some((typed, error)) = s.and_then(|s| s.folder.as_mut().or(s.name.as_mut())) {
+                    typed.extend(text.chars().filter(|c| !c.is_control()));
+                    *error = None;
                 }
             }
             _ => self.cmdline.insert(&text),
