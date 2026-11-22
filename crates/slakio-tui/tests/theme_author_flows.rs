@@ -252,3 +252,20 @@ fn theme_new_extends_what_auto_picks_never_no_color_nor_a_theme_only_shown() {
     d.command("theme new other");
     assert!(std::fs::read_to_string(dir.theme("other")).unwrap().contains(&want), "{want}");
 }
+
+#[test]
+fn a_terminal_file_with_a_hex_colour_still_marks_the_row_of_a_panel_without_focus() {
+    let dir = Scratch::new("unfocused");
+    std::fs::create_dir_all(dir.0.join("themes")).unwrap();
+    std::fs::write(dir.theme("mine"), "[colors]\naccent = \"#ff8800\"\n").unwrap();
+    let mut d = booted(80, 24, Lang::En, dir.config());
+    d.command("theme mine");
+    assert_eq!(d.app.theme.kind, slakio_tui::theme::Kind::Truecolor);
+    let inner = d.app.list_parts().unwrap().rows;
+    let y = inner.y + (d.app.list_cursor() - d.app.list_top()) as u16;
+    d.keys("l tab");
+    assert_ne!(d.app.focus(), slakio_tui::app::Focus::List, "the list panel has no focus");
+    let buf = d.buffer();
+    let bar = (inner.left()..inner.right()).any(|x| buf[(x, y)].bg != ratatui::style::Color::Reset);
+    assert!(bar || buf[(inner.x, y)].symbol() == "\u{258E}", "the selected row is marked:\n{}", d.screen());
+}

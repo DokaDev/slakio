@@ -162,3 +162,24 @@ fn built_in_names_never_read_a_file_and_unknown_names_say_so() {
     assert!(matches!(load("mine", DARK_TRUECOLOR, None), Err(ThemeError::Unknown { dir: None, .. })));
     assert!(matches!(load("../x", DARK_TRUECOLOR, None), Err(ThemeError::BadName(_))));
 }
+
+#[test]
+fn the_selected_row_of_a_panel_without_focus_shows_on_a_terminal_file_that_names_a_hex_colour() {
+    // No `extends`: the base is `terminal`, whose bar colour is the terminal's own.
+    for text in ["[colors]\naccent = \"#ff8800\"\n", "[colors]\ndim = { toward = \"#000000\", keep = 50 }\n"] {
+        let t = theme(text, DARK_TRUECOLOR);
+        assert_eq!(t.kind, Kind::Truecolor, "{text}");
+        let area = Rect::new(0, 0, 10, 1);
+        let mut buf = Buffer::empty(area);
+        buf.set_string(0, 0, "general", Style::new().fg(t.fg));
+        t.paint_selection(&mut buf, area, Selection::Unfocused);
+        let bar = (0..10).any(|x| buf[(x, 0)].bg != Color::Reset);
+        assert!(bar || buf[(0, 0)].symbol() == crate::theme::GUTTER, "{text}: the row is marked");
+    }
+    // A bar of its own: no gutter on top of it.
+    let t = theme("extends = \"tokyo-night\"\n", DARK_TRUECOLOR);
+    let area = Rect::new(0, 0, 10, 1);
+    let mut buf = Buffer::empty(area);
+    t.paint_selection(&mut buf, area, Selection::Unfocused);
+    assert_eq!((buf[(0, 0)].bg, buf[(0, 0)].symbol()), (t.cursor_line, " "));
+}

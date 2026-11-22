@@ -510,7 +510,9 @@ impl Theme {
                 None
             }
             (Kind::Ansi, Selection::Unfocused) => None,
-            (Kind::Truecolor, Selection::Unfocused) => Some(self.cursor_line),
+            // The terminal's own colour (a file on `terminal` that names a `#rrggbb`) shows no
+            // bar: the gutter marks the row instead.
+            (Kind::Truecolor, Selection::Unfocused) => Some(self.cursor_line).filter(|c| *c != Color::Reset),
             (Kind::Truecolor, Selection::Visual) => Some(self.range),
             _ => Some(self.selection),
         };
@@ -539,7 +541,8 @@ impl Theme {
         }
         self.paint_over(buf, row, how);
         let gutter = match (self.kind, how) {
-            (Kind::Truecolor, _) | (_, Selection::Focused) => None,
+            (Kind::Truecolor, Selection::Visual) | (_, Selection::Focused) => None,
+            (_, Selection::Unfocused) if bg.is_some() => None,
             (_, Selection::Unfocused) => Some(self.muted()),
             (_, Selection::Visual) => Some(self.key()),
         };
