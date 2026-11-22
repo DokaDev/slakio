@@ -306,8 +306,8 @@ fn span(range: &std::ops::RangeInclusive<u32>) -> String {
 /// The settings whose value is a whole number (written as one, not as text).
 pub const NUMBERS: &[&str] = &["cache_messages", "cache_max_mb", "cache_days", "download_max_mb"];
 
-/// Set `key` to `value` in the config file at `path` (a whole number for [`NUMBERS`], else a
-/// string), keeping its comments and the order of what is there and the comment after the old
+/// Set `key` to `value` in the config file at `path` (a whole number for [`NUMBERS`], refused
+/// when it is not one; else a string), keeping its comments and the order of what is there and the comment after the old
 /// value; a missing file is created. Used for what the app saves itself (`icons` after asking,
 /// and what the settings screen and `:set` change while running).
 /// A file that cannot be read or parsed is left alone.
@@ -318,8 +318,12 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
         Err(e) => return Err(Fault::io_at(&e, path)),
     };
     let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| Fault::toml_edit(&text, &e))?;
-    let mut item = match value.parse::<i64>() {
-        Ok(n) if NUMBERS.contains(&key) => toml_edit::value(n),
+    // A number setting is never written as text (the next launch would refuse the whole file).
+    let mut item = match value.parse::<u32>() {
+        Ok(n) if NUMBERS.contains(&key) => toml_edit::value(i64::from(n)),
+        Err(e) if NUMBERS.contains(&key) => {
+            return Err(Fault::io_at(&std::io::Error::new(std::io::ErrorKind::InvalidInput, e), path));
+        }
         _ => toml_edit::value(value),
     };
     // Keep what surrounds the old value, such as a comment after it on the same line.
