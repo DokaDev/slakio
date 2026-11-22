@@ -105,12 +105,20 @@ pub const STYLE_ABOUT: &[(&str, &str)] = &[
     ("search_match", "A word a search found, in a result's text."),
 ];
 
-/// The first name of `<from>-copy`, `<from>-copy-2`, … with no file in `dir`.
+/// The first name of `<from>-copy`, `<from>-copy-2`, … with no file in `dir`: always a valid
+/// name (`from`'s letters a name can have, cut so the longest suffix still fits; `theme` when
+/// none is left).
 pub fn free_copy_name(dir: Option<&Path>, from: &str) -> String {
     let taken = |name: &str| {
         dir.is_some_and(|d| theme_file::valid_name(name) && theme_file::path(d, name).symlink_metadata().is_ok())
     };
-    let first = format!("{from}-copy");
+    let stem: String = from
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(64 - "-copy-999".len())
+        .collect();
+    let stem = if stem.is_empty() { "theme" } else { &stem };
+    let first = format!("{stem}-copy");
     if !taken(&first) {
         return first;
     }

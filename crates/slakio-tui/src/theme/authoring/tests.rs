@@ -187,6 +187,20 @@ fn the_first_free_copy_name() {
     assert_eq!(free_copy_name(Some(&d.0), "dark"), "dark-copy-3");
 }
 
+#[test]
+fn the_copy_name_offered_is_always_a_name_a_file_can_have() {
+    let d = Dir::new("free-long");
+    let long = "a".repeat(64);
+    let first = free_copy_name(Some(&d.0), &long);
+    assert!(theme_file::valid_name(&first), "{first}");
+    d.put(&first, "");
+    let second = free_copy_name(Some(&d.0), &long);
+    assert!(theme_file::valid_name(&second) && second != first, "{second}");
+    for from in ["\u{FC}", "a.b"] {
+        assert!(theme_file::valid_name(&free_copy_name(None, from)), "{from}");
+    }
+}
+
 /// `text` without the lines of `tokens` (each key and the comment above it).
 fn without(text: &str, tokens: &[&str]) -> String {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
