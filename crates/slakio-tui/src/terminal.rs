@@ -42,7 +42,7 @@ impl CursorShape {
 /// The cursor shape for what has the keyboard now: a bar in a text input, a block otherwise
 /// (the cursor is hidden there).
 pub fn cursor_shape(app: &App) -> Option<CursorShape> {
-    Some(if app.key_context().is_text_input() { CursorShape::Bar } else { CursorShape::Block })
+    Some(if app.typing_text() { CursorShape::Bar } else { CursorShape::Block })
 }
 
 /// The cursor shape last written to the terminal, so only a change is written.

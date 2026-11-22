@@ -71,6 +71,14 @@ impl App {
         self.prefs.screen = Some(Screen { themes, problem, ..Screen::default() });
     }
 
+    /// Characters typed now are text: a text input has the keyboard, or the settings screen's
+    /// folder or name input is open (Hangul stays Hangul there).
+    pub fn typing_text(&self) -> bool {
+        self.key_context().is_text_input()
+            || (self.key_context() == crate::keymap::Ctx::Settings
+                && self.prefs.screen.as_ref().is_some_and(|s| s.folder.is_some() || s.name.is_some()))
+    }
+
     /// The settings screen closes; a theme only shown goes back to the one before.
     fn close_settings(&mut self) {
         self.end_preview();

@@ -334,7 +334,7 @@ impl App {
                 // keys at the same places (`j` arrives as the jamo on that key); a syllable is
                 // several keys, each resolved where the previous one left off.
                 let mapped = match key.code {
-                    KeyCode::Char(c) if key.mods.is_empty() && !self.key_context().is_text_input() => hangul::keys(c),
+                    KeyCode::Char(c) if key.mods.is_empty() && !self.typing_text() => hangul::keys(c),
                     _ => None,
                 };
                 match mapped {

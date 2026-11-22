@@ -187,3 +187,36 @@ fn a_theme_is_shown_then_kept_or_given_back() {
     key(&mut a, "esc");
     assert_eq!(a.theme_setting, "terminal", "kept");
 }
+
+/// Typed as the terminal delivers it: one key event per character.
+fn typed(a: &mut App, text: &str) {
+    use ratatui::crossterm::event::{Event, KeyEvent};
+    for c in text.chars() {
+        a.handle_event(Event::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)), Instant::now());
+    }
+}
+
+#[test]
+fn hangul_typed_into_the_inputs_stays_hangul() {
+    // "~/da-un-ro-deu" and "nae-te-ma" as precomposed syllables, "eo" (the `j` key) as a jamo.
+    let mut a = app();
+    a.downloads.home = Some(PathBuf::from("/home/me"));
+    select(&mut a, "downloads");
+    key(&mut a, "enter");
+    typed(&mut a, "~/\u{B2E4}\u{C6B4}\u{B85C}\u{B4DC}");
+    key(&mut a, "enter");
+    assert_eq!(
+        saved(&mut a),
+        [("downloads", "~/\u{B2E4}\u{C6B4}\u{B85C}\u{B4DC}".to_string())],
+        "saved as typed, not as QWERTY keys"
+    );
+    assert_eq!(a.prefs.config.downloads, "~/\u{B2E4}\u{C6B4}\u{B85C}\u{B4DC}");
+    select(&mut a, "theme");
+    typed(&mut a, "c");
+    key(&mut a, "ctrl+u");
+    typed(&mut a, "\u{B0B4}\u{D14C}\u{B9C8}");
+    assert_eq!(a.prefs.screen.as_ref().unwrap().name.as_ref().map(|n| n.0.as_str()), Some("\u{B0B4}\u{D14C}\u{B9C8}"));
+    key(&mut a, "esc");
+    typed(&mut a, "\u{3153}");
+    assert_eq!(a.prefs.screen.as_ref().unwrap().selected, find("theme").unwrap() + 1, "the list still moves on jamo");
+}
