@@ -21,4 +21,4 @@ expression: d.snap()
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │
 ╰────────────────────────────╯╰────────────────────────────╯
- NORMAL  ▌A company › Home     │ Enter open · ? help │ demo
+ NORMAL  ▌A company › Home                           │ demo

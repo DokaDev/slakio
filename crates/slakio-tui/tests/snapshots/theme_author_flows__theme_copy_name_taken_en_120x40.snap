@@ -41,4 +41,4 @@ expression: d.snap()
 │   # feed│                                                                                                  │         │
 │   # feed╰────────────────────────────────────────────────── j/k move · h/l change · Enter keep · Esc close ╯         │
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  ▌A company › Home   │ Enter open · l peek · t new tab · Tab next pane · [/] views · ? help · Space more │ demo
+ NORMAL  ▌A company › Home                                                                                       │ demo

@@ -308,3 +308,20 @@ fn the_out_of_view_counts_never_cover_a_row() {
         }
     }
 }
+
+#[test]
+fn the_status_line_offers_no_pane_keys_under_the_screen() {
+    // As under the keyboard help: the place, no keys of the pane under the screen.
+    let line =
+        |place: &str, gap: usize, mark: &str| format!(" NORMAL  ▌A company › {place}{} │ {mark}", " ".repeat(gap));
+    let want = [line("Home", 46, "demo"), line("Home", 86, "demo"), line("＊", 48, "＊＊"), line("＊", 88, "＊＊")];
+    let mut lines = Vec::new();
+    for (w, lang) in [(80, Lang::En), (120, Lang::En), (80, Lang::Ko), (120, Lang::Ko)] {
+        let mut d = booted(w, 24, lang, shown_config(), true);
+        d.keys("space ,");
+        let status = demo::mask_hangul(&d.status_line());
+        assert!(!status.contains("Enter") && !status.contains("help"), "{w} {lang:?}: {status}");
+        lines.push(status);
+    }
+    assert_eq!(lines, want, "at 80 and 120 columns, in English and Korean");
+}
