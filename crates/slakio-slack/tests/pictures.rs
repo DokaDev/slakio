@@ -1,7 +1,8 @@
 //! Pictures against the fake Slack: a file's smaller copy fetched from the file host with the
 //! session's cookie and never the token; a profile photo fetched from an avatar host with
-//! neither; only what says it is an image read, at most the bytes asked; redirects followed
-//! only on the file host; addresses elsewhere never asked; every ask a background request of the
+//! neither; only what says it is an image read, at most the bytes asked; a copy's redirects
+//! followed only on the file host, a photo's (at most two) only to an avatar host, each hop
+//! checked again and counted; addresses elsewhere never asked; every ask a background request of the
 //! budget; the switched-off network asks nothing. And their addresses read from Slack's
 //! answers: only the file host for copies, only the avatar hosts for photos.
 
@@ -157,7 +158,7 @@ fn only_an_image_is_read_and_never_more_than_asked() {
 }
 
 #[test]
-fn redirects_stay_on_the_file_host_and_a_photo_follows_none() {
+fn redirects_stay_on_the_file_host_and_a_photo_follows_none_elsewhere() {
     rt().block_on(async {
         let mut r = Run::new().await;
         let (thumb, photo) = r.sources();
@@ -177,7 +178,7 @@ fn redirects_stay_on_the_file_host_and_a_photo_follows_none() {
         let path = thumb.address().split_once(".com").unwrap().1.to_string();
         r.fake.fail_next(PICTURES, to(&path));
         assert!(r.picture(thumb, BYTES_MAX).await.is_ok(), "on the file host: followed");
-        r.fake.fail_next(PICTURES, to(photo.address()));
+        r.fake.fail_next(PICTURES, to("https://evil.example/p.png"));
         assert_eq!(r.picture(photo, BYTES_MAX).await, Err(api("redirected_elsewhere")));
         let log = r.picture_requests();
         assert_eq!(log.len(), 5, "nothing asked elsewhere");
@@ -295,5 +296,83 @@ fn a_picture_that_trickles_ends_at_its_deadline() {
             }
             other => panic!("{other:?}"),
         }
+    });
+}
+
+fn redirect(at: &str) -> Fault {
+    Fault::Raw { status: 302, headers: vec![("location".to_string(), at.to_string())], body: Vec::new() }
+}
+
+/// `photo`'s path on avatar host `host`.
+fn on(host: &str, photo: &Source) -> String {
+    format!("https://{host}{}", photo.address().split_once(".com").unwrap().1)
+}
+
+#[test]
+fn a_photo_follows_at_most_two_redirects_to_avatar_hosts_each_counted_and_bare() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let (_, photo) = r.sources();
+        // Gravatar to Slack's default avatar, then once more on Slack's avatar host.
+        r.fake.fail_next(PICTURES, redirect(&on(AVATAR_HOSTS[2], &photo)));
+        r.fake.fail_next(PICTURES, redirect(&on(AVATAR_HOSTS[0], &photo)));
+        let bytes = r.picture(photo.clone(), BYTES_MAX).await.unwrap();
+        assert_eq!(&bytes[..4], b"\x89PNG");
+        let log = r.picture_requests();
+        assert_eq!(log.len(), 3, "the photo and two hops");
+        for l in &log {
+            for secret in ["cookie", "authorization", "origin", "referer"] {
+                assert_eq!(header(l, secret), None, "{secret} on {}", l.path);
+            }
+            assert!(l.headers.iter().all(|(_, v)| !v.contains(TOKEN) && !v.contains("cookie-TEST")));
+            assert!(l.body.is_empty(), "a GET");
+        }
+        assert_eq!(r.governor.sent(), 3, "each hop counts");
+        // A third hop is refused, though to an avatar host.
+        for host in [AVATAR_HOSTS[2], AVATAR_HOSTS[0], AVATAR_HOSTS[2]] {
+            r.fake.fail_next(PICTURES, redirect(&on(host, &photo)));
+        }
+        assert_eq!(r.picture(photo, BYTES_MAX).await, Err(api("redirected_elsewhere")));
+        assert_eq!(r.picture_requests().len(), 6, "the third hop never asked");
+        assert_eq!(r.governor.sent(), 6);
+    });
+}
+
+#[test]
+fn a_photo_never_follows_a_redirect_to_an_address_a_photo_may_not_come_from() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let (thumb, photo) = r.sources();
+        let slack = AVATAR_HOSTS[2];
+        let path = photo.address().split_once(".com").unwrap().1.to_string();
+        // The fake serves the photo's path on any host.
+        let gravatar = format!("https://{}{path}?s=72", AVATAR_HOSTS[1]);
+        for to in [
+            "https://evil.example/a.png".to_string(),
+            format!("http://{slack}{path}"),
+            format!("https://{slack}.evil.com{path}"),
+            format!("https://evil@{slack}{path}"),
+            format!("https://{slack}@evil.example{path}"),
+            format!("https://{slack}:8443{path}"),
+            format!("https://{slack}:443{path}"),
+            format!("{gravatar}&d=https%3A%2F%2Fevil.example%2Fa.png"),
+            format!("{gravatar}&d=https://evil.example/a.png"),
+            thumb.address().to_string(),
+            path.clone(),
+            format!("//{slack}{path}"),
+            String::new(),
+        ] {
+            r.fake.fail_next(PICTURES, redirect(&to));
+            assert_eq!(r.picture(photo.clone(), BYTES_MAX).await, Err(api("redirected_elsewhere")), "{to:?}");
+        }
+        // A redirect with no address at all.
+        r.fake.fail_next(PICTURES, Fault::Raw { status: 302, headers: Vec::new(), body: Vec::new() });
+        assert_eq!(r.picture(photo.clone(), BYTES_MAX).await, Err(api("redirected_elsewhere")));
+        assert_eq!(r.picture_requests().len(), 14, "only the photo itself each time: nothing asked elsewhere");
+        assert_eq!(r.governor.sent(), 14);
+        // Gravatar sending to Slack's default avatar is followed.
+        r.fake.fail_next(PICTURES, redirect(&format!("{gravatar}&d=https%3A%2F%2F{slack}%2Fimg%2Fava_0010-72.png")));
+        assert!(r.picture(photo, BYTES_MAX).await.is_ok());
+        assert_eq!(r.picture_requests().len(), 16);
     });
 }

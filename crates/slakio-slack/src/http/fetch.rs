@@ -1,8 +1,9 @@
 //! A file's download, or a picture, on the wire: one `GET` to Slack's file host ([`FILE_HOST`])
 //! or to one of the avatar hosts ([`AVATAR_HOSTS`]), no other, over TLS (HTTP/2 when offered,
 //! else HTTP/1.1), or for the tests' fake Slack to its loopback address (the host's path, sent
-//! there). A request to an avatar host that carries a cookie or an `Authorization` header is
-//! refused here, whoever built it: the session's cookie goes to the file host only. The answer's
+//! there). A request to an avatar host that carries a cookie, an `Authorization`, an `Origin` or
+//! a `Referer` header is refused here, whoever built it: the session's cookie goes to the file
+//! host only, and nothing tells an avatar host which page asked. The answer's
 //! head is read at once; its body comes a piece at a time ([`Fetched::chunk`]), each within
 //! [`IDLE`] of the one before. A redirect is not followed here: the caller decides whether its
 //! address may be fetched.
@@ -23,10 +24,10 @@ pub const IDLE: Duration = Duration::from_secs(30);
 
 const ONLY_FILES: SlackError =
     SlackError::Offline { why: "only Slack's file host and avatar hosts can be reached for a file or a picture" };
-const NO_COOKIE: SlackError = SlackError::Offline { why: "no cookie or token goes to an avatar host" };
+const NO_COOKIE: SlackError = SlackError::Offline { why: "no cookie, token, origin or referer goes to an avatar host" };
 
 /// `host` may be fetched from, with `headers`: the file host with any; an avatar host only
-/// without a cookie or an `Authorization`.
+/// without a cookie, an `Authorization`, an `Origin` or a `Referer`.
 fn allowed(host: &str, headers: &[(&'static str, String)]) -> Result<(), SlackError> {
     if host == FILE_HOST {
         return Ok(());
@@ -34,7 +35,7 @@ fn allowed(host: &str, headers: &[(&'static str, String)]) -> Result<(), SlackEr
     if !AVATAR_HOSTS.contains(&host) {
         return Err(ONLY_FILES);
     }
-    let secret = |n: &str| n.eq_ignore_ascii_case("cookie") || n.eq_ignore_ascii_case("authorization");
+    let secret = |n: &str| ["cookie", "authorization", "origin", "referer"].iter().any(|s| n.eq_ignore_ascii_case(s));
     if headers.iter().any(|(n, _)| secret(n)) {
         return Err(NO_COOKIE);
     }
@@ -173,14 +174,26 @@ mod tests {
     fn an_avatar_host_never_gets_a_cookie_or_a_token() {
         let cookie = [("Cookie", "d=x".to_string())];
         let auth = [("authorization", "Bearer x".to_string())];
+        let origin = [("Origin", "https://app.slack.com".to_string())];
+        let referer = [("referer", "https://app.slack.com/".to_string())];
         let plain = [("Accept", "image/*".to_string())];
         assert!(allowed(FILE_HOST, &cookie).is_ok(), "the file host takes the cookie");
         for host in AVATAR_HOSTS {
             assert!(allowed(host, &plain).is_ok());
             assert!(allowed(host, &cookie).is_err(), "{host}");
             assert!(allowed(host, &auth).is_err(), "{host}");
+            assert!(allowed(host, &origin).is_err(), "{host}");
+            assert!(allowed(host, &referer).is_err(), "{host}");
         }
-        for host in ["evil.example", "slack.com", "app.slack.com", "www.gravatar.com", ""] {
+        let tricks = [
+            format!("{}.evil.com", AVATAR_HOSTS[2]),
+            format!("evil@{}", AVATAR_HOSTS[2]),
+            format!("{}:8443", AVATAR_HOSTS[2]),
+        ];
+        for host in ["evil.example", "slack.com", "app.slack.com", "www.gravatar.com", ""]
+            .into_iter()
+            .chain(tricks.iter().map(String::as_str))
+        {
             assert!(allowed(host, &plain).is_err(), "{host}");
         }
     }
