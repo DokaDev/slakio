@@ -22,8 +22,8 @@ expression: d.snap()
 │ f    Show Files                        s    Search messages                  │
 │ o    Show To-dos                       j    Read the conversation from a day │
 │ e    Show or hide the list panel       q    Quit                             │
-│ v    Fold the view switcher to the v…  w    +Window                          │
-│ W    Switch workspace                  t    +Tab                             │
-│ [    Back to the conversation before                                         │
+│ v    Fold the view switcher to the v…  ,    Settings                         │
+│ W    Switch workspace                  w    +Window                          │
+│ [    Back to the conversation before   t    +Tab                             │
 ╰───────────────────────────────────── Esc close · Backspace back · ? all keys ╯
  NORMAL  ▌A company › Home                                               │ demo

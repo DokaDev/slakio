@@ -50,6 +50,7 @@ pub mod query;
 pub(crate) mod requests;
 mod restore;
 pub mod search;
+pub mod settings;
 pub mod shell;
 pub mod signin;
 mod splits;
@@ -141,8 +142,8 @@ pub struct App {
     /// drawn here; `:theme` changes the one and keeps the other.
     pub theme_setting: String,
     pub look: Look,
-    /// Where theme files are read from (`themes/` next to the config file; none without one).
-    pub theme_dir: Option<std::path::PathBuf>,
+    /// The config file's settings, where theme files are read from, and the settings screen.
+    pub prefs: settings::Prefs,
     pub settings: Settings,
     pub cmdline: cmdline::CommandLine,
     pub status: Status,
@@ -207,7 +208,7 @@ impl App {
             theme,
             theme_setting: "auto".to_string(),
             look: Look::default(),
-            theme_dir: None,
+            prefs: settings::Prefs::default(),
             settings: Settings::default(),
             cmdline: cmdline::CommandLine::default(),
             status: Status::default(),
@@ -400,7 +401,7 @@ impl App {
                 self.guide = Guide::default();
                 match seq[..] {
                     [key] if ctx == Ctx::Search => self.search_key(key.code, key.mods, now),
-                    [key] => self.type_key(ctx, key),
+                    [key] => self.type_key(ctx, key, now),
                     [.., last] if last == KeyChord::char('?') => self.open_help(ctx),
                     _ => {}
                 }
@@ -441,7 +442,7 @@ impl App {
                 self.info(Msg::StatusQuitHint { keys }, now);
             }
             AppAction::Palette => {
-                if self.dialog.is_none() && !self.checking_sign_in() {
+                if self.dialog.is_none() && !self.checking_sign_in() && self.prefs.screen.is_none() {
                     self.help = None;
                     if self.cmdline.is_open() {
                         self.cmdline.close();

@@ -1,8 +1,10 @@
 //! The settings the palette changes and saves in the config file: `:theme`, `:avatars`,
-//! `:images`, `:density`, `:icons` (each with a value, or alone: the other value).
+//! `:images`, `:density`, `:icons` (each with a value, or alone: the other value), and every
+//! setting of the settings table with `:set <key>=<value>` ([`crate::app::settings::table`]).
 
 use super::{DENSITY_VALUES, ICON_VALUES, NET_VALUES, Row, icons_arg, setting_arg};
 use crate::action::{self, AppAction};
+use crate::app::settings::table;
 use crate::app::status::Level;
 use crate::app::todos::{FILTER_VALUES, SORT_VALUES};
 use crate::app::{App, Effect};
@@ -86,6 +88,7 @@ impl App {
             AppAction::ToggleDensity => self.set_density(if s.compact { "comfortable" } else { "compact" }, now),
             AppAction::ToggleNetwork => return self.set_net(self.offline(), now),
             AppAction::SignInAgain => return self.sign_in_again(),
+            AppAction::Settings => return self.open_settings(),
             _ => self.set_icons(if s.icons { "off" } else { "on" }, now),
         };
         if let Err(msg) = done {
@@ -144,6 +147,38 @@ impl App {
         }
     }
 
+    /// The palette's row of `:avatars` value `i`.
+    pub(super) fn avatars_row(&self, i: usize) -> Row {
+        let (words, current) = match AVATAR_VALUES[i] {
+            "initials" => (Label::AvatarsInitials, self.settings.avatars && !self.settings.photos),
+            "image" => (Label::AvatarsImage, self.settings.avatars && self.settings.photos),
+            _ => (Label::AvatarsOff, !self.settings.avatars),
+        };
+        self.value_row(AVATAR_VALUES[i], words, current)
+    }
+
+    /// The palette's row of theme file `i` after `:theme `.
+    pub(super) fn theme_file_row(&self, i: usize) -> Row {
+        let name = self.theme_files().get(i).cloned().unwrap_or_default();
+        let current = name == self.theme_setting;
+        self.value_row(&name, Label::SettingsThemeFile, current)
+    }
+
+    /// Theme file `i` picked after `:theme `: used and saved, or why not said in the palette.
+    pub(super) fn theme_file_run(&mut self, i: usize, now: Instant) {
+        let name = self.theme_files().get(i).cloned().unwrap_or_default();
+        self.theme_typed(&format!("theme {name}"), now);
+    }
+
+    /// A row of value `name` meaning `words`, marked when it is the `current` one.
+    fn value_row(&self, name: &str, words: Label, current: bool) -> Row {
+        Row {
+            name: name.to_string(),
+            label: self.i18n.label(words).to_string(),
+            keys: if current { self.i18n.label(Label::PaletteCurrent).to_string() } else { String::new() },
+        }
+    }
+
     /// The palette's row of `:images` value `i`.
     pub(super) fn images_row(&self, i: usize) -> Row {
         let words = match IMAGE_VALUES[i] {
@@ -156,6 +191,27 @@ impl App {
             name: IMAGE_VALUES[i].to_string(),
             label: self.i18n.label(words).to_string(),
             keys: if current { self.i18n.label(Label::PaletteCurrent).to_string() } else { String::new() },
+        }
+    }
+}
+
+impl App {
+    /// `:set <key>=<value>` that no entry of the palette ran: the setting of the table changed
+    /// and saved (the palette closes), or why not said in the palette. The aliases' own words
+    /// (`Unknown density …`) stay theirs.
+    pub(super) fn run_set(&mut self, text: String, now: Instant) {
+        match table::parse_set(&text) {
+            Some(Ok((k, value))) => match self.apply_setting(k, &value, now) {
+                Ok(()) => self.cmdline.close(),
+                Err(msg) => self.cmdline.error = Some(msg),
+            },
+            parsed => {
+                let said = unknown(text);
+                self.cmdline.error = Some(match (parsed, said) {
+                    (Some(Err(msg)), Msg::CommandUnknown { .. }) => msg,
+                    (_, said) => said,
+                });
+            }
         }
     }
 }

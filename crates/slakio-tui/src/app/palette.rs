@@ -33,7 +33,6 @@ use crate::theme::NAMES;
 pub use net::NET_VALUES;
 use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-use settings::unknown;
 pub use settings::{AVATAR_VALUES, IMAGE_VALUES, avatars_arg, theme_arg};
 use slakio_core::i18n::{Label, Msg};
 use std::time::Instant;
@@ -58,6 +57,8 @@ pub enum Item {
     ThemeCommand,
     /// A theme for `:theme` (index into [`NAMES`]).
     Theme(usize),
+    /// A theme file for `:theme` (index into [`App::theme_files`]).
+    ThemeFile(usize),
     /// A value for `:avatars <value>` (index into [`AVATAR_VALUES`]).
     Avatars(usize),
     /// A value for `:images <value>` (index into [`IMAGE_VALUES`]).
@@ -99,7 +100,7 @@ pub struct Row {
 /// itself; the shell's and the panes' only with a backend.
 fn offered(a: Action, backend: bool) -> bool {
     match a {
-        Action::App(AppAction::Quit) => true,
+        Action::App(AppAction::Quit | AppAction::Settings) => true,
         Action::App(
             AppAction::ChooseWorkspace
             | AppAction::Retry
@@ -130,7 +131,7 @@ fn themes(arg: &str) -> Vec<usize> {
 }
 
 /// What a theme name stands for.
-fn theme_label(name: &str) -> Label {
+pub(crate) fn theme_label(name: &str) -> Label {
     match name {
         "terminal" => Label::ThemesTerminal,
         "dark" => Label::ThemesDark,
@@ -222,7 +223,9 @@ impl App {
             }
         }
         if let Some(arg) = theme_arg(line) {
-            return themes(arg).into_iter().map(Item::Theme).collect();
+            let files = self.theme_files();
+            let files = ranked(&files.iter().map(String::as_str).collect::<Vec<_>>(), arg);
+            return themes(arg).into_iter().map(Item::Theme).chain(files.into_iter().map(Item::ThemeFile)).collect();
         }
         if let Some(arg) = setting_arg(line, "density") {
             return ranked(DENSITY_VALUES, arg).into_iter().map(Item::Density).collect();
@@ -305,18 +308,8 @@ impl App {
                     label: label(theme_label(NAMES[i])),
                     keys: if NAMES[i] == self.theme_setting { label(Label::PaletteCurrent) } else { String::new() },
                 },
-                Item::Avatars(i) => {
-                    let (words, current) = match AVATAR_VALUES[i] {
-                        "initials" => (Label::AvatarsInitials, self.settings.avatars && !self.settings.photos),
-                        "image" => (Label::AvatarsImage, self.settings.avatars && self.settings.photos),
-                        _ => (Label::AvatarsOff, !self.settings.avatars),
-                    };
-                    Row {
-                        name: AVATAR_VALUES[i].to_string(),
-                        label: label(words),
-                        keys: if current { label(Label::PaletteCurrent) } else { String::new() },
-                    }
-                }
+                Item::ThemeFile(i) => self.theme_file_row(i),
+                Item::Avatars(i) => self.avatars_row(i),
                 Item::Images(i) => self.images_row(i),
                 Item::Action(i) => {
                     Row { name: String::new(), label: label(REGISTRY[i].label), keys: keys_of(REGISTRY[i].action) }
@@ -431,6 +424,7 @@ impl App {
                     self.warn(msg, now);
                 }
             }
+            Some(Item::ThemeFile(i)) => self.theme_file_run(i, now),
             Some(Item::Avatars(i)) => {
                 self.cmdline.close();
                 if let Err(msg) = self.set_avatars(AVATAR_VALUES[i], now) {
@@ -486,7 +480,7 @@ impl App {
             None if self.backend.is_some_and(|c| c.demo) && setting_arg(&text, "net").is_some() => {
                 self.cmdline.error = Some(Msg::Label(Label::NetDemo));
             }
-            None => self.cmdline.error = Some(unknown(text)),
+            None => self.run_set(text, now),
         }
     }
 

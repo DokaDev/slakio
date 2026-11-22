@@ -578,3 +578,59 @@ fn the_palette_s_images_values_show_whole() {
         assert!(row.contains(&want), "{lang:?} {w}: {row}");
     }
 }
+
+/// The picture cells (where, their symbol and their colour: which picture) outside the box of a
+/// popup `w` columns wide, centred on a screen `width` wide.
+fn pictures_outside(s: &Scripted, width: u16, w: u16) -> Vec<(u16, u16, String, ratatui::style::Color)> {
+    let buf = s.d.buffer();
+    let left = (width - w) / 2;
+    let area = buf.area;
+    (area.top()..area.bottom())
+        .flat_map(|y| (area.left()..area.right()).map(move |x| (x, y)))
+        .filter(|&(x, _)| x < left || x >= left + w)
+        .filter(|&(x, y)| is_placeholder(buf[(x, y)].symbol()))
+        .map(|(x, y)| (x, y, buf[(x, y)].symbol().to_string(), buf[(x, y)].fg))
+        .collect()
+}
+
+#[test]
+fn the_settings_screen_and_a_theme_shown_leave_pictures_outside_it_as_they_are() {
+    // 240 columns: the box (100 wide, centred) leaves the picture in the main pane outside it.
+    let (mut s, _) = shown(240, 40, true);
+    let asked = frame(&mut s);
+    deliver(&mut s, asked[0].0, slakio_world::pictures::png("x", 360, 240));
+    s.d.app.images.take_graphics();
+    let before = pictures_outside(&s, 240, 100);
+    assert!(!before.is_empty(), "the picture is outside the box:\n{}", s.d.screen());
+    s.keys("space ,");
+    assert!(s.d.screen().contains("Settings"), "{}", s.d.screen());
+    assert_eq!(pictures_outside(&s, 240, 100), before, "open");
+    s.keys("l l");
+    assert_ne!(s.d.app.theme_setting, s.d.app.theme.name, "a theme shown");
+    assert_eq!(pictures_outside(&s, 240, 100), before, "a theme shown");
+    assert!(frame(&mut s).is_empty(), "nothing asked again");
+    s.keys("esc");
+    assert_eq!(pictures_outside(&s, 240, 100), before, "closed");
+    assert_eq!(s.d.app.images.take_graphics(), "", "no picture sent again for a theme shown");
+}
+
+#[test]
+fn a_custom_selection_and_dim_leave_pictures_under_the_settings_screen_as_they_are() {
+    let dir = std::env::temp_dir().join(format!("slakio-image-theme-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let text = "extends = \"dark\"\n[colors]\ndim = { toward = \"#000000\", keep = 30 }\n[styles]\n\
+                selection = { fg = \"#ff0000\", bg = \"#00ff00\", modifiers = [\"reversed\"] }\n";
+    std::fs::write(dir.join("loud.toml"), text).unwrap();
+    let look =
+        slakio_tui::theme::Look { truecolor: true, background: slakio_tui::theme::Background::Dark, no_color: false };
+    let theme = slakio_tui::theme::load("loud", look, Some(&dir));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (mut s, _) = shown(240, 40, true);
+    s.d.app.theme = theme.expect("the theme file is good");
+    let asked = frame(&mut s);
+    deliver(&mut s, asked[0].0, slakio_world::pictures::png("x", 360, 240));
+    let before = pictures_outside(&s, 240, 100);
+    assert!(!before.is_empty());
+    s.keys("space ,");
+    assert_eq!(pictures_outside(&s, 240, 100), before, "dimmed around, the pictures' cells kept");
+}

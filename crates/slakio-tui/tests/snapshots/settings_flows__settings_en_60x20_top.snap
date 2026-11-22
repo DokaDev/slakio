@@ -1,0 +1,24 @@
+---
+source: crates/slakio-tui/tests/settings_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
+│▎╭ Settings ────────────────────────────────────────────╮ │
+│ │ Display                                              │ │
+│ │   theme            ‹ auto              ›  Tokyo Nig… │ │
+│ │   density          ‹ comfortable       ›  As in GUI… │ │
+│ │   nav_rows         ‹ expanded          ›  A row per… │ │
+├─│   icons            ‹ off               ›  Text and…  │ │
+│ │ Pictures                                             │ │
+│ │   avatars          ‹ initials          ›  A person'… │ │
+│ │   images           ‹ auto              ›  Where pic… │ │
+│ │ Language                               9 more below  │ │
+│ │──────────────────────────────────────────────────────│ │
+│ │ The colors. h/l show each theme at once; Enter keeps │ │
+│ │ the one shown. Theme files go in themes/ next to the │ │
+│ │ config file.                                         │ │
+│ │ Saved to /home/me/.config/slakio/config.toml         │ │
+│ │ More settings in /home/me/.config/slakio/config.toml │ │
+│ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │
+╰────────────────────────────╯╰────────────────────────────╯
+ NORMAL  ▌A company › Home     │ Enter open · ? help │ demo

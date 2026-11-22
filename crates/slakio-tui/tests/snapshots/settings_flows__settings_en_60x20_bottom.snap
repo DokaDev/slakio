@@ -1,0 +1,24 @@
+---
+source: crates/slakio-tui/tests/settings_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
+│▎╭ Settings ────────────────────────────────────────────╮ │
+│ │ Language                               8 more above  │ │
+│ │   language         ‹ auto              ›  applies o… │ │
+│ │ Files                                                │ │
+│ │   downloads        ‹ ~/Downloads/slak… ›  Enter: ty… │ │
+├─│   download_max_mb  ‹ 1024              ›  MB: the l… │ │
+│ │ Network                                              │ │
+│ │   network          ‹ on                ›  applies o… │ │
+│ │   live             ‹ on                ›  applies o… │ │
+│ │   restore          ‹ on                ›  applies o… │ │
+│ │   cache            ‹ on                ›  applies o… │ │
+│ │──────────────────────────────────────────────────────│ │
+│ │ off: nothing is kept on disk between runs (every     │ │
+│ │ start fetches).                                      │ │
+│ │ Saved to /home/me/.config/slakio/config.toml         │ │
+│ │ More settings in /home/me/.config/slakio/config.toml │ │
+│ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │
+╰────────────────────────────╯╰────────────────────────────╯
+ NORMAL  ▌A company › Home     │ Enter open · ? help │ demo

@@ -158,6 +158,7 @@ fn every_action_is_registered() {
             SignInAgain,
             Search,
             JumpDate,
+            Settings,
         ]
         .map(Action::App)
     };

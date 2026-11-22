@@ -1,7 +1,8 @@
 //! The keyboard help: every context's keys, made from the key map and the action registry, so
 //! it always shows what the keys do now. The context it was opened from and its parents are
-//! open first; the others are folded with their number of keys. `/` filters the rows; `Enter`
-//! runs the action of a row (or opens a section).
+//! open first; the others are folded with their number of keys. The commands no key runs
+//! (`:avatars`, `:images`, …) are listed under *Everywhere*, their command in place of keys. `/`
+//! filters the rows; `Enter` runs the action of a row (or opens a section).
 
 use super::{App, Guide};
 use crate::action::{self, Action, HelpAction};
@@ -70,6 +71,9 @@ impl Help {
                     _ => entries.push(Row::Entry { ctx, action: a, label: action::spec(a).label, keys: shown }),
                 }
             }
+            if ctx == Ctx::Root {
+                entries.extend(commands_only(km));
+            }
             if !needle.is_empty() {
                 entries.retain(|e| match e {
                     Row::Entry { label, keys, .. } => {
@@ -115,6 +119,14 @@ impl Help {
     }
 }
 
+/// The rows of the actions no key runs, only their command (`:avatars`), in the registry's order.
+fn commands_only(km: &Keymap) -> impl Iterator<Item = Row> + '_ {
+    action::REGISTRY
+        .iter()
+        .filter(move |s| !s.commands.is_empty() && !km.all().iter().any(|b| b.action == s.action))
+        .map(|s| Row::Entry { ctx: Ctx::Root, action: s.action, label: s.label, keys: format!(":{}", s.commands[0]) })
+}
+
 /// The help's actions, routed here by [`App`].
 impl App {
     /// Open the keyboard help for context `ctx`.
@@ -126,7 +138,7 @@ impl App {
 
     pub(super) fn help(&mut self, a: HelpAction, now: Instant) {
         if a == HelpAction::Open {
-            if self.dialog.is_some() {
+            if self.dialog.is_some() || self.prefs.screen.is_some() {
                 return;
             }
             match self.help {

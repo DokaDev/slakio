@@ -210,6 +210,7 @@ pub const DEFAULTS: &[Binding] = &[
     app(Ctx::Shell, "space s", AppAction::Search),
     app(Ctx::Shell, "space j", AppAction::JumpDate),
     app(Ctx::Shell, "space q", AppAction::Quit),
+    app(Ctx::Shell, "space ,", AppAction::Settings),
     // The view switcher runs top to bottom, the list under it: down from its last row is the
     // list's first, and `k` there comes back up. `Esc` goes back to the list as it was.
     shell(Ctx::ViewSwitcher, "j", ShellAction::NavNext),

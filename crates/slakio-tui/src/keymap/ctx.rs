@@ -39,6 +39,8 @@ pub enum Ctx {
     Links,
     /// The search popup's words (text input) and its results.
     Search,
+    /// The settings screen (modal: it reads its keys itself, none are bound here).
+    Settings,
 }
 
 impl Ctx {
@@ -60,6 +62,7 @@ impl Ctx {
         Ctx::Switcher,
         Ctx::Links,
         Ctx::Search,
+        Ctx::Settings,
     ];
 
     /// The id config files and the docs use.
@@ -81,6 +84,7 @@ impl Ctx {
             Ctx::Switcher => "switcher",
             Ctx::Links => "links",
             Ctx::Search => "search",
+            Ctx::Settings => "settings",
         }
     }
 
@@ -102,6 +106,7 @@ impl Ctx {
             Ctx::Switcher => Label::CtxSwitcher,
             Ctx::Links => Label::CtxLinks,
             Ctx::Search => Label::CtxSearch,
+            Ctx::Settings => Label::CtxSettings,
         }
     }
 
@@ -118,7 +123,8 @@ impl Ctx {
             | Ctx::Dialog
             | Ctx::Switcher
             | Ctx::Links
-            | Ctx::Search => None,
+            | Ctx::Search
+            | Ctx::Settings => None,
             Ctx::Shell | Ctx::SignIn => Some(Ctx::Root),
             Ctx::ViewSwitcher | Ctx::List | Ctx::PaneNormal => Some(Ctx::Shell),
             Ctx::PaneVisual => Some(Ctx::PaneNormal),
@@ -137,6 +143,6 @@ impl Ctx {
 
     /// Only its own keys (and the global ones) work here.
     pub fn is_modal(self) -> bool {
-        matches!(self, Ctx::Help | Ctx::Dialog | Ctx::Switcher | Ctx::Links)
+        matches!(self, Ctx::Help | Ctx::Dialog | Ctx::Switcher | Ctx::Links | Ctx::Settings)
     }
 }

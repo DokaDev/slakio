@@ -22,7 +22,8 @@ impl App {
     /// what is under it. `true` when the screen changed.
     pub(super) fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
         match self.overlay() {
-            Some(Overlay::Dialog(_)) => return false,
+            // The settings screen takes keys only.
+            Some(Overlay::Dialog(_) | Overlay::Settings) => return false,
             Some(Overlay::Palette) => return self.palette_mouse(m, now),
             Some(Overlay::Search) => return self.search_mouse(m, now),
             Some(Overlay::Switcher) => return self.switcher_mouse(m),

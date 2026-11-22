@@ -9,7 +9,7 @@
 //!   view switcher (and [`switcher`], the workspace switcher); [`tabbar`] — the work area's
 //!   tabs, when there are two or more; [`timeline`] — a pane's messages;
 //!   [`statusline`] — the bottom line with its hints; [`empty`] — empty states that list keys;
-//!   [`guide`], [`help`], [`palette`], [`dialog`] — the popups.
+//!   [`guide`], [`help`], [`palette`], [`dialog`], [`settings`] — the popups.
 //!
 //! Names and messages drawn here are remote text ([`slakio_core::sanitize::Remote`]): it can
 //! only be drawn through the sanitiser (`line()`, `block()`), never as it came. A test keeps
@@ -26,6 +26,7 @@ mod navbar;
 mod palette;
 mod picker;
 mod search;
+mod settings;
 mod signin;
 mod statusline;
 mod switcher;
@@ -91,6 +92,10 @@ pub fn draw(f: &mut Frame, app: &App, now: Instant) {
                 app.theme.dim_area(f.buffer_mut(), area);
                 statusline::badge(f, app, status);
                 palette::draw(f, app);
+            }
+            Layer::Settings => {
+                app.theme.dim_area(f.buffer_mut(), body);
+                settings::draw(f, app, body);
             }
             Layer::Help => {
                 app.theme.dim_area(f.buffer_mut(), body);

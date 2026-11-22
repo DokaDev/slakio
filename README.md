@@ -187,6 +187,12 @@ images, and settings. This README only lists what works; it will grow with each 
 - `Ctrl+P` (or `:`) opens the command palette: every command and action that works where you
   are, with its keys; type to filter (letters in order are enough: `thm` finds `:theme`),
   `Tab` / arrows to select, `Enter` to run, or click (a click on Quit asks first).
+- `Space ,` (or `:settings`) opens the settings screen: every setting below with its value;
+  `j`/`k` move, `h`/`l` change it at once and save it in the config file (comments kept);
+  on the theme row `h`/`l` show each theme and `Enter` keeps it (`Esc` goes back); on the
+  downloads row `Enter` types a folder. `language`, `network`, `live`, `restore` and `cache`
+  apply on the next launch, and the screen says so. `:set <key>=<value>` changes the same
+  settings from the command palette.
 - `:icons on|off` (or `:icons` to switch) draws Nerd Font icons or text instead, while running,
   and saves it; the first run asks once, showing the icons.
 - People are pictured by their initials on a color of their own: before a sender's name, before

@@ -1,5 +1,6 @@
 //! What typing does where no binding claims the key (text into the composer, the command line,
-//! the help's filter), and the composer's and the command line's own actions.
+//! the help's filter; the settings screen's keys), and the composer's and the command line's own
+//! actions.
 
 use super::composer::Composer;
 use super::{App, Label, Msg};
@@ -10,7 +11,7 @@ use std::time::Instant;
 
 impl App {
     /// A key no binding claims, for what has the focus.
-    pub(super) fn type_key(&mut self, ctx: Ctx, key: KeyChord) {
+    pub(super) fn type_key(&mut self, ctx: Ctx, key: KeyChord, now: Instant) {
         let typed = match key.code {
             KeyCode::Char(c) if !key.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => Some(c),
             _ => None,
@@ -40,6 +41,7 @@ impl App {
                 (_, KeyCode::Backspace) => self.cmdline.backspace(),
                 _ => {}
             },
+            Ctx::Settings => self.settings_key(key, now),
             Ctx::HelpFilter => {
                 let Some(h) = self.help.as_mut() else { return };
                 match (typed, key.code) {

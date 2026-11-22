@@ -63,6 +63,8 @@ pub enum Overlay {
     Search,
     /// The workspace switcher.
     Switcher,
+    /// The settings screen.
+    Settings,
 }
 
 /// A pane, read only.

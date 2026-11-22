@@ -69,6 +69,8 @@ pub enum AppAction {
     /// Read the focused conversation from a day (`:jump <date>`); alone, the command line ready
     /// for the day.
     JumpDate,
+    /// The settings screen (`:settings`): every setting with its value, changed and saved there.
+    Settings,
 }
 
 /// Actions of the `:` command line.
@@ -384,6 +386,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     app(AppAction::SignInAgain, "signin.again", Label::ActionSigninAgain, &["login"]),
     app(AppAction::Search, "search.open", Label::ActionSearchOpen, &["search"]),
     app(AppAction::JumpDate, "jump.date", Label::ActionJumpDate, &["jump"]),
+    app(AppAction::Settings, "settings.open", Label::ActionSettings, &["settings"]),
     spec_of(Action::CommandLine(CommandLineAction::Open), "cmdline.open", Label::ActionCmdlineOpen, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Run), "cmdline.run", Label::ActionCmdlineRun, &[]),
     spec_of(Action::CommandLine(CommandLineAction::Cancel), "cmdline.cancel", Label::ActionCmdlineCancel, &[]),

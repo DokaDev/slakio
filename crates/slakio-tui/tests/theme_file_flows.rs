@@ -39,7 +39,7 @@ fn booted(w: u16, h: u16, lang: Lang) -> Demo {
     let (cfg, err) = slakio_core::config::load(Some(Path::new("config.toml")));
     assert!(err.is_none(), "{err:?}");
     assert_eq!(cfg.theme, "broken", "the config takes a theme file's name");
-    d.app.load_at_start(TRUECOLOR, &cfg.theme, Some(Path::new("config.toml")), d.now);
+    d.app.load_at_start(TRUECOLOR, &cfg, true, d.now);
     d
 }
 
@@ -71,7 +71,12 @@ fn theme_files_at_launch_and_while_running() {
     // A missing file is said too, by its path.
     std::fs::write("config.toml", "theme = \"gone\"\n").unwrap();
     let mut d = Demo::new(200, 24);
-    d.app.load_at_start(TRUECOLOR, "gone", Some(Path::new("config.toml")), d.now);
+    let gone = slakio_core::config::Config {
+        theme: "gone".to_string(),
+        path: Some(Path::new("config.toml").to_path_buf()),
+        ..Default::default()
+    };
+    d.app.load_at_start(TRUECOLOR, &gone, true, d.now);
     assert_eq!(d.app.theme.name, "terminal");
     assert!(
         d.status_line().contains(&native("Theme not used: Unknown theme gone: there is no themes/gone.toml")),

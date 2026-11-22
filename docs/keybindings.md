@@ -111,6 +111,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 | `Space s` | Search messages | `search.open` |
 | `Space j` | Read the conversation from a day | `jump.date` |
 | `Space q` | Quit | `app.quit` |
+| `Space ,` | Settings | `settings.open` |
 
 ## View switcher (`nav`)
 
@@ -334,6 +335,7 @@ Type `:` and the command, then `Enter`.
 | `:login` |  | Sign in again: a workspace Slack signed out, or another |
 | `:search` |  | Search messages |
 | `:jump` |  | Read the conversation from a day |
+| `:settings` |  | Settings |
 | `:nav` | `:rail` | View switcher (in the list panel) |
 | `:list` |  | Show or hide the list panel |
 | `:navrows` |  | Fold the view switcher to the view shown, or unfold it |

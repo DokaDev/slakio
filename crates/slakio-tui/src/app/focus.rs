@@ -35,6 +35,7 @@ impl App {
             Some(Overlay::Palette) => Ctx::CommandLine,
             Some(Overlay::Search) => Ctx::Search,
             Some(Overlay::Switcher) => Ctx::Switcher,
+            Some(Overlay::Settings) => Ctx::Settings,
             None => self.region_context(),
         }
     }
