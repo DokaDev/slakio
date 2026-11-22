@@ -406,6 +406,7 @@ impl App {
     }
 
     /// `Enter`: run the selected entry (see the module's text).
+    #[expect(clippy::too_many_lines, reason = "one arm per kind of palette entry")]
     pub(super) fn palette_run(&mut self, now: Instant) {
         let text = self.cmdline.text().trim().to_string();
         if text.is_empty() && !self.cmdline.picked {
@@ -420,6 +421,7 @@ impl App {
             }
             // A theme file named whole wins over a built-in theme its name matches in part.
             _ if theme_arg(&text).is_some_and(|n| self.theme_file_there(n)) => self.theme_typed(&text, now),
+            _ if self.exact_set(&text) => self.run_set(text, now),
             Some(Item::Command(i) | Item::Action(i)) => {
                 self.cmdline.close();
                 self.dispatch(REGISTRY[i].action, now);

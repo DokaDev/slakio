@@ -225,6 +225,14 @@ fn set_errors_say_what_is_wrong_in_both_languages() {
     }
     // The aliases keep their own words.
     let mut d = booted(120, 40, Lang::En, shown_config(), true);
+    // `:set` takes a whole value only: a part of one is not a fuzzy pick.
+    for line in ["set density=c", "set icons=o", "set avatars=ini", "set images=au"] {
+        d.command(line);
+        assert!(d.app.cmdline.error.is_some(), "{line}");
+        d.keys("esc");
+    }
+    assert!(!d.app.settings.compact);
+    assert_eq!(save(&mut d, None), 0);
     d.command("set density=tiny");
     let said = d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string());
     assert_eq!(said.as_deref(), Some("Unknown density tiny (one of comfortable, compact)"));

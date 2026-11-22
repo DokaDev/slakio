@@ -199,6 +199,12 @@ impl App {
     /// `:set <key>=<value>` that no entry of the palette ran: the setting of the table changed
     /// and saved (the palette closes), or why not said in the palette. The aliases' own words
     /// (`Unknown density …`) stay theirs.
+    /// `:set <key>=<value>` of a settings row is exact, through the table ([`Self::run_set`]):
+    /// the list only suggests (an entry picked by hand runs).
+    pub(super) fn exact_set(&self, text: &str) -> bool {
+        !self.cmdline.picked && table::parse_set(text).is_some_and(|r| !matches!(r, Err(Msg::SetUnknownKey { .. })))
+    }
+
     pub(super) fn run_set(&mut self, text: String, now: Instant) {
         match table::parse_set(&text) {
             Some(Ok((k, value))) => match self.apply_setting(k, &value, now) {

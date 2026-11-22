@@ -220,3 +220,38 @@ fn hangul_typed_into_the_inputs_stays_hangul() {
     typed(&mut a, "\u{3153}");
     assert_eq!(a.prefs.screen.as_ref().unwrap().selected, find("theme").unwrap() + 1, "the list still moves on jamo");
 }
+
+#[test]
+fn every_fixed_row_takes_the_config_file_s_values_and_the_palette_suggests_them() {
+    use crate::app::palette::{AVATAR_VALUES, DENSITY_VALUES, ICON_VALUES, IMAGE_VALUES};
+    let names = |key: &str| match SETTINGS[find(key).unwrap()].values {
+        table::Values::Fixed(v) => v.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
+        _ => unreachable!("{key} is not a fixed row"),
+    };
+    let sorted = |v: &[&'static str]| {
+        let mut v = v.to_vec();
+        v.sort_unstable();
+        v
+    };
+    for (key, core) in [
+        ("density", config::DENSITIES),
+        ("nav_rows", config::NAV_ROWS),
+        ("avatars", config::AVATARS),
+        ("images", config::IMAGES),
+        ("language", config::LANGUAGES),
+        ("network", config::NETWORK),
+        ("live", config::LIVE),
+        ("restore", config::RESTORE),
+        ("cache", config::CACHE),
+    ] {
+        assert_eq!(sorted(&names(key)), sorted(core), "{key}");
+    }
+    // `ask` is the first launch's question; once answered it is `on` or `off`, all a row shows.
+    let icons: Vec<&str> = config::ICONS.iter().copied().filter(|v| *v != "ask").collect();
+    assert_eq!(sorted(&names("icons")), sorted(&icons));
+    for (key, palette) in
+        [("density", DENSITY_VALUES), ("icons", ICON_VALUES), ("avatars", AVATAR_VALUES), ("images", IMAGE_VALUES)]
+    {
+        assert_eq!(names(key), palette, "{key}: the palette suggests the row's values");
+    }
+}
