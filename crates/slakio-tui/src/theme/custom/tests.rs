@@ -200,3 +200,14 @@ fn a_style_left_out_keeps_exactly_the_look_it_had() {
     let t = theme("extends = \"dark\"\n[styles]\ntab_active = { fg = \"red\" }\n", DARK_TRUECOLOR);
     assert_eq!((t.tab_number(true), t.tab_close(true)), (t.tab(true), t.tab(true)));
 }
+
+#[test]
+fn avatar_initials_stay_readable_at_every_tint() {
+    for tint in [0, 1, 50, 99, 100] {
+        let t = theme(&format!("extends = \"dark\"\n[colors]\navatar_tint = {tint}\n"), DARK_TRUECOLOR);
+        let chip = t.avatar(0);
+        assert_ne!(chip.fg, chip.bg, "tint {tint}: initials on a chip of their own colour");
+        let muted = t.avatar_muted();
+        assert_ne!(muted.fg, muted.bg, "tint {tint}: a muted chip");
+    }
+}

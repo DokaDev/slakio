@@ -475,7 +475,8 @@ impl Theme {
     /// `percent` of `c` mixed into the background (`None`: no tint, or not RGB).
     fn tint(&self, c: Color, percent: u16) -> Option<Color> {
         let (Color::Rgb(r, g, b), Color::Rgb(br, bgc, bb)) = (c, self.bg) else { return None };
-        if percent == 0 {
+        // 100: the colour itself, solid (as 0), so the initials on it stay readable.
+        if percent == 0 || percent >= 100 {
             return None;
         }
         let mix = |a: u8, z: u8| ((u16::from(a) * percent + u16::from(z) * (100 - percent)) / 100) as u8;
