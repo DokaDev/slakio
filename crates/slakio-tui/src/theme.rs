@@ -380,7 +380,7 @@ impl Theme {
     /// A link in a message: underlined (with or without color), in the accent; apart from a
     /// person or channel named, which is bold.
     pub fn markup_link(&self) -> Style {
-        self.link().add_modifier(Modifier::UNDERLINED)
+        tokens::over(self.styles.link, || self.link_role().add_modifier(Modifier::UNDERLINED))
     }
 
     /// The letters that pick a link (`o` on a message with several): bold on the warning
@@ -404,7 +404,7 @@ impl Theme {
     fn reaction_mine_role(&self) -> Style {
         match self.kind {
             Kind::Truecolor => Style::new().fg(self.bg).bg(self.accent).add_modifier(Modifier::BOLD),
-            _ => self.reaction().fg(self.accent).add_modifier(Modifier::BOLD),
+            _ => self.reaction_role().fg(self.accent).add_modifier(Modifier::BOLD),
         }
     }
 

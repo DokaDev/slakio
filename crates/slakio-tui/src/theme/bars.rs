@@ -38,13 +38,19 @@ impl Theme {
 
     /// A tab's number: the accent on the tab shown.
     pub fn tab_number(&self, shown: bool) -> Style {
-        if shown && !self.plain() { self.tab(true).fg(self.accent) } else { self.tab(shown) }
+        // A theme file's `tab_active` is the whole tab's look.
+        if shown && !self.plain() && self.styles.tab_active.is_none() {
+            self.tab(true).fg(self.accent)
+        } else {
+            self.tab(shown)
+        }
     }
 
     /// A tab's close button: quiet, a little less on the tab shown.
     pub fn tab_close(&self, shown: bool) -> Style {
         match (self.plain(), shown) {
             (true, _) => self.tab(shown),
+            (false, true) if self.styles.tab_active.is_some() => self.tab(true),
             (false, true) => self.tab(true).fg(self.fg_muted).remove_modifier(Modifier::BOLD),
             (false, false) => self.tab(false).fg(self.fg_dim),
         }

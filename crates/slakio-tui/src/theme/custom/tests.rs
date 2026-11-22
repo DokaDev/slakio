@@ -183,3 +183,20 @@ fn the_selected_row_of_a_panel_without_focus_shows_on_a_terminal_file_that_names
     t.paint_selection(&mut buf, area, Selection::Unfocused);
     assert_eq!((buf[(0, 0)].bg, buf[(0, 0)].symbol()), (t.cursor_line, " "));
 }
+
+#[test]
+fn a_style_left_out_keeps_exactly_the_look_it_had() {
+    // 16 colours: setting `reaction` leaves `reaction_mine` as the base draws it.
+    let ansi = Look { truecolor: false, ..DARK_TRUECOLOR };
+    let base = ansi.theme("terminal");
+    let t = theme("extends = \"terminal\"\n[styles]\nreaction = { bg = \"blue\" }\n", ansi);
+    assert_eq!(t.reaction_mine(), base.reaction_mine());
+    assert_ne!(t.reaction(), base.reaction());
+    // A `link` set is the message link's whole look: no underline added.
+    let t = theme("extends = \"dark\"\n[styles]\nlink = { fg = \"red\" }\n", DARK_TRUECOLOR);
+    assert_eq!(t.markup_link(), Style::new().fg(Color::Red));
+    assert!(DARK_TRUECOLOR.theme("dark").markup_link().add_modifier.contains(Modifier::UNDERLINED));
+    // A `tab_active` set is the whole tab shown: its number and close button too.
+    let t = theme("extends = \"dark\"\n[styles]\ntab_active = { fg = \"red\" }\n", DARK_TRUECOLOR);
+    assert_eq!((t.tab_number(true), t.tab_close(true)), (t.tab(true), t.tab(true)));
+}

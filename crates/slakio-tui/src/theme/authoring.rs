@@ -98,7 +98,7 @@ pub const STYLE_ABOUT: &[(&str, &str)] = &[
     ("code", "Code in a message, inline or a block's lines."),
     ("reaction", "A reaction chip."),
     ("reaction_mine", "Your own reaction."),
-    ("tab_active", "The title of the tab shown."),
+    ("tab_active", "The tab shown: its title, number and close button."),
     ("tab_badge", "A tab's unread count."),
     ("status_line", "The status line."),
     ("hint", "The letters that pick a link (`o` on a message with several)."),
