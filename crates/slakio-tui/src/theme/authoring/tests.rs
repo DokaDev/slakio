@@ -56,6 +56,11 @@ fn a_copy_of_every_builtin_reads_back_as_that_theme() {
             assert_eq!(back, named(&look.theme(&t.name), &name), "{} on {look:?}", t.name);
             let text = d.text(&name);
             assert!(text.contains(&format!("extends = \"{}\"\n", t.name)), "{text}");
+            // On another base it still reads the same: every token is written, none inherited.
+            let other = format!("{name}-on-terminal");
+            d.put(&other, &text.replace(&format!("extends = \"{}\"\n", t.name), "extends = \"terminal\"\n"));
+            let back = load(&other, look, Some(&d.0)).unwrap();
+            assert_eq!(back, named(&look.theme(&t.name), &other), "{} on {look:?}, on terminal", t.name);
         }
     }
     // A family and `auto` copy the theme drawn now, extending it.
@@ -100,6 +105,30 @@ fn every_key_is_set_under_what_it_is_for() {
     assert!(d.text("styled-copy").contains("\nlink = { fg = \"cyan\", modifiers = [\"underlined\"] }\n"));
     let back = load("styled-copy", LOOKS[0], Some(&d.0)).unwrap();
     assert_eq!(back, named(&load("styled", LOOKS[0], Some(&d.0)).unwrap(), "styled-copy"));
+}
+
+#[test]
+fn a_copy_keeps_every_style_with_every_kind_of_colour_and_modifier() {
+    let d = Dir::new("copy-styles");
+    let colors = ["default", "blue", "#12ab34"];
+    let mods = ["bold", "dim", "italic", "underlined", "reversed", "crossed-out"];
+    let mut text = String::from("extends = \"dark\"\n[styles]\n");
+    for (i, token) in theme_file::STYLE_TOKENS.iter().enumerate() {
+        let (fg, bg) = (colors[i % 3], colors[(i + 1) % 3]);
+        let m = [mods[i % 6], mods[(i + 2) % 6]];
+        text.push_str(&format!(
+            "{token} = {{ fg = \"{fg}\", bg = \"{bg}\", modifiers = [\"{}\", \"{}\"] }}\n",
+            m[0], m[1]
+        ));
+    }
+    d.put("styled", &text);
+    let look = LOOKS[0];
+    let source = load("styled", look, Some(&d.0)).unwrap();
+    copy(&d.0, "styled", "styled-copy", look).unwrap();
+    assert_eq!(load("styled-copy", look, Some(&d.0)).unwrap(), named(&source, "styled-copy"));
+    let on_terminal = d.text("styled-copy").replace("extends = \"dark\"\n", "extends = \"terminal\"\n");
+    d.put("styled-on-terminal", &on_terminal);
+    assert_eq!(load("styled-on-terminal", look, Some(&d.0)).unwrap(), named(&source, "styled-on-terminal"));
 }
 
 #[test]
