@@ -493,19 +493,19 @@ Its geometry (`screen::palette`) is shared by drawing and the mouse.
 
 ## The look
 
-`crates/slakio-tui/src/theme.rs` holds the color tokens and the styles made of them; widgets
-name roles, never colors. The built-ins are the terminal's own 16 colors, `dark`, `light`,
+`crates/slakio-tui/src/theme.rs` holds the colour tokens and the styles made of them; widgets
+name roles, never colours. The built-ins are the terminal's own 16 colours, `dark`, `light`,
 `high-contrast`, `nord`, `dracula` and three families (`catppuccin`, `tokyo-night`, `gruvbox`)
 whose light or dark variant follows the terminal's background, asked once with OSC 11; `auto`
-takes `tokyo-night` on a terminal that says it shows 24-bit color. `:theme <name>` resolves a
+takes `tokyo-night` on a terminal that says it shows 24-bit colour. `:theme <name>` resolves a
 name again with what was found at startup (`theme::Look`) and saves it to the config file. Every
-truecolor theme passes WCAG contrast checks (`theme/tests.rs`): body text 4.5:1 on every surface,
+24-bit colour theme passes WCAG contrast checks (`theme/tests.rs`): body text 4.5:1 on every surface,
 muted text and marks 3:1, pills, mode badges and the initials on avatar chips 4.5:1 (4.3:1 on
-a dark theme's tinted chip). An avatar chip (`avatar.rs`: initials and a color slot hashed
+a dark theme's tinted chip). An avatar chip (`avatar.rs`: initials and a colour slot hashed
 from the person's id) takes one of the theme's avatar hues, none in the red family (red is the
-mention pills'); a truecolor theme draws it as a tint of the hue on the background with the
+mention pills'); a 24-bit colour theme draws it as a tint of the hue on the background with the
 hue as the initials (darkened on a light theme), never brighter than the selection bar or the
-accent, and the 16-color theme as colored initials without a background: a solid block is a
+accent, and the 16-colour theme as coloured initials without a background: a solid block is a
 pill's. Two rules hold in every theme and are
 tested cell by cell (`tests/style_flows.rs`): the focus shows on a panel's border and title
 only, and a selection is a background (or a bar in the left gutter), never an underline.

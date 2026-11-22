@@ -89,10 +89,10 @@ images, and settings. This README only lists what works; it will grow with each 
   channels, DMs, a channel shared with another organization), nothing of which connects
   anywhere:
   - the left column navigates, the right one is the work: the list panel's title is the
-    workspace (its color band, its name, `▾`, then each other workspace that wants you by its
+    workspace (its colour band, its name, `▾`, then each other workspace that wants you by its
     letter and mark, `· B @9`), its first rows the view switcher as in GUI Slack's sidebar — a
     row each for Home, DMs, Activity, Files and To-dos (Files says it comes in a
-    later version; To-dos counts its to-dos in progress, in the warning color when one is
+    later version; To-dos counts its to-dos in progress, in the warning colour when one is
     overdue), an icon (icons on) and the name, the count at the right, the view shown marked
     with an accent `▎` (bars are for cursors only) — `@3` mentions, `●16` the DMs' unread messages, `●` unread channels; red only where a mention is behind it, in the list, the tabs and the
     switcher alike (a DM's pill counts its unread messages, red when one mentions you); the
@@ -111,7 +111,7 @@ images, and settings. This README only lists what works; it will grow with each 
     a reminder;
   - To-dos (`Space o`, also `Space l` and `:later`, Later's names before Slack renamed it)
     lists a filter row, then In progress and Completed (each folds with `Enter`): each to-do
-    shows its author's chip, its text and its reminder (`Overdue` in the warning color, or `in
+    shows its author's chip, its text and its reminder (`Overdue` in the warning colour, or `in
     20h`), then where and when it was written; `x` completes or reopens it, `m` moves it to
     Saved (and a saved message back to To-dos), `d` clears it after asking; `f` (`:filter`)
     filters by state or reminder (overdue, upcoming, no reminder), `s` (`:sort`) orders by due
@@ -195,14 +195,14 @@ images, and settings. This README only lists what works; it will grow with each 
   settings from the command palette.
 - `:icons on|off` (or `:icons` to switch) draws Nerd Font icons or text instead, while running,
   and saves it; the first run asks once, showing the icons.
-- People are pictured by their initials on a color of their own: before a sender's name, before
+- People are pictured by their initials on a colour of their own: before a sender's name, before
   a DM in the list (with whether they are around at its corner) and in a DM's title;
   `:avatars` turns them off and on and saves it; `:avatars image` pictures people by their
   profile photos where pictures are drawn ([Pictures](#pictures)), and by initials elsewhere.
-- Themes: the terminal's own colors, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
+- Themes: the terminal's own colours, `dark`, `light`, `high-contrast`, `nord`, `dracula`, and
   `catppuccin`, `tokyo-night` and `gruvbox` (each its light or dark variant by the terminal's
   background); `:theme <name>` switches while running and saves it; `NO_COLOR=1` draws without
-  colors. Your own theme: a file in `themes/` next to the config file
+  colours. Your own theme: a file in `themes/` next to the config file
   ([Theme files](#theme-files)).
 - Links: `o` on a selected message opens its link in your browser. With several links, each
   one that opens gets a letter or two drawn over its start (`a`, `s`, `d` …, never `j`, `k` or
@@ -251,7 +251,7 @@ images, and settings. This README only lists what works; it will grow with each 
   second.
 - Activity (`Space a`): your mentions (by name, `@here` / `@channel` / `@everyone`, a group of
   yours, a word you follow), new replies in threads you follow, reactions to your messages and
-  DMs, of every workspace you are signed in to, newest first (each workspace's color stripe at
+  DMs, of every workspace you are signed in to, newest first (each workspace's colour stripe at
   the left when there are several). Each notice shows its mark (`@` you, `!` everyone, `&` a
   group, `*` a word, `⤷` a thread, `+` a reaction, `»` a DM), where and when, then who and the
   message's text; unread ones are bold, as Slack counts them. `Enter` opens the message as a
@@ -464,7 +464,7 @@ theme = "auto"           # "auto", "terminal", "dark", "light", "high-contrast",
                          # "dracula", or a family: "catppuccin" (-latte / -mocha),
                          # "tokyo-night" (-day / -night), "gruvbox" (-light / -dark)
 icons = "ask"            # Nerd Font icons: "on", "off", or "ask" once (true / false work too)
-avatars = "initials"     # a person's initials on a colored chip, or "off"
+avatars = "initials"     # a person's initials on a coloured chip, or "off"
 density = "comfortable"  # messages as in GUI Slack, or "compact" columns (`:density` switches)
 nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" (`Space v` switches)
 network = "on"           # "off": nothing is ever sent to Slack (also SLAKIO_NETWORK=off)
@@ -483,8 +483,8 @@ images = "auto"          # pictures where the terminal surely draws them, "on" a
 absolute path) overrides it. A megabyte here is 1,000,000 bytes, the unit file sizes are shown
 in (a file shown as `1.0 GB` is over `download_max_mb = 999`).
 
-`theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit color (`COLORTERM`
-is `truecolor` or `24bit`), else the terminal's own colors. `:theme <name>` (also
+`theme = "auto"` takes `tokyo-night` when the terminal says it shows 24-bit colour (`COLORTERM`
+is `truecolor` or `24bit`), else the terminal's own colours. `:theme <name>` (also
 `:colorscheme`, or `:set theme=<name>`) switches the theme while slakio runs and saves it here,
 keeping your comments. `:avatars` (or `:set avatars=off`) does the same for `avatars`;
 `avatars = "image"` shows profile photos where pictures are drawn, and initials elsewhere

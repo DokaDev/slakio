@@ -6,12 +6,12 @@ expression: d.snap()
 │▎╭ Settings ────────────────────────────────────────────────────────────────╮ │
 │ │ Nord is the name of a built-in theme                                     │ │
 │ │ Display                                                                  │ │
-│ │   theme            ‹ terminal           ›  Your terminal's own colors    │ │
+│ │   theme            ‹ terminal           ›  Your terminal's own colours   │ │
 │ │   density          ‹ comfortable        ›  As in GUI Slack: an avatar b… │ │
 ├─│   nav_rows         ‹ expanded           ›  A row per view (default)      │ │
 │ │   icons            ‹ off                ›  Text and plain symbols only   │ │
 │ │ Pictures                                                                 │ │
-│ │   avatars          ‹ initials           ›  A person's initials on a col… │ │
+│ │   avatars          ‹ initials           ›  Initials on a colour of thei… │ │
 │ │   images           ‹ auto               ›  Where pictures surely show (… │ │
 │ │ Language                                                                 │ │
 │ │                                                            9 more below  │ │

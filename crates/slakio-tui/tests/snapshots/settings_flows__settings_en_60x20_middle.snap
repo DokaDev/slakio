@@ -10,7 +10,7 @@ expression: d.snap()
 │ │   nav_rows         ‹ expanded          ›  A row per… │ │
 ├─│   icons            ‹ off               ›  Text and…  │ │
 │ │ Pictures                                             │ │
-│ │   avatars          ‹ initials          ›  A person'… │ │
+│ │   avatars          ‹ initials          ›  Initials…  │ │
 │ │   images           ‹ auto              ›  Where pic… │ │
 │ │ Language                                             │ │
 │ │                                        9 more below  │ │

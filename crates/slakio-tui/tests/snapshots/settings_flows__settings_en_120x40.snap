@@ -5,12 +5,12 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
 │▎Home    ╭ Settings ────────────────────────────────────────────────────────────────────────────────────────╮         │
 │ DMs     │ Display                                                                                          │         │
-│ Activity│   theme            ‹ auto               ›  Tokyo Night with 24-bit color, else the terminal's c… │         │
+│ Activity│   theme            ‹ auto               ›  Tokyo Night with 24-bit colour, else the terminal's…  │         │
 │ Files   │   density          ‹ comfortable        ›  As in GUI Slack: an avatar block, the name over the…  │         │
 │ To-dos  │   nav_rows         ‹ expanded           ›  A row per view (default)                              │         │
 ├─▾───────│   icons            ‹ off                ›  Text and plain symbols only                           │         │
 │ ▾ Favori│ Pictures                                                                                         │         │
-│   # back│   avatars          ‹ initials           ›  A person's initials on a color of their own (default) │         │
+│   # back│   avatars          ‹ initials           ›  Initials on a colour of their own (default)           │         │
 │   # inci│   images           ‹ auto               ›  Where pictures surely show (default)                  │         │
 │         │ Language                                                                                         │         │
 │ ▾ Ops   │   language         ‹ auto               ›  applies on next launch                                │         │

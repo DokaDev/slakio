@@ -72,3 +72,22 @@ fn an_unknown_theme_changes_nothing_and_names_the_ones_there_are() {
     let why = d.app.palette_error(d.app.size).join(" ");
     assert!(why.starts_with("Unknown theme solarized (use auto, terminal") && why.contains("dracula"), "{why}");
 }
+
+#[test]
+fn english_text_spells_colour_the_british_way() {
+    // `[colors]` is a section name of the theme file format, and stays as written.
+    let words = |text: &str| {
+        text.lines()
+            // The value, after the key.
+            .map(|l| l.split_once(" = ").map_or(l, |(_, v)| v).replace("[colors]", ""))
+            .filter(|l| ["color", "Color"].iter().any(|w| l.contains(w)))
+            .collect::<Vec<_>>()
+    };
+    let en = include_str!("../../../locales/en.toml");
+    assert_eq!(words(en), Vec::<String>::new(), "locales/en.toml");
+    // The theme row's words as the screen shows them.
+    let mut d = Demo::new(120, 40);
+    d.command("theme terminal");
+    d.keys("space ,");
+    assert!(d.screen().contains("Your terminal's own colours"), "{}", d.screen());
+}

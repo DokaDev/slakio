@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/palette_flows.rs
-assertion_line: 134
 expression: small.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -11,9 +10,9 @@ expression: small.snap()
 │ To-dos  │ : theme                                                  │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
 │ ▾ Favori│  auto               Tokyo Night with 24-bit co…  current │         │
-│   # back│  terminal           Your terminal's own colors           │er.      │
-│   # inci│  dark               Dark, truecolor                      │         │
-│         │  light              Light, truecolor                     │         │
+│   # back│  terminal           Your terminal's own colours          │er.      │
+│   # inci│  dark               Dark, 24-bit colour                  │         │
+│         │  light              Light, 24-bit colour                 │         │
 │ ▾ Ops   │  high-contrast      White on black with strong marks     │         │
 │   # depl│  catppuccin         Catppuccin: Latte or Mocha, by the…  │         │
 │   # aler│  catppuccin-latte   Catppuccin Latte (light)             │         │

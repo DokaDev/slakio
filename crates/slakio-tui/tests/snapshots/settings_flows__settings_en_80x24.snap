@@ -10,7 +10,7 @@ expression: d.snap()
 │ │   nav_rows         ‹ expanded           ›  A row per view (default)      │ │
 ├─│   icons            ‹ off                ›  Text and plain symbols only   │ │
 │ │ Pictures                                                                 │ │
-│ │   avatars          ‹ initials           ›  A person's initials on a col… │ │
+│ │   avatars          ‹ initials           ›  Initials on a colour of thei… │ │
 │ │   images           ‹ auto               ›  Where pictures surely show (… │ │
 │ │ Language                                                                 │ │
 │ │   language         ‹ auto               ›  applies on next launch        │ │

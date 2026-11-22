@@ -6,12 +6,12 @@ expression: d.snap()
 │▎Home    ╭ Settings ────────────────────────────────────────────────────────────────────────────────────────╮         │
 │ DMs     │ Nord is the name of a built-in theme                                                             │         │
 │ Activity│ Display                                                                                          │         │
-│ Files   │   theme            ‹ terminal           ›  Your terminal's own colors                            │         │
+│ Files   │   theme            ‹ terminal           ›  Your terminal's own colours                           │         │
 │ To-dos  │   density          ‹ comfortable        ›  As in GUI Slack: an avatar block, the name over the…  │         │
 ├─▾───────│   nav_rows         ‹ expanded           ›  A row per view (default)                              │         │
 │ ▾ Favori│   icons            ‹ off                ›  Text and plain symbols only                           │         │
 │   # back│ Pictures                                                                                         │         │
-│   # inci│   avatars          ‹ initials           ›  A person's initials on a color of their own (default) │         │
+│   # inci│   avatars          ‹ initials           ›  Initials on a colour of their own (default)           │         │
 │         │   images           ‹ auto               ›  Where pictures surely show (default)                  │         │
 │ ▾ Ops   │ Language                                                                                         │         │
 │   # depl│   language         ‹ auto               ›  applies on next launch                                │         │
