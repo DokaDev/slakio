@@ -18,7 +18,8 @@ with `:theme <name>` (also `:set theme=<name>`), which also saves it.
 - A theme file that is a symbolic link is refused ("is a symbolic link"). The `themes` folder
   itself, or the config folder, may be a symbolic link.
 - A file larger than 64 KiB, or anything but a plain file, is refused.
-- slakio never creates the `themes` folder or a file in it.
+- slakio creates the `themes` folder (only you may open it) and a file in it (only you may read
+  it) only when you ask it to write a theme file ([Writing a theme file](#writing-a-theme-file)).
 
 ## The file
 
@@ -116,6 +117,33 @@ left out keeps exactly the look of the theme it extends.
 Pictures are drawn through cells whose colour says which picture they show, so a `selection`
 or `cursor_line` style never changes those cells: its `fg` and modifiers (also `reversed`)
 apply to text only, and the dimming behind a dialog leaves pictures as they are.
+
+## Writing a theme file
+
+- `:theme copy <from> [<name>]` writes `themes/<name>.toml` with every colour token of the theme
+  `<from>` (a built-in theme, `auto` or a theme file; a family such as `catppuccin` as the
+  variant drawn now) set to its value, each under a comment saying what it colours, and
+  `extends` naming the built-in theme it starts from. Each style token is there too: set where
+  `<from>` sets it, else commented out with the look it takes now (it follows the colours). The
+  name is `<from>-copy` (then `-copy-2`, …) when you leave it out.
+- `:theme new <name>` writes `themes/<name>.toml` extending the current theme when it is built in
+  (`auto` as the theme it picks), else `terminal`, with every token commented out and showing the
+  value it takes from there: remove the `# ` in front of a key to set it.
+- On the settings screen (`Space ,`), `c` on the theme row copies the theme shown there (the one
+  being previewed, else the current one): type the name (it starts as `<from>-copy`), `Enter`
+  writes it, `Esc` cancels.
+
+Each writes a new file and never replaces one: a name that is taken, that is not a valid theme
+file name, that is a built-in theme's or a Windows device name such as `nul` (in any case) is
+refused, and nothing is written. Then slakio draws with the new theme, saves
+`theme = "<name>"` in the config file (unless that file has errors) and says where the file is.
+
+`:theme update [<name>]` adds to the theme file `<name>` (the current theme without one) the
+tokens it does not list, such as tokens added after it was written: each under what it is for,
+at the end of its section, commented out with the value it takes now. No line of the file
+changes and its line breaks (also Windows ones) are kept. The file is replaced, at once and only
+yours to read, only when the result reads exactly as before and the file has not changed since
+it was read. The theme drawn and the config file stay as they are.
 
 ## When a theme cannot be used
 

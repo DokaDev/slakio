@@ -187,3 +187,16 @@ fn read_plain_reads_a_file_up_to_its_cap_and_nothing_else() {
     }
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_private_new_file_is_only_its_owners_and_never_replaces_one() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_dir("private-new");
+    let path = dir.join("a.toml");
+    create_new_private(&path, b"first").unwrap();
+    assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(create_new_private(&path, b"second").unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read_to_string(&path).unwrap(), "first");
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -189,8 +189,8 @@ images, and settings. This README only lists what works; it will grow with each 
   `Tab` / arrows to select, `Enter` to run, or click (a click on Quit asks first).
 - `Space ,` (or `:settings`) opens the settings screen: every setting below with its value;
   `j`/`k` move, `h`/`l` change it at once and save it in the config file (comments kept);
-  on the theme row `h`/`l` show each theme and `Enter` keeps it (`Esc` goes back); on the
-  downloads row `Enter` types a folder. `language`, `network`, `live`, `restore` and `cache`
+  on the theme row `h`/`l` show each theme and `Enter` keeps it (`Esc` goes back), `c` copies
+  it to a new theme file; on the downloads row `Enter` types a folder. `language`, `network`, `live`, `restore` and `cache`
   apply on the next launch, and the screen says so. `:set <key>=<value>` changes the same
   settings from the command palette.
 - `:icons on|off` (or `:icons` to switch) draws Nerd Font icons or text instead, while running,
@@ -513,8 +513,9 @@ says why in the status line.
 you change. A file that cannot be used (an unknown token, a bad colour, a symbolic link) is not
 fatal: slakio draws with `terminal`, says `Theme not used: <path>:<line>: <problem>` in the
 status line and keeps the name in the config file. The file format, every token and its rules
-are in [docs/themes.md](docs/themes.md). There is no command yet that writes a theme file for
-you.
+are in [docs/themes.md](docs/themes.md). `:theme copy <from> [<name>]` writes a theme file with
+every token of a theme (also `c` on the settings screen's theme row), `:theme new <name>` one
+with every token commented out, and `:theme update [<name>]` adds the tokens a file does not list.
 
 ## Development
 

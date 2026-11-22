@@ -23,8 +23,8 @@ expression: d.snap()
 │         │   restore          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
 │ ▾ Channe│   cache            ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
 │   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
-│   # desi│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊＊. ＊＊ ＊＊＊ ＊＊ ＊＊ ＊       │         │
-│   # feed│ themes/＊ ＊＊＊.                                                                                │         │
+│   # desi│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊ ＊＊ ＊＊＊ ＊＊＊＊＊.   │         │
+│   # feed│ ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.                                                       │         │
 │   # feed│ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                                                 │         │
 │   # feed│ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                                                │         │
 │   # feed│                                                                                                  │         │

@@ -1,0 +1,44 @@
+---
+source: crates/slakio-tui/tests/theme_author_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
+│▎＊      ╭ ＊＊ ────────────────────────────────────────────────────────────────────────────────────────────╮         │
+│ DM      │ Nord: ＊＊ ＊＊＊ ＊＊＊＊＊                                                                     │         │
+│ ＊＊    │ ＊＊                                                                                             │         │
+│ ＊＊    │   theme            ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                        │         │
+│ ＊ ＊   │   density          ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)      │         │
+├─▾───────│   nav_rows         ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                               │         │
+│ ▾ Favori│   icons            ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                    │         │
+│   # back│ ＊＊                                                                                             │         │
+│   # inci│   avatars          ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                 │         │
+│         │   images           ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                 │         │
+│ ▾ Ops   │ ＊＊                                                                                             │         │
+│   # depl│   language         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│   # aler│ ＊＊                                                                                             │         │
+│   # part│   downloads        ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                      │         │
+│   # host│   download_max_mb  ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                         │         │
+│   # big-│ ＊＊＊＊                                                                                         │         │
+│   # long│   network          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│         │   live             ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│ ▾ Channe│   restore          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│   # anno│   cache            ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│   # desi│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│   # feed│ ＊＊＊ ＊＊: Nord                                                                                │         │
+│   # feed│ terminal＊ ＊＊＊: Enter＊ ＊＊ ＊＊, Esc＊ ＊＊                                                 │         │
+│   # feed│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊ ＊＊ ＊＊＊ ＊＊＊＊＊.   │         │
+│   # feed│ ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.                                                       │         │
+│   # feed│ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                                                 │         │
+│   # feed│ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                                                │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed│                                                                                                  │         │
+│   # feed╰─────────────────────────────────────────────────── j/k ＊＊ · h/l ＊＊＊ · Enter ＊＊ · Esc ＊＊ ╯         │
+╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  ▌A company › ＊    │ Enter ＊＊ · t ＊ ＊ · Tab ＊＊ ＊＊ · : ＊＊ · [/] ＊＊ · ? ＊＊＊ · Space ＊＊＊ │ ＊＊

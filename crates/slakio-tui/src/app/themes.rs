@@ -3,11 +3,14 @@
 //! launch it draws with `terminal` and the status line says why, the setting kept as written.
 //! On the settings screen's theme row a theme is shown before it is kept: the theme drawn before
 //! comes back with `Esc`, and one that cannot be used is never kept (why is said on top). Showing
-//! a theme changes colours only: pictures are never sent to the terminal again for it.
+//! a theme changes colours only: pictures are never sent to the terminal again for it. `c` there
+//! copies the theme shown to a new theme file, its name typed first, and draws with the copy.
 
 use crate::app::App;
+use crate::keymap::KeyChord;
 use crate::theme::{self, Look, Theme};
-use slakio_core::config::Config;
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+use slakio_core::config::{self, Config};
 use slakio_core::i18n::Msg;
 use slakio_core::theme_file::{self, ThemeError};
 use std::time::Instant;
@@ -120,6 +123,71 @@ impl App {
     pub(super) fn end_preview(&mut self) {
         if let Some(p) = self.prefs.screen.as_mut().and_then(|s| s.preview.take()) {
             self.theme = p.before;
+        }
+    }
+
+    /// The theme the theme row shows: the one previewed, else the one set.
+    pub fn theme_shown(&self) -> String {
+        let s = self.prefs.screen.as_ref();
+        s.and_then(|s| s.preview.as_ref().and_then(|p| s.themes.get(p.index)))
+            .cloned()
+            .unwrap_or_else(|| self.theme_setting.clone())
+    }
+
+    /// `c` on the theme row: type the name of a copy of the theme shown, the first free
+    /// `<from>-copy[-n]` to start from.
+    pub(super) fn open_name(&mut self) {
+        let name = self.copy_name(&self.theme_shown());
+        if let Some(s) = self.prefs.screen.as_mut() {
+            s.name = Some((name, None));
+        }
+    }
+
+    /// A key while the name of the copy is typed: `Enter` writes it and draws with it (or says
+    /// why not), `Esc` leaves it.
+    pub(super) fn name_key(&mut self, key: KeyChord, now: Instant) {
+        let Some((text, error)) = self.prefs.screen.as_mut().and_then(|s| s.name.as_mut()) else { return };
+        let ctrl = key.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+        match key.code {
+            KeyCode::Esc => {}
+            KeyCode::Char('c') if ctrl => {}
+            KeyCode::Char('u') if ctrl => {
+                text.clear();
+                *error = None;
+                return;
+            }
+            KeyCode::Backspace => {
+                text.pop();
+                *error = None;
+                return;
+            }
+            KeyCode::Char(c) if !ctrl => {
+                text.push(c);
+                *error = None;
+                return;
+            }
+            KeyCode::Enter => {
+                let name = text.trim().to_string();
+                let from = self.theme_shown();
+                if let Err(msg) = self.copy_theme(&from, &name, now) {
+                    if let Some((_, e)) = self.prefs.screen.as_mut().and_then(|s| s.name.as_mut()) {
+                        *e = Some(msg);
+                    }
+                    return;
+                }
+                let mut themes: Vec<String> = config::THEMES.iter().map(|t| (*t).to_string()).collect();
+                themes.extend(self.theme_files());
+                if let Some(s) = self.prefs.screen.as_mut() {
+                    s.themes = themes;
+                    // The copy is drawn now: the theme before a preview is not drawn again.
+                    s.preview = None;
+                    s.problem = None;
+                }
+            }
+            _ => return,
+        }
+        if let Some(s) = self.prefs.screen.as_mut() {
+            s.name = None;
         }
     }
 }

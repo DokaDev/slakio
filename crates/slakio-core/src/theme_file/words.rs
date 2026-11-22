@@ -58,9 +58,14 @@ fn shown(text: &str) -> String {
 impl NameError {
     /// The words for the status line.
     pub fn message(&self, i18n: &I18n) -> Localized {
+        i18n.msg(&self.msg())
+    }
+
+    /// The message of [`Self::message`], to be said later.
+    pub fn msg(&self) -> Msg {
         match self {
-            NameError::Invalid(name) => i18n.msg(&Msg::ThemeFileBadName { name: shown(name) }),
-            NameError::Builtin(name) => i18n.msg(&Msg::ThemeFileBuiltinName { name: shown(name) }),
+            NameError::Invalid(name) => Msg::ThemeFileBadName { name: shown(name) },
+            NameError::Builtin(name) => Msg::ThemeFileBuiltinName { name: shown(name) },
         }
     }
 }

@@ -1,0 +1,28 @@
+---
+source: crates/slakio-tui/tests/theme_author_flows.rs
+expression: d.snap()
+---
+╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
+│▎╭ Settings ────────────────────────────────────────────────────────────────╮ │
+│ │ Display                                                                  │ │
+│ │   theme            ‹ terminal           ›  Your terminal's own colors    │ │
+│ │   density          ‹ comfortable        ›  As in GUI Slack: an avatar b… │ │
+│ │   nav_rows         ‹ expanded           ›  A row per view (default)      │ │
+├─│   icons            ‹ off                ›  Text and plain symbols only   │ │
+│ │ Pictures                                                                 │ │
+│ │   avatars          ‹ initials           ›  A person's initials on a col… │ │
+│ │   images           ‹ auto               ›  Where pictures surely show (… │ │
+│ │ Language                                                                 │ │
+│ │   language         ‹ auto               ›  applies on next launch        │ │
+│ │ Files                                                      7 more below  │ │
+│ │──────────────────────────────────────────────────────────────────────────│ │
+│ │ Copy to: terminal-copy                                                   │ │
+│ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │
+│ │ The colors. h/l show each theme at once; Enter keeps the one shown; c    │ │
+│ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │
+│ │ config file.                                                             │ │
+│ │ Saved to /home/me/.config/slakio/config.toml                             │ │
+│ │ More settings in /home/me/.config/slakio/config.toml                     │ │
+│ ╰────────────────────────── j/k move · h/l change · Enter keep · Esc close ╯ │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ NORMAL  ▌A compa… › Home │ Enter open · t new tab · ? help · Space more │ demo

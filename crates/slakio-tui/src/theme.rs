@@ -25,6 +25,7 @@ use ratatui::style::{Color, Modifier, Style};
 use slakio_core::model::Presence;
 use std::borrow::Cow;
 
+pub mod authoring;
 mod builtins;
 mod custom;
 mod tokens;

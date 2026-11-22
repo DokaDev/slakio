@@ -3,7 +3,8 @@
 //! `Space`) change the selected setting at once and save it in the config file through the same
 //! path as `:set`, so the screen, `:set` and the file always agree; `Esc` or `q` close. On the
 //! theme row `h`/`l` only show a theme ([`super::themes`]): `Enter` keeps it, `Esc` goes back. On
-//! the downloads row `Enter` types a folder. A setting that applies on the next launch says so.
+//! the downloads row `Enter` types a folder; `c` on the theme row copies the theme shown to a new
+//! theme file, its name typed first. A setting that applies on the next launch says so.
 //! It is modal and takes the keys only (no mouse).
 //!
 //! The config file's settings are kept here as read at launch ([`Prefs`]): those the app does not
@@ -52,6 +53,8 @@ pub struct Screen {
     pub problem: Option<Msg>,
     /// The downloads folder being typed, and why the last one typed cannot be used.
     pub folder: Option<(String, Option<Msg>)>,
+    /// `c` on the theme row: the name of the copy being typed, and why the last one cannot be.
+    pub name: Option<(String, Option<Msg>)>,
 }
 
 impl App {
@@ -175,6 +178,9 @@ impl App {
         if s.folder.is_some() {
             return self.folder_key(key, now);
         }
+        if s.name.is_some() {
+            return self.name_key(key, now);
+        }
         let ctrl = key.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
         let n = SETTINGS.len();
         let step: isize = match key.code {
@@ -192,6 +198,7 @@ impl App {
             KeyCode::Char('h') | KeyCode::Left => -1,
             KeyCode::Char('l') | KeyCode::Right => 1,
             KeyCode::Enter | KeyCode::Char(' ') => 0,
+            KeyCode::Char('c') if SETTINGS[s.selected].values == Values::Themes => return self.open_name(),
             _ => return,
         };
         let k = s.selected;

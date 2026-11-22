@@ -89,6 +89,24 @@
 "theme_file.bad_percent" = "{name} needs a whole number from 0 to 100"
 "theme_file.bad_dim" = "dim needs \"modifier\" or a table of toward (#rrggbb) and keep (0 to 100)"
 
+# Writing theme files (:theme copy, :theme new, :theme update, c on the settings theme row).
+"theme_file.written" = "Theme {name}: written to {path}"
+"theme_file.exists" = "{path} is there already: it is left as it is"
+"theme_file.write_failed" = "{path} could not be written"
+"theme_file.no_folder" = "No config folder: there is no themes folder to write to"
+"theme_file.not_a_file" = "{name} is a built-in theme: there is no file to update"
+"theme_file.changed" = "{path} changed since it was read, or would not read the same: it is left as it is"
+"theme_file.unwritable" = "{token} has a value a theme file cannot hold"
+"theme_file.cannot_copy" = "Theme {name} cannot be copied: {why}"
+"theme_file.updated" = { one = "{count} token added, commented out, to {path}", other = "{count} tokens added, commented out, to {path}" }
+"theme_file.complete" = "Every token is listed already in {path}"
+"palette.theme_usage" = "Use :theme copy <from> [name], :theme new <name> or :theme update [name]"
+"palette.theme_copy" = "Copy {from} to the theme file {name} and use it"
+"palette.theme_new" = "Write the theme file {name} extending {base} and use it"
+"palette.theme_update" = "Add the tokens the theme file {name} does not list"
+"settings.theme_name_prompt" = "Copy to:"
+"settings.theme_name_hint" = "A copy of {from}: Enter writes it and uses it, Esc cancels"
+
 # The empty work area without a backend.
 
 # The views (the view switcher, the first rows of the list panel).
@@ -709,7 +727,7 @@
 "settings.downloads_relative" = "Not a folder slakio can use: {path} (an absolute path, or one that starts with ~/)"
 "settings.changed" = "{key}: {value}"
 "settings.changed_restart" = "{key}: {value} (applies on next launch)"
-"settings.about_theme" = "The colors. h/l show each theme at once; Enter keeps the one shown. Theme files go in themes/ next to the config file."
+"settings.about_theme" = "The colors. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme file. Theme files go in themes/ next to the config file."
 "settings.about_density" = "How messages are laid out."
 "settings.about_nav_rows" = "The view switcher a row per view, or folded to the view shown (also Space v)."
 "settings.about_icons" = "Nerd Font icons, or text and plain symbols (also :icons)."

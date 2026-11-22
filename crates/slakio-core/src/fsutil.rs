@@ -92,6 +92,23 @@ fn write_then_rename(tmp: &Path, target: &Path, bytes: &[u8], private: bool) -> 
 /// (`O_EXCL`) and written in place (removed again when that fails). Missing parent
 /// directories are created.
 pub fn create_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    make_new(path, bytes, false)
+}
+
+/// [`create_new`] for a file only its owner may read: mode 0600 (Unix) from the moment it is
+/// made, whatever the umask. On Windows it is the same as [`create_new`].
+pub fn create_new_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    make_new(path, bytes, true)
+}
+
+fn make_new(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
+    let mut opts = fs::OpenOptions::new();
+    #[cfg(unix)]
+    if private {
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
     let dir = match path.parent().filter(|d| !d.as_os_str().is_empty()) {
         Some(d) => d.to_path_buf(),
         None => PathBuf::from("."),
@@ -100,7 +117,13 @@ pub fn create_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let tmp = dir.join(format!(".{name}.new-{}", std::process::id()));
     let result = (|| {
-        let mut f = fs::OpenOptions::new().write(true).create(true).truncate(true).open(&tmp)?;
+        let mut f = opts.clone().write(true).create(true).truncate(true).open(&tmp)?;
+        // One left by an earlier run keeps its mode: made private here as well.
+        #[cfg(unix)]
+        if private {
+            use std::os::unix::fs::PermissionsExt;
+            f.set_permissions(fs::Permissions::from_mode(0o600))?;
+        }
         f.write_all(bytes)?;
         f.sync_all()?;
         drop(f);
@@ -109,7 +132,7 @@ pub fn create_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(e),
             // No hard links here: create it exclusively and write it in place.
             Err(_) => {
-                let mut f = fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+                let mut f = opts.clone().write(true).create_new(true).open(path)?;
                 let written = f.write_all(bytes).and_then(|()| f.sync_all());
                 if written.is_err() {
                     let _ = fs::remove_file(path);

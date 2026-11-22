@@ -348,6 +348,11 @@ pub fn names(dir: &Path) -> Listing {
 /// Read and check theme `name` from `dir`. The name is checked first; a file that is not there
 /// is [`ThemeError::Unknown`]. Nothing is created.
 pub fn read(dir: &Path, name: &str) -> Result<ThemeSpec, ThemeError> {
+    read_text(dir, name).map(|(_, spec)| spec)
+}
+
+/// [`read`], with the text of the file as it was read.
+pub fn read_text(dir: &Path, name: &str) -> Result<(String, ThemeSpec), ThemeError> {
     if !valid_name(name) {
         return Err(ThemeError::BadName(name.to_string()));
     }
@@ -379,7 +384,10 @@ pub fn read(dir: &Path, name: &str) -> Result<ThemeSpec, ThemeError> {
     let Ok(text) = String::from_utf8(bytes) else {
         return Err(ThemeError::File { path, line: None, problem: Problem::NotText });
     };
-    parse(&text).map_err(|(line, problem)| ThemeError::File { path, line, problem })
+    match parse(&text) {
+        Ok(spec) => Ok((text, spec)),
+        Err((line, problem)) => Err(ThemeError::File { path, line, problem }),
+    }
 }
 
 #[cfg(test)]

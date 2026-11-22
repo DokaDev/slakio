@@ -15,8 +15,8 @@ expression: d.snap()
 │ │ Language                               9 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ The colors. h/l show each theme at once; Enter keeps │ │
-│ │ the one shown. Theme files go in themes/ next to the │ │
-│ │ config file.                                         │ │
+│ │ the one shown; c copies it to a new theme file.      │ │
+│ │ Theme files go in themes/ next to the config file.   │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │

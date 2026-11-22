@@ -91,7 +91,7 @@ fn color_slot<'a>(t: &'a mut Theme, name: &str) -> Option<&'a mut Color> {
 }
 
 /// The colours of the 16 ANSI names, in [`theme_file::ANSI_NAMES`] order.
-const ANSI: [Color; 16] = [
+pub(super) const ANSI: [Color; 16] = [
     Color::Black,
     Color::Red,
     Color::Green,

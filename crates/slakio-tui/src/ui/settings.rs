@@ -1,6 +1,7 @@
-//! The settings screen over the dimmed screen: why a theme is not used (on top), every setting
-//! under its group as `key ‹ value › what it means` (on a short screen the list scrolls and says
-//! how many lines are out of view above and below), a rule, then what the selected setting is for
+//! The settings screen over the dimmed screen: why a theme is not used, or why the folder or the
+//! name of a theme copy typed cannot be (on top), every setting under its group as
+//! `key ‹ value › what it means` (on a short screen the list scrolls and says how many lines are
+//! out of view above and below), a rule, then what is typed and what the selected setting is for
 //! and where it is saved.
 //!
 //! ```text
@@ -55,8 +56,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     };
     // Why the theme shown (or set) is not used, or the folder typed.
     let problem = s.preview.as_ref().and_then(|p| p.error.as_ref()).or(s.problem.as_ref());
-    let folder_error = s.folder.as_ref().and_then(|(_, e)| e.as_ref());
-    for msg in folder_error.into_iter().chain(problem) {
+    let typed_error = s.folder.as_ref().or(s.name.as_ref()).and_then(|(_, e)| e.as_ref());
+    for msg in typed_error.into_iter().chain(problem) {
         for line in wrap(&i18n.msg(msg), tw).into_iter().take(PROBLEM_LINES) {
             if y < bottom {
                 put(f, y, &line, t.warning());
@@ -78,7 +79,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             break;
         }
         put(f, y, line, *style);
-        if i == 0 && s.folder.is_some() {
+        if i == 0 && (s.folder.is_some() || s.name.is_some()) {
             let cx = (x + width(line) as u16).min(x + tw as u16);
             f.set_cursor_position(Position { x: cx, y });
         }
@@ -96,8 +97,14 @@ fn foot(app: &App, s: &Screen, tw: usize) -> Vec<(String, Style)> {
     if let Some((text, _)) = &s.folder {
         foot.push((format!("{} {text}", i18n.label(Label::SettingsDownloadsPrompt)), t.text()));
     }
+    if let Some((text, _)) = &s.name {
+        foot.push((format!("{} {text}", i18n.label(Label::SettingsThemeNamePrompt)), t.text()));
+        let msg = Msg::SettingsThemeNameHint { from: app.theme_shown() };
+        foot.extend(wrap(&i18n.msg(&msg), tw).into_iter().map(|l| (l, t.warning())));
+    }
     if let (Values::Themes, Some(p)) = (spec.values, &s.preview)
         && p.error.is_none()
+        && s.name.is_none()
     {
         let name = s.themes.get(p.index).cloned().unwrap_or_default();
         let msg = Msg::SettingsThemePreview { name, current: app.theme_setting.clone() };

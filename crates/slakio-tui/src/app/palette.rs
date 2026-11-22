@@ -21,6 +21,7 @@
 mod jump;
 mod net;
 mod settings;
+mod theme_cmd;
 
 use super::todos::{FILTER_VALUES, SORT_VALUES};
 use super::{App, Effect};
@@ -59,6 +60,8 @@ pub enum Item {
     Theme(usize),
     /// A theme file for `:theme` (index into [`App::theme_files`]).
     ThemeFile(usize),
+    /// `:theme copy`, `:theme new` or `:theme update` with its words.
+    ThemeAuthor,
     /// A value for `:avatars <value>` (index into [`AVATAR_VALUES`]).
     Avatars(usize),
     /// A value for `:images <value>` (index into [`IMAGE_VALUES`]).
@@ -192,6 +195,9 @@ impl App {
     /// The one entry a command line with its argument runs, when it is one of those: `:rename`,
     /// `:resize`, `:open <url>`, `:download cancel`.
     fn whole_line(&self, line: &str) -> Option<Item> {
+        if theme_cmd::of_line(line).is_some() {
+            return Some(Item::ThemeAuthor);
+        }
         if rename_arg(line).is_some() && self.backend.is_some() {
             return Some(Item::Rename);
         }
@@ -309,6 +315,7 @@ impl App {
                     keys: if NAMES[i] == self.theme_setting { label(Label::PaletteCurrent) } else { String::new() },
                 },
                 Item::ThemeFile(i) => self.theme_file_row(i),
+                Item::ThemeAuthor => self.theme_cmd_row(),
                 Item::Avatars(i) => self.avatars_row(i),
                 Item::Images(i) => self.images_row(i),
                 Item::Action(i) => {
@@ -425,6 +432,7 @@ impl App {
                 }
             }
             Some(Item::ThemeFile(i)) => self.theme_file_run(i, now),
+            Some(Item::ThemeAuthor) => self.run_theme_cmd(&text, now),
             Some(Item::Avatars(i)) => {
                 self.cmdline.close();
                 if let Err(msg) = self.set_avatars(AVATAR_VALUES[i], now) {
