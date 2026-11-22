@@ -13,13 +13,13 @@ pub const CODE_APART: f64 = 1.3;
 const TEXT_ON_CODE: f64 = 4.5;
 
 /// The contrast of two RGB colors (`None` for a terminal color).
-fn contrast(a: Color, b: Color) -> Option<f64> {
+pub(super) fn contrast(a: Color, b: Color) -> Option<f64> {
     let (x, y) = (luminance(a)?, luminance(b)?);
     Some((x.max(y) + 0.05) / (x.min(y) + 0.05))
 }
 
 /// `percent` of `c` mixed into `base` (`None`: not RGB).
-fn mix(c: Color, base: Color, percent: u16) -> Option<Color> {
+pub(super) fn mix(c: Color, base: Color, percent: u16) -> Option<Color> {
     let (Color::Rgb(r, g, b), Color::Rgb(br, bg, bb)) = (c, base) else { return None };
     let m = |a: u8, z: u8| ((u16::from(a) * percent + u16::from(z) * (100 - percent)) / 100) as u8;
     Some(Color::Rgb(m(r, br), m(g, bg), m(b, bb)))

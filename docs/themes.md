@@ -88,7 +88,7 @@ These four are slakio's own:
 |---|---|
 | `workspaces` | A list of 1 to 16 colours, taken by workspaces in sign-in order (wrapping round). A colour too close to `accent` is skipped, so a workspace's stripe never reads as a focus frame. |
 | `avatars` | A list of 1 to 16 colours for the initials chips of people. |
-| `avatar_tint` | A whole number from 0 to 100: the percent of a person's colour mixed into the background for their chip. `0` and `100` draw the colour solid under `mode_fg`. It only changes the initials chips, never pictures. |
+| `avatar_tint` | A whole number from 0 to 100: the percent of a person's colour mixed into the background for their chip. `0` and `100` draw the colour solid under `mode_fg`. Where the initials would read under 4.5:1 on their chip (a tint close to 100, say), they step toward black or white until they do. It only changes the initials chips, never pictures. |
 | `dim` | How the screen behind a dialog or the palette is dimmed: `"modifier"` (the terminal's dim attribute, colours kept), or `{ toward = "#rrggbb", keep = 0 to 100 }`: every colour blended toward `toward`, keeping `keep` percent of it. `toward` must be `#rrggbb`. |
 
 ### `[styles]`

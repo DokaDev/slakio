@@ -426,20 +426,23 @@ impl Theme {
     }
 
     /// A person's avatar chip, of color slot `slot`: their initials bold in their color on a
-    /// tint of it (darkened on a light background, for 4.5:1), solid under [`Self::mode_fg`]
-    /// where a theme has no tint; colored initials alone in the 16-color theme (a solid block
-    /// there is a pill); reversed without colors.
+    /// tint of it (darkened on a light background), solid under [`Self::mode_fg`] where a theme
+    /// has no tint, stepped toward black or white below 4.5:1; colored initials alone
+    /// in the 16-color theme (a solid block there is a pill); reversed without colors.
     pub fn avatar(&self, slot: usize) -> Style {
         let hue = self.avatars[slot % self.avatars.len()];
         let style = Style::new().add_modifier(Modifier::BOLD);
         match self.kind {
             Kind::NoColor => style.add_modifier(Modifier::REVERSED),
             Kind::Ansi => style.fg(hue),
-            Kind::Truecolor => match self.tint(hue, self.avatar_tint) {
-                Some(bg) if self.light() => style.fg(darken(hue, 80)).bg(bg),
-                Some(bg) => style.fg(hue).bg(bg),
-                None => style.fg(self.mode_fg).bg(hue),
-            },
+            Kind::Truecolor => chip::on_chip(
+                match self.tint(hue, self.avatar_tint) {
+                    Some(bg) if self.light() => style.fg(darken(hue, 80)).bg(bg),
+                    Some(bg) => style.fg(hue).bg(bg),
+                    None => style.fg(self.mode_fg).bg(hue),
+                },
+                chip::INITIALS,
+            ),
         }
     }
 
@@ -449,7 +452,7 @@ impl Theme {
         match self.kind {
             Kind::NoColor => self.bold(),
             Kind::Ansi => self.muted().add_modifier(Modifier::BOLD),
-            Kind::Truecolor => self.text().bg(self.neutral_chip()).add_modifier(Modifier::BOLD),
+            Kind::Truecolor => chip::on_chip(self.bold().bg(self.neutral_chip()), chip::INITIALS),
         }
     }
 
@@ -463,7 +466,7 @@ impl Theme {
         match self.kind {
             Kind::NoColor => self.faint(),
             Kind::Ansi => self.muted(),
-            Kind::Truecolor => self.muted().bg(self.neutral_chip()),
+            Kind::Truecolor => chip::on_chip(self.muted().bg(self.neutral_chip()), chip::MUTED),
         }
     }
 
@@ -589,6 +592,7 @@ impl Theme {
 }
 
 mod bars;
+mod chip;
 mod code;
 mod workspace;
 

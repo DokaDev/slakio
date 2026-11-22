@@ -73,7 +73,9 @@ pub const COLOR_ABOUT: &[(&str, &str)] = &[
     (
         "avatar_tint",
         "A whole number from 0 to 100: the percent of a person's colour mixed into the background for their chip. \
-         `0` and `100` draw the colour solid under `mode_fg`. It only changes the initials chips, never pictures.",
+         `0` and `100` draw the colour solid under `mode_fg`. Where the initials would read under 4.5:1 on their \
+         chip (a tint close to 100, say), they step toward black or white until they do. It only changes the \
+         initials chips, never pictures.",
     ),
     (
         "dim",
