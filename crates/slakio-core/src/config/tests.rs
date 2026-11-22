@@ -137,6 +137,20 @@ fn a_saved_value_keeps_its_same_line_comment() {
 }
 
 #[test]
+fn a_number_is_saved_as_a_number() {
+    let dir = scratch("number");
+    let path = dir.join("config.toml");
+    std::fs::write(&path, "# mine\ndownload_max_mb = 300  # big ones\n").unwrap();
+    set(&path, "download_max_mb", "256").unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(text, "# mine\ndownload_max_mb = 256  # big ones\n");
+    assert_eq!(parse(&text).unwrap().download_max_mb, 256);
+    set(&path, "downloads", "123").unwrap();
+    assert!(std::fs::read_to_string(&path).unwrap().contains("downloads = \"123\""), "text stays text");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn the_cache_settings_are_read_within_their_ranges() {
     let d = Config::default();
     assert_eq!((d.cache.as_str(), d.cache_messages, d.cache_max_mb, d.cache_days), ("on", 200, 500, 30));

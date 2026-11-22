@@ -303,10 +303,13 @@ fn span(range: &std::ops::RangeInclusive<u32>) -> String {
     format!("a whole number from {} to {}", range.start(), range.end())
 }
 
-/// Set `key` to the string `value` in the config file at `path`, keeping its comments and the
-/// order of what is there and the comment after the old value; a missing file is created. Used
-/// for what the app saves itself (`icons` after asking, `theme`, `avatars`, `icons`, `density`
-/// and `nav_rows` when changed while running).
+/// The settings whose value is a whole number (written as one, not as text).
+pub const NUMBERS: &[&str] = &["cache_messages", "cache_max_mb", "cache_days", "download_max_mb"];
+
+/// Set `key` to `value` in the config file at `path` (a whole number for [`NUMBERS`], else a
+/// string), keeping its comments and the order of what is there and the comment after the old
+/// value; a missing file is created. Used for what the app saves itself (`icons` after asking,
+/// and what the settings screen and `:set` change while running).
 /// A file that cannot be read or parsed is left alone.
 pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
     let text = match std::fs::read_to_string(path) {
@@ -315,7 +318,10 @@ pub fn set(path: &Path, key: &str, value: &str) -> Result<(), Fault> {
         Err(e) => return Err(Fault::io_at(&e, path)),
     };
     let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| Fault::toml_edit(&text, &e))?;
-    let mut item = toml_edit::value(value);
+    let mut item = match value.parse::<i64>() {
+        Ok(n) if NUMBERS.contains(&key) => toml_edit::value(n),
+        _ => toml_edit::value(value),
+    };
     // Keep what surrounds the old value, such as a comment after it on the same line.
     if let (Some(old), Some(new)) = (doc.get(key).and_then(toml_edit::Item::as_value), item.as_value_mut()) {
         *new.decor_mut() = old.decor().clone();
