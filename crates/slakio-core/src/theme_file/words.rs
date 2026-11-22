@@ -6,10 +6,23 @@ use crate::sanitize::Remote;
 use std::path::Path;
 
 impl ThemeError {
-    /// The words for the status line and the settings screen, as `path:line: problem` for a
+    /// The words for the settings screen and the command line, as `path:line: problem` for a
     /// problem in a file.
     pub fn message(&self, i18n: &I18n) -> Localized {
-        let p = |path: &Path| shown(&path.display().to_string());
+        self.words(i18n, false)
+    }
+
+    /// [`Self::message`] short enough for the status line: the file's name without its folder
+    /// (the theme's name is its stem), and a bad value without the forms it may take.
+    pub fn brief(&self, i18n: &I18n) -> Localized {
+        self.words(i18n, true)
+    }
+
+    fn words(&self, i18n: &I18n, brief: bool) -> Localized {
+        let p = |path: &Path| match path.file_name().filter(|_| brief) {
+            Some(name) => shown(&name.to_string_lossy()),
+            None => shown(&path.display().to_string()),
+        };
         let m = match self {
             ThemeError::BadName(name) => Msg::ThemeFileBadName { name: shown(name) },
             ThemeError::Unknown { name, dir: Some(dir) } => {
@@ -21,21 +34,26 @@ impl ThemeError {
             ThemeError::NotPlain { path } => Msg::ThemeFileNotPlain { path: p(path) },
             ThemeError::TooLarge { path } => Msg::ThemeFileTooLarge { path: p(path) },
             ThemeError::Read { path, .. } => Msg::ThemeFileReadFailed { path: p(path) },
-            ThemeError::File { path, line: Some(line), problem } => {
-                Msg::ThemeFileAtLine { path: p(path), line: line.to_string(), problem: problem_words(problem, i18n) }
-            }
+            ThemeError::File { path, line: Some(line), problem } => Msg::ThemeFileAtLine {
+                path: p(path),
+                line: line.to_string(),
+                problem: problem_words(problem, i18n, brief),
+            },
             ThemeError::File { path, line: None, problem } => {
-                Msg::ThemeFileInFile { path: p(path), problem: problem_words(problem, i18n) }
+                Msg::ThemeFileInFile { path: p(path), problem: problem_words(problem, i18n, brief) }
             }
         };
         i18n.msg(&m)
     }
 }
 
-/// The words for a problem in a theme file.
-fn problem_words(problem: &Problem, i18n: &I18n) -> String {
+/// The words for a problem in a theme file (`brief`: without the forms a value may take).
+fn problem_words(problem: &Problem, i18n: &I18n, brief: bool) -> String {
     let m = match problem {
         Problem::Toml(words) => return shown(words),
+        Problem::BadColor(value) if brief => Msg::ThemeFileBadColorShort { value: shown(value) },
+        Problem::BadModifier(value) if brief => Msg::ThemeFileBadModifierShort { value: shown(value) },
+        Problem::BadDim if brief => Msg::Label(Label::ThemeFileBadDimShort),
         Problem::NotText => Msg::Label(Label::ThemeFileNotText),
         Problem::UnknownToken(name) => Msg::ThemeFileUnknownToken { name: shown(name) },
         Problem::NotAColor(name) => Msg::ThemeFileNotAColor { name: shown(name) },

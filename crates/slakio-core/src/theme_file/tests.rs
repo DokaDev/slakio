@@ -188,6 +188,43 @@ fn a_problem_is_worded_with_its_path_and_line() {
 }
 
 #[test]
+fn a_brief_problem_names_the_file_without_its_folder() {
+    use crate::i18n::{Label, Msg};
+    let dir = scratch("brief").join("a-folder-long-enough-to-fill-a-status-line-by-itself");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (en, ko) = (I18n::new(Lang::En), I18n::new(Lang::Ko));
+    let cases = [
+        (
+            "[colors]\nfg = \"#12345\"\n",
+            "#12345 is not a colour",
+            Msg::ThemeFileBadColorShort { value: "#12345".into() },
+        ),
+        (
+            "[styles]\nlink = { modifiers = [\"blink\"] }\n",
+            "blink is not a modifier",
+            Msg::ThemeFileBadModifierShort { value: "blink".into() },
+        ),
+        ("[colors]\ndim = 1\n", "dim needs \"modifier\" or a table", Msg::Label(Label::ThemeFileBadDimShort)),
+        (
+            "[colors]\nborder_x = \"red\"\n",
+            "border_x is not a theme token",
+            Msg::ThemeFileUnknownToken { name: "border_x".into() },
+        ),
+    ];
+    for (text, en_why, ko_why) in cases {
+        std::fs::write(dir.join("mine.toml"), text).unwrap();
+        let e = read(&dir, "mine").unwrap_err();
+        assert_eq!(e.brief(&en).to_string(), format!("mine.toml:2: {en_why}"), "{text}");
+        assert_eq!(e.brief(&ko).to_string(), format!("mine.toml:2: {}", ko.msg(&ko_why)), "{text}");
+        assert!(!e.brief(&ko).contains('('), "{text}: no forms in Korean either");
+        assert!(e.message(&en).starts_with(&dir.join("mine.toml").display().to_string()), "{text}");
+    }
+    let gone = read(&dir, "gone").unwrap_err();
+    assert_eq!(gone.brief(&en), "Unknown theme gone: there is no gone.toml");
+    let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+}
+
+#[test]
 fn names_are_plain_file_names() {
     for ok in ["mine", "my-theme_2", "A", &"x".repeat(64)] {
         assert!(valid_name(ok), "{ok}");

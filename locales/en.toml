@@ -84,11 +84,14 @@
 "theme_file.not_a_color" = "{name} is a style: it goes under [styles]"
 "theme_file.not_a_style" = "{name} is not a style: it goes under [colors]"
 "theme_file.bad_color" = "{value} is not a colour (#rrggbb, an ANSI name or default)"
+"theme_file.bad_color_short" = "{value} is not a colour"
 "theme_file.bad_modifier" = "{value} is not a modifier (bold, dim, italic, underlined, reversed or crossed-out)"
+"theme_file.bad_modifier_short" = "{value} is not a modifier"
 "theme_file.unknown_base" = "extends names no built-in theme: {name}"
 "theme_file.bad_palette" = "{name} needs a list of 1 to 16 colours"
 "theme_file.bad_percent" = "{name} needs a whole number from 0 to 100"
 "theme_file.bad_dim" = "dim needs \"modifier\" or a table of toward (#rrggbb) and keep (0 to 100)"
+"theme_file.bad_dim_short" = "dim needs \"modifier\" or a table"
 
 # Writing theme files (:theme copy, :theme new, :theme update, c on the settings theme row).
 "theme_file.written" = "Theme {name}: written to {path}"
