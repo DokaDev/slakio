@@ -25,7 +25,7 @@ expression: d.snap()
 │   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # desi│ Copy to: terminal-copy                                                                           │         │
 │   # feed│ A copy of terminal: Enter writes it and uses it, Esc cancels                                     │         │
-│   # feed│ The colors. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme   │         │
+│   # feed│ The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme  │         │
 │   # feed│ file. Theme files go in themes/ next to the config file.                                         │         │
 │   # feed│ Saved to /home/me/.config/slakio/config.toml                                                     │         │
 │   # feed│ More settings in /home/me/.config/slakio/config.toml                                             │         │

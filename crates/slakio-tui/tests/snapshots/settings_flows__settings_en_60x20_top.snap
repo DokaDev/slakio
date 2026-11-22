@@ -11,12 +11,12 @@ expression: d.snap()
 ├─│   icons            ‹ off               ›  Text and…  │ │
 │ │ Pictures                                             │ │
 │ │   avatars          ‹ initials          ›  A person'… │ │
-│ │   images           ‹ auto              ›  Where pic… │ │
-│ │                                       10 more below  │ │
+│ │                                       11 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
-│ │ The colors. h/l show each theme at once; Enter keeps │ │
-│ │ the one shown; c copies it to a new theme file.      │ │
-│ │ Theme files go in themes/ next to the config file.   │ │
+│ │ The colours. h/l show each theme at once; Enter      │ │
+│ │ keeps the one shown; c copies it to a new theme      │ │
+│ │ file. Theme files go in themes/ next to the config   │ │
+│ │ file.                                                │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │

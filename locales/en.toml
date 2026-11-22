@@ -731,7 +731,7 @@
 "settings.changed" = "{key}: {value}"
 "settings.changed_restart" = "{key}: {value} (applies on next launch)"
 "settings.changed_unsaved" = "{key}: {value} (not saved, so not used on next launch)"
-"settings.about_theme" = "The colors. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme file. Theme files go in themes/ next to the config file."
+"settings.about_theme" = "The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme file. Theme files go in themes/ next to the config file."
 "settings.about_density" = "How messages are laid out."
 "settings.about_nav_rows" = "The view switcher a row per view, or folded to the view shown (also Space v)."
 "settings.about_icons" = "Nerd Font icons, or text and plain symbols (also :icons)."

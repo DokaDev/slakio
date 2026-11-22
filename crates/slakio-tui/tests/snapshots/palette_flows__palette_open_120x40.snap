@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/palette_flows.rs
-assertion_line: 53
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮

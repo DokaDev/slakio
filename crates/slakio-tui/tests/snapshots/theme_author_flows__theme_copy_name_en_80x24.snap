@@ -18,7 +18,7 @@ expression: d.snap()
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: terminal-copy                                                   │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │
-│ │ The colors. h/l show each theme at once; Enter keeps the one shown; c    │ │
+│ │ The colours. h/l show each theme at once; Enter keeps the one shown; c   │ │
 │ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │
 │ │ config file.                                                             │ │
 │ │ Saved to /home/me/.config/slakio/config.toml                             │ │

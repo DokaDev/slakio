@@ -23,7 +23,7 @@ expression: d.snap()
 │         │   restore          ‹ on                 ›  applies on next launch                                │         │
 │ ▾ Channe│   cache            ‹ on                 ›  applies on next launch                                │         │
 │   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
-│   # desi│ The colors. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme   │         │
+│   # desi│ The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme  │         │
 │   # feed│ file. Theme files go in themes/ next to the config file.                                         │         │
 │   # feed│ Saved to /home/me/.config/slakio/config.toml                                                     │         │
 │   # feed│ More settings in /home/me/.config/slakio/config.toml                                             │         │
