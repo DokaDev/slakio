@@ -102,11 +102,15 @@ pub fn create_new_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
 }
 
 fn make_new(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
-    let mut opts = fs::OpenOptions::new();
+    let opts = fs::OpenOptions::new();
     #[cfg(unix)]
-    if private {
-        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-    }
+    let opts = {
+        let mut opts = opts;
+        if private {
+            std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+        }
+        opts
+    };
     #[cfg(not(unix))]
     let _ = private;
     let dir = match path.parent().filter(|d| !d.as_os_str().is_empty()) {
