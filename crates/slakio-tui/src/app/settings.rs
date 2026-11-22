@@ -150,7 +150,9 @@ impl App {
         self.effects.push(Effect::Save { key, value: value.clone() });
         let (key, value) = (key.to_string(), value);
         self.info(
-            if SETTINGS[k].restart {
+            if SETTINGS[k].restart && !self.prefs.writable {
+                Msg::SettingsChangedUnsaved { key, value }
+            } else if SETTINGS[k].restart {
                 Msg::SettingsChangedRestart { key, value }
             } else {
                 Msg::SettingsChanged { key, value }
@@ -337,6 +339,8 @@ impl App {
                 (self.i18n.msg(&Msg::SettingsCustom { value }).to_string(), label(Label::SettingsMaxMb))
             }
             Values::Megabytes(_) => (value, label(Label::SettingsMaxMb)),
+            // A file with errors is never written: the next launch does not see the change.
+            Values::Fixed(_) if spec.restart && !self.prefs.writable => (value, label(Label::SettingsOnRestartUnsaved)),
             Values::Fixed(_) if spec.restart => (value, label(Label::SettingsOnRestart)),
             Values::Fixed(values) => {
                 let what = values.iter().find(|(v, _)| *v == value).and_then(|(_, l)| *l);

@@ -168,6 +168,28 @@ fn a_broken_config_file_is_said_and_left_alone() {
 }
 
 #[test]
+fn a_broken_config_file_never_says_a_change_applies_on_next_launch() {
+    let dir = Scratch::new("broken-restart");
+    let path = dir.0.join("config.toml");
+    std::fs::write(&path, "density = \"tiny\"\n").unwrap();
+    let (cfg, err) = config::load(Some(&path));
+    assert!(err.is_some());
+    let mut d = booted(120, 40, Lang::En, cfg, false);
+    d.keys("space ,");
+    assert!(d.screen().contains("not saved, so not used on next launch"), "{}", d.screen());
+    // language
+    d.keys("j j j j j j l");
+    assert_eq!(d.app.prefs.config.language, "en");
+    let screen = d.screen();
+    assert!(!screen.contains("applies on next launch"), "{screen}");
+    assert!(d.status_line().contains("language: en (not saved"), "{}", d.status_line());
+    // A file that can be written: said as before.
+    let mut d = booted(120, 40, Lang::En, shown_config(), true);
+    d.keys("space ,");
+    assert!(d.screen().contains("applies on next launch"), "{}", d.screen());
+}
+
+#[test]
 fn a_theme_file_that_cannot_be_used_is_shown_never_kept() {
     let dir = Scratch::new("theme");
     std::fs::create_dir_all(dir.0.join("themes")).unwrap();
