@@ -66,6 +66,7 @@ impl NameError {
         match self {
             NameError::Invalid(name) => Msg::ThemeFileBadName { name: shown(name) },
             NameError::Builtin(name) => Msg::ThemeFileBuiltinName { name: shown(name) },
+            NameError::Reserved(name) => Msg::ThemeFileReservedName { name: shown(name) },
         }
     }
 }

@@ -209,7 +209,15 @@ fn names_are_plain_file_names() {
         assert!(shadows(builtin));
         assert_eq!(check_name(builtin), Err(NameError::Builtin(builtin.to_string())), "{builtin}");
     }
+    for word in ["copy", "New", "UPDATE"] {
+        assert!(valid_name(word));
+        assert_eq!(check_name(word), Err(NameError::Reserved(word.to_string())), "{word}");
+    }
     let en = I18n::new(Lang::En);
+    assert_eq!(
+        NameError::Reserved("new".into()).message(&en),
+        "new is a word of :theme (copy, new, update): a theme file of that name could not be picked with it"
+    );
     assert_eq!(
         NameError::Invalid("../x".into()).message(&en),
         "../x is not a theme file's name (1 to 64 letters, digits, - and _)"

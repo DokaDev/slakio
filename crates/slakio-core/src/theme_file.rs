@@ -266,6 +266,9 @@ pub enum NameError {
     Invalid(String),
     /// The name of a built-in theme (ignoring case).
     Builtin(String),
+    /// A word of `:theme` (`copy`, `new`, `update`, ignoring case): a file of that name could
+    /// not be picked with `:theme <name>`.
+    Reserved(String),
 }
 
 /// A name a theme file may have: 1 to 64 ASCII letters, digits, `-` and `_` (so it is a plain
@@ -280,8 +283,8 @@ pub fn shadows(name: &str) -> bool {
     crate::config::THEMES.iter().any(|n| n.eq_ignore_ascii_case(name))
 }
 
-/// A name a new theme file may be given: a [`valid_name`] that is no built-in theme's and no
-/// Windows device name (`con`, `prn`, `aux`, `nul`, `com1` to `com9`, `lpt1` to `lpt9`),
+/// A name a new theme file may be given: a [`valid_name`] that is no built-in theme's, no word
+/// of `:theme` (`copy`, `new`, `update`) and no Windows device name (`con`, `prn`, `aux`, `nul`, `com1` to `com9`, `lpt1` to `lpt9`),
 /// ignoring case.
 pub fn check_name(name: &str) -> Result<(), NameError> {
     if !valid_name(name) {
@@ -291,6 +294,9 @@ pub fn check_name(name: &str) -> Result<(), NameError> {
         return Err(NameError::Builtin(name.to_string()));
     }
     let lower = name.to_ascii_lowercase();
+    if ["copy", "new", "update"].contains(&lower.as_str()) {
+        return Err(NameError::Reserved(name.to_string()));
+    }
     let numbered = |prefix: &str| {
         lower.strip_prefix(prefix).is_some_and(|n| n.len() == 1 && n.as_bytes()[0].is_ascii_digit() && n != "0")
     };
