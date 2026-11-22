@@ -264,10 +264,11 @@ fn a_paste_goes_into_the_input_open_and_nowhere_else() {
     assert!(!a.cmdline.is_open() && a.cmdline.text().is_empty(), "no input open: the paste goes nowhere");
     select(&mut a, "downloads");
     key(&mut a, "enter ctrl+u");
-    a.handle_event(Event::Paste("/tmp/x\n".to_string()), Instant::now());
-    assert_eq!(a.prefs.screen.as_ref().unwrap().folder.as_ref().map(|f| f.0.as_str()), Some("/tmp/x"));
+    // A folder every system takes (an absolute path differs between them).
+    a.handle_event(Event::Paste("~/pasted\n".to_string()), Instant::now());
+    assert_eq!(a.prefs.screen.as_ref().unwrap().folder.as_ref().map(|f| f.0.as_str()), Some("~/pasted"));
     key(&mut a, "enter");
-    assert_eq!(saved(&mut a), [("downloads", "/tmp/x".to_string())]);
+    assert_eq!(saved(&mut a), [("downloads", "~/pasted".to_string())]);
 }
 
 #[test]
