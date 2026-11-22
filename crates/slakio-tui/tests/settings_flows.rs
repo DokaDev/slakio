@@ -458,3 +458,48 @@ fn a_theme_file_that_cannot_be_used_says_so_on_its_row() {
     let (en, ko) = ("A theme file with an error", "＊＊＊ ＊＊ ＊＊ ＊＊");
     assert_eq!(got, [en, ko, en, ko], "whole at 80 and 120 columns, in English and Korean");
 }
+
+#[test]
+fn the_help_line_of_the_palette_is_whole_at_80_and_120_columns() {
+    let mut got = Vec::new();
+    for w in [80, 120] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, 24, lang, shown_config(), true);
+            d.keys("?");
+            d.keys("/");
+            d.type_text("ctrl+p");
+            let screen = d.snap();
+            let line =
+                screen.lines().find(|l| l.ends_with("Ctrl+P │ │") || l.contains("Ctrl+P │  ")).unwrap_or_default();
+            got.push(line.split('│').filter(|c| c.contains("Ctrl+P")).collect::<String>().trim().to_string());
+        }
+    }
+    let (en, ko) = ("Command palette: every command, with its keys", "＊＊ ＊＊＊: ＊＊ ＊＊＊ ＊＊, ＊＊ ＊＊");
+    let line = |text: &str, gap: usize| format!("{text}{}Ctrl+P", " ".repeat(gap));
+    let want = [line(en, 19), line(ko, 24), line(en, 43), line(ko, 48)];
+    assert_eq!(got, want, "whole at 80 and 120 columns, in English and Korean");
+}
+
+#[test]
+fn the_korean_size_text_needs_no_particle_after_a_number() {
+    // The screen is too small to show 80 or 120 columns of it: the text at two small sizes.
+    let mut got = Vec::new();
+    for (w, h) in [(40, 8), (45, 9)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(80, 24, lang, shown_config(), true);
+            d.app.resize(w, h);
+            let text: Vec<String> = d
+                .snap()
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.contains("NORMAL"))
+                .map(String::from)
+                .collect();
+            got.push(text.join(" "));
+        }
+    }
+    // In Korean a word follows the size, never a particle on the number.
+    let en = |size: &str| format!("The terminal is {size}; slakio needs at least 50×10.");
+    let ko = |size: &str| format!("＊＊＊＊ {size}＊＊＊. slakio＊ ＊＊ 50×10 ＊＊＊ ＊＊＊＊＊.");
+    assert_eq!(got, [en("40×8"), ko("40×8"), en("45×9"), ko("45×9")]);
+}

@@ -11,7 +11,7 @@ The keys of *Always* work everywhere, also while typing. Other keys resolve in t
 |---|---|---|
 | `Ctrl+Q` | Quit | `app.quit` |
 | `F1` | Keyboard help | `help.open` |
-| `Ctrl+P` | Command palette: every command and action by name, with its keys | `palette.open` |
+| `Ctrl+P` | Command palette: every command, with its keys | `palette.open` |
 
 ## Everywhere (`root`)
 

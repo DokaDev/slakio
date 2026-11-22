@@ -235,7 +235,7 @@
 "action.composer.delete_word" = "Delete the word before the cursor"
 "action.composer.delete_line" = "Delete to the start of the line"
 "action.interrupt" = "Cancel what is pending (Ctrl+Q quits)"
-"action.palette" = "Command palette: every command and action by name, with its keys"
+"action.palette" = "Command palette: every command, with its keys"
 "action.workspace.choose" = "Switch workspace"
 "action.help.open" = "Keyboard help"
 "action.focus.next" = "Next panel"

@@ -157,7 +157,7 @@
 "status.no_earlier" = "이전 대화가 없습니다"
 "status.no_later" = "다음 대화가 없습니다"
 
-"screen.too_small" = "터미널이 {width}×{height}입니다. slakio에는 최소 {min_width}×{min_height}가 필요합니다."
+"screen.too_small" = "터미널이 {width}×{height}입니다. slakio는 최소 {min_width}×{min_height} 크기가 필요합니다."
 
 "action.quit" = "종료"
 "action.cmdline.open" = "명령줄 열기"
@@ -210,7 +210,7 @@
 "action.composer.delete_word" = "커서 앞 단어 지우기"
 "action.composer.delete_line" = "줄 처음까지 지우기"
 "action.interrupt" = "기다리는 키 취소 (종료는 Ctrl+Q)"
-"action.palette" = "명령 팔레트: 모든 명령과 동작을 이름으로, 키와 함께"
+"action.palette" = "명령 팔레트: 모든 명령과 동작, 키와 함께"
 "action.workspace.choose" = "워크스페이스 바꾸기"
 "action.help.open" = "키 도움말"
 "action.focus.next" = "다음 패널"
