@@ -43,6 +43,30 @@ fn booted(w: u16, h: u16, lang: Lang) -> Demo {
     d
 }
 
+/// However long the folder of the theme file: the status line says the words `want` says, and
+/// the settings screen the whole path.
+fn deep_folder_says_the_same(dir: &Path, want: &[&str]) {
+    let deep = dir.join("a-folder-name-long-enough-to-fill-the-status-line-on-its-own").join("and-more");
+    std::fs::create_dir_all(deep.join("themes")).unwrap();
+    std::fs::copy("themes/broken.toml", deep.join("themes").join("broken.toml")).unwrap();
+    let cfg = slakio_core::config::Config {
+        theme: "broken".to_string(),
+        path: Some(deep.join("config.toml")),
+        ..Default::default()
+    };
+    for (i, (w, lang)) in [(80, Lang::En), (120, Lang::En), (80, Lang::Ko), (120, Lang::Ko)].into_iter().enumerate() {
+        let mut d = Demo::with(w, 24, lang, Settings::default());
+        d.app.load_at_start(TRUECOLOR, &cfg, true, d.now);
+        assert_eq!(demo::mask_hangul(d.status_line().trim_end()), want[i], "{w} {lang:?}: a deep folder");
+        // The settings screen says the whole path.
+        d.keys("space ,");
+        let problem = d.app.prefs.screen.as_ref().and_then(|s| s.problem.clone());
+        let said = problem.map(|m| d.app.i18n.msg(&m).to_string()).unwrap_or_default();
+        let path = deep.join("themes").join("broken.toml").display().to_string();
+        assert!(said.contains(&format!("{path}:3: #12345")), "{w} {lang:?}: {said}");
+    }
+}
+
 #[test]
 fn theme_files_at_launch_and_while_running() {
     let dir = std::env::temp_dir().join(format!("slakio-theme-files-{}", std::process::id()));
@@ -68,26 +92,7 @@ fn theme_files_at_launch_and_while_running() {
         lines.push(demo::mask_hangul(d.status_line().trim_end()));
     }
     assert_eq!(lines, want, "the status line at 80 and 120 columns, in English and Korean");
-    // However long the folder: the same words.
-    let deep = dir.join("a-folder-name-long-enough-to-fill-the-status-line-on-its-own").join("and-more");
-    std::fs::create_dir_all(deep.join("themes")).unwrap();
-    std::fs::copy("themes/broken.toml", deep.join("themes").join("broken.toml")).unwrap();
-    let cfg = slakio_core::config::Config {
-        theme: "broken".to_string(),
-        path: Some(deep.join("config.toml")),
-        ..Default::default()
-    };
-    for (i, (w, lang)) in [(80, Lang::En), (120, Lang::En), (80, Lang::Ko), (120, Lang::Ko)].into_iter().enumerate() {
-        let mut d = Demo::with(w, 24, lang, Settings::default());
-        d.app.load_at_start(TRUECOLOR, &cfg, true, d.now);
-        assert_eq!(demo::mask_hangul(d.status_line().trim_end()), want[i], "{w} {lang:?}: a deep folder");
-        // The settings screen says the whole path.
-        d.keys("space ,");
-        let problem = d.app.prefs.screen.as_ref().and_then(|s| s.problem.clone());
-        let said = problem.map(|m| d.app.i18n.msg(&m).to_string()).unwrap_or_default();
-        let path = deep.join("themes").join("broken.toml").display().to_string();
-        assert!(said.contains(&format!("{path}:3: #12345")), "{w} {lang:?}: {said}");
-    }
+    deep_folder_says_the_same(&dir, &want);
     assert_eq!(std::fs::read_to_string("config.toml").unwrap(), CONFIG, "the config file is untouched");
 
     // A missing file is said too, by its path.
