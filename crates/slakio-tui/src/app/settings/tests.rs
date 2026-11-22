@@ -289,3 +289,29 @@ fn every_row_reads_and_writes_its_own_setting_alone() {
         assert_eq!(a.setting_value(k), value, "{}", spec.key);
     }
 }
+
+#[test]
+fn small_things_of_the_screen() {
+    // `h`/`l` on the downloads row type a folder, as the keys line says.
+    let mut a = app();
+    select(&mut a, "downloads");
+    key(&mut a, "l");
+    assert!(a.prefs.screen.as_ref().unwrap().folder.is_some());
+    // `Ctrl+U` clears what was typed and why it could not be used.
+    for c in "rel".chars() {
+        a.settings_key(KeyChord::char(c), Instant::now());
+    }
+    key(&mut a, "enter ctrl+u");
+    assert_eq!(a.prefs.screen.as_ref().unwrap().folder, Some((String::new(), None)));
+    key(&mut a, "esc esc");
+    // The theme set, in another case than the list's: shown from where it is.
+    a.theme_setting = "Terminal".to_string();
+    a.open_settings();
+    key(&mut a, "l");
+    assert_eq!(a.prefs.screen.as_ref().unwrap().preview.as_ref().map(|p| p.index), Some(2));
+    key(&mut a, "esc");
+    // A drag going on when the screen opens stops (its button-up goes to the screen).
+    a.tab_drag = Some(0);
+    a.open_settings();
+    assert_eq!(a.tab_drag, None);
+}

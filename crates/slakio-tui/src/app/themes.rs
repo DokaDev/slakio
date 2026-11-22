@@ -85,7 +85,8 @@ impl App {
         let n = screen.themes.len().max(1) as isize;
         let at = match &screen.preview {
             Some(p) => p.index,
-            None => screen.themes.iter().position(|t| *t == self.theme_setting).unwrap_or(0),
+            // A file system that ignores case reads `Mine` from `mine.toml`.
+            None => screen.themes.iter().position(|t| t.eq_ignore_ascii_case(&self.theme_setting)).unwrap_or(0),
         } as isize;
         let index = (at + step).rem_euclid(n) as usize;
         let Some(name) = screen.themes.get(index).cloned() else { return };

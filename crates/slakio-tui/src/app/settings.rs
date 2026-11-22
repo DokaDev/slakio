@@ -3,7 +3,7 @@
 //! `Space`) change the selected setting at once and save it in the config file through the same
 //! path as `:set`, so the screen, `:set` and the file always agree; `Esc` or `q` close. On the
 //! theme row `h`/`l` only show a theme ([`super::themes`]): `Enter` keeps it, `Esc` goes back. On
-//! the downloads row `Enter` types a folder; `c` on the theme row copies the theme shown to a new
+//! the downloads row `Enter` (also `h`/`l`) types a folder; `c` on the theme row copies the theme shown to a new
 //! theme file, its name typed first. A setting that applies on the next launch says so.
 //! It is modal and takes the keys only (no mouse).
 //!
@@ -65,6 +65,9 @@ impl App {
         self.switcher = None;
         self.keys.clear();
         self.guide = Guide::default();
+        // Keyboard only: a drag going on stops here (its button-up never reaches it).
+        self.tab_drag = None;
+        self.seam_drag = None;
         let mut themes: Vec<String> = config::THEMES.iter().map(|t| (*t).to_string()).collect();
         themes.extend(self.theme_files());
         let problem = self.theme_named(&self.theme_setting).err().map(|e| self.theme_problem(&e));
@@ -225,8 +228,7 @@ impl App {
         match SETTINGS[k].values {
             Values::Themes if step == 0 => self.keep_preview(now),
             Values::Themes => self.preview_theme(step),
-            Values::Folder if step == 0 => self.open_folder(now),
-            Values::Folder => {}
+            Values::Folder => self.open_folder(now),
             Values::Fixed(values) => {
                 let at = values.iter().position(|(v, _)| *v == self.setting_value(k)).unwrap_or(0) as isize;
                 let next = (at + if step == 0 { 1 } else { step }).rem_euclid(values.len() as isize);
@@ -274,6 +276,7 @@ impl App {
             KeyCode::Esc => {}
             KeyCode::Char('u') if ctrl => {
                 text.clear();
+                *error = None;
                 return;
             }
             KeyCode::Char('c') if ctrl => {}
