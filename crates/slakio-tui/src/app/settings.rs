@@ -108,7 +108,8 @@ impl App {
             "network" => &c.network,
             "live" => &c.live,
             "restore" => &c.restore,
-            _ => &c.cache,
+            "cache" => &c.cache,
+            other => unreachable!("setting {other} has no value here"),
         };
         value.to_string()
     }
@@ -143,7 +144,8 @@ impl App {
             "network" => self.prefs.config.network.clone_from(&value),
             "live" => self.prefs.config.live.clone_from(&value),
             "restore" => self.prefs.config.restore.clone_from(&value),
-            _ => self.prefs.config.cache.clone_from(&value),
+            "cache" => self.prefs.config.cache.clone_from(&value),
+            other => unreachable!("setting {other} cannot be set here"),
         }
         self.effects.push(Effect::Save { key, value: value.clone() });
         let (key, value) = (key.to_string(), value);

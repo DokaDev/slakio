@@ -269,3 +269,23 @@ fn a_paste_goes_into_the_input_open_and_nowhere_else() {
     key(&mut a, "enter");
     assert_eq!(saved(&mut a), [("downloads", "/tmp/x".to_string())]);
 }
+
+#[test]
+fn every_row_reads_and_writes_its_own_setting_alone() {
+    // A row the lookups do not name panics here (never another setting's value shown or set).
+    for (k, spec) in SETTINGS.iter().enumerate() {
+        let mut a = app();
+        let before: Vec<String> = (0..SETTINGS.len()).map(|i| a.setting_value(i)).collect();
+        let value = match spec.values {
+            table::Values::Themes => "dark".to_string(),
+            table::Values::Fixed(v) => v.iter().map(|(n, _)| (*n).to_string()).find(|n| *n != before[k]).unwrap(),
+            table::Values::Folder => "~/x".to_string(),
+            table::Values::Megabytes(p) => p[0].to_string(),
+        };
+        a.apply_setting(k, &value, Instant::now()).unwrap();
+        for (i, was) in before.iter().enumerate().filter(|(i, _)| *i != k) {
+            assert_eq!(&a.setting_value(i), was, "{} changed {}", spec.key, SETTINGS[i].key);
+        }
+        assert_eq!(a.setting_value(k), value, "{}", spec.key);
+    }
+}
