@@ -40,7 +40,8 @@ struct Checked {
 /// Check the text of a theme file. `Err`: the first problem in the file (by where it is) and
 /// its line, when known.
 pub fn parse(text: &str) -> Result<ThemeSpec, (Option<usize>, Problem)> {
-    let line = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
+    // Bytes, not a `str` slice: an offset inside a character never panics.
+    let line = |at: usize| text.as_bytes()[..at.min(text.len())].iter().filter(|b| **b == b'\n').count() + 1;
     let f: File = toml::from_str(text)
         .map_err(|e| (e.span().map(|s| line(s.start)), Problem::Toml(e.message().trim().to_string())))?;
     let mut c = Checked::default();
@@ -53,7 +54,7 @@ pub fn parse(text: &str) -> Result<ThemeSpec, (Option<usize>, Problem)> {
         }
     }
     for (k, v) in &f.colors {
-        c.color(k, v);
+        c.color(text, k, v);
     }
     for (k, v) in &f.styles {
         c.style(k, v.get_ref());
@@ -93,7 +94,7 @@ impl Checked {
     }
 
     /// A key of `[colors]`.
-    fn color(&mut self, k: &Spanned<String>, v: &Spanned<toml::Value>) {
+    fn color(&mut self, text: &str, k: &Spanned<String>, v: &Spanned<toml::Value>) {
         let (name, at, vat) = (k.get_ref().as_str(), k.span().start, v.span().start);
         if let Some(t) = token(COLOR_TOKENS, name) {
             if let Some(c) = self.one_color(vat, v.get_ref()) {
@@ -103,7 +104,8 @@ impl Checked {
         }
         match name {
             "workspaces" | "avatars" => {
-                let list = self.palette(name, vat, v.get_ref());
+                let items = item_starts(text, v.span());
+                let list = self.palette(name, vat, &items, v.get_ref());
                 if name == "workspaces" {
                     self.spec.workspaces = list;
                 } else {
@@ -124,12 +126,14 @@ impl Checked {
     }
 
     /// `workspaces` or `avatars`: 1 to [`MAX_PALETTE`] colours.
-    fn palette(&mut self, name: &str, at: usize, v: &toml::Value) -> Option<Vec<ColorSpec>> {
+    /// `starts`: where each item is in the file (else the list's start, `at`, is said).
+    fn palette(&mut self, name: &str, at: usize, starts: &[usize], v: &toml::Value) -> Option<Vec<ColorSpec>> {
         let Some(items) = v.as_array().filter(|a| (1..=MAX_PALETTE).contains(&a.len())) else {
             self.problem(at, Problem::BadPalette(name.to_string()));
             return None;
         };
-        let colors: Vec<Option<ColorSpec>> = items.iter().map(|i| self.one_color(at, i)).collect();
+        let colors: Vec<Option<ColorSpec>> =
+            items.iter().enumerate().map(|(n, i)| self.one_color(starts.get(n).copied().unwrap_or(at), i)).collect();
         colors.into_iter().collect()
     }
 
@@ -158,6 +162,20 @@ impl Checked {
             }
         }
         self.styles.push((at, t, StyleSpec { fg, bg, modifiers }));
+    }
+}
+
+/// Where each item of the list at `span` of `text` starts (none when it is not a list).
+fn item_starts(text: &str, span: std::ops::Range<usize>) -> Vec<usize> {
+    #[derive(Deserialize)]
+    struct List {
+        x: Vec<Spanned<toml::Value>>,
+    }
+    const KEY: &str = "x = ";
+    let Some(list) = text.get(span.clone()) else { return Vec::new() };
+    match toml::from_str::<List>(&format!("{KEY}{list}")) {
+        Ok(l) => l.x.iter().map(|i| (span.start + i.span().start).saturating_sub(KEY.len())).collect(),
+        Err(_) => Vec::new(),
     }
 }
 

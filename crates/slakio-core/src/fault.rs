@@ -51,7 +51,7 @@ impl Fault {
 
     /// `text` does not parse as TOML (or has a value of the wrong type): the line of `span`.
     pub fn toml(text: &str, span: Option<std::ops::Range<usize>>, message: &str) -> Self {
-        let line = span.map(|s| text[..s.start.min(text.len())].matches('\n').count() + 1);
+        let line = span.map(|s| text.as_bytes()[..s.start.min(text.len())].iter().filter(|b| **b == b'\n').count() + 1);
         Self::new(FaultKind::Toml { line }, message.trim().to_string())
     }
 

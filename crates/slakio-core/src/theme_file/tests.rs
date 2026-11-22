@@ -336,3 +336,23 @@ fn the_listing_looks_at_a_bounded_number_of_entries() {
     assert!(started.elapsed() < std::time::Duration::from_secs(5));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_bad_colour_in_a_list_of_several_lines_is_said_at_its_own_line() {
+    let text = "[colors]\nworkspaces = [\n  \"#111111\",\n  \"#222222\",\n  \"#zzz\",\n]\n";
+    assert_eq!(err(text), (Some(5), Problem::BadColor("#zzz".into())));
+    let text = "[colors]\navatars = [\"red\",\n\n \"x\"]\n";
+    assert_eq!(err(text), (Some(4), Problem::BadColor("x".into())));
+}
+
+#[test]
+fn a_broken_file_with_hangul_never_panics() {
+    // Korean words in comments, keys and values, cut at every byte.
+    let text = "# \u{D14C}\u{B9C8}\n[colors]\n\u{D14C} = \"\u{B9C8}\n\u{AC00}\u{B098} = [\"#zz\u{B2E4}\"\nfg = \"#\u{B2E4}\u{B2E4}\"\n";
+    for end in 0..=text.len() {
+        if let Some(cut) = text.get(..end) {
+            let _ = parse(cut);
+        }
+        let _ = parse(&String::from_utf8_lossy(&text.as_bytes()[..end]));
+    }
+}
