@@ -157,6 +157,39 @@ fn a_photo_is_decoded_for_the_picture_slot() {
     assert_eq!(fetch(&mut images, &mut requests, &photo).shape, Shape::Photo { cols: 4, rows: 2 });
 }
 
+#[test]
+fn a_photo_in_the_list_s_chip_is_a_picture_of_its_own_beside_the_slot_s() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
+    let slot = fetch(&mut images, &mut requests, &photo);
+    assert_eq!(images.look_as(&ws(), &photo, CHIP_PHOTO), Look::Pending, "the chip's is not the slot's");
+    assert!(images.ask(&mut requests, Instant::now()));
+    let r = requests.take().pop().expect("asked for the chip");
+    assert_eq!(r.command, Command::Image { source: photo.clone(), max: BYTES_MAX });
+    let chip = images.answered(r.id, vec![1]).expect("a job");
+    assert_eq!(chip.shape, Shape::Photo { cols: 2, rows: 1 });
+    assert_ne!(chip.id, slot.id);
+    // Each result goes to its own picture, whichever comes first.
+    let made = |job: &Job, cols, rows| Prepared {
+        id: job.id,
+        cols,
+        rows,
+        bytes: 5,
+        transmit: graphics::transmit(job.id, cols, rows, &[0; 5]),
+    };
+    images.decoded(key(&chip), Ok(made(&chip, 2, 1)));
+    images.decoded(key(&slot), Ok(made(&slot, 4, 2)));
+    assert_eq!(images.look_as(&ws(), &photo, CHIP_PHOTO), Look::Ready { id: chip.id, cols: 2, rows: 1 });
+    assert_eq!(images.look(&ws(), &photo), Look::Ready { id: slot.id, cols: 4, rows: 2 });
+    assert_eq!(images.held(), (2, 10));
+    // Photos off: both leave the terminal.
+    images.take_graphics();
+    images.forget_photos();
+    let sent = images.take_graphics();
+    assert!(sent.contains(&graphics::delete(chip.id)) && sent.contains(&graphics::delete(slot.id)), "{sent:?}");
+    assert_eq!(images.held(), (0, 0));
+}
+
 fn kitty() -> detect::Env {
     detect::Env { term: "xterm-kitty".into(), ..detect::Env::default() }
 }

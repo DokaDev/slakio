@@ -27,7 +27,7 @@ const SENT_SIDE_MAX: u32 = 1600;
 pub const CELL_GUESS: (u16, u16) = (9, 18);
 
 /// What a picture is shown as.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Shape {
     /// A file's picture under its card, in its own size up to [`PREVIEW_COLS`] × [`PREVIEW_ROWS`].
     Preview,

@@ -1,7 +1,9 @@
 //! Pictures in the timeline: previews of the pictures messages share, under their cards, and
-//! people's profile photos in the comfortable layout's picture slot (`avatars = "image"`), drawn
-//! with the kitty graphics protocol where the terminal draws it ([`detect`]); elsewhere, and
-//! while a picture is not there yet, the text card and the initials stay as they are.
+//! people's profile photos in the comfortable layout's picture slot and in the list's DM rows
+//! (`avatars = "image"`), drawn with the kitty graphics protocol where the terminal draws it
+//! ([`detect`]); elsewhere, and while a picture is not there yet, the text card and the initials
+//! stay as they are. A picture is kept per address and the cells it fills ([`Shape`]): a photo
+//! shown in both places is two pictures to the terminal.
 //!
 //! How a picture comes: drawing a frame notes the pictures it would show ([`Images::look`]);
 //! after the frame the app asks the backend for those it does not have ([`Images::ask`], at most
@@ -48,6 +50,12 @@ pub const FAILED_MAX: usize = 1024;
 /// The slot a profile photo fills (the comfortable layout's).
 pub const PHOTO: Shape =
     Shape::Photo { cols: crate::avatar::BLOCK.cols as u16, rows: crate::avatar::BLOCK.rows as u16 };
+/// The cells a DM's peer's photo fills in the list: the initials chip's.
+pub const CHIP_PHOTO: Shape =
+    Shape::Photo { cols: crate::avatar::CHIP.cols as u16, rows: crate::avatar::CHIP.rows as u16 };
+
+/// A picture as slakio keeps it: where it comes from and the cells it fills.
+type Key = (Source, Shape);
 
 /// Why a picture is not shown, as its card says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,18 +156,18 @@ pub struct Images {
     pub tty: bool,
     /// The last setting other than `off` (`:images` alone goes back to it).
     pub last_on: Option<String>,
-    entries: HashMap<Source, Entry>,
+    entries: HashMap<Key, Entry>,
     /// The pictures the terminal holds, the least recently drawn first.
-    held: VecDeque<Source>,
+    held: VecDeque<Key>,
     bytes: usize,
     /// The pictures that failed, the oldest first (at most [`FAILED_MAX`]).
-    failed: VecDeque<Source>,
-    asked: HashMap<Generation, Source>,
+    failed: VecDeque<Key>,
+    asked: HashMap<Generation, Key>,
     /// What the last frame would have shown and did not have (and its workspace); `false`: it
     /// was only laid out, not shown.
-    wanted: RefCell<Vec<(WorkspaceId, Source, bool)>>,
+    wanted: RefCell<Vec<(WorkspaceId, Key, bool)>>,
     /// What the last frame showed (`false`: only laid out).
-    drawn: RefCell<Vec<(Source, bool)>>,
+    drawn: RefCell<Vec<(Key, bool)>>,
     last_id: u32,
     /// The highest picture id ever sent.
     pub highest: u32,
@@ -208,37 +216,52 @@ impl Images {
     /// Profile photos are no longer drawn: those held leave the terminal, and those asked for
     /// or being decoded are not waited for.
     pub fn forget_photos(&mut self) {
-        let photos: Vec<Source> = self.entries.keys().filter(|s| matches!(s, Source::Avatar(_))).cloned().collect();
-        self.held.retain(|s| !matches!(s, Source::Avatar(_)));
-        self.failed.retain(|s| !matches!(s, Source::Avatar(_)));
-        self.asked.retain(|_, s| !matches!(s, Source::Avatar(_)));
-        for source in photos {
-            if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&source) {
+        let photo = |k: &Key| matches!(k.0, Source::Avatar(_));
+        let photos: Vec<Key> = self.entries.keys().filter(|k| photo(k)).cloned().collect();
+        self.held.retain(|k| !photo(k));
+        self.failed.retain(|k| !photo(k));
+        self.asked.retain(|_, k| !photo(k));
+        for key in photos {
+            if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&key) {
                 self.bytes -= bytes;
                 self.graphics.push_str(&graphics::delete(id));
             }
         }
     }
 
-    /// What `source` (of workspace `ws`) is for drawing; noted as wanted when it is not here.
+    /// What `source` (of workspace `ws`) is for drawing, as a preview or in the comfortable
+    /// layout's photo slot ([`Images::look_as`]).
     pub fn look(&self, ws: &WorkspaceId, source: &Source) -> Look {
+        let shape = match source {
+            Source::Thumb(_) => Shape::Preview,
+            Source::Avatar(_) => PHOTO,
+        };
+        self.look_as(ws, source, shape)
+    }
+
+    /// What `source` (of workspace `ws`) is for drawing as `shape`; noted as wanted when it is
+    /// not here.
+    pub fn look_as(&self, ws: &WorkspaceId, source: &Source, shape: Shape) -> Look {
         if !self.on {
             return Look::Pending;
         }
-        match self.entries.get(source) {
+        let key = (source.clone(), shape);
+        match self.entries.get(&key) {
             Some(Entry::Ready { id, cols, rows, .. }) => {
-                self.drawn.borrow_mut().push((source.clone(), true));
-                Look::Ready { id: *id, cols: *cols, rows: *rows }
+                let look = Look::Ready { id: *id, cols: *cols, rows: *rows };
+                self.drawn.borrow_mut().push((key, true));
+                look
             }
             Some(Entry::Failed { why, again }) => {
+                let why = *why;
                 if again.is_some() {
-                    self.wanted.borrow_mut().push((ws.clone(), source.clone(), true));
+                    self.wanted.borrow_mut().push((ws.clone(), key, true));
                 }
-                Look::Failed(*why)
+                Look::Failed(why)
             }
             Some(Entry::Asked(_) | Entry::Decoding(_)) => Look::Pending,
             None => {
-                self.wanted.borrow_mut().push((ws.clone(), source.clone(), true));
+                self.wanted.borrow_mut().push((ws.clone(), key, true));
                 Look::Pending
             }
         }
@@ -269,26 +292,26 @@ impl Images {
     /// is asked for (at most [`IN_FLIGHT_MAX`] at once; a failed one once its wait is over); what
     /// it only laid out is neither. `true` when something was asked.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
-        for (source, _) in self.drawn.take().into_iter().filter(|d| d.1) {
-            if let Some(i) = self.held.iter().position(|s| *s == source) {
+        for (key, _) in self.drawn.take().into_iter().filter(|d| d.1) {
+            if let Some(i) = self.held.iter().position(|k| *k == key) {
                 let s = self.held.remove(i).expect("found");
                 self.held.push_back(s);
             }
         }
         let mut asked = false;
-        for (ws, source, _) in self.wanted.take().into_iter().filter(|w| w.2) {
+        for (ws, key, _) in self.wanted.take().into_iter().filter(|w| w.2) {
             if self.in_flight() >= IN_FLIGHT_MAX {
                 break;
             }
-            match self.entries.get(&source) {
+            match self.entries.get(&key) {
                 None => {}
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
-            let id = requests.ask(Some(ws), Command::Image { source: source.clone(), max: BYTES_MAX });
-            self.asked.insert(id, source.clone());
-            self.failed.retain(|s| *s != source);
-            self.entries.insert(source, Entry::Asked(id));
+            let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
+            self.asked.insert(id, key.clone());
+            self.failed.retain(|k| *k != key);
+            self.entries.insert(key, Entry::Asked(id));
             asked = true;
         }
         asked
@@ -297,25 +320,22 @@ impl Images {
     /// The bytes picture request `id` asked for came: the job that makes them ready, when it is
     /// one of these (the picture's id is given now).
     pub fn answered(&mut self, id: Generation, bytes: Vec<u8>) -> Option<Job> {
-        let source = self.asked.remove(&id)?;
-        if self.entries.get(&source) != Some(&Entry::Asked(id)) {
+        let key = self.asked.remove(&id)?;
+        if self.entries.get(&key) != Some(&Entry::Asked(id)) {
             return None;
         }
-        self.entries.insert(source.clone(), Entry::Decoding(id));
-        let shape = match source {
-            Source::Thumb(_) => Shape::Preview,
-            Source::Avatar(_) => PHOTO,
-        };
+        self.entries.insert(key.clone(), Entry::Decoding(id));
+        let (source, shape) = key;
         self.last_id = if self.last_id >= graphics::ID_MAX { 1 } else { self.last_id + 1 };
         Some(Job { source, request: id, id: self.last_id, bytes, shape })
     }
 
     /// `source` failed for `why`; asked again after `again`, if ever. At most [`FAILED_MAX`]
     /// are kept.
-    fn fail(&mut self, source: Source, why: Why, again: Option<Instant>) {
-        self.failed.retain(|s| *s != source);
-        self.failed.push_back(source.clone());
-        self.entries.insert(source, Entry::Failed { why, again });
+    fn fail(&mut self, key: Key, why: Why, again: Option<Instant>) {
+        self.failed.retain(|k| *k != key);
+        self.failed.push_back(key.clone());
+        self.entries.insert(key, Entry::Failed { why, again });
         while self.failed.len() > FAILED_MAX {
             let Some(old) = self.failed.pop_front() else { break };
             if matches!(self.entries.get(&old), Some(Entry::Failed { .. })) {
@@ -326,7 +346,7 @@ impl Images {
 
     /// Picture request `id` failed (`kind`) at `now`: `true` when it was one of these.
     pub fn failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
-        let Some(source) = self.asked.remove(&id) else { return false };
+        let Some(key) = self.asked.remove(&id) else { return false };
         let why = match kind {
             FailKind::TooLarge => Why::TooLarge,
             FailKind::Api { code } if code == "not_an_image" => Why::Unreadable,
@@ -337,7 +357,7 @@ impl Images {
             k if k.retryable() || *k == FailKind::CapReached => Some(now + RETRY_AFTER),
             _ => None,
         };
-        self.fail(source, why, again);
+        self.fail(key, why, again);
         true
     }
 
@@ -346,9 +366,12 @@ impl Images {
     /// request no longer waited for changes nothing.
     pub fn decoded(&mut self, job: (Source, Generation), result: Result<Prepared, Refused>) {
         let (source, request) = job;
-        if self.entries.get(&source) != Some(&Entry::Decoding(request)) {
+        // Request ids are never used twice: the one decoding it is the picture.
+        let Some(key) =
+            self.entries.iter().find(|(k, e)| k.0 == source && **e == Entry::Decoding(request)).map(|(k, _)| k.clone())
+        else {
             return;
-        }
+        };
         let p = match result {
             Ok(p) => p,
             Err(refused) => {
@@ -356,14 +379,14 @@ impl Images {
                     Refused::TooLarge => Why::TooLarge,
                     Refused::Unreadable => Why::Unreadable,
                 };
-                return self.fail(source, why, None);
+                return self.fail(key, why, None);
             }
         };
         self.graphics.push_str(&p.transmit);
         self.highest = self.highest.max(p.id);
         self.bytes += p.bytes;
-        self.entries.insert(source.clone(), Entry::Ready { id: p.id, cols: p.cols, rows: p.rows, bytes: p.bytes });
-        self.held.push_back(source);
+        self.entries.insert(key.clone(), Entry::Ready { id: p.id, cols: p.cols, rows: p.rows, bytes: p.bytes });
+        self.held.push_back(key);
         while self.held.len() > ENTRIES_MAX || (self.bytes > BYTES_CAP && self.held.len() > 1) {
             let Some(old) = self.held.pop_front() else { break };
             if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&old) {
