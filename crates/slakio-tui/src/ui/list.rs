@@ -23,10 +23,15 @@
 //! │   3   Jiho Park, …        │   a group DM: how many people are in it
 //! ```
 //!
+//! With `avatars = "image"` a DM's chip is its peer's photo once the terminal holds it
+//! ([`photo`]); the initials until then and wherever pictures are not drawn.
+//!
 //! With `avatars = "off"` a DM starts with the presence mark alone (`● Minsu Kim`, `@` while
 //! unknown) and a group DM with `@`.
 //!
 //! Unread conversations are bold, muted ones faint and never badged; nothing else marks them.
+
+mod photo;
 
 use super::{avatar_chip, count_pill, frame, highlight, presence_mark};
 use crate::app::model::Row;
@@ -243,8 +248,16 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             // DMs has no sections: its rows start where a section's name would.
             let x = if app.shell.view == View::Home { 3 } else { 1 };
             // With avatars, a DM starts with its peer's chip and the presence mark at its
-            // corner, a group DM with a chip of how many people are in it; the name follows.
+            // corner, a group DM with a chip of how many people are in it; the name follows. A
+            // DM's photo takes the chip's cells; muted, it stays as it is (its colour says which
+            // picture it is).
+            let photo = match &c.kind {
+                ConversationKind::Dm { user } if avatars_on(app, c) => photo::chip(app, &c.workspace, user),
+                _ => None,
+            };
+            let is_photo = photo.is_some();
             let chip = avatars_on(app, c).then(|| match &c.kind {
+                ConversationKind::Dm { .. } if is_photo => photo,
                 ConversationKind::Dm { user } => avatar_chip(app, &c.workspace, user, c.name.line().as_str()),
                 ConversationKind::GroupDm { users } => {
                     let n = if users.len() > 9 { "9+".to_string() } else { format!("{:<2}", users.len()) };
@@ -254,7 +267,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             });
             let (mark_x, name_x) = match chip.flatten() {
                 Some(mut chip) => {
-                    if c.muted {
+                    if c.muted && !is_photo {
                         chip.style = t.avatar_muted();
                     }
                     put(f, area, x, avatar::WIDTH as u16, vec![chip]);
