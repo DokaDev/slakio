@@ -200,3 +200,30 @@ fn a_private_new_file_is_only_its_owners_and_never_replaces_one() {
     assert_eq!(fs::read_to_string(&path).unwrap(), "first");
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_link_planted_as_the_new_files_temporary_file_is_never_followed() {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    for private in [false, true] {
+        let dir = temp_dir(&format!("planted-new-{private}"));
+        let victim = dir.join("victim");
+        fs::write(&victim, "keep").unwrap();
+        fs::set_permissions(&victim, fs::Permissions::from_mode(0o644)).unwrap();
+        let path = dir.join("t.toml");
+        let tmp = dir.join(format!(".t.toml.new-{}", std::process::id()));
+        std::os::unix::fs::symlink(&victim, &tmp).unwrap();
+        if private { create_new_private(&path, b"x") } else { create_new(&path, b"x") }.unwrap();
+        assert_eq!(fs::read_to_string(&victim).unwrap(), "keep", "the link's target is untouched");
+        assert_eq!(mode(&victim), 0o644, "and keeps its mode");
+        let meta = fs::symlink_metadata(&path).unwrap();
+        assert!(meta.file_type().is_file(), "a plain file");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "x");
+        if private {
+            assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+        }
+        assert!(fs::symlink_metadata(&tmp).is_err(), "no temporary file is left");
+        let _ = fs::remove_dir_all(&dir);
+    }
+}

@@ -121,8 +121,8 @@ fn make_new(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let tmp = dir.join(format!(".{name}.new-{}", std::process::id()));
     let result = (|| {
-        let mut f = opts.clone().write(true).create(true).truncate(true).open(&tmp)?;
-        // One left by an earlier run keeps its mode: made private here as well.
+        let mut f = open_new(opts.clone().write(true).create_new(true), &tmp)?;
+        // Whatever the umask: private.
         #[cfg(unix)]
         if private {
             use std::os::unix::fs::PermissionsExt;
@@ -150,6 +150,23 @@ fn make_new(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
         sync_dir(&dir);
     }
     result
+}
+
+/// `path` opened with `opts` (which make it new, `create_new`): never through what is there
+/// already (a link put in its place is not followed). One left there (by an earlier run of the
+/// same id, or planted) is removed, the link itself and not what it points to, and the open
+/// tried again, a few times at most.
+fn open_new(opts: &fs::OpenOptions, path: &Path) -> io::Result<fs::File> {
+    let mut tries = 0;
+    loop {
+        match opts.open(path) {
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists && tries < 3 => {
+                tries += 1;
+                fs::remove_file(path)?;
+            }
+            opened => return opened,
+        }
+    }
 }
 
 /// Rename `from` to `to`, never replacing anything at `to` (an `AlreadyExists` error then;
