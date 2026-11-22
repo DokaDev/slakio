@@ -360,3 +360,24 @@ fn the_frame_says_the_keys_of_the_folder_and_the_name_typed() {
     let want = [line(76, en, 38), line(76, ko, 37), line(100, en, 38), line(100, ko, 37)];
     assert_eq!(got, want, "at 80 and 120 columns, in English and Korean");
 }
+
+#[test]
+fn the_help_line_of_login_is_whole_at_80_and_120_columns() {
+    let mut got = Vec::new();
+    for w in [80, 120] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, 24, lang, shown_config(), true);
+            d.keys("?");
+            d.keys("/");
+            d.type_text("login");
+            let screen = d.snap();
+            let line = screen.lines().find(|l| l.contains(":login")).unwrap_or_default();
+            got.push(line.split('│').filter(|c| c.contains(":login")).collect::<String>().trim().to_string());
+        }
+    }
+    let (en, ko) =
+        ("Sign in again: a workspace Slack signed out, or another", "＊＊ ＊＊＊: ＊＊＊＊＊ ＊＊＊＊＊＊＊ ＊＊ ＊");
+    let line = |text: &str, gap: usize| format!("{text}{}:login", " ".repeat(gap));
+    let want = [line(en, 9), line(ko, 18), line(en, 33), line(ko, 42)];
+    assert_eq!(got, want, "whole at 80 and 120 columns, in English and Korean");
+}

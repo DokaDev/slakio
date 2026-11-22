@@ -266,7 +266,7 @@
 "action.links.open" = "목록 커서의 링크 열기"
 "action.links.back" = "마지막에 누른 글자 되돌리기"
 "action.links.cancel" = "고르기 그만, 아무것도 안 열기"
-"action.signin.again" = "다시 로그인: Slack이 로그아웃시킨 워크스페이스, 또는 다른 워크스페이스"
+"action.signin.again" = "다시 로그인: 로그아웃된 워크스페이스나 다른 곳"
 
 "ctx.root" = "어디서나"
 "ctx.shell" = "메인 화면"
