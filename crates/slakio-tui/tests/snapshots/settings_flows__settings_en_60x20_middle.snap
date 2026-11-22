@@ -5,18 +5,18 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────╮ │
 │ │ Display                                              │ │
-│ │   theme            ‹ auto              ›  Tokyo Nig… │ │
-│ │   density          ‹ comfortable       ›  As in GUI… │ │
-│ │   nav_rows         ‹ expanded          ›  A row per… │ │
-├─│   icons            ‹ off               ›  Text and…  │ │
+│ │   Theme            ‹ auto              ›  Tokyo Nig… │ │
+│ │   Density          ‹ comfortable       ›  As in GUI… │ │
+│ │   View rows        ‹ expanded          ›  A row per… │ │
+├─│   Nerd Font icons  ‹ off               ›  Text and…  │ │
 │ │ Pictures                                             │ │
-│ │   avatars          ‹ initials          ›  Initials…  │ │
-│ │   images           ‹ auto              ›  Where pic… │ │
-│ │ Language                                             │ │
-│ │                                        9 more below  │ │
+│ │   Avatars          ‹ initials          ›  Initials…  │ │
+│ │   Images           ‹ auto              ›  Where pic… │ │
+│ │                                       10 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ Previews of shared pictures and profile photos,      │ │
 │ │ where the terminal draws them (also :images).        │ │
+│ │ Set with :set images=…                               │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │

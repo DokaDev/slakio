@@ -7,10 +7,11 @@
 //! ```text
 //! ╭ Settings ─────────────────────────────────────────────────────────────╮
 //! │ Display                                                               │
-//! │   theme            ‹ auto        ›  Tokyo Night with 24-bit color, …  │
-//! │   density          ‹ comfortable ›  As in GUI Slack: an avatar block… │
+//! │   Theme            ‹ auto        ›  Tokyo Night with 24-bit colour, … │
+//! │   Density          ‹ comfortable ›  As in GUI Slack: an avatar block… │
 //! │───────────────────────────────────────────────────────────────────────│
-//! │ The colors. h/l show each theme at once; Enter keeps the one shown. … │
+//! │ The colours. h/l show each theme at once; Enter keeps the one shown. │
+//! │ Set with :set theme=…                                                 │
 //! │ Saved to ~/.config/slakio/config.toml                                 │
 //! ╰──────────────────────── j/k move · h/l change · Enter keep · Esc close ╯
 //! ```
@@ -114,6 +115,9 @@ fn foot(app: &App, s: &Screen, tw: usize) -> Vec<(String, Style)> {
         foot.extend(wrap(&i18n.msg(&msg), tw).into_iter().map(|l| (l, t.warning())));
     }
     foot.extend(wrap(&i18n.label(spec.about), tw).into_iter().map(|l| (l, t.text())));
+    // The row's name is a label: its key is said here, as `:set` takes it.
+    let set_with = i18n.msg(&Msg::SettingsSetWith { key: spec.key.to_string() });
+    foot.extend(wrap(&set_with, tw).into_iter().map(|l| (l, t.muted())));
     match app.config_file() {
         Some(path) if app.prefs.writable => {
             let path = path.display().to_string();
@@ -166,7 +170,7 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
         skip = (selected_line + 1).saturating_sub(rows_room);
     }
     let (above, below) = (skip, lines.len().saturating_sub(skip + rows_room));
-    let key_w = SETTINGS.iter().map(|s| s.key.len()).max().unwrap_or(0);
+    let key_w = SETTINGS.iter().map(|s| width(&i18n.label(s.label))).max().unwrap_or(0);
     let shown: Vec<(String, String)> = (0..SETTINGS.len()).map(|k| app.setting_shown(k)).collect();
     // A long folder is cut by its middle rather than widening the column (the default's width).
     let folder_w = width("~/Downloads/slakio");
@@ -222,7 +226,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, Stri
     let read_only = SETTINGS[k].values == Values::Folder && app.prefs.download_env.is_some();
     let value = if SETTINGS[k].values == Values::Folder { clip_middle(value, widths.1) } else { clip(value, widths.1) };
     let value = format!("‹ {} ›", pad(&value, widths.1));
-    let text = format!("  {}  ", pad(SETTINGS[k].key, widths.0));
+    let text = format!("  {}  ", pad(&app.i18n.label(SETTINGS[k].label), widths.0));
     f.buffer_mut().set_stringn(x, y, clip(&text, tw), tw, t.text());
     let vx = x + width(&text) as u16;
     let left = tw.saturating_sub(width(&text));

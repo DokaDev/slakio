@@ -35,7 +35,7 @@ fn the_language_set_on_the_settings_screen_is_used_at_the_next_start() {
     let Some(mut run) = Run::spawn_with(&scratch.0, &file, &out, &env, (120, 40), "--demo") else { return };
     run.wait_for("the demo", |s| s.contains("backend"));
     run.type_bytes(b" ,");
-    run.wait_for("the settings screen", |s| s.contains("Settings") && s.contains("language"));
+    run.wait_for("the settings screen", |s| s.contains("Settings") && s.contains("Language"));
     // The language row is the seventh: down six, then the value after `auto` twice.
     run.type_bytes(b"jjjjjj");
     run.type_bytes(b"ll");

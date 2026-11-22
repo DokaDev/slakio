@@ -5,29 +5,29 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
 │▎＊      ╭ ＊＊ ────────────────────────────────────────────────────────────────────────────────────────────╮         │
 │ DM      │ ＊＊                                                                                             │         │
-│ ＊＊    │   theme            ‹ auto               ›  24＊＊ ＊＊＊ Tokyo Night, ＊＊＊ ＊＊＊ ＊ (＊＊＊)  │         │
-│ ＊＊    │   density          ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)      │         │
-│ ＊ ＊   │   nav_rows         ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                               │         │
-├─▾───────│   icons            ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                    │         │
+│ ＊＊    │   ＊＊              ‹ auto               ›  24＊＊ ＊＊＊ Tokyo Night, ＊＊＊ ＊＊＊ ＊ (＊＊＊) │         │
+│ ＊＊    │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)     │         │
+│ ＊ ＊   │   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                              │         │
+├─▾───────│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │ ▾ Favori│ ＊＊                                                                                             │         │
-│   # back│   avatars          ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                 │         │
-│   # inci│   images           ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                 │         │
+│   # back│   ＊＊＊            ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                │         │
+│   # inci│   ＊＊              ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                │         │
 │         │ ＊＊                                                                                             │         │
-│ ▾ Ops   │   language         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│ ▾ Ops   │   ＊＊              ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # depl│ ＊＊                                                                                             │         │
-│   # aler│   downloads        ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                      │         │
-│   # part│   download_max_mb  ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                         │         │
+│   # aler│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
+│   # part│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                        │         │
 │   # host│ ＊＊＊＊                                                                                         │         │
-│   # big-│   network          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│   # long│   live             ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│         │   restore          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│ ▾ Channe│   cache            ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│   # big-│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│   # long│   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│         │   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│ ▾ Channe│   ＊＊＊ ＊＊       ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # desi│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊ ＊＊ ＊＊＊ ＊＊＊＊＊.   │         │
 │   # feed│ ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.                                                       │         │
+│   # feed│ ＊＊＊＊ ＊＊＊: :set theme=…                                                                    │         │
 │   # feed│ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                                                 │         │
 │   # feed│ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                                                │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

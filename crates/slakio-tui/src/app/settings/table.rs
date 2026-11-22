@@ -46,6 +46,8 @@ pub enum Values {
 pub struct Spec {
     /// Its key in the config file and after `:set`.
     pub key: &'static str,
+    /// Its name on the settings screen.
+    pub label: Label,
     pub group: Group,
     pub values: Values,
     /// What it is for, under the list when it is selected.
@@ -56,25 +58,27 @@ pub struct Spec {
 
 const ON_OFF: &[(&str, Option<Label>)] = &[("on", None), ("off", None)];
 
-const fn row(key: &'static str, group: Group, values: Values, about: Label) -> Spec {
-    Spec { key, group, values, about, restart: false }
+const fn row(key: &'static str, label: Label, group: Group, values: Values, about: Label) -> Spec {
+    Spec { key, label, group, values, about, restart: false }
 }
 
-const fn on_restart(key: &'static str, group: Group, values: Values, about: Label) -> Spec {
-    Spec { key, group, values, about, restart: true }
+const fn on_restart(key: &'static str, label: Label, group: Group, values: Values, about: Label) -> Spec {
+    Spec { key, label, group, values, about, restart: true }
 }
 
 /// Every setting, in the screen's order.
 pub const SETTINGS: &[Spec] = &[
-    row("theme", Group::Display, Values::Themes, Label::SettingsAboutTheme),
+    row("theme", Label::SettingsLabelTheme, Group::Display, Values::Themes, Label::SettingsAboutTheme),
     row(
         "density",
+        Label::SettingsLabelDensity,
         Group::Display,
         Values::Fixed(&[("comfortable", Some(Label::DensityComfortable)), ("compact", Some(Label::DensityCompact))]),
         Label::SettingsAboutDensity,
     ),
     row(
         "nav_rows",
+        Label::SettingsLabelNavRows,
         Group::Display,
         Values::Fixed(&[
             ("expanded", Some(Label::SettingsNavRowsExpanded)),
@@ -84,12 +88,14 @@ pub const SETTINGS: &[Spec] = &[
     ),
     row(
         "icons",
+        Label::SettingsLabelIcons,
         Group::Display,
         Values::Fixed(&[("on", Some(Label::IconsOn)), ("off", Some(Label::IconsOff))]),
         Label::SettingsAboutIcons,
     ),
     row(
         "avatars",
+        Label::SettingsLabelAvatars,
         Group::Pictures,
         Values::Fixed(&[
             ("initials", Some(Label::AvatarsInitials)),
@@ -100,6 +106,7 @@ pub const SETTINGS: &[Spec] = &[
     ),
     row(
         "images",
+        Label::SettingsLabelImages,
         Group::Pictures,
         Values::Fixed(&[
             ("auto", Some(Label::ImagesAuto)),
@@ -110,16 +117,35 @@ pub const SETTINGS: &[Spec] = &[
     ),
     on_restart(
         "language",
+        Label::SettingsLabelLanguage,
         Group::Language,
         Values::Fixed(&[("auto", None), ("en", None), ("ko", None)]),
         Label::SettingsAboutLanguage,
     ),
-    row("downloads", Group::Files, Values::Folder, Label::SettingsAboutDownloads),
-    row("download_max_mb", Group::Files, Values::Megabytes(&[64, 256, 1024, 4096]), Label::SettingsAboutDownloadMaxMb),
-    on_restart("network", Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutNetwork),
-    on_restart("live", Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutLive),
-    on_restart("restore", Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutRestore),
-    on_restart("cache", Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutCache),
+    row("downloads", Label::SettingsLabelDownloads, Group::Files, Values::Folder, Label::SettingsAboutDownloads),
+    row(
+        "download_max_mb",
+        Label::SettingsLabelDownloadMaxMb,
+        Group::Files,
+        Values::Megabytes(&[64, 256, 1024, 4096]),
+        Label::SettingsAboutDownloadMaxMb,
+    ),
+    on_restart(
+        "network",
+        Label::SettingsLabelNetwork,
+        Group::Network,
+        Values::Fixed(ON_OFF),
+        Label::SettingsAboutNetwork,
+    ),
+    on_restart("live", Label::SettingsLabelLive, Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutLive),
+    on_restart(
+        "restore",
+        Label::SettingsLabelRestore,
+        Group::Network,
+        Values::Fixed(ON_OFF),
+        Label::SettingsAboutRestore,
+    ),
+    on_restart("cache", Label::SettingsLabelCache, Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutCache),
 ];
 
 /// The row of setting `key`.

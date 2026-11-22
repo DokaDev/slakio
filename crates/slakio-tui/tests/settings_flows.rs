@@ -296,7 +296,8 @@ fn the_out_of_view_counts_never_cover_a_row() {
         let mut d = booted(w, h, Lang::En, shown_config(), true);
         d.keys("space ,");
         for _ in 0..=SETTINGS.len() {
-            let key = SETTINGS[d.app.prefs.screen.as_ref().unwrap().selected].key;
+            // A row is named by its label.
+            let key = d.app.i18n.label(SETTINGS[d.app.prefs.screen.as_ref().unwrap().selected].label).to_string();
             let screen = d.screen();
             let row = screen.lines().find(|l| l.contains(&format!(" {key} ")) && l.contains('\u{2039}'));
             let row = row.unwrap_or_else(|| panic!("{w}x{h} {key}: no row\n{screen}"));
@@ -382,9 +383,16 @@ fn the_help_line_of_login_is_whole_at_80_and_120_columns() {
     assert_eq!(got, want, "whole at 80 and 120 columns, in English and Korean");
 }
 
-/// The value on setting `key`'s row, between its marks.
+/// The downloads row's label as the screen shows it (Hangul masked).
+fn folder_label(d: &Demo) -> String {
+    use slakio_tui::app::settings::table::{SETTINGS, find};
+    demo::mask_hangul(&d.app.i18n.label(SETTINGS[find("downloads").unwrap()].label))
+}
+
+/// The value on the row labelled `key`, between its marks.
 fn value_of(screen: &str, key: &str) -> String {
-    let row = screen.lines().find(|l| l.contains(&format!(" {key} ")) && l.contains('‹')).unwrap_or_default();
+    let row = screen.lines().find(|l| l.split_once('‹').is_some_and(|(name, _)| name.trim_end().ends_with(key)));
+    let row = row.unwrap_or_default();
     let from = row.find('‹').map_or(0, |i| i + '‹'.len_utf8());
     let to = row.find('›').unwrap_or(from);
     row[from..to].to_string()
@@ -397,13 +405,16 @@ fn a_long_folder_is_cut_by_its_middle_never_widening_the_column() {
     for (w, h) in [(80, 24), (120, 40)] {
         for lang in [Lang::En, Lang::Ko] {
             let mut d = booted(w, h, lang, shown_config(), true);
-            d.keys("space ,");
+            // The downloads row selected, so it is in view.
+            d.keys("space , j j j j j j j");
             let before = d.snap();
             d.app.prefs.config.downloads = long.to_string();
             let screen = d.snap();
-            got.push(value_of(&screen, "downloads"));
+            got.push(value_of(&screen, &folder_label(&d)));
             // Every other row is as with the default folder.
-            let others = |s: &str| s.lines().filter(|l| !l.contains(" downloads ")).collect::<Vec<_>>().join("\n");
+            let label = folder_label(&d);
+            let named = |l: &str| l.split_once('‹').is_some_and(|(name, _)| name.trim_end().ends_with(&label));
+            let others = |s: &str| s.lines().filter(|l| !named(l)).collect::<Vec<_>>().join("\n");
             assert_eq!(others(&screen), others(&before), "{w} {lang:?}");
         }
     }
@@ -419,15 +430,20 @@ fn the_read_only_folder_reads_in_the_muted_colour() {
             let mut d = booted(w, h, lang, shown_config(), true);
             d.app.prefs.download_env = Some("/srv/files".to_string());
             d.command("theme nord");
-            d.keys("space ,");
-            let screen = d.screen();
-            let y = screen.lines().position(|l| l.contains(" downloads ") && l.contains('‹')).unwrap();
+            // The row under it selected: the folder's row in view, not under the selection bar.
+            d.keys("space , j j j j j j j j");
+            let screen = d.snap();
+            let label = folder_label(&d);
+            let y = screen
+                .lines()
+                .position(|l| l.split_once('‹').is_some_and(|(name, _)| name.trim_end().ends_with(&label)))
+                .unwrap();
             let buf = d.buffer();
             let x = (0..w).find(|&x| buf[(x, y as u16)].symbol() == "‹").unwrap();
             for dx in 0..14 {
                 assert_eq!(buf[(x + dx, y as u16)].fg, d.app.theme.fg_muted, "{w} {lang:?} at {dx}");
             }
-            got.push(value_of(&d.snap(), "downloads"));
+            got.push(value_of(&d.snap(), &folder_label(&d)));
         }
     }
     let shown = " /srv/files         ";
@@ -502,4 +518,50 @@ fn the_korean_size_text_needs_no_particle_after_a_number() {
     let en = |size: &str| format!("The terminal is {size}; slakio needs at least 50×10.");
     let ko = |size: &str| format!("＊＊＊＊ {size}＊＊＊. slakio＊ ＊＊ 50×10 ＊＊＊ ＊＊＊＊＊.");
     assert_eq!(got, [en("40×8"), ko("40×8"), en("45×9"), ko("45×9")]);
+}
+
+#[test]
+fn rows_are_named_by_label_and_the_selected_one_says_its_set_key() {
+    use slakio_tui::app::settings::table::SETTINGS;
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, h, lang, shown_config(), true);
+            d.keys("space ,");
+            let mut names = Vec::new();
+            for spec in SETTINGS {
+                let screen = d.snap();
+                // The selected row's name, whole, before its value.
+                let label = demo::mask_hangul(&d.app.i18n.label(spec.label));
+                let row =
+                    screen.lines().find(|l| l.split_once('‹').is_some_and(|(n, _)| n.trim_end().ends_with(&label)));
+                assert!(row.is_some(), "{w} {lang:?} {}: no row named {label}\n{screen}", spec.key);
+                names.push(label);
+                // Under the list, the key `:set` takes, whole.
+                let typed = format!(":set {}=…", spec.key);
+                let set = screen.lines().find(|l| l.contains(&typed)).unwrap_or_default();
+                let set = set.split('│').find(|c| c.contains(&typed)).unwrap_or_default().trim().to_string();
+                let want = match lang {
+                    Lang::Ko => format!("＊＊＊＊ ＊＊＊: :set {}=…", spec.key),
+                    _ => format!("Set with :set {}=…", spec.key),
+                };
+                assert_eq!(set, want, "{w} {lang:?}");
+                d.keys("j");
+            }
+            got.push(names.join(" | "));
+        }
+    }
+    let en = "Theme | Density | View rows | Nerd Font icons | Avatars | Images | Language | Download folder | \
+              Download limit | Network | Live updates | Restore tabs | Message cache";
+    let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊ | ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
+              ＊＊＊ ＊＊＊＊ | ＊ ＊＊ | ＊＊＊ ＊＊";
+    assert_eq!(got, [en, ko, en, ko], "at 80 and 120 columns, in English and Korean");
+    // The keys stay findable: `:images` and `:avatars` in the help.
+    for word in [":images", ":avatars"] {
+        let mut d = booted(80, 24, Lang::Ko, shown_config(), true);
+        d.keys("?");
+        d.keys("/");
+        d.type_text(&word[1..]);
+        assert!(d.snap().contains(word), "{word}:\n{}", d.snap());
+    }
 }

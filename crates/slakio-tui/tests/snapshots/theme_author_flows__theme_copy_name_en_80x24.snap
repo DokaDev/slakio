@@ -5,22 +5,22 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────────────────────────╮ │
 │ │ Display                                                                  │ │
-│ │   theme            ‹ terminal           ›  Your terminal's own colours   │ │
-│ │   density          ‹ comfortable        ›  As in GUI Slack: an avatar b… │ │
-│ │   nav_rows         ‹ expanded           ›  A row per view (default)      │ │
-├─│   icons            ‹ off                ›  Text and plain symbols only   │ │
+│ │   Theme            ‹ terminal           ›  Your terminal's own colours   │ │
+│ │   Density          ‹ comfortable        ›  As in GUI Slack: an avatar b… │ │
+│ │   View rows        ‹ expanded           ›  A row per view (default)      │ │
+├─│   Nerd Font icons  ‹ off                ›  Text and plain symbols only   │ │
 │ │ Pictures                                                                 │ │
-│ │   avatars          ‹ initials           ›  Initials on a colour of thei… │ │
-│ │   images           ‹ auto               ›  Where pictures surely show (… │ │
+│ │   Avatars          ‹ initials           ›  Initials on a colour of thei… │ │
+│ │   Images           ‹ auto               ›  Where pictures surely show (… │ │
 │ │ Language                                                                 │ │
-│ │   language         ‹ auto               ›  applies on next launch        │ │
-│ │                                                            8 more below  │ │
+│ │                                                            9 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: terminal-copy                                                   │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │
 │ │ The colours. h/l show each theme at once; Enter keeps the one shown; c   │ │
 │ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │
 │ │ config file.                                                             │ │
+│ │ Set with :set theme=…                                                    │ │
 │ │ Saved to /home/me/.config/slakio/config.toml                             │ │
 │ │ More settings in /home/me/.config/slakio/config.toml                     │ │
 │ ╰────────────────────────────────── Enter save · Esc cancel · Ctrl+U clear ╯ │

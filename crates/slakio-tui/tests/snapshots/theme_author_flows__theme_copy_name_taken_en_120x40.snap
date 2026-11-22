@@ -6,31 +6,31 @@ expression: d.snap()
 │▎Home    ╭ Settings ────────────────────────────────────────────────────────────────────────────────────────╮         │
 │ DMs     │ Nord is the name of a built-in theme                                                             │         │
 │ Activity│ Display                                                                                          │         │
-│ Files   │   theme            ‹ terminal           ›  Your terminal's own colours                           │         │
-│ To-dos  │   density          ‹ comfortable        ›  As in GUI Slack: an avatar block, the name over the…  │         │
-├─▾───────│   nav_rows         ‹ expanded           ›  A row per view (default)                              │         │
-│ ▾ Favori│   icons            ‹ off                ›  Text and plain symbols only                           │         │
+│ Files   │   Theme            ‹ terminal           ›  Your terminal's own colours                           │         │
+│ To-dos  │   Density          ‹ comfortable        ›  As in GUI Slack: an avatar block, the name over the…  │         │
+├─▾───────│   View rows        ‹ expanded           ›  A row per view (default)                              │         │
+│ ▾ Favori│   Nerd Font icons  ‹ off                ›  Text and plain symbols only                           │         │
 │   # back│ Pictures                                                                                         │         │
-│   # inci│   avatars          ‹ initials           ›  Initials on a colour of their own (default)           │         │
-│         │   images           ‹ auto               ›  Where pictures surely show (default)                  │         │
+│   # inci│   Avatars          ‹ initials           ›  Initials on a colour of their own (default)           │         │
+│         │   Images           ‹ auto               ›  Where pictures surely show (default)                  │         │
 │ ▾ Ops   │ Language                                                                                         │         │
-│   # depl│   language         ‹ auto               ›  applies on next launch                                │         │
+│   # depl│   Language         ‹ auto               ›  applies on next launch                                │         │
 │   # aler│ Files                                                                                            │         │
-│   # part│   downloads        ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
-│   # host│   download_max_mb  ‹ 1024               ›  MB: the largest file downloaded                       │         │
+│   # part│   Download folder  ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
+│   # host│   Download limit   ‹ 1024               ›  MB: the largest file downloaded                       │         │
 │   # big-│ Network                                                                                          │         │
-│   # long│   network          ‹ on                 ›  applies on next launch                                │         │
-│         │   live             ‹ on                 ›  applies on next launch                                │         │
-│ ▾ Channe│   restore          ‹ on                 ›  applies on next launch                                │         │
-│   # anno│   cache            ‹ on                 ›  applies on next launch                                │         │
+│   # long│   Network          ‹ on                 ›  applies on next launch                                │         │
+│         │   Live updates     ‹ on                 ›  applies on next launch                                │         │
+│ ▾ Channe│   Restore tabs     ‹ on                 ›  applies on next launch                                │         │
+│   # anno│   Message cache    ‹ on                 ›  applies on next launch                                │         │
 │   # desi│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # feed│ Copy to: Nord                                                                                    │         │
 │   # feed│ A copy of terminal: Enter writes it and uses it, Esc cancels                                     │         │
 │   # feed│ The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme  │         │
 │   # feed│ file. Theme files go in themes/ next to the config file.                                         │         │
+│   # feed│ Set with :set theme=…                                                                            │         │
 │   # feed│ Saved to /home/me/.config/slakio/config.toml                                                     │         │
 │   # feed│ More settings in /home/me/.config/slakio/config.toml                                             │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

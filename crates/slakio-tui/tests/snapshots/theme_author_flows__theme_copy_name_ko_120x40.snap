@@ -5,31 +5,31 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
 │▎＊      ╭ ＊＊ ────────────────────────────────────────────────────────────────────────────────────────────╮         │
 │ DM      │ ＊＊                                                                                             │         │
-│ ＊＊    │   theme            ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                        │         │
-│ ＊＊    │   density          ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)      │         │
-│ ＊ ＊   │   nav_rows         ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                               │         │
-├─▾───────│   icons            ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                    │         │
+│ ＊＊    │   ＊＊              ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                       │         │
+│ ＊＊    │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)     │         │
+│ ＊ ＊   │   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                              │         │
+├─▾───────│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │ ▾ Favori│ ＊＊                                                                                             │         │
-│   # back│   avatars          ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                 │         │
-│   # inci│   images           ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                 │         │
+│   # back│   ＊＊＊            ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                │         │
+│   # inci│   ＊＊              ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                │         │
 │         │ ＊＊                                                                                             │         │
-│ ▾ Ops   │   language         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│ ▾ Ops   │   ＊＊              ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # depl│ ＊＊                                                                                             │         │
-│   # aler│   downloads        ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                      │         │
-│   # part│   download_max_mb  ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                         │         │
+│   # aler│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
+│   # part│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                        │         │
 │   # host│ ＊＊＊＊                                                                                         │         │
-│   # big-│   network          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│   # long│   live             ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│         │   restore          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
-│ ▾ Channe│   cache            ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                    │         │
+│   # big-│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│   # long│   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│         │   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│ ▾ Channe│   ＊＊＊ ＊＊       ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # desi│ ＊＊＊ ＊＊: terminal-copy                                                                       │         │
 │   # feed│ terminal＊ ＊＊＊: Enter＊ ＊＊ ＊＊, Esc＊ ＊＊                                                 │         │
 │   # feed│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊ ＊＊ ＊＊＊ ＊＊＊＊＊.   │         │
 │   # feed│ ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.                                                       │         │
+│   # feed│ ＊＊＊＊ ＊＊＊: :set theme=…                                                                    │         │
 │   # feed│ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                                                 │         │
 │   # feed│ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                                                │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

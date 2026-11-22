@@ -5,18 +5,18 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────╮ │
 │ │ Display                                              │ │
-│ │   theme            ‹ auto              ›  Tokyo Nig… │ │
-│ │   density          ‹ comfortable       ›  As in GUI… │ │
-│ │   nav_rows         ‹ expanded          ›  A row per… │ │
-├─│   icons            ‹ off               ›  Text and…  │ │
+│ │   Theme            ‹ auto              ›  Tokyo Nig… │ │
+│ │   Density          ‹ comfortable       ›  As in GUI… │ │
+│ │   View rows        ‹ expanded          ›  A row per… │ │
+├─│   Nerd Font icons  ‹ off               ›  Text and…  │ │
 │ │ Pictures                                             │ │
-│ │   avatars          ‹ initials          ›  Initials…  │ │
-│ │                                       11 more below  │ │
+│ │                                       12 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter      │ │
 │ │ keeps the one shown; c copies it to a new theme      │ │
 │ │ file. Theme files go in themes/ next to the config   │ │
 │ │ file.                                                │ │
+│ │ Set with :set theme=…                                │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │

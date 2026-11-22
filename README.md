@@ -192,7 +192,8 @@ images, and settings. This README only lists what works; it will grow with each 
   on the theme row `h`/`l` show each theme and `Enter` keeps it (`Esc` goes back), `c` copies
   it to a new theme file; on the downloads row `Enter` types a folder. `language`, `network`, `live`, `restore` and `cache`
   apply on the next launch, and the screen says so. `:set <key>=<value>` changes the same
-  settings from the command palette.
+  settings from the command palette; each row has a name of its own, and the selected one says its
+  `:set` key.
 - `:icons on|off` (or `:icons` to switch) draws Nerd Font icons or text instead, while running,
   and saves it; the first run asks once, showing the icons.
 - People are pictured by their initials on a colour of their own: before a sender's name, before

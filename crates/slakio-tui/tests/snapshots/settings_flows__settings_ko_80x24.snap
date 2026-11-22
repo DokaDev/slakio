@@ -5,22 +5,22 @@ expression: d.snap()
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
 │▎╭ ＊＊ ────────────────────────────────────────────────────────────────────╮ │
 │ │ ＊＊                                                                     │ │
-│ │   theme            ‹ auto               ›  24＊＊ ＊＊＊ Tokyo Night,…   │ │
-│ │   density          ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊,…   │ │
-│ │   nav_rows         ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)       │ │
-├─│   icons            ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊            │ │
+│ │   ＊＊              ‹ auto               ›  24＊＊ ＊＊＊ Tokyo Night,…  │ │
+│ │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊,…  │ │
+│ │   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)      │ │
+├─│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊           │ │
 │ │ ＊＊                                                                     │ │
-│ │   avatars          ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊… │ │
-│ │   images           ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊… │ │
+│ │   ＊＊＊            ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊…  │ │
+│ │   ＊＊              ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊…  │ │
 │ │ ＊＊                                                                     │ │
-│ │   language         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊            │ │
+│ │   ＊＊              ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊           │ │
 │ │ ＊＊                                                                     │ │
-│ │   downloads        ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊              │ │
-│ │   download_max_mb  ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊ │ │
-│ │                                                           ＊＊＊ 5＊ ＊  │ │
+│ │   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊             │ │
+│ │                                                           ＊＊＊ 6＊ ＊  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊   │ │
 │ │ ＊＊ ＊＊＊ ＊＊＊＊＊. ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.       │ │
+│ │ ＊＊＊＊ ＊＊＊: :set theme=…                                            │ │
 │ │ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                         │ │
 │ │ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                        │ │
 │ ╰─────────────────────────── j/k ＊＊ · h/l ＊＊＊ · Enter ＊＊ · Esc ＊＊ ╯ │

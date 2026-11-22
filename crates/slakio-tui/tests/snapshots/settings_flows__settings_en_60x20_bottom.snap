@@ -4,19 +4,19 @@ expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────╮ │
-│ │                                       10 more above  │ │
-│ │ Files                                                │ │
-│ │   downloads        ‹ ~/Downlo…s/slakio ›  Enter: ty… │ │
-│ │   download_max_mb  ‹ 1024              ›  MB: the l… │ │
-├─│ Network                                              │ │
-│ │   network          ‹ on                ›  applies o… │ │
-│ │   live             ‹ on                ›  applies o… │ │
-│ │   restore          ‹ on                ›  applies o… │ │
-│ │   cache            ‹ on                ›  applies o… │ │
+│ │                                       11 more above  │ │
+│ │   Download folder  ‹ ~/Downlo…s/slakio ›  Enter: ty… │ │
+│ │   Download limit   ‹ 1024              ›  MB: the l… │ │
+│ │ Network                                              │ │
+├─│   Network          ‹ on                ›  applies o… │ │
+│ │   Live updates     ‹ on                ›  applies o… │ │
+│ │   Restore tabs     ‹ on                ›  applies o… │ │
+│ │   Message cache    ‹ on                ›  applies o… │ │
 │ │                                                      │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ off: nothing is kept on disk between runs (every     │ │
 │ │ start fetches).                                      │ │
+│ │ Set with :set cache=…                                │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │
