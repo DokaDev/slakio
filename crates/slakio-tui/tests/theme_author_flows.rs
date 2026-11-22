@@ -233,3 +233,22 @@ fn typed_names_are_said_safe_to_print() {
     let said = d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string()).unwrap_or_default();
     assert!(said.starts_with("live cannot be maybe (one of"), "{said}");
 }
+
+#[test]
+fn theme_new_extends_what_auto_picks_never_no_color_nor_a_theme_only_shown() {
+    let dir = Scratch::new("new-auto");
+    let no_color = Look { no_color: true, ..TRUECOLOR };
+    let mut d = Demo::with(120, 40, Lang::En, Settings::default());
+    d.app.load_at_start(no_color, &dir.config(), true, d.now);
+    assert_eq!(d.app.theme_setting, "auto");
+    d.command("theme new plain");
+    assert_eq!(d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string()), None);
+    let picked = slakio_tui::theme::resolve("auto", true, Background::Dark).name.to_string();
+    let want = format!("extends = \"{picked}\"\n");
+    assert!(std::fs::read_to_string(dir.theme("plain")).unwrap().contains(&want), "{want}");
+    // A theme drawn that is not the one set (as one only shown is): the setting decides.
+    let mut d = booted(120, 40, Lang::En, dir.config());
+    d.app.theme = TRUECOLOR.theme("dracula");
+    d.command("theme new other");
+    assert!(std::fs::read_to_string(dir.theme("other")).unwrap().contains(&want), "{want}");
+}

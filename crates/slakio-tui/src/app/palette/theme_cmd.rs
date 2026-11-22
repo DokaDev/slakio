@@ -42,12 +42,12 @@ pub(super) fn of_line(line: &str) -> Option<Result<ThemeCommand<'_>, ()>> {
 }
 
 impl App {
-    /// The built-in theme `:theme new` extends: the one drawn now when it is built in (`auto` as
-    /// what it picks), else `terminal`.
+    /// The built-in theme `:theme new` extends: the one set when it is built in (`auto` as what
+    /// it picks on this terminal, never `no-color` nor a theme only shown), else `terminal`.
     fn new_base(&self) -> String {
         let lower = self.theme_setting.to_ascii_lowercase();
         if lower == "auto" {
-            return self.theme.name.to_string();
+            return crate::theme::resolve("auto", self.look.truecolor, self.look.background).name.to_string();
         }
         if NAMES.contains(&lower.as_str()) { lower } else { "terminal".to_string() }
     }
