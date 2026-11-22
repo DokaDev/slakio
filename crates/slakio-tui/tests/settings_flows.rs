@@ -93,6 +93,18 @@ fn a_short_screen_scrolls_the_list_and_says_how_much_is_out_of_view() {
 }
 
 #[test]
+fn a_screen_too_small_to_draw_it_changes_nothing() {
+    let mut d = booted(120, 40, Lang::En, shown_config(), true);
+    d.keys("space ,");
+    d.app.resize(40, 8);
+    d.keys("j l enter");
+    assert!(!d.app.settings.compact, "nothing changes unseen");
+    assert_eq!(save(&mut d, None), 0);
+    d.keys("esc");
+    assert!(d.app.prefs.screen.is_none(), "Esc still closes it");
+}
+
+#[test]
 fn which_key_lists_the_settings_and_no_key_clashes() {
     for (lang, want) in [(Lang::En, ",    Settings"), (Lang::Ko, ",    ＊＊")] {
         let mut d = booted(120, 40, lang, shown_config(), true);

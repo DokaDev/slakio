@@ -182,6 +182,14 @@ impl App {
 
     /// A key on the settings screen (see the module's text).
     pub(super) fn settings_key(&mut self, key: KeyChord, now: Instant) {
+        // Too small to be drawn (as the screen under it): no change unseen, it only closes.
+        if self.sign_in().is_none() && self.backend.is_some() && crate::screen::too_small(self.size) {
+            let close = key.mods.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c');
+            if close || matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
+                self.close_settings();
+            }
+            return;
+        }
         let Some(s) = self.prefs.screen.as_mut() else { return };
         if s.folder.is_some() {
             return self.folder_key(key, now);
