@@ -323,8 +323,15 @@ impl App {
                     .and_then(|s| s.preview.as_ref().and_then(|p| s.themes.get(p.index)))
                     .cloned()
                     .unwrap_or(value);
+                // A theme file that cannot be used says so, shown or set.
+                let broken = self.prefs.screen.as_ref().is_some_and(|s| match &s.preview {
+                    Some(p) => p.error.is_some(),
+                    None => s.problem.is_some(),
+                });
                 let what = if config::THEMES.contains(&name.as_str()) {
                     super::palette::theme_label(&name)
+                } else if broken {
+                    Label::SettingsThemeFileBroken
                 } else {
                     Label::SettingsThemeFile
                 };

@@ -680,6 +680,7 @@
 "settings.more_above" = "위에 {count}개 더"
 "settings.more_below" = "아래에 {count}개 더"
 "settings.theme_file" = "테마 파일"
+"settings.theme_file_broken" = "오류가 있는 테마 파일"
 "settings.theme_preview" = "{name} 표시 중: Enter로 유지, Esc로 {current}로 돌아감"
 "settings.nav_rows_expanded" = "보기마다 한 줄 (기본값)"
 "settings.nav_rows_collapsed" = "보이는 보기 한 줄로 접기"

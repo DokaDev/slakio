@@ -723,6 +723,7 @@
 "settings.more_above" = { one = "{count} more above", other = "{count} more above" }
 "settings.more_below" = { one = "{count} more below", other = "{count} more below" }
 "settings.theme_file" = "A theme file"
+"settings.theme_file_broken" = "A theme file with an error"
 "settings.theme_preview" = "Showing {name}: Enter keeps it, Esc goes back to {current}"
 "settings.nav_rows_expanded" = "A row per view (default)"
 "settings.nav_rows_collapsed" = "Folded to the view shown"

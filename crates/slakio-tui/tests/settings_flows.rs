@@ -433,3 +433,28 @@ fn the_read_only_folder_reads_in_the_muted_colour() {
     let shown = " /srv/files         ";
     assert_eq!(got, [shown, shown, shown, shown], "at 80 and 120 columns, in English and Korean");
 }
+
+#[test]
+fn a_theme_file_that_cannot_be_used_says_so_on_its_row() {
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let dir = Scratch::new(&format!("broken-row-{w}"));
+            std::fs::create_dir_all(dir.0.join("themes")).unwrap();
+            std::fs::write(dir.0.join("themes").join("zbad.toml"), "[colors]\naccent = \"#12345\"\n").unwrap();
+            // Set at launch, and shown on the theme row.
+            let cfg = Config { path: Some(dir.0.join("config.toml")), theme: "zbad".to_string(), ..Config::default() };
+            let mut d = booted(w, h, lang, cfg, true);
+            d.keys("space ,");
+            let screen = d.snap();
+            let set = screen.lines().find(|l| l.contains(" zbad ")).unwrap_or_default().to_string();
+            d.keys("l h");
+            assert_eq!(d.snap().lines().find(|l| l.contains(" zbad ")).unwrap_or_default(), set, "{w} {lang:?}");
+            got.push(
+                set.split('›').nth(1).unwrap_or_default().split('│').next().unwrap_or_default().trim().to_string(),
+            );
+        }
+    }
+    let (en, ko) = ("A theme file with an error", "＊＊＊ ＊＊ ＊＊ ＊＊");
+    assert_eq!(got, [en, ko, en, ko], "whole at 80 and 120 columns, in English and Korean");
+}
