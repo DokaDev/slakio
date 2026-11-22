@@ -281,7 +281,9 @@ images, and settings. This README only lists what works; it will grow with each 
 Where the terminal surely draws pictures, a picture a message shares (PNG, JPEG or GIF; a GIF
 shows its first frame) has a preview under its card, at most 36 × 10 cells, and with
 `avatars = "image"` (or `:avatars image`) the comfortable layout shows people's profile photos
-in place of their initials. Elsewhere, and until a picture has come, the text card and the
+in place of their initials, and each DM in the list shows its peer's photo, small, in the two
+cells of their initials (group DMs keep how many people are in them; only the rows on screen
+fetch their photos, and a photo shown in both places is fetched for each). Elsewhere, and until a picture has come, the text card and the
 initials show as before; a picture that cannot be shown says why on its card (too large, no
 preview, not loaded). Nothing of it ever blocks the screen: pictures are fetched in the
 background and decoded off the screen's thread.
