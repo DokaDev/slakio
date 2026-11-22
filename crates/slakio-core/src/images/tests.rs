@@ -66,3 +66,63 @@ fn only_png_jpeg_and_gif_are_previewed() {
         assert!(!previewed(t), "{t}");
     }
 }
+
+#[test]
+fn slack_s_default_avatars_come_from_its_static_host_exactly() {
+    let host = AVATAR_HOSTS[2];
+    let ok = format!("https://{host}/df10d/img/avatars/ava_0010-72.png");
+    assert_eq!(avatar_address(&ok).as_deref(), Some(ok.as_str()));
+    assert_eq!(host_of(&ok), Some(host));
+    for bad in [
+        format!("http://{host}/img/avatars/ava_0010-72.png"),
+        format!("https://{host}.evil.com/img/avatars/ava_0010-72.png"),
+        format!("https://evil@{host}/img/avatars/ava_0010-72.png"),
+        format!("https://{host}@evil.example/img/avatars/ava_0010-72.png"),
+        format!("https://{host}:443/img/avatars/ava_0010-72.png"),
+        format!("https://{host}:8443/img/avatars/ava_0010-72.png"),
+        format!("https://x{host}/img/avatars/ava_0010-72.png"),
+        format!("https://{host}"),
+        format!("https://{host}/a.png#frag"),
+    ] {
+        assert_eq!(avatar_address(&bad), None, "{bad}");
+    }
+    // Its own default avatar is no file host copy.
+    assert_eq!(thumb_address(&ok), None);
+}
+
+#[test]
+fn a_gravatar_address_is_kept_only_when_its_fallback_is_slack_s() {
+    let slack = AVATAR_HOSTS[2];
+    let hash = "https://secure.gravatar.com/avatar/04939292775a6f4a1817e5e846c11609.jpg";
+    let ok = [
+        format!("{hash}?s=72&d=https%3A%2F%2F{slack}%2Fdf10d%2Fimg%2Favatars%2Fava_0010-72.png"),
+        format!("{hash}?d=https%3A%2F%2F{}%2F2020-01-01%2F1_72.jpg&s=72", AVATAR_HOSTS[0]),
+        format!("{hash}?s=72&d=https://{slack}/img/avatars/ava_0010-72.png"),
+        format!("{hash}?s=72&d=mp"),
+        format!("{hash}?d=404"),
+        format!("{hash}?s=72"),
+        hash.to_string(),
+    ];
+    for url in &ok {
+        assert_eq!(avatar_address(url).as_deref(), Some(url.as_str()), "{url}");
+    }
+    for bad in [
+        format!("{hash}?s=72&d=https%3A%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?s=72&d=https://evil.example/a.png"),
+        format!("{hash}?s=72&default=https%3A%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?s=72&D=https%3A%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?s=72&%64=https%3A%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?d=mp&d=https%3A%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?d=http%3A%2F%2F{slack}%2Fimg%2Fa.png"),
+        format!("{hash}?d=https%3A%2F%2F{slack}.evil.com%2Fimg%2Fa.png"),
+        format!("{hash}?d=https%3A%2F%2Fevil%40{slack}%2Fimg%2Fa.png"),
+        format!("{hash}?d=https%3A%2F%2F{slack}%3A8443%2Fimg%2Fa.png"),
+        format!("{hash}?d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2Fx.png"),
+        format!("{hash}?d=%2F%2Fevil.example%2Fa.png"),
+        format!("{hash}?d=%2Fimg%2Fa.png"),
+        format!("{hash}?d=%zz"),
+        format!("{hash}?d=https%3A%2F%2F{slack}%2Fimg%2Fa.png%"),
+    ] {
+        assert_eq!(avatar_address(&bad), None, "{bad}");
+    }
+}

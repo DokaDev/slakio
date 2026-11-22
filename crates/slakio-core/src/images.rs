@@ -7,10 +7,12 @@
 
 use crate::model::FILE_HOST;
 
-/// The hosts profile photos are fetched from: Slack's avatar host and the Gravatar host Slack
-/// links to. Exact names, `https` only; spelled in two parts like [`FILE_HOST`] (the commit
-/// hook refuses Slack's CDN host written whole).
-pub const AVATAR_HOSTS: [&str; 2] = [concat!("avatars.slack", "-edge.com"), "secure.gravatar.com"];
+/// The hosts profile photos are fetched from: Slack's avatar host, the Gravatar host Slack
+/// links to, and Slack's static host, which serves its default avatars (a person without a
+/// photo of their own). Exact names, `https` only; spelled in two parts like [`FILE_HOST`] (the
+/// commit hook refuses Slack's CDN hosts written whole).
+pub const AVATAR_HOSTS: [&str; 3] =
+    [concat!("avatars.slack", "-edge.com"), "secure.gravatar.com", concat!("a.slack", "-edge.com")];
 
 /// The most bytes of one picture fetched.
 pub const BYTES_MAX: u64 = 2_000_000;
@@ -66,9 +68,11 @@ pub fn thumb_address(url: &str) -> Option<String> {
     on_host(url, FILE_HOST, true)
 }
 
-/// `url` when a profile photo may be fetched from it: an address on one of [`AVATAR_HOSTS`].
+/// `url` when a profile photo may be fetched from it: an address on one of [`AVATAR_HOSTS`];
+/// one on Gravatar only when each fallback it names is Slack's ([`gravatar::fallbacks_allowed`]).
 pub fn avatar_address(url: &str) -> Option<String> {
-    AVATAR_HOSTS.iter().find_map(|h| on_host(url, h, true))
+    let kept = AVATAR_HOSTS.iter().find_map(|h| on_host(url, h, true))?;
+    (host_of(&kept) != Some(AVATAR_HOSTS[1]) || gravatar::fallbacks_allowed(&kept)).then_some(kept)
 }
 
 /// The host of an address [`thumb_address`] or [`avatar_address`] kept.
@@ -81,6 +85,8 @@ pub fn host_of(url: &str) -> Option<&str> {
 pub fn previewed(filetype: &str) -> bool {
     matches!(filetype.to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif")
 }
+
+mod gravatar;
 
 #[cfg(test)]
 mod tests;
