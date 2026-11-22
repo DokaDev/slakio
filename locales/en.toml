@@ -93,6 +93,7 @@
 "theme_file.written" = "Theme {name}: written to {path}"
 "theme_file.exists" = "{path} is there already: it is left as it is"
 "theme_file.write_failed" = "{path} could not be written"
+"theme_file.shared" = "{path} is shared (not yours alone, or others may write in it): no theme file is written there"
 "theme_file.no_folder" = "No config folder: there is no themes folder to write to"
 "theme_file.not_a_file" = "{name} is a built-in theme: there is no file to update"
 "theme_file.changed" = "{path} changed since it was read, or would not read the same: it is left as it is"

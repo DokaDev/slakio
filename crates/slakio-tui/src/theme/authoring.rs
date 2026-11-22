@@ -32,6 +32,9 @@ pub enum AuthorError {
     Exists(PathBuf),
     /// The file (or the folder) could not be written.
     Write(PathBuf),
+    /// The themes folder is not the user's own, or others may write in it: nothing is written
+    /// there (reading from it stays allowed).
+    Shared(PathBuf),
     /// A built-in theme: there is no file to update.
     NotAFile(String),
     /// The file changed after it was read, or would not read as it did: it is left as it is.
@@ -160,13 +163,23 @@ pub fn new(dir: &Path, name: &str, base: &str, look: Look) -> Result<PathBuf, Au
 
 /// Make `<dir>/<name>.toml` (and `dir`, only its owner's, when it is missing) with `text`.
 fn write(dir: &Path, name: &str, text: &str) -> Result<PathBuf, AuthorError> {
-    // Apart from the file, so a folder that cannot be made is never taken for a taken name.
-    fsutil::private_dir(dir).map_err(|_| AuthorError::Write(dir.to_path_buf()))?;
+    shared_check(dir)?;
     let path = theme_file::path(dir, name);
     match fsutil::create_new_private(&path, text.as_bytes()) {
         Ok(()) => Ok(path),
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(AuthorError::Exists(path)),
         Err(_) => Err(AuthorError::Write(path)),
+    }
+}
+
+/// The themes folder `dir` made (only its owner's) when missing, and refused when it is shared:
+/// someone else's, or one others may write in (a link's target is never changed). Apart from
+/// the file, so a folder that cannot be made is never taken for a taken name.
+fn shared_check(dir: &Path) -> Result<(), AuthorError> {
+    match fsutil::own_private_dir(dir) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(AuthorError::Shared(dir.to_path_buf())),
+        Err(_) => Err(AuthorError::Write(dir.to_path_buf())),
     }
 }
 

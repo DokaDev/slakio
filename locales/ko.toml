@@ -81,6 +81,7 @@
 "theme_file.written" = "테마 {name}: {path}에 썼습니다"
 "theme_file.exists" = "{path}: 이미 있어서 그대로 둡니다"
 "theme_file.write_failed" = "{path}: 쓰지 못했습니다"
+"theme_file.shared" = "{path}: 공유 폴더라(본인 소유가 아니거나 다른 사용자가 쓸 수 있음) 테마 파일을 쓰지 않습니다"
 "theme_file.no_folder" = "설정 폴더가 없어 테마 파일을 쓸 themes 폴더가 없습니다"
 "theme_file.not_a_file" = "{name}: 내장 테마라 업데이트할 파일이 없습니다"
 "theme_file.changed" = "{path}: 읽은 뒤 바뀌었거나 같은 뜻으로 읽히지 않아 그대로 둡니다"

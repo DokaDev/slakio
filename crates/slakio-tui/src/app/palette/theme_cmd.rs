@@ -146,6 +146,7 @@ impl App {
             AuthorError::Unwritable { token } => Msg::ThemeFileUnwritable { token: (*token).to_string() },
             AuthorError::Exists(path) => Msg::ThemeFileExists { path: p(path) },
             AuthorError::Write(path) => Msg::ThemeFileWriteFailed { path: p(path) },
+            AuthorError::Shared(path) => Msg::ThemeFileShared { path: p(path) },
             AuthorError::NotAFile(name) => Msg::ThemeFileNotAFile { name: shown(name) },
             AuthorError::Changed(path) => Msg::ThemeFileChanged { path: p(path) },
         }

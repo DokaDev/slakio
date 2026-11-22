@@ -295,6 +295,48 @@ pub fn private_dir(dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// [`private_dir`] for a folder that may be a symbolic link (the user's dotfiles), to write files
+/// in: a folder made here, or there already and not a link, is made private as [`private_dir`]
+/// does, but what a link points to is never changed. Hands back whether files may be written
+/// there: the folder (a link's target) is the user's own and no one else may write in it (Unix;
+/// elsewhere it always may), so no one else can put a file or a link in place of one written.
+pub fn own_private_dir(dir: &Path) -> io::Result<bool> {
+    let mut b = fs::DirBuilder::new();
+    b.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+    b.create(dir)?;
+    #[cfg(unix)]
+    let ok = {
+        use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+        // Opened without following a link: only a folder that is itself there is changed.
+        let mut opts = fs::OpenOptions::new();
+        opts.read(true).custom_flags(libc::O_NOFOLLOW | libc::O_DIRECTORY);
+        if let Ok(d) = opts.open(dir)
+            && d.metadata().is_ok_and(|m| m.is_dir() && m.mode() & 0o077 != 0)
+        {
+            let _ = d.set_permissions(fs::Permissions::from_mode(0o700));
+        }
+        let m = fs::metadata(dir)?;
+        m.is_dir() && is_mine(m.uid()) && m.mode() & 0o022 == 0
+    };
+    #[cfg(not(unix))]
+    let ok = true;
+    Ok(ok)
+}
+
+/// The user id `uid` is the one slakio runs as.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn is_mine(uid: u32) -> bool {
+    rustix::process::geteuid().as_raw() == uid
+}
+
+/// Not known here: taken as not (fail closed).
+#[cfg(all(unix, not(any(target_os = "macos", target_os = "linux"))))]
+fn is_mine(_uid: u32) -> bool {
+    false
+}
+
 /// The bytes of the plain file at `path`, at most `max` of them. A symbolic link, a pipe or
 /// anything but a plain file is refused without waiting on it (it is opened without following
 /// a link and without blocking, then looked at as opened), and so is a file longer than `max`.

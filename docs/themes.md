@@ -20,6 +20,9 @@ with `:theme <name>` (also `:set theme=<name>`), which also saves it.
 - A file larger than 64 KiB, or anything but a plain file, is refused.
 - slakio creates the `themes` folder (only you may open it) and a file in it (only you may read
   it) only when you ask it to write a theme file ([Writing a theme file](#writing-a-theme-file)).
+- slakio writes no theme file in a `themes` folder that is not yours or that others may write
+  in (it says "is shared"); it still reads from one. Through a symbolic link it never changes
+  the folder's permissions.
 
 ## The file
 

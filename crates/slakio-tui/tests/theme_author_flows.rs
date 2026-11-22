@@ -171,3 +171,24 @@ fn no_config_folder_writes_nothing() {
     let why = d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string());
     assert_eq!(why.as_deref(), Some("No config folder: there is no themes folder to write to"));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_shared_themes_folder_is_said_and_not_written_in() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = Scratch::new("shared");
+    let shared = dir.0.join("shared");
+    std::fs::create_dir_all(&shared).unwrap();
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777)).unwrap();
+    std::os::unix::fs::symlink(&shared, dir.0.join("themes")).unwrap();
+    let mut d = booted(120, 40, Lang::En, dir.config());
+    d.command("theme copy dark mine");
+    let want = format!(
+        "{} is shared (not yours alone, or others may write in it): no theme file is written there",
+        dir.0.join("themes").display()
+    );
+    assert_eq!(d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string()), Some(want));
+    assert!(!dir.theme("mine").exists());
+    assert!(saved_themes(&mut d).is_empty());
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o700)).unwrap();
+}

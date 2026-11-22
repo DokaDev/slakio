@@ -323,3 +323,31 @@ fn update_never_waits_on_a_pipe_nor_writes_through_a_link() {
     assert_eq!(update::write_checked(&link, text, "new text"), Err(AuthorError::Write(link.clone())));
     assert_eq!(std::fs::read_to_string(&victim).unwrap(), text);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_shared_themes_folder_is_never_written_in_nor_changed_through_a_link() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = Dir::new("shared");
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    let shared = d.1.join("shared");
+    std::fs::create_dir_all(&shared).unwrap();
+    std::fs::write(shared.join("kept.toml"), "extends = \"dark\"\n").unwrap();
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o775)).unwrap();
+    std::os::unix::fs::symlink(&shared, &d.0).unwrap();
+    // Others may write in it: refused, the folder left as it is.
+    assert_eq!(copy(&d.0, "dark", "a", LOOKS[0]), Err(AuthorError::Shared(d.0.clone())));
+    assert_eq!(new(&d.0, "b", "dark", LOOKS[0]), Err(AuthorError::Shared(d.0.clone())));
+    assert_eq!(update(&d.0, "kept", LOOKS[0]), Err(AuthorError::Shared(d.0.clone())));
+    assert_eq!(mode(&shared), 0o775, "not changed through the link");
+    assert!(!shared.join("a.toml").exists() && !shared.join("b.toml").exists());
+    assert_eq!(std::fs::read_to_string(shared.join("kept.toml")).unwrap(), "extends = \"dark\"\n");
+    // Reading from it stays allowed.
+    assert!(theme_file::read(&d.0, "kept").is_ok());
+    // The user's own folder others may only read: written in, its mode not changed.
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o755)).unwrap();
+    copy(&d.0, "dark", "a", LOOKS[0]).unwrap();
+    assert_eq!(mode(&shared), 0o755, "a link's target is never chmodded");
+    assert_eq!(mode(&shared.join("a.toml")), 0o600);
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o700)).unwrap();
+}

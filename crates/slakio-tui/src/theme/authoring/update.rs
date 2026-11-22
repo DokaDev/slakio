@@ -4,7 +4,7 @@
 //! line breaks. No line of the file changes; the file is replaced (0600, at once) only when it
 //! reads exactly as before and has not changed since it was read.
 
-use super::{AuthorError, COLOR_ABOUT, STYLE_ABOUT, color_value, style_value};
+use super::{AuthorError, COLOR_ABOUT, STYLE_ABOUT, color_value, shared_check, style_value};
 use crate::theme::custom::from_spec;
 use crate::theme::{Look, NAMES};
 use slakio_core::fsutil;
@@ -63,6 +63,7 @@ pub fn update(dir: &Path, name: &str, look: Look) -> Result<Updated, AuthorError
     if !same {
         return Err(AuthorError::Changed(path));
     }
+    shared_check(dir)?;
     write_checked(&path, &text, &new)?;
     Ok(Updated::Added { path, count: colors.len() + styles.len() })
 }
