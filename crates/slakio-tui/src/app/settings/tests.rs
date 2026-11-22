@@ -163,7 +163,7 @@ fn the_environment_s_downloads_folder_is_shown_and_not_changed() {
     key(&mut a, "enter");
     assert_eq!(a.prefs.screen.as_ref().unwrap().folder, None, "nothing to type");
     let (value, what) = a.setting_shown(find("downloads").unwrap());
-    assert_eq!((value.as_str(), what.as_str()), ("/tmp/dl", "Set by SLAKIO_DOWNLOAD_DIR: read-only here"));
+    assert_eq!((value.as_str(), what.as_str()), ("/tmp/dl", "Fixed by SLAKIO_DOWNLOAD_DIR"));
     let k = find("downloads").unwrap();
     assert!(a.apply_setting(k, "~/y", Instant::now()).is_err(), ":set cannot change it either");
     assert!(saved(&mut a).is_empty());

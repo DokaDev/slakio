@@ -10,8 +10,8 @@ expression: d.snap()
 │ │   View rows        ‹ expanded          ›  A row per… │ │
 ├─│   Nerd Font icons  ‹ off               ›  Text and…  │ │
 │ │ Pictures                                             │ │
-│ │   Avatars          ‹ initials          ›  Initials…  │ │
-│ │   Images           ‹ auto              ›  Where pic… │ │
+│ │   Avatars          ‹ initials          ›  Coloured…  │ │
+│ │   Images           ‹ auto              ›  Where sur… │ │
 │ │                                       10 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ Previews of shared pictures and profile photos,      │ │

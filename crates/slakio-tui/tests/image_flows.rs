@@ -554,9 +554,9 @@ fn the_palette_s_images_values_show_whole() {
         typed(&mut s, "images ");
         let screen = s.d.screen();
         for (value, en, l) in [
-            ("auto", "Where pictures surely show (default)", Label::ImagesAuto),
-            ("on", "Always (the terminal may not show them)", Label::ImagesOn),
-            ("off", "No pictures: text cards and initials only", Label::ImagesOff),
+            ("auto", "Where sure to show (default)", Label::ImagesAuto),
+            ("on", "Always (may not show)", Label::ImagesOn),
+            ("off", "Text cards and initials only", Label::ImagesOff),
         ] {
             let want = words(lang, en, label(l));
             let row = screen
@@ -572,7 +572,7 @@ fn the_palette_s_images_values_show_whole() {
         // `:avatars image` shows whole too.
         typed(&mut s, "avatars ");
         let screen = s.d.screen();
-        let want = words(lang, "Photos where pictures show, else initials", label(Label::AvatarsImage));
+        let want = words(lang, "Photos, else initials", label(Label::AvatarsImage));
         let row =
             screen.lines().find(|row| row.contains(" image  ")).unwrap_or_else(|| panic!("{lang:?} {w}:\n{screen}"));
         assert!(row.contains(&want), "{lang:?} {w}: {row}");

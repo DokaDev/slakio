@@ -7,12 +7,12 @@ expression: d.snap()
 │ │ Nord is the name of a built-in theme                                     │ │
 │ │ Display                                                                  │ │
 │ │   Theme            ‹ terminal           ›  Your terminal's own colours   │ │
-│ │   Density          ‹ comfortable        ›  As in GUI Slack: an avatar b… │ │
+│ │   Density          ‹ comfortable        ›  As in GUI Slack (default)     │ │
 ├─│   View rows        ‹ expanded           ›  A row per view (default)      │ │
 │ │   Nerd Font icons  ‹ off                ›  Text and plain symbols only   │ │
 │ │ Pictures                                                                 │ │
-│ │   Avatars          ‹ initials           ›  Initials on a colour of thei… │ │
-│ │   Images           ‹ auto               ›  Where pictures surely show (… │ │
+│ │   Avatars          ‹ initials           ›  Coloured initials (default)   │ │
+│ │   Images           ‹ auto               ›  Where sure to show (default)  │ │
 │ │                                                           10 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: Nord                                                            │ │

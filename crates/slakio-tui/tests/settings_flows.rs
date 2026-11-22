@@ -176,7 +176,7 @@ fn a_broken_config_file_never_says_a_change_applies_on_next_launch() {
     assert!(err.is_some());
     let mut d = booted(120, 40, Lang::En, cfg, false);
     d.keys("space ,");
-    assert!(d.screen().contains("not saved, so not used on next launch"), "{}", d.screen());
+    assert!(d.screen().contains("unsaved: not used next launch"), "{}", d.screen());
     // language
     d.keys("j j j j j j l");
     assert_eq!(d.app.prefs.config.language, "en");

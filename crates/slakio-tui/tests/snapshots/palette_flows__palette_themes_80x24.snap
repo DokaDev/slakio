@@ -9,18 +9,18 @@ expression: small.snap()
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │ To-dos  │ : theme                                                  │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
-│ ▾ Favori│  auto               Tokyo Night with 24-bit co…  current │         │
+│ ▾ Favori│  auto               Tokyo Night or ANSI (defau…  current │         │
 │   # back│  terminal           Your terminal's own colours          │er.      │
 │   # inci│  dark               Dark, 24-bit colour                  │         │
 │         │  light              Light, 24-bit colour                 │         │
-│ ▾ Ops   │  high-contrast      White on black with strong marks     │         │
-│   # depl│  catppuccin         Catppuccin: Latte or Mocha, by the…  │         │
+│ ▾ Ops   │  high-contrast      White on black, strong marks         │         │
+│   # depl│  catppuccin         Latte or Mocha, by background        │         │
 │   # aler│  catppuccin-latte   Catppuccin Latte (light)             │         │
 │   # part│  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
-│   # host│  tokyo-night        Tokyo Night: Day or Night, by the t… │         │
+│   # host│  tokyo-night        Day or Night, by background          │         │
 │   # big-│  tokyo-night-day    Tokyo Night Day (light)              │         │
 │   # long│  tokyo-night-night  Tokyo Night (dark)                   │         │
-│         │  gruvbox            Gruvbox: light or dark, by the term… │         │
+│         │  gruvbox            Light or dark, by background         │         │
 │ ▾ Channe╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │
 │   # announcements          ││                                                │
 │   # design-review          ││                                                │

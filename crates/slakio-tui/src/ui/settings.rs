@@ -7,8 +7,8 @@
 //! ```text
 //! ╭ Settings ─────────────────────────────────────────────────────────────╮
 //! │ Display                                                               │
-//! │   Theme            ‹ auto        ›  Tokyo Night with 24-bit colour, … │
-//! │   Density          ‹ comfortable ›  As in GUI Slack: an avatar block… │
+//! │   Theme            ‹ auto        ›  Tokyo Night or ANSI (default)     │
+//! │   Density          ‹ comfortable ›  As in GUI Slack (default)         │
 //! │───────────────────────────────────────────────────────────────────────│
 //! │ The colours. h/l show each theme at once; Enter keeps the one shown. │
 //! │ Set with :set theme=…                                                 │
@@ -170,15 +170,8 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
         skip = (selected_line + 1).saturating_sub(rows_room);
     }
     let (above, below) = (skip, lines.len().saturating_sub(skip + rows_room));
-    let key_w = SETTINGS.iter().map(|s| width(&i18n.label(s.label))).max().unwrap_or(0);
     let shown: Vec<(String, String)> = (0..SETTINGS.len()).map(|k| app.setting_shown(k)).collect();
-    // A long folder is cut by its middle rather than widening the column (the default's width).
-    let folder_w = width("~/Downloads/slakio");
-    let value_w = (0..SETTINGS.len())
-        .map(|k| if SETTINGS[k].values == Values::Folder { folder_w } else { width(&shown[k].0) })
-        .max()
-        .unwrap_or(0)
-        .min(tw / 3);
+    let (key_w, value_w) = columns(app, &shown, tw);
     let list_top = y;
     y += u16::from(top);
     let mut group = groups.iter();
@@ -217,6 +210,26 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
     y
 }
 
+/// The widths of the list's key and value columns, every row's value and what it means `shown`,
+/// the rows `tw` wide.
+fn columns(app: &App, shown: &[(String, String)], tw: usize) -> (usize, usize) {
+    let key_w = SETTINGS.iter().map(|s| width(&app.i18n.label(s.label))).max().unwrap_or(0);
+    // A long folder is cut by its middle rather than widening the column (the default's width).
+    let folder_w = width("~/Downloads/slakio");
+    let value_w = (0..SETTINGS.len())
+        .map(|k| if SETTINGS[k].values == Values::Folder { folder_w } else { width(&shown[k].0) })
+        .max()
+        .unwrap_or(0)
+        .min(tw / 3);
+    (key_w, value_w)
+}
+
+/// The columns left for what a value means on a row `tw` wide, its key and its value `widths`
+/// wide: `  key  ‹ value ›  what`.
+fn what_room(tw: usize, widths: (usize, usize)) -> usize {
+    tw.saturating_sub(widths.0 + 4 + widths.1 + 4 + 2)
+}
+
 /// Setting `k`'s row, its value and what it means `shown`, its key and its value `widths` wide.
 fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, String), widths: (usize, usize)) {
     let t = &app.theme;
@@ -234,7 +247,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, Stri
     let style = if read_only { t.muted() } else { t.key_warm() };
     f.buffer_mut().set_stringn(vx, y, clip(&value, left), left, style);
     let wx = vx + width(&value) as u16 + 2;
-    let rest = tw.saturating_sub(usize::from(wx.saturating_sub(x)));
+    let rest = what_room(tw, widths);
     if rest > 0 {
         f.buffer_mut().set_stringn(wx, y, clip(what, rest), rest, t.muted());
     }
@@ -249,3 +262,6 @@ fn pad(text: &str, w: usize) -> String {
 fn wrap(text: &str, w: usize) -> Vec<String> {
     crate::text::wrap(text, w, usize::MAX).0
 }
+
+#[cfg(test)]
+mod tests;

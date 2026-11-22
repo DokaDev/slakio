@@ -7,17 +7,17 @@ expression: d.snap()
 │ DM      │ Nord: ＊＊ ＊＊＊ ＊＊＊＊＊                                                                     │         │
 │ ＊＊    │ ＊＊                                                                                             │         │
 │ ＊＊    │   ＊＊              ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                       │         │
-│ ＊ ＊   │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊: ＊＊＊ ＊＊, ＊＊ ＊＊ ＊＊ (＊＊)     │         │
+│ ＊ ＊   │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊ (＊＊)                                  │         │
 ├─▾───────│   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                              │         │
 │ ▾ Favori│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │   # back│ ＊＊                                                                                             │         │
-│   # inci│   ＊＊＊            ‹ initials           ›  ＊＊＊＊ ＊＊ ＊ ＊＊ ＊＊＊ (＊＊＊)                │         │
-│         │   ＊＊              ‹ auto               ›  ＊＊＊＊ ＊＊＊ ＊＊ ＊ ＊＊ (＊＊＊)                │         │
+│   # inci│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊＊)                              │         │
+│         │   ＊＊              ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊＊)                            │         │
 │ ▾ Ops   │ ＊＊                                                                                             │         │
 │   # depl│   ＊＊              ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # aler│ ＊＊                                                                                             │         │
 │   # part│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
-│   # host│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊ ＊＊ ＊＊ ＊ ＊＊                        │         │
+│   # host│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
 │   # big-│ ＊＊＊＊                                                                                         │         │
 │   # long│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │         │   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │

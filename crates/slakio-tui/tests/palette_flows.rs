@@ -121,7 +121,7 @@ fn theme_lists_the_themes_marks_the_current_one_and_switches() {
     let rows = d.app.palette_rows();
     assert_eq!(rows.len(), slakio_tui::theme::NAMES.len());
     assert_eq!((rows[0].name.as_str(), rows[0].keys.as_str()), ("auto", "current"));
-    assert!(rows.iter().any(|r| r.name == "gruvbox" && r.label.contains("light or dark")));
+    assert!(rows.iter().any(|r| r.name == "gruvbox" && r.label.contains("Light or dark")));
     d.type_text("gru");
     let names: Vec<String> = d.app.palette_rows().into_iter().map(|r| r.name).collect();
     assert_eq!(names, ["gruvbox", "gruvbox-light", "gruvbox-dark"]);
