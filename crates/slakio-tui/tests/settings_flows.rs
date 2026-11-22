@@ -410,3 +410,26 @@ fn a_long_folder_is_cut_by_its_middle_never_widening_the_column() {
     let cut = " /a/folde…lf/slakio ";
     assert_eq!(got, [cut, cut, cut, cut], "at 80 and 120 columns, in English and Korean");
 }
+
+#[test]
+fn the_read_only_folder_reads_in_the_muted_colour() {
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, h, lang, shown_config(), true);
+            d.app.prefs.download_env = Some("/srv/files".to_string());
+            d.command("theme nord");
+            d.keys("space ,");
+            let screen = d.screen();
+            let y = screen.lines().position(|l| l.contains(" downloads ") && l.contains('‹')).unwrap();
+            let buf = d.buffer();
+            let x = (0..w).find(|&x| buf[(x, y as u16)].symbol() == "‹").unwrap();
+            for dx in 0..14 {
+                assert_eq!(buf[(x + dx, y as u16)].fg, d.app.theme.fg_muted, "{w} {lang:?} at {dx}");
+            }
+            got.push(value_of(&d.snap(), "downloads"));
+        }
+    }
+    let shown = " /srv/files         ";
+    assert_eq!(got, [shown, shown, shown, shown], "at 80 and 120 columns, in English and Korean");
+}

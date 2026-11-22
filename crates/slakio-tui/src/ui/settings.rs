@@ -226,7 +226,8 @@ fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, Stri
     f.buffer_mut().set_stringn(x, y, clip(&text, tw), tw, t.text());
     let vx = x + width(&text) as u16;
     let left = tw.saturating_sub(width(&text));
-    let style = if read_only { t.faint() } else { t.key_warm() };
+    // Read-only, it stays readable: muted, as what it means.
+    let style = if read_only { t.muted() } else { t.key_warm() };
     f.buffer_mut().set_stringn(vx, y, clip(&value, left), left, style);
     let wx = vx + width(&value) as u16 + 2;
     let rest = tw.saturating_sub(usize::from(wx.saturating_sub(x)));
