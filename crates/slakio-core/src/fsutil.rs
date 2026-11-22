@@ -26,6 +26,35 @@ pub fn atomic_write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     write_atomically(path, bytes, true)
 }
 
+/// [`atomic_write_private`] that never writes through a symbolic link: a link at `path` is
+/// replaced by the new file (a rename replaces the link, never what it points to), so a link
+/// put there after the file was read is not followed. The folder must be there already.
+pub fn atomic_replace_private_nofollow(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let dir = match path.parent().filter(|d| !d.as_os_str().is_empty()) {
+        Some(d) => d.to_path_buf(),
+        None => PathBuf::from("."),
+    };
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = dir.join(format!(".{name}.tmp-{}", std::process::id()));
+    let result = write_then_rename(&tmp, path, bytes, true);
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result?;
+    sync_dir(&dir);
+    Ok(())
+}
+
+/// The plain file at `path` may be written: it opens for writing (nothing is written) without
+/// following a link and without waiting on it (Unix), and is a plain file as opened.
+pub fn writable_plain(path: &Path) -> bool {
+    let mut opts = fs::OpenOptions::new();
+    opts.write(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut opts, libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    opts.open(path).and_then(|f| f.metadata()).is_ok_and(|m| m.is_file())
+}
+
 fn write_atomically(path: &Path, bytes: &[u8], private: bool) -> io::Result<()> {
     let target = write_target(path)?;
     let dir = match target.parent().filter(|d| !d.as_os_str().is_empty()) {

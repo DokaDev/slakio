@@ -68,13 +68,17 @@ pub fn update(dir: &Path, name: &str, look: Look) -> Result<Updated, AuthorError
 }
 
 /// Replace the file at `path`, read as `text`, with `new`: refused when it may not be written
-/// (a read-only file is not replaced) or no longer reads as `text`.
+/// (a read-only file, a link or a pipe is not replaced, and none is waited on) or no longer
+/// reads as `text`. The new file is renamed into place, so a link put there since is replaced,
+/// never followed.
 pub(super) fn write_checked(path: &Path, text: &str, new: &str) -> Result<(), AuthorError> {
-    std::fs::OpenOptions::new().append(true).open(path).map_err(|_| AuthorError::Write(path.to_path_buf()))?;
+    if !fsutil::writable_plain(path) {
+        return Err(AuthorError::Write(path.to_path_buf()));
+    }
     if fsutil::read_plain(path, theme_file::MAX_BYTES).ok().as_deref() != Some(text.as_bytes()) {
         return Err(AuthorError::Changed(path.to_path_buf()));
     }
-    fsutil::atomic_write_private(path, new.as_bytes()).map_err(|_| AuthorError::Write(path.to_path_buf()))
+    fsutil::atomic_replace_private_nofollow(path, new.as_bytes()).map_err(|_| AuthorError::Write(path.to_path_buf()))
 }
 
 /// The two read files set the same (the line `extends` is on aside).

@@ -300,3 +300,26 @@ fn update_keeps_a_private_file_private() {
     assert!(matches!(update(&d.0, "kept", LOOKS[0]), Ok(Updated::Added { count: 1, .. })));
     assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
 }
+
+#[cfg(unix)]
+#[test]
+fn update_never_waits_on_a_pipe_nor_writes_through_a_link() {
+    let d = Dir::new("update-nofollow");
+    let text = "extends = \"dark\"\n";
+    // A pipe where the file was: refused at once, not waited on.
+    let pipe = theme_file::path(&d.0, "pipe");
+    std::fs::create_dir_all(&d.0).unwrap();
+    assert!(std::process::Command::new("mkfifo").arg(&pipe).status().unwrap().success());
+    let (tx, rx) = std::sync::mpsc::channel();
+    let at = pipe.clone();
+    std::thread::spawn(move || tx.send(update::write_checked(&at, text, "new text")).unwrap());
+    let done = rx.recv_timeout(std::time::Duration::from_secs(10)).expect("waited on a pipe");
+    assert_eq!(done, Err(AuthorError::Write(pipe)));
+    // A link put where the file was: refused, its target untouched.
+    let victim = d.1.join("victim");
+    std::fs::write(&victim, text).unwrap();
+    let link = theme_file::path(&d.0, "link");
+    std::os::unix::fs::symlink(&victim, &link).unwrap();
+    assert_eq!(update::write_checked(&link, text, "new text"), Err(AuthorError::Write(link.clone())));
+    assert_eq!(std::fs::read_to_string(&victim).unwrap(), text);
+}

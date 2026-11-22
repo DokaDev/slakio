@@ -227,3 +227,28 @@ fn a_link_planted_as_the_new_files_temporary_file_is_never_followed() {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn a_nofollow_replace_replaces_a_link_never_its_target() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_dir("replace-nofollow");
+    let victim = dir.join("victim");
+    fs::write(&victim, "keep").unwrap();
+    fs::set_permissions(&victim, fs::Permissions::from_mode(0o644)).unwrap();
+    let path = dir.join("t.toml");
+    std::os::unix::fs::symlink(&victim, &path).unwrap();
+    atomic_replace_private_nofollow(&path, b"new").unwrap();
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "keep", "the link's target is untouched");
+    assert_eq!(fs::metadata(&victim).unwrap().permissions().mode() & 0o777, 0o644);
+    let meta = fs::symlink_metadata(&path).unwrap();
+    assert!(meta.file_type().is_file(), "the link is replaced by a plain file");
+    assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+    assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+    assert!(leftovers(&dir).is_empty());
+    assert!(!writable_plain(&victim.with_file_name("none")), "nothing there");
+    std::os::unix::fs::symlink(&victim, dir.join("link")).unwrap();
+    assert!(!writable_plain(&dir.join("link")), "a link is not followed");
+    assert!(writable_plain(&victim));
+    let _ = fs::remove_dir_all(&dir);
+}
