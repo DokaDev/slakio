@@ -4,16 +4,16 @@ expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────╮ │
-│ │ Language                               8 more above  │ │
-│ │   language         ‹ auto              ›  applies o… │ │
+│ │                                       10 more above  │ │
 │ │ Files                                                │ │
 │ │   downloads        ‹ ~/Downloads/slak… ›  Enter: ty… │ │
-├─│   download_max_mb  ‹ 1024              ›  MB: the l… │ │
-│ │ Network                                              │ │
+│ │   download_max_mb  ‹ 1024              ›  MB: the l… │ │
+├─│ Network                                              │ │
 │ │   network          ‹ on                ›  applies o… │ │
 │ │   live             ‹ on                ›  applies o… │ │
 │ │   restore          ‹ on                ›  applies o… │ │
 │ │   cache            ‹ on                ›  applies o… │ │
+│ │                                                      │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ off: nothing is kept on disk between runs (every     │ │
 │ │ start fetches).                                      │ │

@@ -14,7 +14,7 @@ expression: d.snap()
 │ │   images           ‹ auto               ›  Where pictures surely show (… │ │
 │ │ Language                                                                 │ │
 │ │   language         ‹ auto               ›  applies on next launch        │ │
-│ │ Files                                                      7 more below  │ │
+│ │                                                            8 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: terminal-copy                                                   │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │

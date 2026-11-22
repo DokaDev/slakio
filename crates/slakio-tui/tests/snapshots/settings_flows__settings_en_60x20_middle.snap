@@ -13,7 +13,7 @@ expression: d.snap()
 │ │   avatars          ‹ initials          ›  A person'… │ │
 │ │   images           ‹ auto              ›  Where pic… │ │
 │ │ Language                                             │ │
-│ │   language         ‹ auto              8 more below  │ │
+│ │                                        9 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ Previews of shared pictures and profile photos,      │ │
 │ │ where the terminal draws them (also :images).        │ │

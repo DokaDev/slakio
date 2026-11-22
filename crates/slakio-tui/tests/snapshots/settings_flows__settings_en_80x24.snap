@@ -16,7 +16,7 @@ expression: d.snap()
 │ │   language         ‹ auto               ›  applies on next launch        │ │
 │ │ Files                                                                    │ │
 │ │   downloads        ‹ ~/Downloads/slakio ›  Enter: type a folder          │ │
-│ │   download_max_mb  ‹ 1024               ›  MB: the largest 5 more below  │ │
+│ │                                                            6 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ The colors. h/l show each theme at once; Enter keeps the one shown; c    │ │
 │ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │

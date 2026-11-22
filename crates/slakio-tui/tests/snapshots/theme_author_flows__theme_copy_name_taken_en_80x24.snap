@@ -14,7 +14,7 @@ expression: d.snap()
 │ │   avatars          ‹ initials           ›  A person's initials on a col… │ │
 │ │   images           ‹ auto               ›  Where pictures surely show (… │ │
 │ │ Language                                                                 │ │
-│ │   language         ‹ auto               ›  applies on next 8 more below  │ │
+│ │                                                            9 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: Nord                                                            │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │

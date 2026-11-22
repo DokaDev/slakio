@@ -150,17 +150,28 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
     } else {
         room.saturating_sub(1 + foot).max(LIST_MIN.min(lines.len())).min(room)
     };
+    // Scrolled, the list's first and last lines say how much is out of view, on lines of their
+    // own (never over a row).
+    let scrolls = lines.len() > list_room && list_room >= 3;
     let selected_line = lines.iter().position(|l| *l == Some(s.selected)).unwrap_or(0);
-    let skip = (selected_line + 1).saturating_sub(list_room);
-    let (above, below) = (skip, lines.len().saturating_sub(skip + list_room));
+    let mut rows_room = if scrolls { list_room - 1 } else { list_room };
+    let mut skip = (selected_line + 1).saturating_sub(rows_room);
+    // The line on top is the count's only once rows are above.
+    let top = scrolls && skip > 0;
+    if top {
+        rows_room -= 1;
+        skip = (selected_line + 1).saturating_sub(rows_room);
+    }
+    let (above, below) = (skip, lines.len().saturating_sub(skip + rows_room));
     let key_w = SETTINGS.iter().map(|s| s.key.len()).max().unwrap_or(0);
     let shown: Vec<(String, String)> = (0..SETTINGS.len()).map(|k| app.setting_shown(k)).collect();
     let value_w = shown.iter().map(|(v, _)| width(v)).max().unwrap_or(0).min(tw / 3);
     let list_top = y;
+    y += u16::from(top);
     let mut group = groups.iter();
     for (i, line) in lines.iter().enumerate() {
         let heading = line.is_none().then(|| group.next()).flatten();
-        if i < skip || i >= skip + list_room {
+        if i < skip || i >= skip + rows_room {
             continue;
         }
         let row = Rect::new(area.x, y, area.width, 1);
@@ -178,6 +189,7 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
     }
     // At the right end of the list's first and last lines.
     let list_bottom = list_top + list_room as u16;
+    y = y.max(list_top + if scrolls { list_room as u16 } else { 0 });
     for (count, at, up) in [(above, list_top, true), (below, list_bottom.saturating_sub(1), false)] {
         if count == 0 || (up && list_room == 1 && below > 0) {
             continue;

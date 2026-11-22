@@ -254,3 +254,23 @@ fn the_help_lists_images_avatars_and_the_settings_key() {
         assert!(d.screen().contains(want), "{word}:\n{}", d.screen());
     }
 }
+
+#[test]
+fn the_out_of_view_counts_never_cover_a_row() {
+    use slakio_tui::app::settings::table::SETTINGS;
+    for (w, h) in [(80, 24), (60, 20)] {
+        let mut d = booted(w, h, Lang::En, shown_config(), true);
+        d.keys("space ,");
+        for _ in 0..=SETTINGS.len() {
+            let key = SETTINGS[d.app.prefs.screen.as_ref().unwrap().selected].key;
+            let screen = d.screen();
+            let row = screen.lines().find(|l| l.contains(&format!(" {key} ")) && l.contains('\u{2039}'));
+            let row = row.unwrap_or_else(|| panic!("{w}x{h} {key}: no row\n{screen}"));
+            assert!(row.contains('\u{203A}') && !row.contains(" more "), "{w}x{h} {key}: {row}\n{screen}");
+            for l in screen.lines().filter(|l| l.contains(" more ")) {
+                assert!(!l.contains('\u{2039}'), "{w}x{h}: a count on a row: {l}\n{screen}");
+            }
+            d.keys("j");
+        }
+    }
+}
