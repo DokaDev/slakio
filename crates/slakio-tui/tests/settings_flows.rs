@@ -381,3 +381,32 @@ fn the_help_line_of_login_is_whole_at_80_and_120_columns() {
     let want = [line(en, 9), line(ko, 18), line(en, 33), line(ko, 42)];
     assert_eq!(got, want, "whole at 80 and 120 columns, in English and Korean");
 }
+
+/// The value on setting `key`'s row, between its marks.
+fn value_of(screen: &str, key: &str) -> String {
+    let row = screen.lines().find(|l| l.contains(&format!(" {key} ")) && l.contains('‹')).unwrap_or_default();
+    let from = row.find('‹').map_or(0, |i| i + '‹'.len_utf8());
+    let to = row.find('›').unwrap_or(from);
+    row[from..to].to_string()
+}
+
+#[test]
+fn a_long_folder_is_cut_by_its_middle_never_widening_the_column() {
+    let long = "/a/folder/name/long/enough/to/fill/the/value/column/by/itself/slakio";
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, h, lang, shown_config(), true);
+            d.keys("space ,");
+            let before = d.snap();
+            d.app.prefs.config.downloads = long.to_string();
+            let screen = d.snap();
+            got.push(value_of(&screen, "downloads"));
+            // Every other row is as with the default folder.
+            let others = |s: &str| s.lines().filter(|l| !l.contains(" downloads ")).collect::<Vec<_>>().join("\n");
+            assert_eq!(others(&screen), others(&before), "{w} {lang:?}");
+        }
+    }
+    let cut = " /a/folde…lf/slakio ";
+    assert_eq!(got, [cut, cut, cut, cut], "at 80 and 120 columns, in English and Korean");
+}

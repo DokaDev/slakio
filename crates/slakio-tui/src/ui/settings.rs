@@ -22,7 +22,7 @@ use super::modal;
 use crate::app::App;
 use crate::app::settings::Screen;
 use crate::app::settings::table::{SETTINGS, Values, groups};
-use crate::text::{clip, width};
+use crate::text::{clip, clip_middle, width};
 use crate::theme::Selection;
 use ratatui::Frame;
 use ratatui::layout::{Position, Rect};
@@ -168,7 +168,13 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
     let (above, below) = (skip, lines.len().saturating_sub(skip + rows_room));
     let key_w = SETTINGS.iter().map(|s| s.key.len()).max().unwrap_or(0);
     let shown: Vec<(String, String)> = (0..SETTINGS.len()).map(|k| app.setting_shown(k)).collect();
-    let value_w = shown.iter().map(|(v, _)| width(v)).max().unwrap_or(0).min(tw / 3);
+    // A long folder is cut by its middle rather than widening the column (the default's width).
+    let folder_w = width("~/Downloads/slakio");
+    let value_w = (0..SETTINGS.len())
+        .map(|k| if SETTINGS[k].values == Values::Folder { folder_w } else { width(&shown[k].0) })
+        .max()
+        .unwrap_or(0)
+        .min(tw / 3);
     let list_top = y;
     y += u16::from(top);
     let mut group = groups.iter();
@@ -214,7 +220,8 @@ fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, Stri
     let tw = usize::from(row.width).saturating_sub(2);
     let (value, what) = shown;
     let read_only = SETTINGS[k].values == Values::Folder && app.prefs.download_env.is_some();
-    let value = format!("‹ {} ›", pad(&clip(value, widths.1), widths.1));
+    let value = if SETTINGS[k].values == Values::Folder { clip_middle(value, widths.1) } else { clip(value, widths.1) };
+    let value = format!("‹ {} ›", pad(&value, widths.1));
     let text = format!("  {}  ", pad(SETTINGS[k].key, widths.0));
     f.buffer_mut().set_stringn(x, y, clip(&text, tw), tw, t.text());
     let vx = x + width(&text) as u16;
