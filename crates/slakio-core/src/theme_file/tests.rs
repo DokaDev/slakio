@@ -315,3 +315,24 @@ fn the_theme_folder_is_next_to_the_config_file() {
     assert_eq!(dir(Path::new("/c/slakio/config.toml")), Some(PathBuf::from("/c/slakio/themes")));
     assert_eq!(path(Path::new("/c/themes"), "mine"), PathBuf::from("/c/themes/mine.toml"));
 }
+
+#[test]
+fn the_listing_looks_at_a_bounded_number_of_entries() {
+    // An endless folder: the listing still ends, after MAX_SEEN entries.
+    let seen = std::cell::Cell::new(0usize);
+    let endless = (0..).map(|i| {
+        seen.set(seen.get() + 1);
+        Some(PathBuf::from(format!("x{i}")))
+    });
+    assert_eq!(listing(endless), Listing::default());
+    assert_eq!(seen.get(), MAX_SEEN);
+    // A real folder of 10,000 other files: nothing listed, and quickly.
+    let dir = scratch("crowded");
+    for i in 0..10_000 {
+        std::fs::write(dir.join(format!("n{i}")), "").unwrap();
+    }
+    let started = std::time::Instant::now();
+    assert_eq!(names(&dir), Listing::default());
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    let _ = std::fs::remove_dir_all(&dir);
+}

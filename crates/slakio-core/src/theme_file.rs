@@ -37,6 +37,9 @@ pub const MAX_BYTES: u64 = 64 * 1024;
 
 /// The most theme files listed ([`names`]).
 pub const MAX_FILES: usize = 256;
+/// The most entries of a themes folder looked at for a listing ([`names`]), whatever they are:
+/// a folder (a link may point anywhere) with more is listed from the first ones only.
+pub const MAX_SEEN: usize = 4096;
 
 /// The most colours of `workspaces` and of `avatars`.
 pub const MAX_PALETTE: usize = 16;
@@ -320,11 +323,17 @@ pub struct Listing {
 /// The theme files in `dir`: plain files `<name>.toml` with a [`valid_name`]. Symbolic links,
 /// anything but a plain file and other names are left out without a word; a missing or
 /// unreadable folder has none. `dir` itself may be a symbolic link.
+/// At most [`MAX_SEEN`] entries are looked at.
 pub fn names(dir: &Path) -> Listing {
     let Ok(entries) = std::fs::read_dir(dir) else { return Listing::default() };
+    listing(entries.map(|e| e.ok().map(|e| e.path())))
+}
+
+/// [`names`] of the entries `paths` (`None`: one that could not be read), at most
+/// [`MAX_SEEN`] of them looked at.
+fn listing(paths: impl Iterator<Item = Option<PathBuf>>) -> Listing {
     let mut out = Listing::default();
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
+    for path in paths.take(MAX_SEEN).flatten() {
         if path.extension().and_then(|x| x.to_str()) != Some("toml") {
             continue;
         }

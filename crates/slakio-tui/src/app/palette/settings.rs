@@ -159,14 +159,14 @@ impl App {
 
     /// The palette's row of theme file `i` after `:theme `.
     pub(super) fn theme_file_row(&self, i: usize) -> Row {
-        let name = self.theme_files().get(i).cloned().unwrap_or_default();
+        let name = self.palette_theme_files().get(i).cloned().unwrap_or_default();
         let current = name == self.theme_setting;
         self.value_row(&name, Label::SettingsThemeFile, current)
     }
 
     /// Theme file `i` picked after `:theme `: used and saved, or why not said in the palette.
     pub(super) fn theme_file_run(&mut self, i: usize, now: Instant) {
-        let name = self.theme_files().get(i).cloned().unwrap_or_default();
+        let name = self.palette_theme_files().get(i).cloned().unwrap_or_default();
         self.theme_typed(&format!("theme {name}"), now);
     }
 

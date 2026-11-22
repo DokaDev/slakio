@@ -16,6 +16,9 @@ pub struct CommandLine {
     pub picked: bool,
     /// Why the last `Enter` ran nothing (shown under the list until the text changes).
     pub error: Option<Msg>,
+    /// The theme files listed after `:theme `, read once while it is open (not on every key or
+    /// frame).
+    pub theme_files: std::cell::OnceCell<Vec<String>>,
 }
 
 impl CommandLine {

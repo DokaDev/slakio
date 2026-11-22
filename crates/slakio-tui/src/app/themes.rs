@@ -74,6 +74,11 @@ impl App {
         self.prefs.theme_dir.as_deref().map(|d| theme_file::names(d).names).unwrap_or_default()
     }
 
+    /// [`App::theme_files`] as the open palette lists them: read once while it is open.
+    pub(super) fn palette_theme_files(&self) -> &[String] {
+        self.cmdline.theme_files.get_or_init(|| self.theme_files())
+    }
+
     /// `h`/`l` on the theme row: draw with the theme before or after the one shown, not saved.
     pub(super) fn preview_theme(&mut self, step: isize) {
         let Some(screen) = self.prefs.screen.as_ref() else { return };

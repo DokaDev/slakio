@@ -58,7 +58,7 @@ pub enum Item {
     ThemeCommand,
     /// A theme for `:theme` (index into [`NAMES`]).
     Theme(usize),
-    /// A theme file for `:theme` (index into [`App::theme_files`]).
+    /// A theme file for `:theme` (index into the theme files the open palette lists).
     ThemeFile(usize),
     /// `:theme copy`, `:theme new` or `:theme update` with its words.
     ThemeAuthor,
@@ -229,7 +229,7 @@ impl App {
             }
         }
         if let Some(arg) = theme_arg(line) {
-            let files = self.theme_files();
+            let files = self.palette_theme_files();
             let files = ranked(&files.iter().map(String::as_str).collect::<Vec<_>>(), arg);
             return themes(arg).into_iter().map(Item::Theme).chain(files.into_iter().map(Item::ThemeFile)).collect();
         }

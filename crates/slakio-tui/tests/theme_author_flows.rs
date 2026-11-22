@@ -192,3 +192,26 @@ fn a_shared_themes_folder_is_said_and_not_written_in() {
     assert!(saved_themes(&mut d).is_empty());
     std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o700)).unwrap();
 }
+
+#[test]
+fn the_palette_lists_the_theme_files_once_while_it_is_open() {
+    let dir = Scratch::new("listing-once");
+    std::fs::create_dir_all(dir.0.join("themes")).unwrap();
+    std::fs::write(dir.theme("first"), "extends = \"dark\"\n").unwrap();
+    let mut d = booted(120, 40, Lang::En, dir.config());
+    let listed = |d: &Demo, name: &str| d.app.palette_rows().iter().any(|r| r.name == name);
+    d.keys(":");
+    d.type_text("theme ");
+    assert!(listed(&d, "first"), "{}", d.screen());
+    // A file made while the palette is open is not read on the next key or frame.
+    std::fs::write(dir.theme("second"), "extends = \"dark\"\n").unwrap();
+    d.type_text("s");
+    d.keys("backspace");
+    let _ = d.screen();
+    assert!(!listed(&d, "second"), "the folder is read once while the palette is open");
+    // Opened again: read again.
+    d.keys("esc");
+    d.keys(":");
+    d.type_text("theme ");
+    assert!(listed(&d, "second"), "{}", d.screen());
+}
