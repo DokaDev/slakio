@@ -58,7 +58,7 @@
 
 "theme_file.at_line" = "{path}:{line}: {problem}"
 "theme_file.in_file" = "{path}: {problem}"
-"theme_file.bad_name" = "{name}: 테마 파일 이름이 될 수 없습니다 (영문자, 숫자, -, _로 1~64자)"
+"theme_file.bad_name" = "{name}: 테마 파일 이름이 될 수 없습니다 (ASCII 영문자, 숫자, _, -로 1~64자: A-Z a-z 0-9 _ -)"
 "theme_file.builtin_name" = "{name}: 내장 테마의 이름입니다"
 "theme_file.reserved_name" = "{name}: :theme의 하위 명령(copy, new, update)이라 이 이름의 테마 파일은 :theme로 고를 수 없습니다"
 "theme_file.missing" = "알 수 없는 테마 {name}: {path} 파일이 없습니다"

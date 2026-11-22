@@ -69,7 +69,7 @@
 # Theme files (themes/<name>.toml next to the config file): why one cannot be used.
 "theme_file.at_line" = "{path}:{line}: {problem}"
 "theme_file.in_file" = "{path}: {problem}"
-"theme_file.bad_name" = "{name} is not a theme file's name (1 to 64 letters, digits, - and _)"
+"theme_file.bad_name" = "{name} is not a theme file's name: 1 to 64 ASCII letters, digits, _ and - (A-Z a-z 0-9 _ -)"
 "theme_file.builtin_name" = "{name} is the name of a built-in theme"
 "theme_file.reserved_name" = "{name} is a word of :theme (copy, new, update): a theme file of that name could not be picked with it"
 "theme_file.missing" = "Unknown theme {name}: there is no {path}"

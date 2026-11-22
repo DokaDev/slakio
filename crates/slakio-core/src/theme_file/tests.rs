@@ -257,7 +257,7 @@ fn names_are_plain_file_names() {
     );
     assert_eq!(
         NameError::Invalid("../x".into()).message(&en),
-        "../x is not a theme file's name (1 to 64 letters, digits, - and _)"
+        "../x is not a theme file's name: 1 to 64 ASCII letters, digits, _ and - (A-Z a-z 0-9 _ -)"
     );
     assert_eq!(NameError::Builtin("Dark".into()).message(&en), "Dark is the name of a built-in theme");
 }

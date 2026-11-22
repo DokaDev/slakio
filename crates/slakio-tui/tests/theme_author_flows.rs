@@ -141,9 +141,9 @@ fn the_palette_copies_writes_and_updates_theme_files() {
     d.keys("esc");
     // Bad names: exact words, nothing written.
     for (cmd, want) in [
-        ("theme new ../x", "../x is not a theme file's name (1 to 64 letters, digits, - and _)"),
+        ("theme new ../x", "../x is not a theme file's name: 1 to 64 ASCII letters, digits, _ and - (A-Z a-z 0-9 _ -)"),
         ("theme copy dark Dracula", "Dracula is the name of a built-in theme"),
-        ("theme new nul", "nul is not a theme file's name (1 to 64 letters, digits, - and _)"),
+        ("theme new nul", "nul is not a theme file's name: 1 to 64 ASCII letters, digits, _ and - (A-Z a-z 0-9 _ -)"),
         ("theme copy", "Use :theme copy <from> [name], :theme new <name> or :theme update [name]"),
         ("theme update dark", "dark is a built-in theme: there is no file to update"),
     ] {
@@ -268,4 +268,32 @@ fn a_terminal_file_with_a_hex_colour_still_marks_the_row_of_a_panel_without_focu
     let buf = d.buffer();
     let bar = (inner.left()..inner.right()).any(|x| buf[(x, y)].bg != ratatui::style::Color::Reset);
     assert!(bar || buf[(inner.x, y)].symbol() == "\u{258E}", "the selected row is marked:\n{}", d.screen());
+}
+
+#[test]
+fn the_name_rule_says_ascii_letters_on_the_screen() {
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let dir = Scratch::new("ascii");
+            let mut d = booted(w, h, lang, dir.config());
+            d.keys("space , c ctrl+u");
+            d.type_text("a.b");
+            d.keys("enter");
+            let screen = d.snap();
+            // What is said on top of the box: its lines down to the first group's heading.
+            let mut top: Vec<String> = screen
+                .lines()
+                .skip(2)
+                .take_while(|l| !l.contains('‹'))
+                .map(|l| l.split('│').nth(2).unwrap_or_default().trim().to_string())
+                .collect();
+            top.pop();
+            got.push(top.join(" "));
+            assert!(!dir.theme("a.b").exists());
+        }
+    }
+    let en = "a.b is not a theme file's name: 1 to 64 ASCII letters, digits, _ and - (A-Z a-z 0-9 _ -)";
+    let ko = "a.b: ＊＊ ＊＊ ＊＊＊ ＊ ＊ ＊＊＊＊ (ASCII ＊＊＊, ＊＊, _, -＊ 1~64＊: A-Z a-z 0-9 _ -)";
+    assert_eq!(got, [en, ko, en, ko], "whole at 80 and 120 columns, in English and Korean");
 }
