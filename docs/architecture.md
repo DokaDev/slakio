@@ -271,8 +271,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
    (`edgeapi.slack.com`), for the live updates the realtime host (`wss-primary.slack.com`,
    HTTP/1.1 only), for a file the user downloads and a picture's smaller copy Slack's file
    host (`model::FILE_HOST`, the `files` host of `slack.com`), and for profile photos the
-   avatar hosts (`images::AVATAR_HOSTS`: Slack's avatar host and `secure.gravatar.com`, which
-   never get a cookie or a token: the wire refuses a request to them that carries one),
+   avatar hosts (`images::AVATAR_HOSTS`: Slack's avatar host, `secure.gravatar.com` and Slack's
+   static host for default avatars, which never get a cookie, a token, an `Origin` or a
+   `Referer`: the wire refuses a request to them that carries one),
    nothing else: the host is checked where the socket opens, so no other host is ever reached.
    The tests reach a loopback address over plain HTTP.
 6. **Format.** Requests look like the official web client's (the browser's header set in its
@@ -292,7 +293,10 @@ downloaded; never the original) goes with the download's cookie and image header
 photo (`User::avatar`, only on an avatar host) with no cookie, no token, no `Origin` or
 `Referer`. Both are `https` only, checked when Slack's answer is read and again before the
 request (`images::Source::checked`); a copy follows redirects only on the file host, a photo
-none. Each ask counts as a background request of the workspace's lane (`Governor::picture`);
+at most 2 (`picture::AVATAR_REDIRECTS`), each only to an address `images::avatar_address` keeps
+(a Gravatar address only when each `d=`/`default=` fallback it names is a keyword or on Slack's
+avatar hosts), each hop counted. The user's own photo comes from the start bundle's `self`
+profile, else from the edge `users/info` lookup the boot already makes for the DMs' people. Each ask counts as a background request of the workspace's lane (`Governor::picture`);
 at most four at once a workspace, each within 25 s in all (`picture::DEADLINE`, however its
 bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
 bytes (said or counted). The UI decodes it on a blocking task, the size read

@@ -302,8 +302,15 @@ background and decoded off the screen's thread.
   `SLAKIO_IMAGES=on` (or `images = "on"`).
 - What is fetched: the smaller copy Slack makes of a picture (never the original), from Slack's
   file host with your session cookie and never your token, as a file's download; and profile
-  photos from Slack's avatar host (`avatars.slack` + `-edge.com`) or `secure.gravatar.com`, over
-  `https` only, with no cookie and no token, and no redirect followed. Only an answer that says
+  photos from Slack's avatar host (`avatars.slack` + `-edge.com`), `secure.gravatar.com`, or
+  Slack's static host (`a.slack` + `-edge.com`, where Slack keeps the default avatars of people
+  without a photo of their own), over `https` only, on those exact hosts (no other port, no
+  user name in the address), with no cookie, no token, no `Origin` and no `Referer`. A photo
+  follows at most 2 redirects, each only to one of those hosts and checked again, and each
+  counted as a request; a redirect anywhere else is refused, and nothing is asked there. A
+  Gravatar address is used only when the fallback picture it names (`d=`) is Slack's own or one
+  of Gravatar's built-in pictures. Your own photo shows too: it comes from your profile in
+  Slack's start answer, or from the same people lookup slakio already makes. Only an answer that says
   it is an image is read, at most 2 MB of it; a picture larger than 4096 pixels a side or 4.2
   million pixels is refused from its header, before it is decoded. Each picture fetched counts
   as a background request against the request cap, and the network switches stop it. With
