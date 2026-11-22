@@ -12,7 +12,9 @@
 # each workspace's slot, waiting places, keychain entries and cache part its own.
 # Raised from 8.5 for picture previews and profile photos: the `image` decoder (PNG, JPEG, GIF)
 # measured about +0.29 MiB on aarch64 macOS, CI's x86_64 Linux build 8.24 MiB before it.
-binary_mib_max = 9.0
+# Raised from 9.0 for theme files and the settings screen: theme files brought the `toml` parser
+# and serde's derived readers into the binary (CI's x86_64 Linux build 8.97 MiB after them).
+binary_mib_max = 9.5
 
 [idle]
 # The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
