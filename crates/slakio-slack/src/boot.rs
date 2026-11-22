@@ -2,7 +2,9 @@
 //! preferences and do-not-disturb times; it cannot do without), then what it can do without —
 //! the unread counts (`client.counts`), the DMs' people by name (edge `users/info`) and whether
 //! they are in do not disturb (`dnd.teamInfo`) — each of which, when it fails, is unknown and
-//! never zero or "not in do not disturb".
+//! never zero or "not in do not disturb". The user's own profile photo comes from the start
+//! bundle's profile, else from the same edge lookup (the user asked for along with the DMs'
+//! people), else from what a page already told of them.
 //!
 //! Counts are Slack's: a channel is unread when Slack says it has unreads and its mentions are
 //! Slack's mention count; a DM's (and a group DM's) count is Slack's too, every message there
@@ -44,7 +46,12 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     let counts = counts(client).await;
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
-    let mut known = people.names(client, &peers, Priority::Background).await;
+    // The user too, when the start bundle has no photo of them.
+    let mut asked = peers.clone();
+    if self_.profile.as_ref().and_then(wire::Profile::avatar).is_none() {
+        asked.push(self_.id.clone());
+    }
+    let mut known = people.names(client, &asked, Priority::Background).await;
     let now = now_micros() / 1_000_000;
     let dnd = dnd(client, &peers, now).await;
     for u in &mut known {
@@ -148,6 +155,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
         Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external, &sections[1]))
     }));
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
+    let avatar = own_photo(&me, &known);
     let presence = match boot.dnd.as_ref().and_then(|d| d.active(now)) {
         Some(true) => Presence::Dnd,
         _ => Presence::Unknown,
@@ -167,7 +175,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
             org: Org::Own,
             bot: false,
             presence,
-            avatar: None,
+            avatar,
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
         .collect(),
@@ -178,6 +186,15 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
         taken: Ts(now_micros()),
         counts_failed,
     }
+}
+
+/// The user's own photo: the start bundle's, else the one looked up or learned of them
+/// (`known`).
+fn own_photo(me: &wire::Me, known: &[User]) -> Option<String> {
+    me.profile
+        .as_ref()
+        .and_then(wire::Profile::avatar)
+        .or_else(|| known.iter().find(|u| u.id.as_str() == me.id).and_then(|u| u.avatar.clone()))
 }
 
 pub(crate) fn now_micros() -> u64 {

@@ -116,6 +116,10 @@ pub struct DndTeam {
 pub struct Me {
     pub id: String,
     pub name: Option<String>,
+    /// The user's own profile, when the start bundle carries it (one that cannot be read is
+    /// none).
+    #[serde(default, deserialize_with = "loose")]
+    pub profile: Option<Profile>,
 }
 
 #[derive(Debug, Deserialize)]

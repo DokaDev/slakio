@@ -98,3 +98,53 @@ fn the_user_s_do_not_disturb_is_read_from_the_start_bundle() {
     assert_eq!(wire::Dnd { dnd_enabled: Some(true), ..wire::Dnd::default() }.active(NOW), None);
     assert_eq!(me(&snapshot(boot(json!({}), json!("odd")), None, Vec::new(), NOW)), Presence::Unknown);
 }
+
+fn me_with(profile: serde_json::Value) -> wire::UserBoot {
+    let mut b = boot(json!({}), json!(null));
+    b.me = serde_json::from_value(json!({"id": "U0", "name": "me", "profile": profile})).unwrap();
+    b
+}
+
+fn person(id: &str, avatar: Option<&str>) -> User {
+    User {
+        id: UserId::new(id),
+        workspace: WorkspaceId::new("T1"),
+        name: Remote::new(id),
+        display_name: Remote::new(id),
+        org: Org::Own,
+        bot: false,
+        presence: Presence::Unknown,
+        avatar: avatar.map(str::to_string),
+    }
+}
+
+#[test]
+fn the_user_s_own_photo_comes_from_the_start_bundle_s_profile() {
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let photo = format!("https://{host}/2020-01-01/0_72.png");
+    let s = snapshot(me_with(json!({"image_72": photo})), None, Vec::new(), NOW);
+    assert_eq!(s.users[0].id.as_str(), "U0");
+    assert_eq!(s.users[0].avatar.as_deref(), Some(photo.as_str()));
+    // A photo on any other host is none.
+    let s = snapshot(me_with(json!({"image_72": "https://evil.example/0.png"})), None, Vec::new(), NOW);
+    assert_eq!(s.users[0].avatar, None);
+    // A profile that cannot be read is none, not a failed start.
+    let s = snapshot(me_with(json!("odd")), None, Vec::new(), NOW);
+    assert_eq!(s.users[0].avatar, None);
+}
+
+#[test]
+fn the_user_s_own_photo_looked_up_or_learned_is_kept_not_dropped() {
+    let host = slakio_core::images::AVATAR_HOSTS[2];
+    let learned = format!("https://{host}/img/avatars/ava_0010-72.png");
+    let known = vec![person("U0", Some(&learned)), person("U1", None)];
+    let s = snapshot(boot(json!({}), json!(null)), None, known.clone(), NOW);
+    let me: Vec<&User> = s.users.iter().filter(|u| u.id.as_str() == "U0").collect();
+    assert_eq!(me.len(), 1, "the user once");
+    assert_eq!(me[0].avatar.as_deref(), Some(learned.as_str()));
+    assert_eq!(me[0].org, Org::Own);
+    // The start bundle's own photo comes first.
+    let own = format!("https://{}/2020-01-01/0_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+    let s = snapshot(me_with(json!({"image_48": own})), None, known, NOW);
+    assert_eq!(s.users[0].avatar.as_deref(), Some(own.as_str()));
+}

@@ -376,3 +376,24 @@ fn a_photo_never_follows_a_redirect_to_an_address_a_photo_may_not_come_from() {
         assert_eq!(r.picture_requests().len(), 16);
     });
 }
+
+#[test]
+fn the_user_s_own_photo_is_looked_up_when_the_start_bundle_has_none() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let s = match r.ask(Command::Boot).await {
+            Event::Booted(s) => *s,
+            other => panic!("{other:?}"),
+        };
+        let me = &s.workspaces[0].me;
+        let world = r.world.snapshot();
+        let want = world.users.iter().find(|u| &u.id == me).and_then(|u| u.avatar.clone());
+        assert!(want.is_some(), "the world gives the user a photo");
+        let got: Vec<_> = s.users.iter().filter(|u| &u.id == me).collect();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].avatar, want, "looked up, not dropped");
+        let asked =
+            r.fake.log().into_iter().filter(|l| l.method() == "users/info").any(|l| l.body.contains(me.as_str()));
+        assert!(asked, "asked of the edge cache with the DMs' people");
+    });
+}
