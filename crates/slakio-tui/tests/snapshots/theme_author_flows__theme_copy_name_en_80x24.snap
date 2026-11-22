@@ -23,6 +23,6 @@ expression: d.snap()
 │ │ config file.                                                             │ │
 │ │ Saved to /home/me/.config/slakio/config.toml                             │ │
 │ │ More settings in /home/me/.config/slakio/config.toml                     │ │
-│ ╰────────────────────────── j/k move · h/l change · Enter keep · Esc close ╯ │
+│ ╰────────────────────────────────── Enter save · Esc cancel · Ctrl+U clear ╯ │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › Home                                               │ demo

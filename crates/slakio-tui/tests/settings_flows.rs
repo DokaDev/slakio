@@ -325,3 +325,38 @@ fn the_status_line_offers_no_pane_keys_under_the_screen() {
     }
     assert_eq!(lines, want, "at 80 and 120 columns, in English and Korean");
 }
+
+#[test]
+fn the_frame_says_the_keys_of_the_folder_and_the_name_typed() {
+    // The settings box's bottom border, from its corner to its corner.
+    let border = |d: &Demo| {
+        let screen = d.snap();
+        let line = screen.lines().find(|l| l.contains("Esc") && l.contains('╰')).unwrap_or_default().to_string();
+        let from = line.find('╰').unwrap_or(0);
+        let to = line.rfind('╯').map_or(line.len(), |i| i + '╯'.len_utf8());
+        line[from..to].to_string()
+    };
+    let mut got = Vec::new();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, h, lang, shown_config(), true);
+            d.keys("space ,");
+            let list = border(&d);
+            // downloads: type a folder.
+            d.keys("j j j j j j j enter");
+            assert!(d.app.prefs.screen.as_ref().is_some_and(|s| s.folder.is_some()), "{w} {lang:?}");
+            let folder = border(&d);
+            d.keys("esc");
+            assert_eq!(border(&d), list, "{w} {lang:?}: the list's keys again");
+            // theme: the name of a copy.
+            d.keys("k k k k k k k c");
+            assert!(d.app.prefs.screen.as_ref().is_some_and(|s| s.name.is_some()), "{w} {lang:?}");
+            assert_eq!(border(&d), folder, "{w} {lang:?}: the same keys");
+            got.push(folder);
+        }
+    }
+    let line = |w: usize, keys: &str, kw: usize| format!("╰{} {keys} ╯", "─".repeat(w - kw - 4));
+    let (en, ko) = ("Enter save · Esc cancel · Ctrl+U clear", "Enter ＊＊ · Esc ＊＊ · Ctrl+U ＊＊＊");
+    let want = [line(76, en, 38), line(76, ko, 37), line(100, en, 38), line(100, ko, 37)];
+    assert_eq!(got, want, "at 80 and 120 columns, in English and Korean");
+}

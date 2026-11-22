@@ -705,6 +705,7 @@
 "ctx.settings" = "Settings screen"
 "settings.title" = "Settings"
 "settings.keys" = "j/k move · h/l change · Enter keep · Esc close"
+"settings.input_keys" = "Enter save · Esc cancel · Ctrl+U clear"
 "settings.group_display" = "Display"
 "settings.group_pictures" = "Pictures"
 "settings.group_language" = "Language"

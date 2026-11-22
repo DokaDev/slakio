@@ -662,6 +662,7 @@
 "ctx.settings" = "설정 화면"
 "settings.title" = "설정"
 "settings.keys" = "j/k 이동 · h/l 바꾸기 · Enter 유지 · Esc 닫기"
+"settings.input_keys" = "Enter 저장 · Esc 취소 · Ctrl+U 지우기"
 "settings.group_display" = "화면"
 "settings.group_pictures" = "그림"
 "settings.group_language" = "언어"

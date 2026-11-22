@@ -46,7 +46,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     }
     let rect = Rect::new(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h);
     let i18n = &app.i18n;
-    let inner = modal(f, app, rect, &i18n.label(Label::SettingsTitle), &i18n.label(Label::SettingsKeys));
+    // While a folder or a name is typed, the keys of what is typed.
+    let typing = s.folder.is_some() || s.name.is_some();
+    let keys = if typing { Label::SettingsInputKeys } else { Label::SettingsKeys };
+    let inner = modal(f, app, rect, &i18n.label(Label::SettingsTitle), &i18n.label(keys));
     let tw = usize::from(inner.width).saturating_sub(2);
     let x = inner.x + 1;
     let bottom = inner.bottom();
@@ -79,7 +82,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
             break;
         }
         put(f, y, line, *style);
-        if i == 0 && (s.folder.is_some() || s.name.is_some()) {
+        if i == 0 && typing {
             let cx = (x + width(line) as u16).min(x + tw as u16);
             f.set_cursor_position(Position { x: cx, y });
         }
