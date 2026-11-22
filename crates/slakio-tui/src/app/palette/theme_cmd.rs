@@ -58,13 +58,11 @@ impl App {
         let label = match of_line(&text) {
             Some(Ok(ThemeCommand::Copy { from, name })) => {
                 let name = name.map_or_else(|| self.copy_name(from), str::to_string);
-                Msg::PaletteThemeCopy { from: from.to_string(), name }
+                Msg::PaletteThemeCopy { from: shown(from), name: shown(&name) }
             }
-            Some(Ok(ThemeCommand::New { name })) => {
-                Msg::PaletteThemeNew { name: name.to_string(), base: self.new_base() }
-            }
+            Some(Ok(ThemeCommand::New { name })) => Msg::PaletteThemeNew { name: shown(name), base: self.new_base() },
             Some(Ok(ThemeCommand::Update { name })) => {
-                Msg::PaletteThemeUpdate { name: name.map_or_else(|| self.theme_setting.clone(), str::to_string) }
+                Msg::PaletteThemeUpdate { name: shown(name.unwrap_or(&self.theme_setting)) }
             }
             _ => Msg::Label(Label::PaletteThemeUsage),
         };

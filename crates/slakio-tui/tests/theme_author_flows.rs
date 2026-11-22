@@ -215,3 +215,21 @@ fn the_palette_lists_the_theme_files_once_while_it_is_open() {
     d.type_text("theme ");
     assert!(listed(&d, "second"), "{}", d.screen());
 }
+
+#[test]
+fn typed_names_are_said_safe_to_print() {
+    let dir = Scratch::new("typed-names");
+    let mut d = booted(120, 40, Lang::En, dir.config());
+    for typed in
+        ["theme copy \u{202e}dark", "theme copy dark \u{202e}x", "theme new \u{202e}y", "theme update \u{202e}z"]
+    {
+        d.keys(":");
+        d.type_text(typed);
+        let labels: Vec<String> = d.app.palette_rows().into_iter().map(|r| r.label).collect();
+        assert!(!labels.is_empty() && labels.iter().all(|l| !l.contains('\u{202e}')), "{typed:?}: {labels:?}");
+        d.keys("esc");
+    }
+    d.command("set live=\u{202e}maybe");
+    let said = d.app.cmdline.error.as_ref().map(|m| d.app.i18n.msg(m).to_string()).unwrap_or_default();
+    assert!(said.starts_with("live cannot be maybe (one of"), "{said}");
+}

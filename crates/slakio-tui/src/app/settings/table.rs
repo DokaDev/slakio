@@ -4,6 +4,7 @@
 
 use slakio_core::config;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::sanitize::Remote;
 
 /// The groups of the settings screen, in its order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -152,16 +153,16 @@ pub fn parse_set(line: &str) -> Option<Result<(usize, String), Msg>> {
     };
     let Some(k) = find(key) else {
         let keys = SETTINGS.iter().map(|s| s.key).collect::<Vec<_>>().join(", ");
-        return Some(Err(Msg::SetUnknownKey { key: key.to_string(), keys }));
+        return Some(Err(Msg::SetUnknownKey { key: shown(key), keys }));
     };
-    let Some(value) = value else { return Some(Err(Msg::SetNoValue { key: key.to_string() })) };
+    let Some(value) = value else { return Some(Err(Msg::SetNoValue { key: shown(key) })) };
     Some(check(k, value).map(|v| (k, v)))
 }
 
 /// `value` as setting `k` takes it (a fixed value lowercased), or why it is not one.
 pub fn check(k: usize, value: &str) -> Result<String, Msg> {
     let spec = &SETTINGS[k];
-    let bad = |values: String| Msg::SetBadValue { key: spec.key.to_string(), value: value.to_string(), values };
+    let bad = |values: String| Msg::SetBadValue { key: spec.key.to_string(), value: shown(value), values };
     match spec.values {
         Values::Themes | Values::Folder => Ok(value.to_string()),
         Values::Fixed(values) => {
@@ -179,6 +180,11 @@ pub fn check(k: usize, value: &str) -> Result<String, Msg> {
             }
         }
     }
+}
+
+/// A word typed, safe to print on one line.
+fn shown(text: &str) -> String {
+    Remote::new(text).line().into_string()
 }
 
 #[cfg(test)]
@@ -223,5 +229,19 @@ mod tests {
         assert!(matches!(parse_set("set live=maybe"), Some(Err(Msg::SetBadValue { .. }))));
         assert!(matches!(parse_set("set download_max_mb=0"), Some(Err(Msg::SetBadValue { .. }))));
         assert!(matches!(parse_set("set live"), Some(Err(Msg::SetNoValue { .. }))));
+    }
+
+    #[test]
+    fn typed_words_are_said_safe_to_print() {
+        // What was typed is said safe to print: no escape, no bidi control.
+        for line in ["set live=\x1b[31m", "set \x1b[31m=on", "set \u{202e}x"] {
+            let Some(Err(msg)) = parse_set(line) else { panic!("{line:?} is refused") };
+            let said = match msg {
+                Msg::SetBadValue { value, .. } => value,
+                Msg::SetUnknownKey { key, .. } | Msg::SetNoValue { key } => key,
+                other => panic!("{other:?}"),
+            };
+            assert!(!said.contains('\x1b') && !said.contains('\u{202e}'), "{said}");
+        }
     }
 }
