@@ -43,8 +43,9 @@ impl App {
             Ok(t) => self.theme = t,
             Err(e) => {
                 self.theme = look.theme("terminal");
-                let why = self.theme_problem(&e);
-                self.warn(why, now);
+                // The status line names the file without its folder: the whole path is on the
+                // settings screen.
+                self.warn(Msg::ThemeNotUsed { why: e.brief(&self.i18n).to_string() }, now);
             }
         }
     }

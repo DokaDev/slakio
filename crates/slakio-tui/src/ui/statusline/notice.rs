@@ -37,8 +37,9 @@ pub(super) fn notice_max(app: &App, msg: &Msg) -> usize {
     if let Msg::OpenOpening { host } = msg {
         return width(&app.i18n.msg(&Msg::OpenOpening { host: host_tail(host, app.host_room()) }));
     }
-    // A file saved: its name and its folder, as far as a workspace's notice goes.
-    if let Some((_, Some(_))) = filed(msg) {
+    // A file saved: its name and its folder, as far as a workspace's notice goes; so is a
+    // theme file that is not used, with why.
+    if matches!(filed(msg), Some((_, Some(_)))) || matches!(msg, Msg::ThemeNotUsed { .. }) {
         return NOTICE_MAX.max(width(&app.i18n.msg(msg)).min(NOTICE_MAX + NOTICE_NAME));
     }
     let Some(name) = named(msg) else { return NOTICE_MAX };

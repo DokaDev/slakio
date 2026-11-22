@@ -51,11 +51,13 @@ fn theme_files_at_launch_and_while_running() {
     std::fs::write("config.toml", CONFIG).unwrap();
     std::fs::write("themes/broken.toml", "extends = \"dark\"\n[colors]\naccent = \"#12345\"\n").unwrap();
 
+    // The file's name (the theme's name is its stem) and why, whole: the folder is on the
+    // settings screen.
     let want = [
-        " NORMAL  ▌Home │ Theme not used: themes/broken.toml:3: #12345 is not a…  │ demo",
-        " NORMAL  ▌A company › Home │ Theme not used: themes/broken.toml:3: #12345 is… │ Enter open · ? help · Space more │ demo",
-        " NORMAL  ▌＊ │ ＊＊＊ ＊＊ ＊＊: themes/broken.toml:3: #12345: ＊＊ ＊…  │ ＊＊",
-        " NORMAL  ▌A company › ＊ │ ＊＊＊ ＊＊ ＊＊: themes/broken.toml:3: #12345:… │ Enter ＊＊ · l ＊＊＊＊ · ? ＊＊＊ │ ＊＊",
+        " NORMAL  ▌Home │ Theme not used: broken.toml:3: #12345 is not a colour   │ demo",
+        " NORMAL  ▌A compa… › Home │ Theme not used: broken.toml:3: #12345 is not a colour │ Enter open · l peek · ? help │ demo",
+        " NORMAL  ▌＊ │ ＊＊＊ ＊＊ ＊＊: broken.toml:3: #12345: ＊＊ ＊＊＊＊    │ ＊＊",
+        " NORMAL  ▌A company › ＊ │ ＊＊＊ ＊＊ ＊＊: broken.toml:3: #12345: ＊＊ ＊＊＊＊        │ Enter ＊＊ · ? ＊＊＊ │ ＊＊",
     ];
     let mut lines = Vec::new();
     for (w, lang) in [(80, Lang::En), (120, Lang::En), (80, Lang::Ko), (120, Lang::Ko)] {
@@ -65,7 +67,27 @@ fn theme_files_at_launch_and_while_running() {
         assert!(saved(&mut d).is_empty(), "nothing is saved");
         lines.push(demo::mask_hangul(d.status_line().trim_end()));
     }
-    assert_eq!(lines, want.map(native), "the status line at 80 and 120 columns, in English and Korean");
+    assert_eq!(lines, want, "the status line at 80 and 120 columns, in English and Korean");
+    // However long the folder: the same words.
+    let deep = dir.join("a-folder-name-long-enough-to-fill-the-status-line-on-its-own").join("and-more");
+    std::fs::create_dir_all(deep.join("themes")).unwrap();
+    std::fs::copy("themes/broken.toml", deep.join("themes").join("broken.toml")).unwrap();
+    let cfg = slakio_core::config::Config {
+        theme: "broken".to_string(),
+        path: Some(deep.join("config.toml")),
+        ..Default::default()
+    };
+    for (i, (w, lang)) in [(80, Lang::En), (120, Lang::En), (80, Lang::Ko), (120, Lang::Ko)].into_iter().enumerate() {
+        let mut d = Demo::with(w, 24, lang, Settings::default());
+        d.app.load_at_start(TRUECOLOR, &cfg, true, d.now);
+        assert_eq!(demo::mask_hangul(d.status_line().trim_end()), want[i], "{w} {lang:?}: a deep folder");
+        // The settings screen says the whole path.
+        d.keys("space ,");
+        let problem = d.app.prefs.screen.as_ref().and_then(|s| s.problem.clone());
+        let said = problem.map(|m| d.app.i18n.msg(&m).to_string()).unwrap_or_default();
+        let path = deep.join("themes").join("broken.toml").display().to_string();
+        assert!(said.contains(&format!("{path}:3: #12345")), "{w} {lang:?}: {said}");
+    }
     assert_eq!(std::fs::read_to_string("config.toml").unwrap(), CONFIG, "the config file is untouched");
 
     // A missing file is said too, by its path.
@@ -79,7 +101,7 @@ fn theme_files_at_launch_and_while_running() {
     d.app.load_at_start(TRUECOLOR, &gone, true, d.now);
     assert_eq!(d.app.theme.name, "terminal");
     assert!(
-        d.status_line().contains(&native("Theme not used: Unknown theme gone: there is no themes/gone.toml")),
+        d.status_line().contains("Theme not used: Unknown theme gone: there is no gone.toml"),
         "{}",
         d.status_line()
     );
