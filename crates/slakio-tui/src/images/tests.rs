@@ -469,3 +469,27 @@ fn a_list_photo_yields_its_room_to_a_timeline_picture() {
     assert!(matches!(images.look(&ws(), &preview), Look::Ready { .. }));
     assert_eq!(images.held().0, ENTRIES_MAX);
 }
+
+#[test]
+fn emoji_only_laid_out_give_the_frame_s_share_back_and_what_is_shown_keeps_it() {
+    let images = on();
+    let address = |n: usize| format!("https://{}/T1/e{n}/0.png", slakio_core::images::EMOJI_HOSTS[0]);
+    // Shown first: e0. Then a message measured off screen looks at e0 and a share's worth more.
+    images.look_emoji(&ws(), &address(0));
+    let from = images.mark();
+    for n in 0..=EMOJI_PER_FRAME {
+        images.look_emoji(&ws(), &address(n));
+    }
+    images.not_shown(from, images.mark());
+    // What is shown next has the share back, all but e0, which what is shown still holds.
+    for n in 100..100 + EMOJI_PER_FRAME {
+        images.look_emoji(&ws(), &address(n));
+    }
+    let wanted: Vec<Source> = images.wanted.borrow().iter().filter(|w| w.2).map(|w| w.1.0.clone()).collect();
+    let mut expected: Vec<Source> =
+        [0].into_iter().chain(100..99 + EMOJI_PER_FRAME).map(|n| Source::Emoji(address(n))).collect();
+    expected.sort_by_key(|s| s.address().to_string());
+    let mut got = wanted.clone();
+    got.sort_by_key(|s| s.address().to_string());
+    assert_eq!(got, expected, "the share holds for what is shown: {EMOJI_PER_FRAME}");
+}

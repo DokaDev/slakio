@@ -345,8 +345,9 @@ timeline picture, else the new picture is not sent and is parked until the scree
 set of pictures a shown frame looks at differs from the frame before's). After a frame the
 timeline's pictures are asked before the list's photos, at most `IN_FLIGHT_MAX` (4) at once and
 none while the pictures on screen and those on their way fill the room. A frame draws at most
-`EMOJI_PER_FRAME` (32) distinct emoji pictures, counted in the order it lays them out
-(messages only measured included); the rest stay `:name:`.
+`EMOJI_PER_FRAME` (32) distinct emoji pictures, counted in the order it lays them out; a
+message only measured to place the view gives its part back (`Images::not_shown`) and is laid
+out again if it is shown after all, so only what is shown counts. The rest stay `:name:`.
 
 **Downloads** (`download.rs`, `http/fetch.rs`): a file a message shares is downloaded only
 when the user asks (`Command::Download`), at most two at once a workspace. Only an address

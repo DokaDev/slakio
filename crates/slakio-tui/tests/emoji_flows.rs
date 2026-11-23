@@ -334,6 +334,40 @@ fn more_emoji_than_the_terminal_holds_ask_a_frame_s_share_once_each_and_the_rest
     }
 }
 
+#[test]
+fn emoji_of_a_message_only_measured_off_screen_leave_the_share_to_those_shown() {
+    use slakio_core::images::emoji::Custom;
+    // The oldest shows ten emoji; the newest, a wall of a share's worth and more, one a line.
+    let tops: Vec<String> = (0..10).map(|k| format!("top-{k}")).collect();
+    let walls: Vec<String> = (0..40).map(|k| format!("wall-{k}")).collect();
+    let top = format!("oldest {}", tops.iter().map(|n| format!(":{n}:")).collect::<Vec<_>>().join(" "));
+    let wall = walls.iter().map(|n| format!(":{n}:")).collect::<Vec<_>>().join("\n");
+    let mut texts = vec![top];
+    texts.extend((0..3).map(|k| format!("filler {k}")));
+    texts.push(wall);
+    let messages: Vec<(&str, &[&str])> = texts.iter().map(|t| (t.as_str(), &[][..])).collect();
+    let (mut s, ws) = shown(&messages, 100, 20, true);
+    let list = lists(&frame(&mut s))[0].clone();
+    let named = (tops.iter().chain(&walls))
+        .map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n))))
+        .collect();
+    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji: named } });
+    s.pump();
+    let bottom = frame(&mut s);
+    assert!(!pictures(&bottom).is_empty(), "the wall's pictures, shown at the bottom");
+    for r in &bottom {
+        give_picture(&mut s, r);
+    }
+    // Up from the wall: it is measured first (does the view still fit?), then left off screen.
+    s.keys("k k");
+    let asked = pictures(&frame(&mut s));
+    let screen = s.d.screen();
+    assert!(screen.contains("oldest") && !screen.contains(":wall-"), "{screen}");
+    let want: Vec<Source> = tops.iter().map(|n| emoji(&ws, n)).collect();
+    assert_eq!(asked.len(), slakio_tui::images::IN_FLIGHT_MAX, "the first frame up there asks for those it shows");
+    assert!(asked.iter().all(|a| want.contains(a)), "{asked:?}");
+}
+
 /// Signed in again to `ws` as someone else, then booted and `deploys` opened again with
 /// `messages`.
 fn signed_in_as_someone_else(s: &mut Scripted, ws: &WorkspaceId, messages: &[(&str, &[&str])]) {

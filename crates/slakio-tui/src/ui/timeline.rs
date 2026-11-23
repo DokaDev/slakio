@@ -96,6 +96,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         out
     };
     let height = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| laid.entry(i).or_insert_with(|| rows(i)).len();
+    // A message measured to place the view gives back the frame's share of emoji pictures it
+    // took, and is laid out again if it is shown after all: the share goes to what is shown.
+    let give_back = |i: usize, laid: &mut HashMap<usize, Vec<Laid>>| {
+        let took = noted.borrow().get(&i).copied().filter(|(from, to)| to.3 > from.3);
+        if let Some((from, to)) = took {
+            app.images.not_shown(from, to);
+            noted.borrow_mut().remove(&i);
+            laid.remove(&i);
+        }
+    };
     // A selection held on its row (messages came in between it and the bottom) stays there:
     // the bottom is the message that many rows below it, its last rows cut off when it does
     // not end there.
@@ -132,11 +142,18 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
                 }
             };
             if !fits {
+                // What the check laid out may not be shown: laid out again where it is.
+                for i in laid.keys().copied().collect::<Vec<_>>() {
+                    give_back(i, &mut laid);
+                }
                 let mut total = 0;
                 bottom = sel;
                 for j in sel..n {
                     let hj = height(j, &mut laid);
                     if j > sel && total + hj > h {
+                        // Measured, not shown (unless the view fills from the top: laid out
+                        // again then, after what is shown).
+                        give_back(j, &mut laid);
                         break;
                     }
                     total += hj;

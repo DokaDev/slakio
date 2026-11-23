@@ -22,8 +22,8 @@
 //! picture, and otherwise the new picture is not sent and waits, parked, until the screen
 //! changes (the set of pictures a shown frame looks at differs from the frame before's). While
 //! the pictures on screen fill the terminal's room, nothing more is asked for. A frame draws at
-//! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]); the rest stay
-//! text. The timeline's pictures are asked for before the list's photos, which yield their room
+//! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]), counting only
+//! what it shows ([`Images::not_shown`]); the rest stay text. The timeline's pictures are asked for before the list's photos, which yield their room
 //! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
 //! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
 //! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
@@ -157,7 +157,15 @@ pub enum Chosen {
 }
 
 /// A place in what frames note ([`Images::mark`]).
-pub type Mark = (usize, usize, usize);
+pub type Mark = (usize, usize, usize, usize);
+
+/// The emoji pictures the frame being drawn looked at: how many of its looks at each still
+/// count, and every look in order (`false` once its message was only laid out).
+#[derive(Debug, Default)]
+struct EmojiShare {
+    live: HashMap<Key, u32>,
+    looks: Vec<(Key, bool)>,
+}
 
 /// The pictures: what is asked, decoded, held by the terminal, or failed.
 #[derive(Debug, Default)]
@@ -187,9 +195,9 @@ pub struct Images {
     /// What the latest shown frame looked at, and the one before it: never removed.
     screen: HashSet<Key>,
     last_screen: HashSet<Key>,
-    /// The distinct emoji pictures the frame being drawn looked at (at most
+    /// The distinct emoji pictures the frame being drawn looked at for what it shows (at most
     /// [`EMOJI_PER_FRAME`]).
-    emoji_frame: RefCell<HashSet<Key>>,
+    emoji_frame: RefCell<EmojiShare>,
     last_id: u32,
     /// The highest picture id ever sent.
     pub highest: u32,
@@ -308,20 +316,21 @@ impl Images {
     /// What the emoji picture at `address` (of workspace `ws`) is for drawing in two cells
     /// ([`Images::look_as`]); past [`EMOJI_PER_FRAME`] distinct ones in a frame, not looked at
     /// ([`Look::Pending`]: its name stays text). A frame lays a message out once, so its width
-    /// and its drawing agree.
+    /// and its drawing agree. A message only laid out gives its part of the share back
+    /// ([`Images::not_shown`]).
     pub fn look_emoji(&self, ws: &WorkspaceId, address: &str) -> Look {
         if !self.on {
             return Look::Pending;
         }
         let key = (Source::Emoji(address.to_string()), Shape::Emoji);
         {
-            let mut seen = self.emoji_frame.borrow_mut();
-            if !seen.contains(&key) {
-                if seen.len() >= EMOJI_PER_FRAME {
-                    return Look::Pending;
-                }
-                seen.insert(key.clone());
+            let mut share = self.emoji_frame.borrow_mut();
+            let EmojiShare { live, looks } = &mut *share;
+            if !live.contains_key(&key) && live.len() >= EMOJI_PER_FRAME {
+                return Look::Pending;
             }
+            *live.entry(key.clone()).or_default() += 1;
+            looks.push((key.clone(), true));
         }
         self.look_as(ws, &key.0, key.1)
     }
@@ -334,14 +343,27 @@ impl Images {
     /// Where what frames note stands now: what is noted after it, until a later mark, can be
     /// said to be only laid out ([`Images::not_shown`]).
     pub fn mark(&self) -> Mark {
-        (self.wanted.borrow().len(), self.drawn.borrow().len(), self.customs.mark())
+        let looks = self.emoji_frame.borrow().looks.len();
+        (self.wanted.borrow().len(), self.drawn.borrow().len(), self.customs.mark(), looks)
     }
 
     /// What was noted between `from` and `to` was laid out, not shown (a message measured off
-    /// screen): it is neither asked for nor counted as drawn, and a workspace's own emoji list
-    /// it would want is not asked for because of it.
+    /// screen): it is neither asked for nor counted as drawn, a workspace's own emoji list it
+    /// would want is not asked for because of it, and the emoji it looked at no longer count
+    /// toward the frame's [`EMOJI_PER_FRAME`] (unless what is shown looked at them too).
     pub fn not_shown(&self, from: Mark, to: Mark) {
         self.customs.not_shown(from.2, to.2);
+        let mut share = self.emoji_frame.borrow_mut();
+        let EmojiShare { live, looks } = &mut *share;
+        for (key, counts) in looks.get_mut(from.3..to.3).into_iter().flatten().filter(|l| l.1) {
+            *counts = false;
+            if let Some(n) = live.get_mut(key) {
+                *n -= 1;
+                if *n == 0 {
+                    live.remove(key);
+                }
+            }
+        }
         for w in self.wanted.borrow_mut().get_mut(from.0..to.0).into_iter().flatten() {
             w.2 = false;
         }
