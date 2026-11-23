@@ -431,3 +431,41 @@ fn a_frame_draws_at_most_so_many_emoji_pictures() {
     assert_eq!(wanted.len(), EMOJI_PER_FRAME + 1);
     assert!(wanted.iter().all(|s| *s != Source::Emoji(address(EMOJI_PER_FRAME))));
 }
+
+#[test]
+fn a_list_photo_yields_its_room_to_a_timeline_picture() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = |n: usize| Source::Avatar(format!("https://{}/p{n}.png", slakio_core::images::AVATAR_HOSTS[0]));
+    let chips: Vec<Source> = (0..ENTRIES_MAX).map(photo).collect();
+    let draw_chips = |images: &Images| {
+        for c in &chips {
+            images.look_as(&ws(), c, CHIP_PHOTO);
+        }
+    };
+    for _ in 0..ENTRIES_MAX {
+        draw_chips(&images);
+        images.ask(&mut requests, Instant::now());
+        for r in requests.take() {
+            let job = images.answered(r.id, vec![1]).expect("a job");
+            images.decoded(key(&job), Ok(ready(&job, 10)));
+        }
+    }
+    assert_eq!(images.held().0, ENTRIES_MAX);
+    images.take_graphics();
+    // A timeline picture and one more list photo on screen with them: the picture is asked
+    // first, the photo not at all (no room).
+    let preview = thumb(1);
+    draw_chips(&images);
+    images.look_as(&ws(), &photo(999), CHIP_PHOTO);
+    images.look(&ws(), &preview);
+    images.ask(&mut requests, Instant::now());
+    let asked = requests.take();
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(asked[0].command, Command::Image { source: preview.clone(), max: BYTES_MAX });
+    let job = images.answered(asked[0].id, vec![1]).expect("a job");
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    let sent = images.take_graphics();
+    assert!(sent.contains("a=d,d=I,i=1,q=2"), "the oldest list photo made room: {sent:?}");
+    assert!(matches!(images.look(&ws(), &preview), Look::Ready { .. }));
+    assert_eq!(images.held().0, ENTRIES_MAX);
+}

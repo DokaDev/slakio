@@ -17,14 +17,16 @@
 //! What the terminal holds for slakio is bounded: at most [`ENTRIES_MAX`] pictures and
 //! [`BYTES_CAP`] bytes of them; past that the least recently drawn is removed from the terminal
 //! (and fetched again if it is drawn again), but never one the latest frame or the one before it
-//! looked at: when every picture held is on screen, the new picture is not sent and waits, parked, until the screen
+//! looked at: when every picture held is on screen, a list photo makes room for a timeline
+//! picture, and otherwise the new picture is not sent and waits, parked, until the screen
 //! changes (the set of pictures a shown frame looks at differs from the frame before's). While
 //! the pictures on screen fill the terminal's room, nothing more is asked for. A frame draws at
 //! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]); the rest stay
-//! text. A picture that failed says why on its card (too
-//! large, unreadable, not loaded); one that failed for the network or the request budget is
-//! asked again after [`RETRY_AFTER`] ([`RETRY_SOON`] for a busy or offline backend), when it is
-//! drawn again; at most [`FAILED_MAX`] failures are kept.
+//! text. The timeline's pictures are asked for before the list's photos, which yield their room
+//! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
+//! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
+//! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
+//! [`FAILED_MAX`] failures are kept.
 
 pub mod custom;
 pub mod decode;
@@ -337,7 +339,7 @@ impl Images {
     }
 
     /// After a frame: what it showed is the most recently drawn, and what it would have shown
-    /// is asked for (at most [`IN_FLIGHT_MAX`]
+    /// is asked for, the timeline's pictures before the list's photos (at most [`IN_FLIGHT_MAX`]
     /// at once, and none while the pictures on screen and those on their way fill the
     /// terminal's room; a failed one once its wait is over); what it only laid out is neither.
     /// When what it showed differs from the frame before, the parked pictures may be asked
@@ -357,11 +359,18 @@ impl Images {
         self.last_screen = std::mem::replace(&mut self.screen, screen);
         self.emoji_frame.take();
         let mut asked = false;
-        for (ws, key, _) in self.wanted.take().into_iter().filter(|w| w.2) {
+        let mut wanted: Vec<_> = self.wanted.take().into_iter().filter(|w| w.2).collect();
+        wanted.sort_by_key(|w| w.1.1 == CHIP_PHOTO);
+        for (ws, key, _) in wanted {
             let in_flight = self.in_flight();
-            let staying = self.held.iter().filter(|k| self.on_screen(k)).count();
-            if in_flight >= IN_FLIGHT_MAX || staying + in_flight >= ENTRIES_MAX {
+            if in_flight >= IN_FLIGHT_MAX {
                 break;
+            }
+            // A list photo yields its room to the timeline's pictures, never the other way.
+            let chip = key.1 == CHIP_PHOTO;
+            let staying = self.held.iter().filter(|k| self.on_screen(k) && (chip || k.1 != CHIP_PHOTO)).count();
+            if staying + in_flight >= ENTRIES_MAX {
+                continue;
             }
             match self.entries.get(&key) {
                 None => {}
@@ -423,7 +432,7 @@ impl Images {
 
     /// The picture of `job` was made ready (or refused): it is sent to the terminal before the
     /// next frame, and the least recently drawn go while there are too many, never one on
-    /// screen; with no room, it is parked. A result for
+    /// screen but a list photo for a timeline picture; with no room, it is parked. A result for
     /// a request no longer waited for changes nothing.
     pub fn decoded(&mut self, job: (Source, Generation), result: Result<Prepared, Refused>) {
         let (source, request) = job;
@@ -444,7 +453,9 @@ impl Images {
             }
         };
         while self.held.len() >= ENTRIES_MAX || (self.bytes + p.bytes > BYTES_CAP && !self.held.is_empty()) {
-            let Some(i) = self.held.iter().position(|k| !self.on_screen(k)) else {
+            let off = self.held.iter().position(|k| !self.on_screen(k));
+            let chip = || self.held.iter().position(|k| k.1 == CHIP_PHOTO);
+            let Some(i) = off.or_else(|| (key.1 != CHIP_PHOTO).then(chip).flatten()) else {
                 // Never sent, so nothing to remove from the terminal.
                 self.entries.insert(key, Entry::Parked);
                 return;

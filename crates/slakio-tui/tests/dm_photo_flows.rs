@@ -601,3 +601,54 @@ fn more_photos_on_screen_than_the_terminal_holds_are_asked_once_and_none_shown_i
     assert!(per.values().all(|n| *n <= 2), "a photo asked for more than once per place: {per:?}");
     assert_eq!(s.d.app.images.held().0, all.len());
 }
+
+#[test]
+fn the_timeline_s_photos_are_asked_first_and_the_list_s_yield_their_room() {
+    use slakio_tui::images::{ENTRIES_MAX, PHOTO};
+    let (mut s, peers) = crowded(100, 90, 80);
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let address = |s: &Scripted, p| s.d.app.model.user(&ws, p).and_then(|u| u.avatar.clone()).expect("a photo");
+    // The peers whose message the timeline shows, each with its photo slot.
+    let screen = s.d.screen();
+    let shown: Vec<String> = peers
+        .iter()
+        .enumerate()
+        .filter(|(k, _)| screen.contains(&format!("note {k} ")))
+        .map(|(_, p)| address(&s, p))
+        .collect();
+    assert!(shown.len() > IN_FLIGHT_MAX, "{} messages shown", shown.len());
+    assert!(shown.len() + expected(&s).len() > ENTRIES_MAX, "more photos on screen than the terminal holds");
+    // The first requests are the timeline's: delivered, the slots' photos are ready, no chip's.
+    let first = frame(&mut s);
+    assert_eq!(first.len(), IN_FLIGHT_MAX);
+    for (id, _) in &first {
+        deliver(&mut s, *id);
+    }
+    for (_, source) in &first {
+        let Source::Avatar(a) = source else { panic!("{source:?}") };
+        assert!(shown.contains(a), "{a}: not a photo of the timeline");
+        assert!(matches!(s.d.app.images.look_as(&ws, source, PHOTO), Look::Ready { .. }), "{a}: the slot's");
+        assert_eq!(s.d.app.images.look_as(&ws, source, CHIP_PHOTO), Look::Pending, "{a}: not the chip's yet");
+    }
+    for _ in 0..40 {
+        let now = frame(&mut s);
+        if now.is_empty() {
+            break;
+        }
+        for (id, _) in now {
+            deliver(&mut s, id);
+        }
+    }
+    s.d.screen();
+    for a in &shown {
+        let look = s.d.app.images.look_as(&ws, &Source::Avatar(a.clone()), PHOTO);
+        assert!(matches!(look, Look::Ready { .. }), "{a}: every timeline photo shown is there: {look:?}");
+    }
+    let chips = expected(&s)
+        .iter()
+        .filter(|p| {
+            matches!(s.d.app.images.look_as(&ws, &Source::Avatar(p.address.clone()), CHIP_PHOTO), Look::Ready { .. })
+        })
+        .count();
+    assert_eq!(chips + shown.len(), ENTRIES_MAX, "the list's photos fill the room left");
+}
