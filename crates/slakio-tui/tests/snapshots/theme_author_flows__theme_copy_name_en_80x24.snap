@@ -12,8 +12,8 @@ expression: d.snap()
 │ │ Pictures                                                                 │ │
 │ │   Avatars          ‹ initials           ›  Coloured initials (default)   │ │
 │ │   Images           ‹ auto               ›  Where sure to show (default)  │ │
-│ │ Language                                                                 │ │
-│ │                                                            9 more below  │ │
+│ │                                                                          │ │
+│ │                                                           10 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: terminal-copy                                                   │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │

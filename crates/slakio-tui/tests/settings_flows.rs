@@ -10,7 +10,7 @@ mod demo;
 
 use demo::Demo;
 use slakio_core::config::{self, Config};
-use slakio_core::i18n::Lang;
+use slakio_core::i18n::{Label, Lang};
 use slakio_tui::app::{Effect, Settings, WHICH_KEY_DELAY};
 use slakio_tui::theme::{Background, Look};
 use std::path::{Path, PathBuf};
@@ -563,5 +563,63 @@ fn rows_are_named_by_label_and_the_selected_one_says_its_set_key() {
         d.keys("/");
         d.type_text(&word[1..]);
         assert!(d.snap().contains(word), "{word}:\n{}", d.snap());
+    }
+}
+
+/// The screen's lines that are a group's heading, each with the line under it.
+fn headings_and_next(d: &Demo) -> Vec<(String, String)> {
+    let groups: Vec<String> = [
+        Label::SettingsGroupDisplay,
+        Label::SettingsGroupPictures,
+        Label::SettingsGroupLanguage,
+        Label::SettingsGroupFiles,
+        Label::SettingsGroupNetwork,
+    ]
+    .iter()
+    .map(|l| d.app.i18n.label(*l).to_string())
+    .collect();
+    let lines: Vec<String> = d.screen().lines().map(str::to_string).collect();
+    // The settings box's inside, without the panes' and the box's borders.
+    let inside = |line: &str| line.trim_matches(|c: char| "│├┤ ▎".contains(c)).to_string();
+    lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| groups.contains(&inside(l)))
+        .map(|(i, l)| (l.clone(), lines.get(i + 1).cloned().unwrap_or_default()))
+        .collect()
+}
+
+/// A group's heading is never alone at the bottom of the list (as "Files" was above "7 more
+/// below" at 80x24): wherever the list is scrolled to, at every height, in both languages, the
+/// line under a heading is a row of it.
+#[test]
+fn a_heading_is_never_alone_at_the_bottom_of_the_list() {
+    let rows = slakio_tui::app::settings::table::SETTINGS.len();
+    for (lang, sizes) in [(Lang::En, 10..=30), (Lang::Ko, 10..=30)] {
+        for h in sizes {
+            for w in [60, 80] {
+                let mut d = booted(w, h, lang, shown_config(), true);
+                d.keys("space ,");
+                for step in 0..=rows {
+                    let shown = headings_and_next(&d);
+                    for (heading, next) in &shown {
+                        assert!(
+                            next.contains('‹'),
+                            "{lang:?} {w}x{h} step {step}: {heading:?} has no row under it:\n{}",
+                            d.screen()
+                        );
+                    }
+                    d.keys("j");
+                }
+            }
+        }
+    }
+    // At 80x24 the first screen shows every group's heading it shows with its first row.
+    for lang in [Lang::En, Lang::Ko] {
+        let mut d = booted(80, 24, lang, shown_config(), true);
+        d.keys("space ,");
+        let shown = headings_and_next(&d);
+        assert!(shown.len() >= 3, "{lang:?}:\n{}", d.screen());
+        assert!(shown.iter().all(|(_, next)| next.contains('‹')), "{lang:?}:\n{}", d.screen());
     }
 }

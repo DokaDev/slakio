@@ -14,8 +14,8 @@ expression: d.snap()
 │ │   Images           ‹ auto               ›  Where sure to show (default)  │ │
 │ │ Language                                                                 │ │
 │ │   Language         ‹ auto               ›  applies on next launch        │ │
-│ │ Files                                                                    │ │
-│ │                                                            7 more below  │ │
+│ │                                                                          │ │
+│ │                                                            8 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter keeps the one shown; c   │ │
 │ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │

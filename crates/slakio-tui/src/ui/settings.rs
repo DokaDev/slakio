@@ -169,6 +169,10 @@ fn list(f: &mut Frame, app: &App, s: &Screen, area: Rect, foot: usize) -> u16 {
         rows_room -= 1;
         skip = (selected_line + 1).saturating_sub(rows_room);
     }
+    // A group's heading never sits alone on the list's last line: it goes below with its rows.
+    if rows_room > 1 && skip + rows_room < lines.len() && lines[skip + rows_room - 1].is_none() {
+        rows_room -= 1;
+    }
     let (above, below) = (skip, lines.len().saturating_sub(skip + rows_room));
     let shown: Vec<(String, String)> = (0..SETTINGS.len()).map(|k| app.setting_shown(k)).collect();
     let (key_w, value_w) = columns(app, &shown, tw);

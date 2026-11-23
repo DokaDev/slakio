@@ -9,8 +9,8 @@ expression: d.snap()
 │ │   Density          ‹ comfortable       ›  As in GUI… │ │
 │ │   View rows        ‹ expanded          ›  A row per… │ │
 ├─│   Nerd Font icons  ‹ off               ›  Text and…  │ │
-│ │ Pictures                                             │ │
-│ │                                       12 more below  │ │
+│ │                                                      │ │
+│ │                                       13 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter      │ │
 │ │ keeps the one shown; c copies it to a new theme      │ │
