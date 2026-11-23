@@ -285,9 +285,9 @@ shows its first frame) has a preview under its card, at most 36 × 10 cells, and
 `avatars = "image"` (or `:avatars image`) the comfortable layout shows people's profile photos
 in place of their initials, and each DM in the list shows its peer's photo, small, in the two
 cells of their initials (group DMs keep how many people are in them; only the rows on screen
-fetch their photos, and a photo shown in both places is fetched for each). Elsewhere, and until a picture has come, the text card and the
-initials show as before; a picture that cannot be shown says why on its card (too large, no
-preview, not loaded). A workspace's own emoji show as small pictures, two cells wide, in a
+fetch their photos, and a photo shown in both places is fetched for each). Elsewhere, and
+until a picture has come, the text card and the initials show as before; a picture that cannot
+be shown says why on its card (too large, no preview, not loaded). A workspace's own emoji show as small pictures, two cells wide, in a
 message's text and in its reaction chips (a GIF shows its first frame; a line never breaks
 inside one); where pictures are not drawn, until one has come, or when it cannot be fetched,
 `:name:` shows as before. Nothing of it ever blocks the screen: pictures are fetched in the
