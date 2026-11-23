@@ -202,8 +202,18 @@ impl Model {
             (None, Some(w)) => s.workspaces.push(w),
             (_, None) => {}
         }
+        // A photo shown before stays when the answer has none of that person.
+        let photos: HashMap<UserId, String> = (s.users.iter())
+            .filter(|u| &u.workspace == ws)
+            .filter_map(|u| Some((u.id.clone(), u.avatar.clone()?)))
+            .collect();
         s.users.retain(|u| &u.workspace != ws);
-        s.users.extend(new.users);
+        s.users.extend(new.users.into_iter().map(|mut u| {
+            if u.avatar.is_none() {
+                u.avatar = photos.get(&u.id).cloned();
+            }
+            u
+        }));
         s.sections.retain(|x| &x.workspace != ws);
         s.sections.extend(new.sections);
         let mut conversations = new.conversations;
@@ -365,12 +375,17 @@ impl Model {
     }
 
     /// People the backend learned of after the start (a page's authors, of workspace `ws`): each
-    /// is added, or replaces what was known of them in `ws`; one of another workspace is left out.
+    /// is added, or replaces what was known of them in `ws` (a photo known stays when the new
+    /// record has none); one of another workspace is left out.
     pub fn add_users(&mut self, ws: &WorkspaceId, users: &[User]) {
         for u in users.iter().filter(|u| &u.workspace == ws) {
             let key = (u.workspace.clone(), u.id.clone());
             match self.users.get(&key) {
-                Some(&i) => self.snapshot.users[i] = u.clone(),
+                Some(&i) => {
+                    // A record without a photo does not say the photo is gone.
+                    let avatar = u.avatar.clone().or_else(|| self.snapshot.users[i].avatar.take());
+                    self.snapshot.users[i] = User { avatar, ..u.clone() };
+                }
                 None => {
                     // A bot's author of one more name: past [`BOT_NAMES`] of that bot, it takes
                     // the place of its oldest name (its messages still carry their names and the

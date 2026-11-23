@@ -334,3 +334,58 @@ fn a_bot_s_names_kept_as_people_are_capped() {
     let named = m.user(&w, &bot(990).id).unwrap();
     assert_eq!(named.display_name.line().as_str(), "name 990", "each id still names its own");
 }
+
+#[test]
+fn a_known_photo_is_never_replaced_by_no_photo_but_a_new_photo_replaces_it() {
+    let a = WorkspaceId::new("T1");
+    let id = UserId::new("U-peer");
+    let peer = |avatar: Option<&str>| User {
+        id: id.clone(),
+        workspace: a.clone(),
+        name: Remote::new("peer"),
+        display_name: Remote::new("Peer"),
+        org: Org::Own,
+        bot: false,
+        presence: slakio_core::model::Presence::Unknown,
+        avatar: avatar.map(str::to_string),
+    };
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
+    let (one, two) = (one.as_str(), two.as_str());
+    let mut m = Model::default();
+    m.add_users(&a, &[peer(Some(one))]);
+    m.add_users(&a, &[User { presence: slakio_core::model::Presence::Away, ..peer(None) }]);
+    let got = m.user(&a, &id).unwrap();
+    assert_eq!(got.avatar.as_deref(), Some(one), "a later page without a photo keeps it");
+    assert_eq!(got.presence, slakio_core::model::Presence::Away, "the rest of the record is the new one");
+    m.add_users(&a, &[peer(Some(two))]);
+    assert_eq!(m.user(&a, &id).unwrap().avatar.as_deref(), Some(two), "a real new photo replaces it");
+}
+
+#[test]
+fn a_boot_answer_without_a_photo_keeps_the_photo_shown() {
+    let (a, part_a) = part(0);
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let photo = &format!("https://{host}/me_72.png");
+    let mut with = part_a.clone();
+    let me = with.workspaces[0].me.clone();
+    for u in with.users.iter_mut().filter(|u| u.id == me) {
+        u.avatar = Some(photo.clone());
+    }
+    m.merge(&a, &with, false);
+    assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(photo.as_str()));
+    let mut without = part_a.clone();
+    for u in &mut without.users {
+        u.avatar = None;
+    }
+    m.merge(&a, &without, false);
+    assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(photo.as_str()), "a re-boot without it keeps it");
+    let other = format!("https://{host}/new_72.png");
+    for u in without.users.iter_mut().filter(|u| u.id == me) {
+        u.avatar = Some(other.clone());
+    }
+    m.merge(&a, &without, false);
+    assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(other.as_str()), "a real new photo replaces it");
+}
