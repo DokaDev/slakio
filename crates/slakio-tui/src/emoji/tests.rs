@@ -35,3 +35,16 @@ fn emoji_are_two_cells_wide_as_one_grapheme() {
     let s = crate::text::wrap(&replace(":fire: :fire: :fire:"), 5, 9).0;
     assert!(s.iter().all(|l| width(l) <= 5), "{s:?}");
 }
+
+#[test]
+fn every_name_slack_spells_otherwise_is_an_emoji() {
+    for (slack, gemoji) in ALIASES {
+        assert!(emojis::get_by_shortcode(gemoji).is_some(), "{slack} -> {gemoji}");
+        assert_eq!(get(slack), get(gemoji), "{slack}");
+    }
+    assert_eq!(get("thinking_face"), Some("\u{1F914}"));
+    assert_eq!(
+        replace("hm :face_with_rolling_eyes: :man-shrugging:"),
+        "hm \u{1F644} \u{1F937}\u{200D}\u{2642}\u{FE0F}"
+    );
+}
