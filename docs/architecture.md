@@ -295,8 +295,9 @@ photo (`User::avatar`, only on an avatar host) with no cookie, no token, no `Ori
 `Referer`. Both are `https` only, checked when Slack's answer is read and again before the
 request (`images::Source::checked`); a copy follows redirects only on the file host, a photo
 at most 2 (`picture::AVATAR_REDIRECTS`), each only to an address `images::avatar_address` keeps
-(a Gravatar address only when each `d=`/`default=` fallback it names is a keyword or on Slack's
-avatar hosts), each hop counted. The user's own photo comes from the start bundle's `self`
+(a Gravatar address only when it names Gravatar's own parameters alone, plainly and with no `;`,
+and each `d=`/`default=` fallback it names is a keyword or on Slack's avatar hosts), each hop
+counted. The user's own photo comes from the start bundle's `self`
 profile, else from the edge `users/info` lookup the boot already makes for the DMs' people. Each ask counts as a background request of the workspace's lane (`Governor::picture`);
 at most four at once a workspace, each within 25 s in all (`picture::DEADLINE`, however its
 bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`

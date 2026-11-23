@@ -4,17 +4,30 @@
 //! keyword of Gravatar's own pictures (letters and digits only: `mp`, `identicon`, `404`) or,
 //! once percent-decoded, an address on one of Slack's avatar hosts; any other (another host,
 //! Gravatar itself, `http`, a path, a broken escape) refuses the whole address, so nothing is
-//! asked of Gravatar that would send the viewer elsewhere.
+//! asked of Gravatar that would send the viewer elsewhere. Only Gravatar's own parameters may
+//! stand in the query, named plainly, so no server reads a fallback slakio did not check.
 
 use super::{AVATAR_HOSTS, on_host};
 
+/// The parameters a Gravatar address may carry (size, fallback, rating, forced fallback), by
+/// name; any other refuses the address.
+const NAMES: [&str; 8] = ["s", "size", "d", "default", "r", "rating", "f", "forcedefault"];
+
 /// Each fallback `url` (an address on Gravatar) names is a keyword or an address on Slack's
-/// avatar hosts. A parameter's name is read decoded and without regard to case, as a server may.
+/// avatar hosts. A parameter's name is read decoded and without regard to case, as a server may;
+/// it must be one of [`NAMES`] exactly (not padded with spaces, no NUL), and no `;` may stand in
+/// the query (some servers split there too).
 pub(super) fn fallbacks_allowed(url: &str) -> bool {
     let Some((_, query)) = url.split_once('?') else { return true };
-    query.split('&').all(|pair| {
+    if query.contains(';') {
+        return false;
+    }
+    query.split('&').filter(|pair| !pair.is_empty()).all(|pair| {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
         let Some(key) = decode(key) else { return false };
+        if key.trim() != key || key.contains('\0') || !NAMES.iter().any(|n| key.eq_ignore_ascii_case(n)) {
+            return false;
+        }
         if !key.eq_ignore_ascii_case("d") && !key.eq_ignore_ascii_case("default") {
             return true;
         }
@@ -33,6 +46,10 @@ fn decode(s: &str) -> Option<String> {
         match b {
             b'%' => {
                 let hex = [bytes.next()?, bytes.next()?];
+                // Two hex digits exactly: `%+F` is no escape.
+                if !hex.iter().all(u8::is_ascii_hexdigit) {
+                    return None;
+                }
                 out.push(u8::from_str_radix(std::str::from_utf8(&hex).ok()?, 16).ok()?);
             }
             b'+' => out.push(b' '),

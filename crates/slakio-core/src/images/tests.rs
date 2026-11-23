@@ -126,3 +126,38 @@ fn a_gravatar_address_is_kept_only_when_its_fallback_is_slack_s() {
         assert_eq!(avatar_address(&bad), None, "{bad}");
     }
 }
+
+#[test]
+fn a_gravatar_address_names_only_gravatar_s_parameters_plainly() {
+    let hash = "https://secure.gravatar.com/avatar/04939292775a6f4a1817e5e846c11609.jpg";
+    let evil = "https%3A%2F%2Fevil.example%2Fa.png";
+    for ok in [
+        format!("{hash}?s=72&d=mp&r=g&f=y"),
+        format!("{hash}?SIZE=72&Default=identicon&rating=pg&forcedefault=n"),
+        format!("{hash}?s=72&&d=mp"),
+    ] {
+        assert_eq!(avatar_address(&ok).as_deref(), Some(ok.as_str()), "{ok}");
+    }
+    for bad in [
+        // `;` anywhere in the query, as a separator or not.
+        format!("{hash}?s=72;d={evil}"),
+        format!("{hash}?s=72&d=mp;"),
+        format!("{hash}?s=7;2"),
+        // A name another server may trim or cut short.
+        format!("{hash}?+d={evil}"),
+        format!("{hash}?%20d={evil}"),
+        format!("{hash}?d%20={evil}"),
+        format!("{hash}?%09d={evil}"),
+        format!("{hash}?d%00={evil}"),
+        format!("{hash}?%00d={evil}"),
+        // A name Gravatar does not have, or an array of one.
+        format!("{hash}?d[]={evil}"),
+        format!("{hash}?x=1"),
+        format!("{hash}?s=72&callback=y"),
+        // A broken escape in a name.
+        format!("{hash}?%+64={evil}"),
+        format!("{hash}?d=%+F"),
+    ] {
+        assert_eq!(avatar_address(&bad), None, "{bad}");
+    }
+}

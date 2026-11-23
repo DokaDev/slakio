@@ -315,8 +315,8 @@ background and decoded off the screen's thread.
   user name in the address), with no cookie, no token, no `Origin` and no `Referer`. A photo
   follows at most 2 redirects, each only to one of those hosts and checked again, and each
   counted as a request; a redirect anywhere else is refused, and nothing is asked there. A
-  Gravatar address is used only when the fallback picture it names (`d=`) is Slack's own or one
-  of Gravatar's built-in pictures. Your own photo shows too: it comes from your profile in
+  Gravatar address is used only when it carries Gravatar's own settings alone and the fallback
+  picture it names (`d=`) is Slack's own or one of Gravatar's built-in pictures. Your own photo shows too: it comes from your profile in
   Slack's start answer, or from the same people lookup slakio already makes. Only an answer that says
   it is an image is read, at most 2 MB of it; a picture larger than 4096 pixels a side or 4.2
   million pixels is refused from its header, before it is decoded. Each picture fetched counts
