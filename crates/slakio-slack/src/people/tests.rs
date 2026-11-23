@@ -57,3 +57,44 @@ fn an_id_whose_lookup_failed_is_asked_again() {
         assert_eq!(fake.log().len(), 2, "asked again after the failure, then known as unnamed");
     });
 }
+
+fn person(id: &str, photo: Option<&str>) -> wire::Person {
+    let mut profile = json!({"display_name": "Minsu"});
+    if let Some(p) = photo {
+        profile["image_72"] = json!(p);
+    }
+    serde_json::from_value(json!({"id": id, "team_id": "T1", "profile": profile})).unwrap()
+}
+
+fn photo_of(people: &People, id: &str) -> Option<String> {
+    people.known.lock().unwrap().get(id).and_then(|u| u.avatar.clone())
+}
+
+#[test]
+fn a_record_without_a_photo_keeps_the_photo_known_and_a_new_photo_replaces_it() {
+    let people = People::default();
+    people.set_team("T1");
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
+    let (one, two) = (one.as_str(), two.as_str());
+    people.learn(&[person("U1", Some(one))]);
+    people.learn(&[person("U1", None)]);
+    assert_eq!(photo_of(&people, "U1").as_deref(), Some(one), "no photo in a later record is not no photo");
+    people.learn(&[person("U1", Some("https://elsewhere.example/x.png"))]);
+    assert_eq!(photo_of(&people, "U1").as_deref(), Some(one), "a photo on another host is no photo");
+    people.learn(&[person("U1", Some(two))]);
+    assert_eq!(photo_of(&people, "U1").as_deref(), Some(two), "a real new photo replaces it");
+}
+
+#[test]
+fn only_a_person_known_without_a_photo_is_forgotten_to_be_asked_again() {
+    let people = People::default();
+    people.set_team("T1");
+    let two = format!("https://{}/two_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+    people.learn(&[person("U1", None), person("U2", Some(&two))]);
+    people.forget_unpictured("U1");
+    people.forget_unpictured("U2");
+    let known = people.known.lock().unwrap();
+    assert!(!known.contains_key("U1"));
+    assert!(known.contains_key("U2"));
+}

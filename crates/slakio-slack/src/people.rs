@@ -44,8 +44,17 @@ impl People {
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         for p in persons {
             if let Some(u) = user(p, &team) {
-                known.insert(p.id.clone(), u);
+                keep(&mut known, &p.id, u);
             }
+        }
+    }
+
+    /// Forget person `id` when no photo of them is known, so the next [`People::names`] asks
+    /// Slack for them again (the user's own record, when the start bundle has no photo).
+    pub(crate) fn forget_unpictured(&self, id: &str) {
+        let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
+        if known.get(id).is_some_and(|u| u.avatar.is_none()) {
+            known.remove(id);
         }
     }
 
@@ -74,7 +83,7 @@ impl People {
             let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
             for p in found.results.unwrap_or_default() {
                 if let Some(u) = user(&p, &team) {
-                    known.insert(p.id.clone(), u);
+                    keep(&mut known, &p.id, u);
                 }
             }
             let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
@@ -83,6 +92,15 @@ impl People {
         let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         wanted.iter().filter_map(|id| known.get(*id).cloned()).collect()
     }
+}
+
+/// Keep `u`, replacing what was known of them; a photo known before stays when `u` has none
+/// (a record without a photo does not say the photo is gone).
+fn keep(known: &mut HashMap<String, User>, id: &str, mut u: User) {
+    if u.avatar.is_none() {
+        u.avatar = known.get(id).and_then(|old| old.avatar.clone());
+    }
+    known.insert(id.to_string(), u);
 }
 
 /// `p` as the core's person of `team`; `None` when Slack gave no name to show.

@@ -49,6 +49,8 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     // The user too, when the start bundle has no photo of them.
     let mut asked = peers.clone();
     if self_.profile.as_ref().and_then(wire::Profile::avatar).is_none() {
+        // A page may have named them already without a photo: asked all the same.
+        people.forget_unpictured(&self_.id);
         asked.push(self_.id.clone());
     }
     let mut known = people.names(client, &asked, Priority::Background).await;
