@@ -272,8 +272,9 @@ every rail sits in the transport, below the backend, so no caller can go around 
    HTTP/1.1 only), for a file the user downloads and a picture's smaller copy Slack's file
    host (`model::FILE_HOST`, the `files` host of `slack.com`), and for profile photos the
    avatar hosts (`images::AVATAR_HOSTS`: Slack's avatar host, `secure.gravatar.com` and Slack's
-   static host for default avatars, which never get a cookie, a token, an `Origin` or a
-   `Referer`: the wire refuses a request to them that carries one),
+   static host for default avatars), and for a workspace's own emoji the emoji host
+   (`images::EMOJI_HOSTS`); the avatar and emoji hosts never get a cookie, a token, an `Origin`
+   or a `Referer`: the wire refuses a request to them that carries one;
    nothing else: the host is checked where the socket opens, so no other host is ever reached.
    The tests reach a loopback address over plain HTTP.
 6. **Format.** Requests look like the official web client's (the browser's header set in its
@@ -308,6 +309,23 @@ dim under a popup, the selection bar) changes their colour, which names the pict
 the decoder is caught with the panic hook told so (`terminal::catching`): the terminal is left
 as it is. Turning pictures off removes each by its id, then all; the way out removes every id
 sent (a range), then all.
+
+**A workspace's own emoji** (`emoji.rs`; core `images::emoji`; the UI's `images/custom.rs` and
+`ui/timeline/custom.rs`): the first frame that shows a shortcode the standard emoji do not know
+(one with a letter) notes its workspace; after the frame the UI asks for that workspace's list
+once (`Command::Emoji`, answered `Event::Emoji`): `emoji.list`, one background request. It is
+kept in memory for the run, forgotten when the workspace is signed in again (read again when
+next wanted), and after a failure asked again only after the pictures' waits (never for a
+refusal); a failure is never said. The backend reads it into what each name draws
+(`images::emoji::resolve`): its picture only when `images::emoji_address` keeps the address
+(the emoji host, `https`, no port, no user), aliases followed at most `ALIAS_DEPTH` (4) times
+with a guard against cycles, an alias of a name the workspace lacks kept as that standard
+emoji's name. An emoji's picture is `images::Source::Emoji`, asked for only when a frame draws
+it, fetched like a photo (no cookie, no token, no `Origin`, no `Referer`), following at most 2
+redirects (`picture::EMOJI_REDIRECTS`) each only to the emoji host and counted; decoded whole
+into two cells of a row (`Shape::Emoji`, first frame of a GIF) and drawn as two placeholder
+cells; the wrap keeps a picture's later cell with the one before it, so a line never breaks
+inside one. Pictures off, not here, failed or refused: `:name:` text.
 
 **Downloads** (`download.rs`, `http/fetch.rs`): a file a message shares is downloaded only
 when the user asks (`Command::Download`), at most two at once a workspace. Only an address

@@ -122,7 +122,9 @@ images, and settings. This README only lists what works; it will grow with each 
     sender's initials in a 4 × 2 block, the name and time over the text, a sender's messages
     within five minutes grouped under one header (their time shows when selected), one blank
     row between blocks and after reactions, reactions as emoji chips (Slack's shortcodes such as
-    `:+1:` drawn as emoji, skin tones too; a workspace's own emoji stay `:name:`); `:density`
+    `:+1:` drawn as emoji, skin tones too, and the common names Slack spells its own way such as
+    `:thinking_face:`; a workspace's own emoji show as small pictures where pictures are drawn
+    ([Pictures](#pictures)), as the emoji an alias names, and otherwise stay `:name:`); `:density`
     switches to compact columns and saves it; date separators, the edited marker, "N replies"
     rows; older messages load a page at a time as you go up, paced so reading back never
     runs into Slack's limits (a page on its way, one that failed with `r` to retry, and the
@@ -285,7 +287,10 @@ in place of their initials, and each DM in the list shows its peer's photo, smal
 cells of their initials (group DMs keep how many people are in them; only the rows on screen
 fetch their photos, and a photo shown in both places is fetched for each). Elsewhere, and until a picture has come, the text card and the
 initials show as before; a picture that cannot be shown says why on its card (too large, no
-preview, not loaded). Nothing of it ever blocks the screen: pictures are fetched in the
+preview, not loaded). A workspace's own emoji show as small pictures, two cells wide, in a
+message's text and in its reaction chips (a GIF shows its first frame; a line never breaks
+inside one); where pictures are not drawn, until one has come, or when it cannot be fetched,
+`:name:` shows as before. Nothing of it ever blocks the screen: pictures are fetched in the
 background and decoded off the screen's thread.
 
 - Terminals: kitty and Ghostty (the kitty graphics protocol, drawn as ordinary cells, so a
@@ -318,6 +323,15 @@ background and decoded off the screen's thread.
   as a background request against the request cap, and the network switches stop it. With
   `avatars = "image"`, people whose photo is on Gravatar are fetched from `secure.gravatar.com`,
   a service outside Slack: it sees your IP address and which photos you look at.
+- A workspace's own emoji: the first time a message on screen shows a shortcode that is not a
+  standard emoji, slakio reads the workspace's emoji list once (`emoji.list`, one background
+  request; read again only after you sign in to the workspace again, and after a wait when it
+  failed). An alias is followed at most 4 times (a loop of aliases stays `:name:`), and an alias
+  of a standard emoji shows that emoji, with pictures on or off. Each emoji's picture is fetched
+  only when it is on screen, from Slack's emoji host (`emoji.slack` + `-edge.com`) only, over
+  `https`, on that exact host, with no cookie, no token, no `Origin` and no `Referer`, following
+  at most 2 redirects, each only to that host and each counted as a request; an emoji whose
+  picture is anywhere else stays `:name:`. They share the limits above.
 - slakio keeps at most 64 pictures (24 MiB) in the terminal at once, the least recently shown
   going first; nothing of them is written to disk.
 
