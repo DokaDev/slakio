@@ -266,9 +266,11 @@ fn rows_off_screen_ask_for_nothing_and_a_scroll_moves_the_photos_with_their_rows
     assert!(s.d.app.list_top() > 0, "scrolled");
     fill(&mut s);
     exactly_the_rows_on_screen(&s, "scrolled");
-    if !expected(&s).iter().any(|p| p.address == top_photo.address) {
-        assert!(cells(&s).iter().all(|c| c.2 != top_id), "the row scrolled away left nothing behind");
-    }
+    assert!(
+        !expected(&s).iter().any(|p| p.address == top_photo.address),
+        "the top row's person is not on screen once scrolled"
+    );
+    assert!(cells(&s).iter().all(|c| c.2 != top_id), "the row scrolled away left nothing behind");
     // Back up: the photos held are drawn again, nothing asked again.
     s.keys("g g");
     assert_eq!(s.d.app.list_top(), 0);
