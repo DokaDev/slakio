@@ -1,7 +1,8 @@
 //! The pictures slakio shows: smaller copies (thumbnails) of the pictures messages share, from
-//! Slack's file host, and people's profile photos, from Slack's avatar hosts
-//! ([`AVATAR_HOSTS`]). Only `https` addresses on those exact hosts are kept ([`thumb_address`],
-//! [`avatar_address`]); anything else is no picture. How large one may be is bounded here, the
+//! Slack's file host, people's profile photos, from Slack's avatar hosts ([`AVATAR_HOSTS`]), and
+//! a workspace's own emoji, from Slack's emoji host ([`EMOJI_HOSTS`], read as [`emoji`] says).
+//! Only `https` addresses on those exact hosts are kept ([`thumb_address`], [`avatar_address`],
+//! [`emoji_address`]); anything else is no picture. How large one may be is bounded here, the
 //! same for every backend and the UI: [`BYTES_MAX`] bytes fetched, [`SIDE_MAX`] and
 //! [`PIXELS_MAX`] read from a picture's header before it is decoded.
 
@@ -13,6 +14,10 @@ use crate::model::FILE_HOST;
 /// commit hook refuses Slack's CDN hosts written whole).
 pub const AVATAR_HOSTS: [&str; 3] =
     [concat!("avatars.slack", "-edge.com"), "secure.gravatar.com", concat!("a.slack", "-edge.com")];
+
+/// The hosts a workspace's own emoji are fetched from: Slack's emoji host, the one `emoji.list`
+/// names them on. Exact names, `https` only, fetched like a profile photo (no cookie, no token).
+pub const EMOJI_HOSTS: [&str; 1] = [concat!("emoji.slack", "-edge.com")];
 
 /// The most bytes of one picture fetched.
 pub const BYTES_MAX: u64 = 2_000_000;
@@ -34,12 +39,15 @@ pub enum Source {
     Thumb(String),
     /// A profile photo on an avatar host: fetched with no cookie and no token.
     Avatar(String),
+    /// A workspace's own emoji on the emoji host: fetched like a photo, with no cookie and no
+    /// token.
+    Emoji(String),
 }
 
 impl Source {
     pub fn address(&self) -> &str {
         match self {
-            Source::Thumb(a) | Source::Avatar(a) => a,
+            Source::Thumb(a) | Source::Avatar(a) | Source::Emoji(a) => a,
         }
     }
 
@@ -48,6 +56,7 @@ impl Source {
         match self {
             Source::Thumb(a) => thumb_address(a),
             Source::Avatar(a) => avatar_address(a),
+            Source::Emoji(a) => emoji_address(a),
         }
     }
 }
@@ -75,10 +84,16 @@ pub fn avatar_address(url: &str) -> Option<String> {
     (host_of(&kept) != Some(AVATAR_HOSTS[1]) || gravatar::fallbacks_allowed(&kept)).then_some(kept)
 }
 
-/// The host of an address [`thumb_address`] or [`avatar_address`] kept.
+/// `url` when a workspace's own emoji may be fetched from it: an address on one of
+/// [`EMOJI_HOSTS`].
+pub fn emoji_address(url: &str) -> Option<String> {
+    EMOJI_HOSTS.iter().find_map(|h| on_host(url, h, true))
+}
+
+/// The host of an address [`thumb_address`], [`avatar_address`] or [`emoji_address`] kept.
 pub fn host_of(url: &str) -> Option<&str> {
     let rest = url.strip_prefix("https://")?;
-    rest.split('/').next().filter(|h| *h == FILE_HOST || AVATAR_HOSTS.contains(h))
+    rest.split('/').next().filter(|h| *h == FILE_HOST || AVATAR_HOSTS.contains(h) || EMOJI_HOSTS.contains(h))
 }
 
 /// A file named `name` of Slack's kind `filetype` is a picture slakio previews (PNG, JPEG, GIF).
@@ -86,6 +101,7 @@ pub fn previewed(filetype: &str) -> bool {
     matches!(filetype.to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif")
 }
 
+pub mod emoji;
 mod gravatar;
 
 #[cfg(test)]

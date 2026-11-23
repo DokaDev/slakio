@@ -222,6 +222,8 @@ impl App {
             Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
+            // Nothing asks for a workspace's own emoji yet.
+            Event::Emoji { .. } => false,
             Event::Image { bytes } => {
                 if let Some(job) = self.images.answered(id, bytes) {
                     self.effects.push(Effect::Decode(job));

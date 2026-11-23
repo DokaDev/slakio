@@ -19,6 +19,7 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
         "search.messages" => search(world, team, request),
         "activity.feed" => activity(world, team, request),
         "messages.list" => messages_list(world, team, request),
+        "emoji.list" => emoji_list(world, team),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
     if let Some(o) = out.as_object_mut() {
@@ -59,6 +60,14 @@ fn decode(v: &str) -> String {
 /// The workspace this fake serves: the world's `team`-th.
 fn served(world: &World, team: usize) -> Option<&slakio_core::model::Workspace> {
     world.snapshot().workspaces.get(team)
+}
+
+/// The workspace's own emoji ([`slakio_world::emoji::list`]), as `emoji.list` names them.
+fn emoji_list(world: &World, team: usize) -> Value {
+    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
+    let emoji: serde_json::Map<String, Value> =
+        slakio_world::emoji::list(ws.id.as_str()).into_iter().map(|(n, v)| (n, Value::String(v))).collect();
+    json!({"ok": true, "emoji": emoji, "cache_ts": "1767603600.000000"})
 }
 
 fn user_boot(world: &World, team: usize) -> Value {

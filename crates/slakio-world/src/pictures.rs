@@ -14,7 +14,7 @@ pub const AVATAR_SIDE: u32 = 72;
 pub const THUMB_SIZE: (u32, u32) = (360, 240);
 
 /// FNV-1a of `s`.
-fn hash(s: &str) -> u32 {
+pub(crate) fn hash(s: &str) -> u32 {
     s.bytes().fold(0x811C_9DC5, |h, b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193))
 }
 
@@ -33,8 +33,12 @@ pub fn thumb(team: &str, id: &str, name: &str) -> Option<String> {
 }
 
 /// The picture at `path` (an address's path the world made), as PNG bytes: a photo for an
-/// `/avatars/` path, a file's copy for a `/files-tmb/` one; `None` for any other.
+/// `/avatars/` path, a file's copy for a `/files-tmb/` one, an emoji for one of
+/// [`crate::emoji::picture`]'s; `None` for any other.
 pub fn served(path: &str) -> Option<Vec<u8>> {
+    if crate::emoji::is_path(path) {
+        return Some(png(path, crate::emoji::SIDE, crate::emoji::SIDE));
+    }
     if path.starts_with("/avatars/") {
         return Some(png(path, AVATAR_SIDE, AVATAR_SIDE));
     }

@@ -234,7 +234,7 @@ impl Images {
     pub fn look(&self, ws: &WorkspaceId, source: &Source) -> Look {
         let shape = match source {
             Source::Thumb(_) => Shape::Preview,
-            Source::Avatar(_) => PHOTO,
+            Source::Avatar(_) | Source::Emoji(_) => PHOTO,
         };
         self.look_as(ws, source, shape)
     }

@@ -144,7 +144,8 @@ impl Client {
     }
 
     /// Ask for picture `url` (a file's smaller copy on the file host, with the session's cookie
-    /// as for a file; or a profile photo on an avatar host, with no cookie and no token): past
+    /// as for a file; or a profile photo on an avatar host, or an emoji on the emoji host, with
+    /// no cookie and no token): past
     /// the kill switch and the cap (each ask counts as one background request of this workspace).
     /// Switching the network off while it is asked ends it.
     pub(crate) async fn fetch_picture(
@@ -156,7 +157,9 @@ impl Client {
         self.governor.picture(&self.lane)?;
         let headers = match source {
             slakio_core::images::Source::Thumb(_) => crate::picture::thumb_headers(&self.credentials, Os::current()),
-            slakio_core::images::Source::Avatar(_) => crate::picture::avatar_headers(Os::current()),
+            slakio_core::images::Source::Avatar(_) | slakio_core::images::Source::Emoji(_) => {
+                crate::picture::avatar_headers(Os::current())
+            }
         };
         tokio::select! {
             biased;

@@ -13,7 +13,8 @@
 //! [`DOWNLOADS_MAX`] at once (one more is answered `Failed(Busy)`): it tells how much has come
 //! as it comes, and is answered once, with the path it was saved as or why it was not. A
 //! `Cancel` tells it to stop (its own answer then says it was cancelled). A picture
-//! ([`crate::picture`]) is read on a task of its own too, at most [`PICTURES_MAX`] at once.
+//! ([`crate::picture`]) is read on a task of its own too, at most [`PICTURES_MAX`] at once, and
+//! so is the workspace's own emoji list ([`crate::emoji`]).
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
 //! first: opening it again meanwhile fetches it once.
@@ -222,7 +223,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
                 }
                 *slot = Some(spawn_once(&mut tasks, tx, id, listed(client, ctx, command)));
             }
-            command @ (Command::Download { .. } | Command::Cancel { .. } | Command::Image { .. }) => {
+            command @ (Command::Download { .. } | Command::Cancel { .. } | Command::Image { .. } | Command::Emoji) => {
                 if !downloads(&mut tasks, (&mut downloading, &mut pictures), (client, tx), id, command).await {
                     return;
                 }
@@ -285,7 +286,8 @@ struct Downloading {
     stop: watch::Sender<bool>,
 }
 
-/// A download asked for, one told to stop, or a picture. `false` when the UI is gone.
+/// A download asked for, one told to stop, a picture, or the workspace's own emoji. `false` when
+/// the UI is gone.
 async fn downloads(
     tasks: &mut JoinSet<()>,
     (downloading, pictures): (&mut Vec<Downloading>, &mut Vec<InFlight>),
@@ -297,6 +299,11 @@ async fn downloads(
         Command::Download { file, dir, max } => download(tasks, downloading, (client, tx), id, (file, dir, max)).await,
         Command::Cancel { request } => cancel(downloading, &tx, id, request).await,
         Command::Image { source, max } => picture(tasks, pictures, (client, tx), id, (source, max)).await,
+        // The workspace's own emoji ([`crate::emoji`]), on a task of its own.
+        Command::Emoji => {
+            spawn_once(tasks, tx, id, async move { crate::emoji::emoji(&client).await });
+            true
+        }
         // The other commands have arms of their own in `run`: none comes here.
         _ => true,
     }

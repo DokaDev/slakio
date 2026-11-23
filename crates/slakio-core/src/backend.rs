@@ -97,6 +97,9 @@ pub enum Command {
     /// most `max` bytes of it, as it came: answered with [`Event::Image`]. Read in the
     /// background; nothing is saved.
     Image { source: crate::images::Source, max: u64 },
+    /// The request's workspace's own emoji (Slack's `emoji.list`), read in the background:
+    /// answered with [`Event::Emoji`].
+    Emoji,
 }
 
 impl Command {
@@ -113,7 +116,8 @@ impl Command {
             | Command::Activity { .. }
             | Command::Download { .. }
             | Command::Cancel { .. }
-            | Command::Image { .. } => false,
+            | Command::Image { .. }
+            | Command::Emoji => false,
             Command::Save { .. } => true,
         }
     }
@@ -287,6 +291,11 @@ pub enum Event {
     /// The bytes of the picture a [`Command::Image`] asked for, as they came (not decoded).
     Image {
         bytes: Vec<u8>,
+    },
+    /// What each of the workspace's own emoji a [`Command::Emoji`] asked for draws, by name
+    /// (aliases followed, [`crate::images::emoji::resolve`]); one that draws nothing is left out.
+    Emoji {
+        emoji: Vec<(String, crate::images::emoji::Custom)>,
     },
 }
 

@@ -48,7 +48,10 @@ impl Logged {
         if self.path.starts_with("/files-pri/") {
             return FILES;
         }
-        if self.path.starts_with("/files-tmb/") || self.path.starts_with("/avatars/") {
+        if self.path.starts_with("/files-tmb/")
+            || self.path.starts_with("/avatars/")
+            || slakio_world::emoji::is_path(&self.path)
+        {
             return PICTURES;
         }
         match self.path.strip_prefix("/api/") {
@@ -91,8 +94,8 @@ pub enum Fault {
 /// The name file downloads go by in [`FakeSlack::fail_next`] and [`Logged::method`].
 pub const FILES: &str = "files";
 
-/// The name the pictures go by (files' smaller copies, `/files-tmb/…`, and profile photos,
-/// `/avatars/…`, both made by [`slakio_world::pictures`]).
+/// The name the pictures go by (files' smaller copies, `/files-tmb/…`, profile photos,
+/// `/avatars/…`, and emoji, `/<team>/<name>/<hex>.png`, all made by [`slakio_world::pictures`]).
 pub const PICTURES: &str = "pictures";
 
 /// The most bytes of a file the fake serves.

@@ -39,7 +39,8 @@ pub fn workspace_of(request: &Request) -> Option<&WorkspaceId> {
         | Command::Activity { .. }
         | Command::Download { .. }
         | Command::Cancel { .. }
-        | Command::Image { .. } => request.workspace.as_ref(),
+        | Command::Image { .. }
+        | Command::Emoji => request.workspace.as_ref(),
     }
 }
 
@@ -87,6 +88,7 @@ fn ends(event: &Event) -> bool {
             | Event::Downloaded { .. }
             | Event::Cancelled { .. }
             | Event::Image { .. }
+            | Event::Emoji { .. }
             | Event::Failed { .. }
     )
 }

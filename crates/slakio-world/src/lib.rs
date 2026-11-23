@@ -21,6 +21,7 @@
 //! the user's Activity ([`activity`]).
 
 pub mod activity;
+pub mod emoji;
 pub mod files;
 mod hostile;
 pub mod pictures;

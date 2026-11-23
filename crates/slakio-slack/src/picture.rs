@@ -4,13 +4,16 @@
 //!
 //! * Only an address its kind may come from is fetched ([`Source::checked`]), again here
 //!   whatever the caller checked: a copy from the file host, a photo from an avatar host.
-//! * A copy goes with the session's cookie (as the browser loads it on Slack's pages); a photo
-//!   with no cookie and no token ([`avatar_headers`]), and the wire refuses one that would.
+//! * A copy goes with the session's cookie (as the browser loads it on Slack's pages); a photo,
+//!   and a workspace's own emoji (from the emoji host,
+//!   [`slakio_core::images::EMOJI_HOSTS`]), with no cookie and no token ([`avatar_headers`]),
+//!   and the wire refuses one that would.
 //! * A copy follows a redirect (at most [`crate::download::REDIRECTS`]) only to another address
 //!   on the file host; a photo (at most [`AVATAR_REDIRECTS`]) only to another address on an
 //!   avatar host, checked again as a photo's address (`https`, the exact host, no port, no
 //!   userinfo, a Gravatar fallback only Slack's) and asked the same way, with nothing of the
-//!   session. Each ask, and each hop, passes the kill switch and counts as one background
+//!   session; an emoji (at most [`EMOJI_REDIRECTS`]) only to another address on the emoji host,
+//!   asked the same bare way. Each ask, and each hop, passes the kill switch and counts as one background
 //!   request of the workspace.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
 //!   a larger one, said or counted, is refused; all of it within [`DEADLINE`].
@@ -24,6 +27,10 @@ use std::time::Duration;
 
 /// The most redirects a profile photo follows (Gravatar to Slack's default avatar is one).
 pub const AVATAR_REDIRECTS: usize = 2;
+
+/// The most redirects an emoji's picture follows, each only to another address on the emoji
+/// host.
+pub const EMOJI_REDIRECTS: usize = 2;
 
 /// The longest one picture may take, from asking to its last byte, however its bytes come (one
 /// that keeps a host's answer trickling never holds a place for longer).
@@ -87,6 +94,11 @@ async fn read(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, Sla
             (301 | 302 | 303 | 307 | 308, Source::Avatar(_)) if hops < AVATAR_REDIRECTS => {
                 hops += 1;
                 let to = answer.location.as_deref().and_then(slakio_core::images::avatar_address);
+                url = to.ok_or_else(|| api("redirected_elsewhere"))?;
+            }
+            (301 | 302 | 303 | 307 | 308, Source::Emoji(_)) if hops < EMOJI_REDIRECTS => {
+                hops += 1;
+                let to = answer.location.as_deref().and_then(slakio_core::images::emoji_address);
                 url = to.ok_or_else(|| api("redirected_elsewhere"))?;
             }
             (301 | 302 | 303 | 307 | 308, _) => return Err(api("redirected_elsewhere")),

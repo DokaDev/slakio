@@ -43,6 +43,7 @@ pub(crate) mod boot;
 pub mod client;
 pub(crate) mod dated;
 pub mod download;
+pub(crate) mod emoji;
 pub mod error;
 pub mod governor;
 pub(crate) mod http;

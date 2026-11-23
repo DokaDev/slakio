@@ -74,6 +74,11 @@ impl Backend for DemoBackend {
                     },
                 }
             }
+            // The world's own emoji, as Slack's would be read.
+            Command::Emoji => {
+                let ws = request.workspace.clone().unwrap_or_else(|| self.world.snapshot().workspaces[0].id.clone());
+                Event::Emoji { emoji: slakio_core::images::emoji::resolve(&slakio_world::emoji::list(ws.as_str())) }
+            }
             // Every download is answered as it is asked for: none is still on its way.
             Command::Cancel { request } => Event::Cancelled { request, stopping: false },
             // A change that does not apply changes nothing; the answer is the list as it is.
