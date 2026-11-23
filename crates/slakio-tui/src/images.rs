@@ -243,12 +243,25 @@ impl Images {
     /// Profile photos are no longer drawn: those held leave the terminal, and those asked for
     /// or being decoded are not waited for.
     pub fn forget_photos(&mut self) {
-        let photo = |k: &Key| matches!(k.0, Source::Avatar(_));
-        let photos: Vec<Key> = self.entries.keys().filter(|k| photo(k)).cloned().collect();
-        self.held.retain(|k| !photo(k));
-        self.failed.retain(|k| !photo(k));
-        self.asked.retain(|_, k| !photo(k));
-        for key in photos {
+        self.forget_where(|k| matches!(k.0, Source::Avatar(_)));
+    }
+
+    /// Workspace `ws` is signed in to as someone else: its own emoji go, the list and the
+    /// pictures it named (held ones leave the terminal); both are read again when next wanted.
+    pub fn forget_customs(&mut self, ws: &WorkspaceId) {
+        let gone: HashSet<Source> = self.customs.pictures(ws).into_iter().map(Source::Emoji).collect();
+        self.customs.forget(ws);
+        self.forget_where(|k| gone.contains(&k.0));
+    }
+
+    /// The pictures `gone` says go: those held leave the terminal, and those asked for or being
+    /// decoded are not waited for.
+    fn forget_where(&mut self, gone: impl Fn(&Key) -> bool) {
+        let keys: Vec<Key> = self.entries.keys().filter(|k| gone(k)).cloned().collect();
+        self.held.retain(|k| !gone(k));
+        self.failed.retain(|k| !gone(k));
+        self.asked.retain(|_, k| !gone(k));
+        for key in keys {
             if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&key) {
                 self.bytes -= bytes;
                 self.graphics.push_str(&graphics::delete(id));

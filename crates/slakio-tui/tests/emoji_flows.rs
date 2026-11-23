@@ -16,6 +16,7 @@ use slakio_core::images::Source;
 use slakio_core::model::{Message, Reaction, Ts, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::Effect;
+use slakio_tui::app::model::SignedIn;
 use slakio_tui::images::graphics::is_placeholder;
 use slakio_tui::images::prepare;
 
@@ -33,6 +34,12 @@ fn shown(messages: &[(&str, &[&str])], w: u16, h: u16, on: bool) -> (Scripted, W
         assert!(s.d.app.images.on);
     }
     s.d.app.resize(w, h);
+    let ws = open(&mut s, messages);
+    (s, ws)
+}
+
+/// `deploys` opened with `messages` (text, reactions), oldest first; its workspace.
+fn open(s: &mut Scripted, messages: &[(&str, &[&str])]) -> WorkspaceId {
     s.d.list_cursor_on("deploys");
     s.keys("enter");
     let mut e = s.b.reply(0);
@@ -53,7 +60,7 @@ fn shown(messages: &[(&str, &[&str])], w: u16, h: u16, on: bool) -> (Scripted, W
     page.complete = true;
     s.b.push(e);
     s.pump();
-    (s, ws)
+    ws
 }
 
 /// Draw a frame and ask for what it wanted, as the binary's loop does: the lists and pictures
@@ -325,4 +332,105 @@ fn more_emoji_than_the_terminal_holds_ask_a_frame_s_share_once_each_and_the_rest
         let screen = s.d.screen();
         assert!(screen.contains(&format!(":{last}:")), "{last}: past the share, text:\n{screen}");
     }
+}
+
+/// Signed in again to `ws` as someone else, then booted and `deploys` opened again with
+/// `messages`.
+fn signed_in_as_someone_else(s: &mut Scripted, ws: &WorkspaceId, messages: &[(&str, &[&str])]) {
+    let other =
+        SignedIn { id: ws.clone(), name: "A".into(), read_only: true, host: String::new(), user: "UOTHER".into() };
+    s.d.app.signed_in_again(&[other], &["A".to_string()], s.d.now);
+    s.pump();
+    let boot = s.b.held.iter().position(|r| r.command == Command::Boot).expect("booted again");
+    s.b.answer(boot);
+    s.pump();
+    open(s, messages);
+}
+
+/// As [`shown`] at 120×40, pictures on, but signed in to `deploys`'s workspace as the binary
+/// does (so it can be signed in to again).
+fn shown_signed_in(messages: &[(&str, &[&str])]) -> (Scripted, WorkspaceId) {
+    use slakio_core::backend::Backend;
+    let world = slakio_world::World::demo();
+    let snapshot = world.snapshot();
+    let deploys = snapshot.conversations.iter().find(|c| c.name == "deploys").expect("deploys");
+    let w = snapshot.workspaces.iter().find(|w| w.id == deploys.workspace).expect("its workspace");
+    let mut s = Scripted::connected(true);
+    let mut app = slakio_tui::app::App::new(slakio_core::i18n::Lang::En, slakio_tui::theme::Theme::terminal());
+    app.resize(120, 40);
+    let me = SignedIn {
+        id: w.id.clone(),
+        name: "A".into(),
+        read_only: true,
+        host: String::new(),
+        user: w.me.as_str().into(),
+    };
+    app.connect_workspaces(s.b.capabilities(), &[me]);
+    s.d.app = app;
+    s.pump();
+    let boot = s.b.held.iter().position(|r| r.command == Command::Boot).expect("booted");
+    s.b.answer(boot);
+    s.pump();
+    s.d.app.images.env = slakio_tui::images::detect::Env { term: "xterm-kitty".into(), ..Default::default() };
+    (s.d.app.images.setting, s.d.app.images.tty) = ("auto".into(), true);
+    s.d.app.images.resolve();
+    let ws = open(&mut s, messages);
+    (s, ws)
+}
+
+#[test]
+fn signed_in_again_as_someone_else_a_refused_list_is_asked_again_once() {
+    let text: &[(&str, &[&str])] = &[("ship :party-blob:", &[])];
+    let (mut s, ws) = shown_signed_in(text);
+    let asked = frame(&mut s);
+    s.b.push(Envelope::failed(lists(&asked)[0].id, FailKind::Auth, "invalid_auth"));
+    s.pump();
+    assert!(frame(&mut s).is_empty(), "refused: never again for this sign-in");
+    signed_in_as_someone_else(&mut s, &ws, text);
+    let asked = frame(&mut s);
+    assert_eq!(lists(&asked).len(), 1, "the new user's list, once");
+    assert!(lists(&frame(&mut s)).is_empty());
+    // Signed in as yet another user while that list is on its way: its late refusal is the
+    // sign-in before's, and the list is asked again.
+    let late = lists(&asked)[0].id;
+    let third =
+        SignedIn { id: ws.clone(), name: "A".into(), read_only: true, host: String::new(), user: "UTHIRD".into() };
+    s.d.app.signed_in_again(&[third], &["A".to_string()], s.d.now);
+    s.pump();
+    let boot = s.b.held.iter().position(|r| r.command == Command::Boot).expect("booted again");
+    s.b.answer(boot);
+    s.pump();
+    open(&mut s, text);
+    s.b.push(Envelope::failed(late, FailKind::Auth, "invalid_auth"));
+    s.pump();
+    assert_eq!(lists(&frame(&mut s)).len(), 1, "not barred by the old sign-in's answer");
+}
+
+#[test]
+fn signed_in_again_as_someone_else_the_list_and_its_pictures_go_and_are_read_again() {
+    let text: &[(&str, &[&str])] = &[("ship :party-blob:", &[])];
+    let (mut s, ws) = shown_signed_in(text);
+    drawn(&mut s);
+    assert_eq!(s.d.app.images.held().0, 1, "the picture is held");
+    s.d.app.images.take_graphics();
+    signed_in_as_someone_else(&mut s, &ws, text);
+    assert_eq!(s.d.app.images.held(), (0, 0), "the user before's emoji picture left");
+    assert!(s.d.app.images.take_graphics().contains("a=d"), "deleted from the terminal");
+    let asked = frame(&mut s);
+    assert_eq!(lists(&asked).len(), 1, "the list is read again");
+    assert!(pictures(&asked).is_empty(), "no picture before the new list says where it is");
+    give_list(&mut s, lists(&asked)[0]);
+    assert_eq!(pictures(&frame(&mut s)), [emoji(&ws, "party-blob")], "its picture is asked again");
+}
+
+#[test]
+fn signed_in_again_as_the_same_user_the_pictures_stay() {
+    let text: &[(&str, &[&str])] = &[("ship :party-blob:", &[])];
+    let (mut s, ws) = shown_signed_in(text);
+    drawn(&mut s);
+    let me = s.d.app.model.me(&ws).expect("booted").as_str().to_string();
+    let same = SignedIn { id: ws.clone(), name: "A".into(), read_only: true, host: String::new(), user: me };
+    s.d.app.signed_in_again(&[same], &["A".to_string()], s.d.now);
+    s.pump();
+    assert_eq!(s.d.app.images.held().0, 1, "kept for the same user");
 }

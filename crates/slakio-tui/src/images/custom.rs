@@ -80,10 +80,22 @@ impl Customs {
         true
     }
 
-    /// Workspace `ws` was signed in again: its list is read again when next wanted.
+    /// Workspace `ws` was signed in again: its list is read again when next wanted (one asked
+    /// for before is not waited for: its answer is the old sign-in's).
     pub fn forget(&mut self, ws: &WorkspaceId) {
         self.sets.remove(ws);
         self.failed.remove(ws);
+        self.asked.retain(|_, w| w != ws);
+    }
+
+    /// The picture addresses workspace `ws`'s list names.
+    pub fn pictures(&self, ws: &WorkspaceId) -> Vec<String> {
+        (self.sets.get(ws).into_iter().flat_map(HashMap::values))
+            .filter_map(|c| match c {
+                Custom::Picture(address) => Some(address.clone()),
+                Custom::Standard(_) => None,
+            })
+            .collect()
     }
 }
 
