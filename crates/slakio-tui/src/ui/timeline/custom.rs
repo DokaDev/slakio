@@ -27,12 +27,15 @@ pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(Strin
         let after = &rest[start + 1..];
         let name = after.find(':').map(|e| &after[..e]).filter(|n| shortcode(n));
         match name.and_then(|n| drawn(app, ws, n, style)) {
-            Some(run) => {
+            Some((run, picture)) => {
                 if !plain.is_empty() {
                     out.push((std::mem::take(&mut plain), style));
                 }
                 out.push(run);
                 rest = &after[name.unwrap_or_default().len() + 1..];
+                if picture {
+                    rest = after_picture(rest);
+                }
             }
             None => {
                 plain.push(':');
@@ -47,19 +50,31 @@ pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(Strin
     out
 }
 
+/// `rest`, the text right after a picture, without what would only spoil it: a skin tone
+/// (`:skin-tone-2:` to `-6:`, which a picture has no way to take) and the marks that join the
+/// character before them (a combining accent, a variation selector), which would join the
+/// picture's last cell and blank it.
+fn after_picture(rest: &str) -> &str {
+    let rest = (rest.strip_prefix(":skin-tone-"))
+        .and_then(|r| r.strip_prefix(['2', '3', '4', '5', '6']))
+        .and_then(|r| r.strip_prefix(':'))
+        .unwrap_or(rest);
+    rest.trim_start_matches(|c: char| c != '\n' && unicode_width::UnicodeWidthChar::width(c) == Some(0))
+}
+
 /// What `:name:` is drawn as in workspace `ws`, when it is one of the workspace's own emoji that
-/// can be drawn now.
-fn drawn(app: &App, ws: &WorkspaceId, name: &str, style: Style) -> Option<(String, Style)> {
+/// can be drawn now (`true`: as its picture).
+fn drawn(app: &App, ws: &WorkspaceId, name: &str, style: Style) -> Option<((String, Style), bool)> {
     if emoji::get(name).is_some() {
         return None;
     }
     match app.images.customs.get(ws, name)? {
-        Custom::Standard(standard) => emoji::get(standard).map(|e| (e.to_string(), style)),
+        Custom::Standard(standard) => emoji::get(standard).map(|e| ((e.to_string(), style), false)),
         Custom::Picture(address) => match app.images.look_emoji(ws, address) {
             Look::Ready { id, cols: 2, rows: 1 } => {
                 let mut cells = Style::default().fg(graphics::color(id));
                 cells.bg = style.bg;
-                Some((graphics::row(0, 2), cells))
+                Some(((graphics::row(0, 2), cells), true))
             }
             _ => None,
         },

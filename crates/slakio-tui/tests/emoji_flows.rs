@@ -434,3 +434,27 @@ fn signed_in_again_as_the_same_user_the_pictures_stay() {
     s.pump();
     assert_eq!(s.d.app.images.held().0, 1, "kept for the same user");
 }
+
+#[test]
+fn a_skin_tone_or_a_joining_mark_right_after_a_picture_is_left_out() {
+    for text in ["ship :party-blob::skin-tone-3: now", "ship :party-blob:\u{301} now", "ship :party-blob:\u{fe0f} now"]
+    {
+        let (mut s, _) = shown(&[(text, &["party-blob::skin-tone-2"])], 120, 40, true);
+        drawn(&mut s);
+        let screen = s.d.screen();
+        assert!(!screen.contains("skin-tone"), "{text:?}:\n{screen}");
+        let rows = cells(&s);
+        assert_eq!(rows.len(), 2, "{text:?}: the text's picture and the chip's: {rows:?}");
+        assert!(rows.iter().all(|(_, xs)| xs.len() == 2), "{text:?}: two whole cells each: {rows:?}");
+        // Nothing joins a picture's cell: a mark there is read as part of the picture's id.
+        let buf = s.d.buffer();
+        for (y, xs) in &rows {
+            for &x in xs {
+                let cell = buf[(x, *y)].symbol();
+                assert!(!cell.contains(['\u{301}', '\u{fe0f}']), "{text:?}: a mark joined the cell at {x},{y}");
+            }
+        }
+        let line = screen.lines().nth(usize::from(rows[0].0)).unwrap();
+        assert!(line.contains("ship") && line.contains("now"), "{text:?}: {line}");
+    }
+}
