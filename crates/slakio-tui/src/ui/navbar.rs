@@ -29,7 +29,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, list: Rect) {
         let title = t.title(focused);
         for p in &chip.pieces {
             let style = match p.part {
-                Part::Band => ws.map_or(title, |w| t.workspace(w.color)),
+                Part::Band => ws.map_or(title, |w| t.workspace_text(w.color)),
                 Part::Caret => t.muted(),
                 Part::Other => t.muted().add_modifier(Modifier::BOLD),
                 // Only a mention is red (ui-ux-spec §H.1).

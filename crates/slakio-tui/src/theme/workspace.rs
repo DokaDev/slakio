@@ -26,6 +26,16 @@ impl Theme {
         Style::new().fg(color.unwrap_or(self.workspaces[slot % self.workspaces.len()]))
     }
 
+    /// Workspace color `c` as text on the background (the badge on the list's title): stepped
+    /// toward black or white below 4.5:1, as initials on their chip.
+    pub fn workspace_text(&self, c: WorkspaceColor) -> Style {
+        let style = self.workspace(c);
+        match style.fg {
+            Some(fg) => style.fg(super::chip::readable(fg, self.bg, super::chip::INITIALS)),
+            None => style,
+        }
+    }
+
     /// The colors workspaces take, by slot (wrapping around): the palette in its order, without
     /// those near the accent, so the next one takes their place.
     pub(super) fn workspace_colors(&self) -> impl Iterator<Item = Color> + '_ {

@@ -67,7 +67,9 @@ pub const COLOR_ABOUT: &[(&str, &str)] = &[
     (
         "workspaces",
         "A list of 1 to 16 colours, taken by workspaces in sign-in order (wrapping round). A colour too close to \
-         `accent` is skipped, so a workspace's stripe never reads as a focus frame.",
+         `accent` is skipped, so a workspace's stripe never reads as a focus frame. Where a colour would read \
+         under 4.5:1 on `bg` as the workspace's letter on the list's title, the letter steps toward black or \
+         white until it does.",
     ),
     ("avatars", "A list of 1 to 16 colours for the initials chips of people."),
     (

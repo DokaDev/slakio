@@ -128,3 +128,17 @@ fn readable_moves_only_as_far_as_it_has_to() {
     assert_eq!(readable(Color::Cyan, Color::Reset, INITIALS), Color::Cyan);
     assert_eq!(readable(teal, Color::Blue, INITIALS), teal);
 }
+
+/// The workspace badge on the list's title keeps 4.5:1 on the background in every workspace
+/// color of every built-in that draws RGB.
+#[test]
+fn the_workspace_badge_keeps_its_contrast_on_every_builtin() {
+    let mut worst = f64::MAX;
+    for t in themes().iter().filter(|t| t.kind == Kind::Truecolor) {
+        for slot in 0..t.workspaces.len() {
+            let c = slakio_core::model::WorkspaceColor(u8::try_from(slot).unwrap());
+            measured(t, &format!("workspace badge {slot}"), t.workspace_text(c).fg, Some(t.bg), INITIALS, &mut worst);
+        }
+    }
+    assert!(worst < 99.0, "measured");
+}
