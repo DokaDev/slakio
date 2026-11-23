@@ -652,3 +652,40 @@ fn the_timeline_s_photos_are_asked_first_and_the_list_s_yield_their_room() {
         .count();
     assert_eq!(chips + shown.len(), ENTRIES_MAX, "the list's photos fill the room left");
 }
+
+#[test]
+fn a_person_in_the_timeline_and_the_list_is_fetched_at_most_twice() {
+    use slakio_tui::images::PHOTO;
+    // Room for every photo on screen, then more photos on screen than the terminal holds.
+    for (extra, room) in [(20, true), (80, false)] {
+        let (mut s, peers) = crowded(100, 90, extra);
+        let ws = s.d.app.model.workspaces()[0].id.clone();
+        let mut per: std::collections::HashMap<Source, usize> = Default::default();
+        for round in 0..60 {
+            let now = frame(&mut s);
+            assert!(now.len() <= IN_FLIGHT_MAX, "{extra}, round {round}: {} at once", now.len());
+            for (id, source) in now {
+                *per.entry(source).or_default() += 1;
+                deliver(&mut s, id);
+            }
+        }
+        assert!(frame(&mut s).is_empty(), "{extra}: settled");
+        assert!(per.values().all(|n| *n <= 2), "{extra}: once per place at most: {per:?}");
+        if room {
+            let list: Vec<String> = expected(&s).into_iter().map(|p| p.address).collect();
+            let screen = s.d.screen();
+            let both: Vec<Source> = (peers.iter().enumerate())
+                .filter(|(k, _)| screen.contains(&format!("note {k} ")))
+                .filter_map(|(_, p)| s.d.app.model.user(&ws, p)?.avatar.clone())
+                .filter(|a| list.contains(a))
+                .map(Source::Avatar)
+                .collect();
+            assert!(!both.is_empty(), "someone in both places");
+            for source in &both {
+                assert_eq!(per.get(source), Some(&2), "{source:?}: once for the slot, once for the chip");
+                assert!(matches!(s.d.app.images.look_as(&ws, source, PHOTO), Look::Ready { .. }));
+                assert!(matches!(s.d.app.images.look_as(&ws, source, CHIP_PHOTO), Look::Ready { .. }));
+            }
+        }
+    }
+}
