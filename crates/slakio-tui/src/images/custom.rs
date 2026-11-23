@@ -23,8 +23,9 @@ pub struct Customs {
     asked: HashMap<Generation, WorkspaceId>,
     /// The workspaces whose list failed, and when it may be asked for again (never: `None`).
     failed: HashMap<WorkspaceId, Option<Instant>>,
-    /// The workspaces a frame showed a shortcode of that no list says yet.
-    seen: RefCell<Vec<WorkspaceId>>,
+    /// The workspaces a frame showed a shortcode of that no list says yet (`false`: only laid
+    /// out, not shown).
+    seen: RefCell<Vec<(WorkspaceId, bool)>>,
 }
 
 impl Customs {
@@ -36,10 +37,22 @@ impl Customs {
             Some(set) => set.get(name),
             None => {
                 if name.bytes().any(|b| b.is_ascii_alphabetic()) {
-                    self.seen.borrow_mut().push(ws.clone());
+                    self.seen.borrow_mut().push((ws.clone(), true));
                 }
                 None
             }
+        }
+    }
+
+    /// Where what frames note stands now ([`super::Images::mark`]).
+    pub fn mark(&self) -> usize {
+        self.seen.borrow().len()
+    }
+
+    /// What was noted between `from` and `to` was only laid out ([`super::Images::not_shown`]).
+    pub fn not_shown(&self, from: usize, to: usize) {
+        for s in self.seen.borrow_mut().get_mut(from..to).into_iter().flatten() {
+            s.1 = false;
         }
     }
 
@@ -47,7 +60,7 @@ impl Customs {
     /// its wait is over). `true` when something was asked.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
         let mut asked = false;
-        for ws in self.seen.take() {
+        for (ws, _) in self.seen.take().into_iter().filter(|s| s.1) {
             let waiting = self.asked.values().any(|w| *w == ws);
             let barred = self.failed.get(&ws).is_some_and(|again| again.is_none_or(|at| at > now));
             if self.sets.contains_key(&ws) || waiting || barred {

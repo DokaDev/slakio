@@ -68,3 +68,18 @@ fn a_failed_list_waits_by_its_kind() {
         }
     }
 }
+
+#[test]
+fn a_shortcode_only_laid_out_asks_for_no_list() {
+    let (mut c, mut r, now) = (Customs::default(), Requests::default(), Instant::now());
+    let from = c.mark();
+    c.get(&ws("T1"), "party");
+    c.not_shown(from, c.mark());
+    assert!(!c.ask(&mut r, now), "measured off screen: nothing asked");
+    let from = c.mark();
+    c.get(&ws("T1"), "party");
+    c.not_shown(from, c.mark());
+    c.get(&ws("T1"), "party");
+    assert!(c.ask(&mut r, now), "shown once: asked");
+    assert_eq!(asked(&mut r).len(), 1);
+}

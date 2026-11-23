@@ -157,7 +157,7 @@ pub enum Chosen {
 }
 
 /// A place in what frames note ([`Images::mark`]).
-pub type Mark = (usize, usize);
+pub type Mark = (usize, usize, usize);
 
 /// The pictures: what is asked, decoded, held by the terminal, or failed.
 #[derive(Debug, Default)]
@@ -334,12 +334,14 @@ impl Images {
     /// Where what frames note stands now: what is noted after it, until a later mark, can be
     /// said to be only laid out ([`Images::not_shown`]).
     pub fn mark(&self) -> Mark {
-        (self.wanted.borrow().len(), self.drawn.borrow().len())
+        (self.wanted.borrow().len(), self.drawn.borrow().len(), self.customs.mark())
     }
 
     /// What was noted between `from` and `to` was laid out, not shown (a message measured off
-    /// screen): it is neither asked for nor counted as drawn.
+    /// screen): it is neither asked for nor counted as drawn, and a workspace's own emoji list
+    /// it would want is not asked for because of it.
     pub fn not_shown(&self, from: Mark, to: Mark) {
+        self.customs.not_shown(from.2, to.2);
         for w in self.wanted.borrow_mut().get_mut(from.0..to.0).into_iter().flatten() {
             w.2 = false;
         }
