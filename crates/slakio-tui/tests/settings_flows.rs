@@ -553,7 +553,7 @@ fn rows_are_named_by_label_and_the_selected_one_says_its_set_key() {
     }
     let en = "Theme | Density | View rows | Nerd Font icons | Avatars | Images | Language | Download folder | \
               Download limit | Network | Live updates | Restore tabs | Message cache";
-    let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊ | ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
+    let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
               ＊＊＊ ＊＊＊＊ | ＊ ＊＊ | ＊＊＊ ＊＊";
     assert_eq!(got, [en, ko, en, ko], "at 80 and 120 columns, in English and Korean");
     // The keys stay findable: `:images` and `:avatars` in the help.

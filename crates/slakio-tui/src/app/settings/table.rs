@@ -223,6 +223,24 @@ mod tests {
         assert_eq!(groups, [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network]);
     }
 
+    /// A group's heading never reads as one of its rows (Korean once named the pictures group and
+    /// the images row alike): in every language no group is named as any row is.
+    #[test]
+    fn no_group_is_named_as_a_row() {
+        use slakio_core::i18n::{I18n, Lang};
+        let groups = [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network];
+        for lang in [Lang::En, Lang::Ko] {
+            let i18n = I18n::new(lang);
+            for g in groups {
+                let heading = i18n.label(g.label()).to_string();
+                for s in SETTINGS {
+                    let row = i18n.label(s.label).to_string();
+                    assert_ne!(heading.trim(), row.trim(), "{lang:?}: {g:?} and the {} row", s.key);
+                }
+            }
+        }
+    }
+
     #[test]
     fn every_key_is_a_config_key() {
         let file = SETTINGS.iter().map(|s| format!("{} = {}\n", s.key, sample(s))).collect::<String>();

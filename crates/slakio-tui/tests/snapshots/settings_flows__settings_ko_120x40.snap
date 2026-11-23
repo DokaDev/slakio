@@ -11,13 +11,13 @@ expression: d.snap()
 ├─▾───────│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │ ▾ Favori│ ＊＊                                                                                             │         │
 │   # back│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊＊)                              │         │
-│   # inci│   ＊＊              ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊＊)                            │         │
+│   # inci│   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊＊)                            │         │
 │         │ ＊＊                                                                                             │         │
-│ ▾ Ops   │   ＊＊              ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│ ▾ Ops   │   ＊＊ ＊＊         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # depl│ ＊＊                                                                                             │         │
 │   # aler│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
 │   # part│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
-│   # host│ ＊＊＊＊                                                                                         │         │
+│   # host│ ＊＊                                                                                             │         │
 │   # big-│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # long│   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │         │   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │

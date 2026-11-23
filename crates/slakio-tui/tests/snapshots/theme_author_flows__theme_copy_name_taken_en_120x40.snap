@@ -13,12 +13,12 @@ expression: d.snap()
 │   # back│ Pictures                                                                                         │         │
 │   # inci│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
 │         │   Images           ‹ auto               ›  Where sure to show (default)                          │         │
-│ ▾ Ops   │ Language                                                                                         │         │
+│ ▾ Ops   │ Locale                                                                                           │         │
 │   # depl│   Language         ‹ auto               ›  applies on next launch                                │         │
 │   # aler│ Files                                                                                            │         │
 │   # part│   Download folder  ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
 │   # host│   Download limit   ‹ 1024               ›  MB: largest file downloaded                           │         │
-│   # big-│ Network                                                                                          │         │
+│   # big-│ Connection                                                                                       │         │
 │   # long│   Network          ‹ on                 ›  applies on next launch                                │         │
 │         │   Live updates     ‹ on                 ›  applies on next launch                                │         │
 │ ▾ Channe│   Restore tabs     ‹ on                 ›  applies on next launch                                │         │

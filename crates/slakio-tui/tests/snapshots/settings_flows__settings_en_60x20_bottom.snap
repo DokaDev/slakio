@@ -7,7 +7,7 @@ expression: d.snap()
 │ │                                       11 more above  │ │
 │ │   Download folder  ‹ ~/Downlo…s/slakio ›  Enter: ty… │ │
 │ │   Download limit   ‹ 1024              ›  MB: large… │ │
-│ │ Network                                              │ │
+│ │ Connection                                           │ │
 ├─│   Network          ‹ on                ›  applies o… │ │
 │ │   Live updates     ‹ on                ›  applies o… │ │
 │ │   Restore tabs     ‹ on                ›  applies o… │ │
