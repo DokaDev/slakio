@@ -71,3 +71,32 @@ fn language_detection() {
     assert_eq!(detect_lang("auto", env(&[("LC_ALL", ""), ("LC_MESSAGES", "ko_KR"), ("LANG", "C")])), Lang::Ko);
     assert_eq!(detect_lang("auto", env(&[])), Lang::En);
 }
+
+/// The catalog of `lang`'s text for `key`, read from `locales/` when the test runs.
+fn catalog_text(lang: &str, key: &str) -> String {
+    let file = match lang {
+        "en" => include_str!("../../../../locales/en.toml"),
+        _ => include_str!("../../../../locales/ko.toml"),
+    };
+    let table: toml::Table = file.parse().expect("a catalog");
+    table[key].as_str().expect("a string").to_string()
+}
+
+#[test]
+fn the_images_command_names_its_setting_as_the_settings_row_does() {
+    let named = ["images.changed", "images.unknown", "images.not_here", "images.forced", "images.pinned"];
+    for lang in ["en", "ko"] {
+        let row = catalog_text(lang, "settings.label_images").to_lowercase();
+        let group = catalog_text(lang, "settings.group_pictures").to_lowercase();
+        for key in named {
+            let text = catalog_text(lang, key).to_lowercase();
+            assert!(text.contains(&row), "{lang} {key}: {text} does not say {row}");
+        }
+        if row != group {
+            for key in named.iter().chain(&["action.images"]) {
+                let text = catalog_text(lang, key).to_lowercase();
+                assert!(!text.contains(&group), "{lang} {key}: {text} says the group's {group}");
+            }
+        }
+    }
+}
