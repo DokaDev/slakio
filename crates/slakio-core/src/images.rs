@@ -29,7 +29,7 @@ pub const SIDE_MAX: u32 = 4096;
 pub const PIXELS_MAX: u64 = 4_194_304;
 
 /// The longest address fetched.
-const ADDRESS_MAX: usize = 2048;
+pub const ADDRESS_MAX: usize = 2048;
 
 /// Where a picture comes from.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
