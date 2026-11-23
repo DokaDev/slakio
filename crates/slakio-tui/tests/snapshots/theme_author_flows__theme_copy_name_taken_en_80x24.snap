@@ -12,7 +12,7 @@ expression: d.snap()
 │ │   Nerd Font icons  ‹ off                ›  Text and plain symbols only   │ │
 │ │ Pictures                                                                 │ │
 │ │   Avatars          ‹ initials           ›  Coloured initials (default)   │ │
-│ │   Images           ‹ auto               ›  Where sure to show (default)  │ │
+│ │   Images           ‹ auto               ›  Where known to work (default) │ │
 │ │                                                           10 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: Nord                                                            │ │

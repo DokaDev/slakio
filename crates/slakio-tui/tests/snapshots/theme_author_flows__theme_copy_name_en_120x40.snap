@@ -11,7 +11,7 @@ expression: d.snap()
 ├─▾───────│   Nerd Font icons  ‹ off                ›  Text and plain symbols only                           │         │
 │ ▾ Favori│ Pictures                                                                                         │         │
 │   # back│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
-│   # inci│   Images           ‹ auto               ›  Where sure to show (default)                          │         │
+│   # inci│   Images           ‹ auto               ›  Where known to work (default)                         │         │
 │         │ Locale                                                                                           │         │
 │ ▾ Ops   │   Language         ‹ auto               ›  applies on next launch                                │         │
 │   # depl│ Files                                                                                            │         │

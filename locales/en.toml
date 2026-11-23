@@ -27,7 +27,7 @@
 "images.forced" = "Images on: this terminal may not show them"
 "images.not_here" = "Images auto: none here · :images on forces"
 "images.pinned" = "Images: {name} saved; {env}={value} wins now"
-"images.auto" = "Where sure to show (default)"
+"images.auto" = "Where known to work (default)"
 "images.on" = "Always (may not show)"
 "images.off" = "Text cards and initials only"
 "avatars.image" = "Photos, else initials"

@@ -8,11 +8,11 @@ expression: d.snap()
 │ ＊＊    │ ＊＊                                                                                             │         │
 │ ＊＊    │   ＊＊              ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                       │         │
 │ ＊ ＊   │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊ (＊＊)                                  │         │
-├─▾───────│   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊＊)                              │         │
+├─▾───────│   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊)                                │         │
 │ ▾ Favori│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │   # back│ ＊＊                                                                                             │         │
-│   # inci│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊＊)                              │         │
-│         │   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊＊)                            │         │
+│   # inci│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊)                                │         │
+│         │   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊)                              │         │
 │ ▾ Ops   │ ＊＊                                                                                             │         │
 │   # depl│   ＊＊ ＊＊         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # aler│ ＊＊                                                                                             │         │

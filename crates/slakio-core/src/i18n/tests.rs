@@ -100,3 +100,27 @@ fn the_images_command_names_its_setting_as_the_settings_row_does() {
         }
     }
 }
+
+#[test]
+fn every_default_says_so_with_the_same_words() {
+    let en: toml::Table = include_str!("../../../../locales/en.toml").parse().expect("en.toml");
+    let ko: toml::Table = include_str!("../../../../locales/ko.toml").parse().expect("ko.toml");
+    let text = |t: &toml::Table, k: &str| t.get(k).and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let defaults: Vec<&String> = en.keys().filter(|k| text(&en, k).ends_with(" (default)")).collect();
+    assert!(defaults.len() >= 5, "{defaults:?}");
+    let marks: std::collections::BTreeSet<String> = defaults
+        .iter()
+        .map(|k| text(&ko, k).rsplit_once(" (").map(|(_, m)| format!("({m}")).expect("a mark"))
+        .collect();
+    assert_eq!(marks.len(), 1, "one mark of the default in ko: {marks:?}");
+    // Nowhere else a longer spelling of it either.
+    let mark = marks.first().expect("one");
+    let stem = mark.trim_end_matches(')');
+    for (table, stem) in [(&en, "(default"), (&ko, stem)] {
+        for (k, v) in table.iter().filter_map(|(k, v)| v.as_str().map(|v| (k, v))) {
+            for (at, _) in v.match_indices(stem) {
+                assert!(v[at + stem.len()..].starts_with(')'), "{k}: {v}");
+            }
+        }
+    }
+}

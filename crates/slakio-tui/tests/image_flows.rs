@@ -554,7 +554,7 @@ fn the_palette_s_images_values_show_whole() {
         typed(&mut s, "images ");
         let screen = s.d.screen();
         for (value, en, l) in [
-            ("auto", "Where sure to show (default)", Label::ImagesAuto),
+            ("auto", "Where known to work (default)", Label::ImagesAuto),
             ("on", "Always (may not show)", Label::ImagesOn),
             ("off", "Text cards and initials only", Label::ImagesOff),
         ] {
