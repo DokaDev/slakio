@@ -4,7 +4,8 @@
 //! two cells each, [`Shape::Emoji`]), drawn with the kitty graphics protocol where the terminal draws it
 //! ([`detect`]); elsewhere, and while a picture is not there yet, the text card and the initials
 //! stay as they are. A picture is kept per address and the cells it fills ([`Shape`]): a photo
-//! shown in both places is two pictures to the terminal.
+//! shown in both places is two pictures to the terminal, fetched once each (at most two fetches
+//! a run while the screen does not change and neither is removed or fails).
 //!
 //! How a picture comes: drawing a frame notes the pictures it would show ([`Images::look`]);
 //! after the frame the app asks the backend for those it does not have ([`Images::ask`], at most

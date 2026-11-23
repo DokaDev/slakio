@@ -327,6 +327,18 @@ into two cells of a row (`Shape::Emoji`, first frame of a GIF) and drawn as two 
 cells; the wrap keeps a picture's later cell with the one before it, so a line never breaks
 inside one. Pictures off, not here, failed or refused: `:name:` text.
 
+**The pictures' room** (the UI's `images.rs`): the terminal holds at most `ENTRIES_MAX` (64)
+pictures and `BYTES_CAP` bytes, keyed by address and cells (a person in both the timeline and
+the list is two pictures, so at most two fetches a run while the screen does not change and
+neither is removed or fails). The least recently drawn goes first, never one the latest shown
+frame or the one before it looked at; when all are on screen a list photo makes room for a
+timeline picture, else the new picture is not sent and is parked until the screen changes (the
+set of pictures a shown frame looks at differs from the frame before's). After a frame the
+timeline's pictures are asked before the list's photos, at most `IN_FLIGHT_MAX` (4) at once and
+none while the pictures on screen and those on their way fill the room. A frame draws at most
+`EMOJI_PER_FRAME` (32) distinct emoji pictures, counted in the order it lays them out
+(messages only measured included); the rest stay `:name:`.
+
 **Downloads** (`download.rs`, `http/fetch.rs`): a file a message shares is downloaded only
 when the user asks (`Command::Download`), at most two at once a workspace. Only an address
 on the file host is fetched (`https://` + `FILE_HOST` + a plain path; `download::address`):

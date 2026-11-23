@@ -333,7 +333,11 @@ background and decoded off the screen's thread.
   at most 2 redirects, each only to that host and each counted as a request; an emoji whose
   picture is anywhere else stays `:name:`. They share the limits above.
 - slakio keeps at most 64 pictures (24 MiB) in the terminal at once, the least recently shown
-  going first; nothing of them is written to disk.
+  going first, but never one on screen (a list photo only makes room for a timeline picture):
+  past that, the rest keep their initials or `:name:` until the screen changes. The timeline's
+  pictures are fetched before the list's photos. A screen draws at most 32 emoji pictures; more
+  stay `:name:`. A person shown in both the timeline and the list is fetched at most twice, once
+  per size. Nothing of them is written to disk.
 
 ## Keys
 
