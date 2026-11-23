@@ -18,6 +18,11 @@
 //!   up, lookups) takes at most [`Limits::lane_background_per_minute`] and
 //!   [`Limits::lane_background_per_hour`] of them, so one that keeps reconnecting leaves the
 //!   others room;
+//! * a **share for pictures** inside the background shares: the photos, emoji and file thumbnails
+//!   read for the screen take at most [`Limits::lane_picture_per_minute`] and
+//!   [`Limits::lane_picture_per_hour`] of a workspace's part, and [`Limits::picture_per_minute`]
+//!   and [`Limits::picture_per_hour`] of the process's, so a screen full of pictures never leaves
+//!   the socket's opening, its catching up or a lookup without room;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
 //!   one); the others go on;
@@ -84,6 +89,15 @@ pub struct Limits {
     pub lane_background_per_minute: u32,
     /// Of the background share of an hour, the most one workspace's lane uses.
     pub lane_background_per_hour: u32,
+    /// Of the background share of a minute, the most pictures use, every workspace together.
+    pub picture_per_minute: u32,
+    /// Of the background share of an hour, the most pictures use, every workspace together.
+    pub picture_per_hour: u32,
+    /// Of a lane's background share of a minute, the most its pictures use: the rest stays for
+    /// its socket's openings, catching up and lookups.
+    pub lane_picture_per_minute: u32,
+    /// Of a lane's background share of an hour, the most its pictures use.
+    pub lane_picture_per_hour: u32,
     /// Requests for the life of the process: a safety ceiling far above any real use;
     /// reaching it stops all network until the program starts again.
     pub per_process: u32,
@@ -106,6 +120,10 @@ impl Default for Limits {
             background_per_hour: 1000,
             lane_background_per_minute: 60,
             lane_background_per_hour: 700,
+            picture_per_minute: 45,
+            picture_per_hour: 500,
+            lane_picture_per_minute: 30,
+            lane_picture_per_hour: 350,
             per_process: 10_000,
             in_flight: 8,
             waiting: 64,
@@ -166,6 +184,8 @@ impl Clock for FakeClock {
 struct Counts {
     /// When each request of the last hour was let through, oldest first.
     window: VecDeque<Duration>,
+    /// When each picture of the last hour was let through, oldest first (in `window` too).
+    pictures: VecDeque<Duration>,
     /// Methods Slack asked to slow down, and until when.
     paused: HashMap<Method, Duration>,
     /// Methods with a [`spacing`], and when the next of each may go.
@@ -191,8 +211,9 @@ pub struct Governor {
     lanes: Mutex<HashMap<String, (std::sync::Weak<Lane>, Background)>>,
 }
 
-/// When each background request of a lane in the last hour was let through, oldest first.
-type Background = Arc<Mutex<VecDeque<Duration>>>;
+/// When each background request of a lane in the last hour was let through, oldest first, and
+/// whether it was a picture.
+type Background = Arc<Mutex<VecDeque<(Duration, bool)>>>;
 
 impl std::fmt::Debug for Governor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -402,7 +423,7 @@ impl Governor {
                 if !self.is_on() {
                     return Err(off());
                 }
-                self.count(priority, Some(lane))?;
+                self.count(priority, Some(lane), false)?;
                 Admitted { _slot: None, _kept: Some(kept), _lane: None }
             }
             None => self.admit_for(method, priority, Some(lane)).await?,
@@ -437,12 +458,13 @@ impl Governor {
         if !self.is_on() {
             return Err(off());
         }
-        self.count(priority, lane)?;
+        self.count(priority, lane, false)?;
         Ok(Admitted { _slot: Some(slot), _kept: None, _lane: None })
     }
 
-    /// Count a request (of `lane`, when it came through one) against the caps, or refuse it.
-    fn count(&self, priority: Priority, lane: Option<&Lane>) -> Result<(), SlackError> {
+    /// Count a request (of `lane`, when it came through one; a `picture`, when it is one) against
+    /// the caps, or refuse it.
+    fn count(&self, priority: Priority, lane: Option<&Lane>, picture: bool) -> Result<(), SlackError> {
         let now = self.clock.now();
         let mut c = self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if c.tripped {
@@ -469,6 +491,14 @@ impl Governor {
         if over {
             return Err(SlackError::CapReached { why: "the per-minute request cap is reached" });
         }
+        while c.pictures.front().is_some_and(|at| now.saturating_sub(*at) >= HOUR) {
+            c.pictures.pop_front();
+        }
+        if picture
+            && over_share(c.pictures.iter().copied(), now, self.limits.picture_per_minute, self.limits.picture_per_hour)
+        {
+            return Err(SlackError::CapReached { why: "the pictures' share is reached" });
+        }
         if c.total >= self.limits.per_process {
             c.tripped = true;
             drop(c);
@@ -478,16 +508,22 @@ impl Governor {
         // A workspace's background work keeps within its part of the shares.
         if let Some(lane) = lane.filter(|_| priority == Priority::Background) {
             let mut own = lane.background.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            while own.front().is_some_and(|at| now.saturating_sub(*at) >= HOUR) {
+            while own.front().is_some_and(|(at, _)| now.saturating_sub(*at) >= HOUR) {
                 own.pop_front();
             }
-            let minute = own.iter().rev().take_while(|at| now.saturating_sub(**at) < WINDOW).count();
-            if u32::try_from(minute).unwrap_or(u32::MAX) >= self.limits.lane_background_per_minute
-                || u32::try_from(own.len()).unwrap_or(u32::MAX) >= self.limits.lane_background_per_hour
-            {
+            let all = own.iter().map(|(at, _)| *at);
+            if over_share(all, now, self.limits.lane_background_per_minute, self.limits.lane_background_per_hour) {
                 return Err(SlackError::CapReached { why: "this workspace's background share is reached" });
             }
-            own.push_back(now);
+            let pictures = own.iter().filter(|(_, p)| *p).map(|(at, _)| *at);
+            let limits = &self.limits;
+            if picture && over_share(pictures, now, limits.lane_picture_per_minute, limits.lane_picture_per_hour) {
+                return Err(SlackError::CapReached { why: "this workspace's picture share is reached" });
+            }
+            own.push_back((now, picture));
+        }
+        if picture {
+            c.pictures.push_back(now);
         }
         c.total += 1;
         c.window.push_back(now);
@@ -502,7 +538,7 @@ impl Governor {
         if !self.is_on() {
             return Err(SlackError::Offline { why: "the network is switched off" });
         }
-        self.count(Priority::Background, Some(lane))
+        self.count(Priority::Background, Some(lane), false)
     }
 
     /// A file may be downloaded now (or a download follow a redirect): the network is on and
@@ -512,23 +548,32 @@ impl Governor {
         if !self.is_on() {
             return Err(SlackError::Offline { why: "the network is switched off" });
         }
-        self.count(Priority::User, None)
+        self.count(Priority::User, None, false)
     }
 
     /// A picture (a file's smaller copy, a profile photo) may be fetched now: the network is
     /// on and the caps have room. It counts as one background request of `lane` (pictures are
-    /// read for the screen, not asked for): the user's own requests keep their share.
+    /// read for the screen, not asked for): the user's own requests keep their share. Pictures
+    /// keep to their own part of the background shares ([`Limits::lane_picture_per_minute`] and
+    /// the others), so the socket's openings, catching up and lookups always have the rest.
     pub fn picture(&self, lane: &Lane) -> Result<(), SlackError> {
         if !self.is_on() {
             return Err(SlackError::Offline { why: "the network is switched off" });
         }
-        self.count(Priority::Background, Some(lane))
+        self.count(Priority::Background, Some(lane), true)
     }
 
     /// Requests let through so far.
     pub fn sent(&self) -> u32 {
         self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).total
     }
+}
+
+/// Whether `times` (when each was let through in the last hour, oldest first) hold `minute` in
+/// the last [`WINDOW`] or `hour` in all.
+fn over_share(times: impl DoubleEndedIterator<Item = Duration> + Clone, now: Duration, minute: u32, hour: u32) -> bool {
+    let last = times.clone().rev().take_while(|at| now.saturating_sub(*at) < WINDOW).count();
+    u32::try_from(last).unwrap_or(u32::MAX) >= minute || u32::try_from(times.count()).unwrap_or(u32::MAX) >= hour
 }
 
 #[cfg(test)]

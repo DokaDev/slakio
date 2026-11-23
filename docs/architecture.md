@@ -255,6 +255,14 @@ every rail sits in the transport, below the backend, so no caller can go around 
    (counts, lookups) may use 90, so what the user waits for always has room; 1,500 an hour;
    and a safety ceiling of 10,000 for a run, after which all network stops until the program
    starts again. Over a cap a request fails with `CapReached` and is not sent.
+   Pictures (profile photos, a workspace's emoji and file thumbnails, `Governor::picture`) are
+   background requests with a share of their own inside the background shares: at most 30 a
+   minute and 350 an hour of a workspace's 60 and 700, and 45 a minute and 500 an hour of the
+   process's 90 and 1,000 (`Limits::lane_picture_*`, `Limits::picture_*`). So however many
+   pictures a screen wants, the socket's opening, its catching up and the people lookups always
+   have the rest. A picture over its share fails with `CapReached` like any other, is asked
+   again a minute later (`images::RETRY_AFTER`) and shows as text or initials meanwhile; it
+   still counts on the minute, the hour and the run.
    When Slack asks to slow down (HTTP 429 or `ratelimited`), that method is paused for its
    `Retry-After` (30 seconds when Slack does not say); a paused method fails with
    `RateLimited` without being sent, and the other methods go on. A method Slack allows only a
@@ -391,7 +399,8 @@ truth for the span it covers, the whole timeline replaced when it does not reach
 loaded when it was asked (no gap is hidden), what came live meanwhile kept after it; one that
 fails is asked again by itself after a pause that doubles up to 15 minutes. Each workspace's
 socket is its own; one that fails holds none back, and the background share is split so it
-cannot spend another's either (`Limits::lane_background_*`).
+cannot spend another's either (`Limits::lane_background_*`); its pictures keep to their part of
+that share (`Limits::lane_picture_*`), so a reopening never waits for them.
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
 is refused before any request, and a newer page of the same conversation or thread supersedes

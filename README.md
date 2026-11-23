@@ -320,7 +320,10 @@ background and decoded off the screen's thread.
   Slack's start answer, or from the same people lookup slakio already makes. Only an answer that says
   it is an image is read, at most 2 MB of it; a picture larger than 4096 pixels a side or 4.2
   million pixels is refused from its header, before it is decoded. Each picture fetched counts
-  as a background request against the request cap, and the network switches stop it. With
+  as a background request against the request cap, and the network switches stop it. Pictures
+  (photos, emoji and file previews together) take at most 30 requests a minute of a workspace,
+  so live updates can always reconnect and catch up; a picture over that share shows as text or
+  initials and is asked again a minute later. With
   `avatars = "image"`, people whose photo is on Gravatar are fetched from `secure.gravatar.com`,
   a service outside Slack: it sees your IP address and which photos you look at.
 - A workspace's own emoji: the first time a message on screen shows a shortcode that is not a

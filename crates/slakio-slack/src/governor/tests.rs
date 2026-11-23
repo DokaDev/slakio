@@ -396,3 +396,72 @@ fn a_search_waits_its_turn_a_second_after_the_last_and_other_methods_do_not() {
     assert_eq!(spacing(Method::SearchMessages), Some(Duration::from_secs(1)));
     assert_eq!(spacing(Method::ConversationsHistory), None);
 }
+
+#[test]
+fn a_burst_of_pictures_leaves_the_socket_its_catch_up_and_lookups_room() {
+    rt().block_on(async {
+        let (g, _) = governor(Limits::default(), true);
+        let a = g.lane();
+        let let_through = (0..110).filter(|_| g.picture(&a).is_ok()).count();
+        assert_eq!(let_through, 30, "a minute's pictures of one workspace");
+        assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's picture share is reached" }));
+        // The socket opens again at once, and catches up and looks people up.
+        g.dial(&a).unwrap();
+        for method in [Method::ClientCounts, Method::ConversationsHistory, Method::UsersInfo, Method::EdgeUsersInfo] {
+            drop(g.admit_in(&a, method, Priority::Background).await.unwrap());
+        }
+        // However many workspaces show pictures, the process's background minute keeps room.
+        let lanes: Vec<Lane> = (0..3).map(|_| g.lane()).collect();
+        let more = lanes.iter().map(|l| (0..40).filter(|_| g.picture(l).is_ok()).count()).sum::<usize>();
+        assert_eq!(30 + more, 45, "every workspace's pictures of a minute together");
+        assert_eq!(g.picture(&lanes[2]), Err(SlackError::CapReached { why: "the pictures' share is reached" }));
+        for lane in lanes.iter().chain([&a]) {
+            g.dial(lane).unwrap();
+            drop(g.admit_in(lane, Method::ConversationsHistory, Priority::Background).await.unwrap());
+        }
+    });
+}
+
+#[test]
+fn the_picture_share_frees_up_with_time_and_keeps_to_its_hour() {
+    rt().block_on(async {
+        let d = Limits::default();
+        assert_eq!((d.picture_per_minute, d.picture_per_hour), (45, 500));
+        assert_eq!((d.lane_picture_per_minute, d.lane_picture_per_hour), (30, 350));
+        let (g, clock) = governor(Limits { lane_picture_per_hour: 40, ..Limits::default() }, true);
+        let a = g.lane();
+        for _ in 0..30 {
+            g.picture(&a).unwrap();
+        }
+        assert!(g.picture(&a).is_err(), "the 31st of the minute waits");
+        clock.advance(Duration::from_secs(60));
+        for _ in 0..10 {
+            g.picture(&a).unwrap();
+        }
+        assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's picture share is reached" }));
+        g.dial(&a).unwrap();
+        clock.advance(Duration::from_secs(3600));
+        g.picture(&a).unwrap();
+    });
+}
+
+#[test]
+fn pictures_count_on_the_hour_and_the_run() {
+    rt().block_on(async {
+        let (g, _) = governor(Limits { per_hour: 5, ..Limits::default() }, true);
+        let a = g.lane();
+        for _ in 0..5 {
+            g.picture(&a).unwrap();
+        }
+        let e = g.admit(M, Priority::User).await.unwrap_err();
+        assert_eq!(e, SlackError::CapReached { why: "the hourly request budget is reached" });
+        let (g, _) = governor(Limits { per_process: 5, ..Limits::default() }, true);
+        let a = g.lane();
+        for _ in 0..5 {
+            g.picture(&a).unwrap();
+        }
+        assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "the request cap of this run is reached" }));
+        assert_eq!(g.sent(), 5);
+        assert!(!g.is_on(), "the run's cap stops the network");
+    });
+}
