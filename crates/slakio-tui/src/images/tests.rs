@@ -113,6 +113,9 @@ fn the_terminal_holds_at_most_so_many_pictures_and_bytes() {
     assert!(out.contains("a=d,d=I,i=1,q=2") && out.contains("a=d,d=I,i=3,q=2"), "the oldest went");
     assert!(!out.contains("a=d,d=I,i=4,"));
     assert_eq!(images.look(&ws(), &thumb(0)), Look::Pending, "gone: fetched again when drawn");
+    // A frame drawing none of those held: they are no longer on screen.
+    images.ask(&mut requests, Instant::now());
+    requests.take();
     // Bytes: a large one pushes the others out, never itself.
     let job = fetch(&mut images, &mut requests, &thumb(1000));
     images.decoded(key(&job), Ok(ready(&job, BYTES_CAP)));
@@ -344,4 +347,87 @@ fn auto_where_the_terminal_shows_no_pictures_says_so() {
     images.resolve();
     assert_eq!(images.choose("auto"), Chosen::NotHere);
     assert!(!images.on);
+}
+
+/// One shown frame drawing `shown`, then what it asked for, each answered and made ready at once
+/// unless `hold`: the requests (still on their way when held).
+fn frame_of(images: &mut Images, requests: &mut Requests, shown: &[Source], hold: bool) -> Vec<Generation> {
+    for source in shown {
+        images.look(&ws(), source);
+    }
+    images.ask(requests, Instant::now());
+    let mut out = Vec::new();
+    for r in requests.take() {
+        out.push(r.id);
+        if !hold {
+            let job = images.answered(r.id, vec![1]).expect("a job");
+            images.decoded(key(&job), Ok(ready(&job, 10)));
+        }
+    }
+    out
+}
+
+#[test]
+fn more_pictures_on_screen_than_the_terminal_holds_are_asked_once_and_none_shown_is_removed() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let shown: Vec<Source> = (0..ENTRIES_MAX + 10).map(thumb).collect();
+    let mut asked = 0;
+    for round in 0..40 {
+        let now = frame_of(&mut images, &mut requests, &shown, false);
+        assert!(now.len() <= IN_FLIGHT_MAX);
+        asked += now.len();
+        assert!(!images.take_graphics().contains("a=d"), "round {round}: a picture on screen left the terminal");
+    }
+    assert_eq!(asked, ENTRIES_MAX, "each asked once, as many as the terminal holds");
+    assert_eq!(images.held().0, ENTRIES_MAX);
+    assert!(frame_of(&mut images, &mut requests, &shown, false).is_empty(), "settled");
+    let ready = shown.iter().filter(|s| matches!(images.look(&ws(), s), Look::Ready { .. })).count();
+    assert_eq!(ready, ENTRIES_MAX, "the rest stand in for themselves");
+}
+
+#[test]
+fn a_picture_with_no_room_left_is_parked_until_the_screen_changes() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let held: Vec<Source> = (0..ENTRIES_MAX).map(thumb).collect();
+    for _ in 0..ENTRIES_MAX {
+        frame_of(&mut images, &mut requests, &held, false);
+    }
+    assert_eq!(images.held().0, ENTRIES_MAX);
+    images.take_graphics();
+    // Only the newcomer on screen for two frames: the others may make room, so it is asked.
+    let extra = [thumb(999)];
+    assert!(frame_of(&mut images, &mut requests, &extra, true).is_empty(), "the frame before still showed them all");
+    let ids = frame_of(&mut images, &mut requests, &extra, true);
+    assert_eq!(ids.len(), 1);
+    // They are all back on screen with it before its bytes come: nothing shown is removed, it
+    // waits.
+    let all: Vec<Source> = held.iter().chain(&extra).cloned().collect();
+    frame_of(&mut images, &mut requests, &all, true);
+    let job = images.answered(ids[0], vec![1]).expect("a job");
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    assert_eq!(images.take_graphics(), "", "neither sent nor anything removed");
+    assert_eq!(images.held().0, ENTRIES_MAX);
+    // The same screen: parked, not asked.
+    for _ in 0..3 {
+        assert!(frame_of(&mut images, &mut requests, &all, true).is_empty());
+        assert_eq!(images.entries.get(&(extra[0].clone(), Shape::Preview)), Some(&Entry::Parked));
+    }
+    // The screen changes: asked again once there is room (the frame before still showed the
+    // others).
+    assert!(frame_of(&mut images, &mut requests, &extra, true).is_empty());
+    assert_eq!(frame_of(&mut images, &mut requests, &extra, true).len(), 1);
+}
+
+#[test]
+fn a_frame_draws_at_most_so_many_emoji_pictures() {
+    let images = on();
+    let address = |n: usize| format!("https://{}/T1/e{n}/0.png", slakio_core::images::EMOJI_HOSTS[0]);
+    for n in 0..EMOJI_PER_FRAME + 5 {
+        images.look_emoji(&ws(), &address(n));
+    }
+    // One already looked at is looked at again, whatever the count.
+    images.look_emoji(&ws(), &address(0));
+    let wanted: Vec<Source> = images.wanted.borrow().iter().map(|w| w.1.0.clone()).collect();
+    assert_eq!(wanted.len(), EMOJI_PER_FRAME + 1);
+    assert!(wanted.iter().all(|s| *s != Source::Emoji(address(EMOJI_PER_FRAME))));
 }

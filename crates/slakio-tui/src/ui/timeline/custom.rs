@@ -3,16 +3,15 @@
 //! cells of placeholders ([`graphics::row`], in the picture's id colour) once the terminal holds
 //! it; an alias of a standard emoji is drawn as that emoji. Everywhere else — pictures off (a
 //! terminal that draws none, one inside a multiplexer), the list or the picture not there yet,
-//! a picture that failed or is on another host — the `:name:` stays text, as before. Only what a
+//! a picture that failed or is on another host, past the frame's emoji pictures
+//! ([`crate::images::EMOJI_PER_FRAME`]) — the `:name:` stays text, as before. Only what a
 //! frame draws asks for a picture ([`crate::images::Images::look_as`]): a message scrolled away,
 //! a pane closed, `:images off`, and its cells are gone with it.
 
 use crate::app::App;
 use crate::emoji;
-use crate::images::decode::Shape;
 use crate::images::{Look, graphics};
 use ratatui::style::Style;
-use slakio_core::images::Source;
 use slakio_core::images::emoji::{Custom, shortcode};
 use slakio_core::model::WorkspaceId;
 
@@ -56,7 +55,7 @@ fn drawn(app: &App, ws: &WorkspaceId, name: &str, style: Style) -> Option<(Strin
     }
     match app.images.customs.get(ws, name)? {
         Custom::Standard(standard) => emoji::get(standard).map(|e| (e.to_string(), style)),
-        Custom::Picture(address) => match app.images.look_as(ws, &Source::Emoji(address.clone()), Shape::Emoji) {
+        Custom::Picture(address) => match app.images.look_emoji(ws, address) {
             Look::Ready { id, cols: 2, rows: 1 } => {
                 let mut cells = Style::default().fg(graphics::color(id));
                 cells.bg = style.bg;

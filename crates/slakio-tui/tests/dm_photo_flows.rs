@@ -515,3 +515,89 @@ fn a_dialog_s_dim_keeps_every_dm_photo_s_colour_its_id() {
         assert_eq!(cells(&s), want, "{theme}: all back");
     }
 }
+
+/// Booted at `w`×`h` in a world with `extra` more 1:1 DMs, photos on, `deploys` open with one
+/// message by each of those peers (so each is in the timeline and in the list), the list showing
+/// DMs; those peers.
+fn crowded(w: u16, h: u16, extra: usize) -> (Scripted, Vec<slakio_core::model::UserId>) {
+    use slakio_core::model::{ConversationId, Message, Ts, UserId};
+    use slakio_core::sanitize::Remote;
+    let mut snapshot = slakio_world::World::demo().snapshot().clone();
+    let ws = snapshot.workspaces[0].id.clone();
+    let dm = (snapshot.conversations.iter())
+        .find(|c| c.workspace == ws && matches!(c.kind, ConversationKind::Dm { .. }))
+        .cloned()
+        .expect("a DM");
+    let ConversationKind::Dm { user } = &dm.kind else { unreachable!() };
+    let person = snapshot.users.iter().find(|u| u.id == *user && u.workspace == ws).cloned().expect("its peer");
+    let mut peers = Vec::new();
+    for k in 0..extra {
+        let id = UserId::new(format!("UCROWD{k}"));
+        let mut u = person.clone();
+        (u.id, u.name, u.display_name) =
+            (id.clone(), Remote::new(format!("crowd.{k}")), Remote::new(format!("Crowd {k}")));
+        snapshot.users.push(u);
+        let mut c = dm.clone();
+        (c.id, c.kind, c.name) = (
+            ConversationId::new(format!("DCROWD{k}")),
+            ConversationKind::Dm { user: id.clone() },
+            Remote::new(format!("Crowd {k}")),
+        );
+        snapshot.conversations.push(c);
+        peers.push(id);
+    }
+    let mut s = Scripted::booted(true, Some(snapshot));
+    s.d.app.resize(w, h);
+    photos_on(&mut s);
+    s.d.list_cursor_on("deploys");
+    s.keys("enter");
+    let i = s.b.held.iter().position(|r| matches!(r.command, Command::History { .. })).expect("a page asked");
+    let mut e = s.b.reply(i);
+    let Event::History(page) = &mut e.event else { panic!("a page") };
+    page.messages = (peers.iter().enumerate())
+        .map(|(k, p)| Message {
+            ts: Ts(1_767_603_600_000_000 + k as u64 * 60_000_000),
+            user: p.clone(),
+            text: Remote::new(format!("note {k}")),
+            thread: None,
+            reactions: Vec::new(),
+            edited: false,
+            files: Vec::new(),
+        })
+        .collect();
+    page.complete = true;
+    s.b.push(e);
+    s.pump();
+    settle(&mut s);
+    s.keys("space d");
+    (s, peers)
+}
+
+#[test]
+fn more_photos_on_screen_than_the_terminal_holds_are_asked_once_and_none_shown_is_removed() {
+    use slakio_tui::images::ENTRIES_MAX;
+    let (mut s, _) = crowded(100, 90, 80);
+    let list = expected(&s).len();
+    assert!(list > ENTRIES_MAX, "more DM photos on screen ({list}) than the terminal holds");
+    s.d.app.images.take_graphics();
+    let mut all: Vec<Source> = Vec::new();
+    for round in 0..40 {
+        let now = frame(&mut s);
+        assert!(now.len() <= IN_FLIGHT_MAX, "round {round}: {} at once", now.len());
+        for (id, source) in now {
+            all.push(source);
+            deliver(&mut s, id);
+        }
+        let sent = s.d.app.images.take_graphics();
+        assert!(!sent.contains("a=d"), "round {round}: a photo on screen left the terminal");
+    }
+    assert!(frame(&mut s).is_empty(), "settled");
+    assert!(all.len() <= ENTRIES_MAX, "{} asked for, the terminal holds {ENTRIES_MAX}", all.len());
+    // A photo is asked for once per place it fills, the list's chip and the timeline's slot.
+    let mut per: std::collections::HashMap<&Source, usize> = Default::default();
+    for source in &all {
+        *per.entry(source).or_default() += 1;
+    }
+    assert!(per.values().all(|n| *n <= 2), "a photo asked for more than once per place: {per:?}");
+    assert_eq!(s.d.app.images.held().0, all.len());
+}

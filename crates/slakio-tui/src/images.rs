@@ -16,7 +16,12 @@
 //!
 //! What the terminal holds for slakio is bounded: at most [`ENTRIES_MAX`] pictures and
 //! [`BYTES_CAP`] bytes of them; past that the least recently drawn is removed from the terminal
-//! (and fetched again if it is drawn again). A picture that failed says why on its card (too
+//! (and fetched again if it is drawn again), but never one the latest frame or the one before it
+//! looked at: when every picture held is on screen, the new picture is not sent and waits, parked, until the screen
+//! changes (the set of pictures a shown frame looks at differs from the frame before's). While
+//! the pictures on screen fill the terminal's room, nothing more is asked for. A frame draws at
+//! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]); the rest stay
+//! text. A picture that failed says why on its card (too
 //! large, unreadable, not loaded); one that failed for the network or the request budget is
 //! asked again after [`RETRY_AFTER`] ([`RETRY_SOON`] for a busy or offline backend), when it is
 //! drawn again; at most [`FAILED_MAX`] failures are kept.
@@ -32,13 +37,16 @@ use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
 use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 /// The most pictures asked for or being decoded at once.
 pub const IN_FLIGHT_MAX: usize = 4;
 /// The most pictures the terminal holds for slakio.
 pub const ENTRIES_MAX: usize = 64;
+/// The most distinct emoji pictures one frame draws (the others stay `:name:`): well below
+/// [`ENTRIES_MAX`], so emoji never fill the terminal's room alone.
+pub const EMOJI_PER_FRAME: usize = ENTRIES_MAX / 2;
 /// The most bytes (PNG, as sent) of the pictures the terminal holds for slakio.
 pub const BYTES_CAP: usize = 24 * 1024 * 1024;
 /// How long a picture that failed for the network or the request budget waits to be asked again.
@@ -96,6 +104,9 @@ enum Entry {
         why: Why,
         again: Option<Instant>,
     },
+    /// Fetched while every picture held was on screen: not sent, and not asked again until the
+    /// screen changes (drawn as not here yet meanwhile).
+    Parked,
 }
 
 /// A picture to decode and make ready for the terminal, for the binary to run off the loop's
@@ -168,8 +179,14 @@ pub struct Images {
     /// What the last frame would have shown and did not have (and its workspace); `false`: it
     /// was only laid out, not shown.
     wanted: RefCell<Vec<(WorkspaceId, Key, bool)>>,
-    /// What the last frame showed (`false`: only laid out).
+    /// What the last frame looked at, whatever it was (`false`: only laid out).
     drawn: RefCell<Vec<(Key, bool)>>,
+    /// What the latest shown frame looked at, and the one before it: never removed.
+    screen: HashSet<Key>,
+    last_screen: HashSet<Key>,
+    /// The distinct emoji pictures the frame being drawn looked at (at most
+    /// [`EMOJI_PER_FRAME`]).
+    emoji_frame: RefCell<HashSet<Key>>,
     last_id: u32,
     /// The highest picture id ever sent.
     pub highest: u32,
@@ -198,6 +215,9 @@ impl Images {
             self.bytes = 0;
             self.wanted.take();
             self.drawn.take();
+            self.screen.clear();
+            self.last_screen.clear();
+            self.emoji_frame.take();
         }
         self.on = on;
     }
@@ -251,12 +271,9 @@ impl Images {
             return Look::Pending;
         }
         let key = (source.clone(), shape);
+        self.drawn.borrow_mut().push((key.clone(), true));
         match self.entries.get(&key) {
-            Some(Entry::Ready { id, cols, rows, .. }) => {
-                let look = Look::Ready { id: *id, cols: *cols, rows: *rows };
-                self.drawn.borrow_mut().push((key, true));
-                look
-            }
+            Some(Entry::Ready { id, cols, rows, .. }) => Look::Ready { id: *id, cols: *cols, rows: *rows },
             Some(Entry::Failed { why, again }) => {
                 let why = *why;
                 if again.is_some() {
@@ -264,12 +281,38 @@ impl Images {
                 }
                 Look::Failed(why)
             }
-            Some(Entry::Asked(_) | Entry::Decoding(_)) => Look::Pending,
+            Some(Entry::Asked(_) | Entry::Decoding(_) | Entry::Parked) => Look::Pending,
             None => {
                 self.wanted.borrow_mut().push((ws.clone(), key, true));
                 Look::Pending
             }
         }
+    }
+
+    /// What the emoji picture at `address` (of workspace `ws`) is for drawing in two cells
+    /// ([`Images::look_as`]); past [`EMOJI_PER_FRAME`] distinct ones in a frame, not looked at
+    /// ([`Look::Pending`]: its name stays text). A frame lays a message out once, so its width
+    /// and its drawing agree.
+    pub fn look_emoji(&self, ws: &WorkspaceId, address: &str) -> Look {
+        if !self.on {
+            return Look::Pending;
+        }
+        let key = (Source::Emoji(address.to_string()), Shape::Emoji);
+        {
+            let mut seen = self.emoji_frame.borrow_mut();
+            if !seen.contains(&key) {
+                if seen.len() >= EMOJI_PER_FRAME {
+                    return Look::Pending;
+                }
+                seen.insert(key.clone());
+            }
+        }
+        self.look_as(ws, &key.0, key.1)
+    }
+
+    /// `key` was looked at by the latest shown frame or the one before it: it stays.
+    fn on_screen(&self, key: &Key) -> bool {
+        self.screen.contains(key) || self.last_screen.contains(key)
     }
 
     /// Where what frames note stands now: what is noted after it, until a later mark, can be
@@ -294,18 +337,30 @@ impl Images {
     }
 
     /// After a frame: what it showed is the most recently drawn, and what it would have shown
-    /// is asked for (at most [`IN_FLIGHT_MAX`] at once; a failed one once its wait is over); what
-    /// it only laid out is neither. `true` when something was asked.
+    /// is asked for (at most [`IN_FLIGHT_MAX`]
+    /// at once, and none while the pictures on screen and those on their way fill the
+    /// terminal's room; a failed one once its wait is over); what it only laid out is neither.
+    /// When what it showed differs from the frame before, the parked pictures may be asked
+    /// again. `true` when something was asked.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
+        let mut screen = HashSet::new();
         for (key, _) in self.drawn.take().into_iter().filter(|d| d.1) {
             if let Some(i) = self.held.iter().position(|k| *k == key) {
                 let s = self.held.remove(i).expect("found");
                 self.held.push_back(s);
             }
+            screen.insert(key);
         }
+        if screen != self.screen {
+            self.entries.retain(|_, e| *e != Entry::Parked);
+        }
+        self.last_screen = std::mem::replace(&mut self.screen, screen);
+        self.emoji_frame.take();
         let mut asked = false;
         for (ws, key, _) in self.wanted.take().into_iter().filter(|w| w.2) {
-            if self.in_flight() >= IN_FLIGHT_MAX {
+            let in_flight = self.in_flight();
+            let staying = self.held.iter().filter(|k| self.on_screen(k)).count();
+            if in_flight >= IN_FLIGHT_MAX || staying + in_flight >= ENTRIES_MAX {
                 break;
             }
             match self.entries.get(&key) {
@@ -367,8 +422,9 @@ impl Images {
     }
 
     /// The picture of `job` was made ready (or refused): it is sent to the terminal before the
-    /// next frame, and the least recently drawn go while there are too many. A result for a
-    /// request no longer waited for changes nothing.
+    /// next frame, and the least recently drawn go while there are too many, never one on
+    /// screen; with no room, it is parked. A result for
+    /// a request no longer waited for changes nothing.
     pub fn decoded(&mut self, job: (Source, Generation), result: Result<Prepared, Refused>) {
         let (source, request) = job;
         // Request ids are never used twice: the one decoding it is the picture.
@@ -387,18 +443,23 @@ impl Images {
                 return self.fail(key, why, None);
             }
         };
-        self.graphics.push_str(&p.transmit);
-        self.highest = self.highest.max(p.id);
-        self.bytes += p.bytes;
-        self.entries.insert(key.clone(), Entry::Ready { id: p.id, cols: p.cols, rows: p.rows, bytes: p.bytes });
-        self.held.push_back(key);
-        while self.held.len() > ENTRIES_MAX || (self.bytes > BYTES_CAP && self.held.len() > 1) {
-            let Some(old) = self.held.pop_front() else { break };
+        while self.held.len() >= ENTRIES_MAX || (self.bytes + p.bytes > BYTES_CAP && !self.held.is_empty()) {
+            let Some(i) = self.held.iter().position(|k| !self.on_screen(k)) else {
+                // Never sent, so nothing to remove from the terminal.
+                self.entries.insert(key, Entry::Parked);
+                return;
+            };
+            let old = self.held.remove(i).expect("found");
             if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&old) {
                 self.bytes -= bytes;
                 self.graphics.push_str(&graphics::delete(id));
             }
         }
+        self.graphics.push_str(&p.transmit);
+        self.highest = self.highest.max(p.id);
+        self.bytes += p.bytes;
+        self.entries.insert(key.clone(), Entry::Ready { id: p.id, cols: p.cols, rows: p.rows, bytes: p.bytes });
+        self.held.push_back(key);
     }
 
     /// The commands for the terminal not written yet (sending and removing pictures).

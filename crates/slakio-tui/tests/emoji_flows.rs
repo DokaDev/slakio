@@ -292,3 +292,37 @@ fn scrolled_away_or_images_off_the_cells_go_and_only_what_is_shown_is_asked() {
     assert!(s.d.screen().contains(":ship-it:"));
     assert!(pictures(&frame(&mut s)).is_empty());
 }
+
+#[test]
+fn more_emoji_than_the_terminal_holds_ask_a_frame_s_share_once_each_and_the_rest_stay_text() {
+    use slakio_core::images::emoji::Custom;
+    use slakio_tui::images::EMOJI_PER_FRAME;
+    let walls: Vec<String> = (0..200).map(|k| format!("wall-{k}")).collect();
+    let chips: Vec<String> = (0..65).map(|k| format!("chip-{k}")).collect();
+    let wall_text = walls.iter().map(|n| format!(":{n}:")).collect::<Vec<_>>().join(" ");
+    let chip_names: Vec<&str> = chips.iter().map(String::as_str).collect();
+    for (text, last) in [(wall_text.as_str(), "wall-199"), ("hello", "chip-64")] {
+        let (mut s, ws) = shown(&[(text, &chip_names)], 200, 50, true);
+        let asked = frame(&mut s);
+        let list = lists(&asked)[0].clone();
+        let emoji = (walls.iter().chain(&chips))
+            .map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n))))
+            .collect();
+        s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji } });
+        s.pump();
+        let mut all: Vec<Source> = Vec::new();
+        for _ in 0..20 {
+            for r in frame(&mut s) {
+                all.extend(pictures(std::slice::from_ref(&r)));
+                give_picture(&mut s, &r);
+            }
+        }
+        let distinct: std::collections::HashSet<&Source> = all.iter().collect();
+        assert_eq!(distinct.len(), all.len(), "{last}: an emoji on screen was asked for again");
+        assert_eq!(all.len(), EMOJI_PER_FRAME, "{last}: a frame's share, no more");
+        assert!(frame(&mut s).is_empty(), "{last}: settled");
+        assert_eq!(cells(&s).iter().map(|(_, xs)| xs.len()).sum::<usize>(), 2 * EMOJI_PER_FRAME, "{last}");
+        let screen = s.d.screen();
+        assert!(screen.contains(&format!(":{last}:")), "{last}: past the share, text:\n{screen}");
+    }
+}
