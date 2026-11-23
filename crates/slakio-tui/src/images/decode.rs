@@ -9,7 +9,7 @@
 //!   same bounds and to the memory they take.
 //! * A preview fits in [`PREVIEW_COLS`] × [`PREVIEW_ROWS`] cells, never made larger than it is
 //!   (but at least one cell); a photo fills the comfortable layout's picture slot, square, in its
-//!   middle. The cells' size in pixels comes from the terminal (when it says it); the picture
+//!   middle; an emoji fits whole in two cells of a row, in their middle. The cells' size in pixels comes from the terminal (when it says it); the picture
 //!   sent is at most [`SENT_SIDE_MAX`] pixels a side.
 
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, Limits, RgbaImage, imageops};
@@ -33,6 +33,9 @@ pub enum Shape {
     Preview,
     /// A profile photo, `cols` × `rows` cells.
     Photo { cols: u16, rows: u16 },
+    /// A workspace's own emoji: two cells of a row, the whole picture in their middle, its
+    /// proportions kept (a GIF's first frame).
+    Emoji,
 }
 
 /// A picture ready for the terminal: a PNG that fills `cols` × `rows` cells.
@@ -114,6 +117,10 @@ pub fn decode(bytes: &[u8], shape: Shape, cell: Option<(u16, u16)>) -> Result<De
             let side = (u32::from(cols) * cw).min(u32::from(rows) * ch);
             (u32::from(cols), u32::from(rows), (side, side))
         }
+        Shape::Emoji => {
+            let scale = f64::min(f64::from(2 * cw) / f64::from(w), f64::from(ch) / f64::from(h));
+            (2, 1, (((f64::from(w) * scale) as u32).max(1), ((f64::from(h) * scale) as u32).max(1)))
+        }
     };
     // The canvas the cells cover, no larger than is sent; the picture keeps its proportions.
     let (canvas_w, canvas_h) = (cols * cw, rows * ch);
@@ -121,7 +128,9 @@ pub fn decode(bytes: &[u8], shape: Shape, cell: Option<(u16, u16)>) -> Result<De
     let px = |v: u32| ((f64::from(v) * down) as u32).max(1);
     let (canvas_w, canvas_h, fit_w, fit_h) = (px(canvas_w), px(canvas_h), px(fit.0), px(fit.1));
     let picture = match shape {
-        Shape::Preview => imageops::resize(&img.to_rgba8(), fit_w, fit_h, imageops::FilterType::Triangle),
+        Shape::Preview | Shape::Emoji => {
+            imageops::resize(&img.to_rgba8(), fit_w, fit_h, imageops::FilterType::Triangle)
+        }
         Shape::Photo { .. } => {
             let side = w.min(h);
             let square = img.crop_imm((w - side) / 2, (h - side) / 2, side, side).to_rgba8();
@@ -131,7 +140,9 @@ pub fn decode(bytes: &[u8], shape: Shape, cell: Option<(u16, u16)>) -> Result<De
     let mut canvas = RgbaImage::new(canvas_w, canvas_h);
     let (x, y) = match shape {
         Shape::Preview => (0, 0),
-        Shape::Photo { .. } => ((canvas_w.saturating_sub(fit_w)) / 2, (canvas_h.saturating_sub(fit_h)) / 2),
+        Shape::Photo { .. } | Shape::Emoji => {
+            ((canvas_w.saturating_sub(fit_w)) / 2, (canvas_h.saturating_sub(fit_h)) / 2)
+        }
     };
     imageops::overlay(&mut canvas, &picture, i64::from(x), i64::from(y));
     let mut png = Vec::new();

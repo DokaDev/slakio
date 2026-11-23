@@ -222,8 +222,8 @@ impl App {
             Event::Downloaded { path, unmarked, .. } => self.on_downloaded(id, path, unmarked, now),
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
-            // Nothing asks for a workspace's own emoji yet.
-            Event::Emoji { .. } => false,
+            // A workspace's own emoji: its text is drawn again with them.
+            Event::Emoji { emoji } => self.images.customs.answered(id, emoji),
             Event::Image { bytes } => {
                 if let Some(job) = self.images.answered(id, bytes) {
                     self.effects.push(Effect::Decode(job));
@@ -261,6 +261,8 @@ impl App {
             self.boots[b].failed = None;
             if let Some(ws) = self.boots[b].workspace.clone().filter(|_| std::mem::take(&mut self.boots[b].again)) {
                 self.work.catch_up(&ws, true);
+                // Its own emoji are read again when next shown.
+                self.images.customs.forget(&ws);
             }
             // Unknown is not zero: the counts kept are shown, and the status line says so (with
             // several workspaces, whose, short; its stripe found by id, two may have one name).
@@ -305,6 +307,10 @@ impl App {
         // A picture that failed says so on its card (never in the status line or the log).
         if self.images.failed(id, &kind, now) {
             return true;
+        }
+        // A workspace's own emoji not read: its shortcodes stay text (never said).
+        if self.images.customs.failed(id, &kind, now) {
+            return false;
         }
         if self.download_failed(id, &kind, now) {
             let fault = Fault::other(format!("{kind:?}: {}", log_safe(detail)));

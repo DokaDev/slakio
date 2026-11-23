@@ -277,14 +277,31 @@ fn pieces(s: &str, w: usize) -> Vec<&str> {
     out
 }
 
-/// Punctuation that closes what is before it and must not start a line.
+/// Punctuation that closes what is before it and must not start a line; so too a picture's
+/// cell past its first column ([`crate::images::graphics::continues`]).
 fn closing(g: &str) -> bool {
-    g.chars().next().is_some_and(|c| {
-        matches!(
-            c,
-            '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}' | '…' | '。' | '、' | '」' | '』' | '）' | '！' | '？'
-        )
-    })
+    crate::images::graphics::continues(g)
+        || g.chars().next().is_some_and(|c| {
+            matches!(
+                c,
+                '.' | ','
+                    | ';'
+                    | ':'
+                    | '!'
+                    | '?'
+                    | ')'
+                    | ']'
+                    | '}'
+                    | '…'
+                    | '。'
+                    | '、'
+                    | '」'
+                    | '』'
+                    | '）'
+                    | '！'
+                    | '？'
+            )
+        })
 }
 
 #[cfg(test)]

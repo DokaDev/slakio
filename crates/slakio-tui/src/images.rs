@@ -1,6 +1,7 @@
-//! Pictures in the timeline: previews of the pictures messages share, under their cards, and
+//! Pictures in the timeline: previews of the pictures messages share, under their cards,
 //! people's profile photos in the comfortable layout's picture slot and in the list's DM rows
-//! (`avatars = "image"`), drawn with the kitty graphics protocol where the terminal draws it
+//! (`avatars = "image"`), and a workspace's own emoji in text and reaction chips ([`custom`],
+//! two cells each, [`Shape::Emoji`]), drawn with the kitty graphics protocol where the terminal draws it
 //! ([`detect`]); elsewhere, and while a picture is not there yet, the text card and the initials
 //! stay as they are. A picture is kept per address and the cells it fills ([`Shape`]): a photo
 //! shown in both places is two pictures to the terminal.
@@ -20,6 +21,7 @@
 //! asked again after [`RETRY_AFTER`] ([`RETRY_SOON`] for a busy or offline backend), when it is
 //! drawn again; at most [`FAILED_MAX`] failures are kept.
 
+pub mod custom;
 pub mod decode;
 pub mod detect;
 pub mod graphics;
@@ -173,6 +175,8 @@ pub struct Images {
     pub highest: u32,
     /// Commands for the terminal not written yet.
     graphics: String,
+    /// The workspaces' own emoji: what each name draws (kept whether pictures are on or not).
+    pub customs: custom::Customs,
 }
 
 impl Images {
@@ -234,7 +238,8 @@ impl Images {
     pub fn look(&self, ws: &WorkspaceId, source: &Source) -> Look {
         let shape = match source {
             Source::Thumb(_) => Shape::Preview,
-            Source::Avatar(_) | Source::Emoji(_) => PHOTO,
+            Source::Avatar(_) => PHOTO,
+            Source::Emoji(_) => Shape::Emoji,
         };
         self.look_as(ws, source, shape)
     }

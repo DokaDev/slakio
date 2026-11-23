@@ -9,6 +9,8 @@
 //! span of its own (`→ host`), a style no sender's markup gives. While a link is being picked
 //! (`o`), the letters still to type for it are drawn over its first cells in the hint style. Inline code is tinted, or keeps
 //! its backticks where nothing can tint it; a code block's lines are tinted, or marked by a bar.
+//! A workspace's own emoji in text is drawn as its picture, two cells that wrap as one
+//! ([`super::custom`]).
 
 use crate::app::App;
 use crate::app::pane::Shown;
@@ -131,7 +133,7 @@ fn runs_of(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
     let t = &app.theme;
     let text = plain(p, &|p| app.model.named(ws, p));
     match p {
-        Piece::Text(_, marks) => vec![(text, marked(t.text(), *marks))],
+        Piece::Text(_, marks) => super::custom::runs(app, ws, &text, marked(t.text(), *marks)),
         Piece::Code(code) if t.code_marks() => vec![(format!("`{code}`"), t.code())],
         Piece::Code(_) => vec![(text, t.code())],
         Piece::User { id, marks, .. } => {

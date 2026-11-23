@@ -39,7 +39,7 @@ use crate::time;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use slakio_core::i18n::{Label, Msg};
-use slakio_core::model::Org;
+use slakio_core::model::{Org, WorkspaceId};
 
 /// The sender's column, at most (compact).
 const AUTHOR_WIDTH: usize = 14;
@@ -422,7 +422,7 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
     }
     // A chip's first cell is its pad: it sits in the gap, so the emoji lines up with the text.
     let chip_indent = " ".repeat(indent_w.saturating_sub(1));
-    for line in chips(app, m, text_w) {
+    for line in chips(app, pane.target.workspace(), m, text_w) {
         let mut spans = vec![Span::raw(chip_indent.clone())];
         spans.extend(line);
         out.push((Line::from(spans), Kind::Content, Vec::new()));
@@ -441,18 +441,30 @@ fn footer(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid
     out
 }
 
-/// The reactions of `m` as chips ` <emoji> <count> ` (the user's own in the accent), one space
-/// apart, wrapped at `w` cells. An emoji Slack names that is not a standard one stays `:name:`.
-pub fn chips(app: &App, m: &Shown, w: usize) -> Vec<Vec<Span<'static>>> {
+/// The reactions of `m` (of workspace `ws`) as chips ` <emoji> <count> ` (the user's own in the
+/// accent), one space apart, wrapped at `w` cells. An emoji Slack names that is not a standard
+/// one is the workspace's own picture for it where it can be drawn ([`super::custom`]), else
+/// `:name:`.
+pub fn chips(app: &App, ws: &WorkspaceId, m: &Shown, w: usize) -> Vec<Vec<Span<'static>>> {
     let t = &app.theme;
     let mut lines: Vec<Vec<Span<'static>>> = Vec::new();
     let mut used = 0;
     for r in &m.reactions {
         let name = r.name.as_str();
-        let face = emoji::get(name).map_or_else(|| format!(":{name}:"), str::to_string);
-        let chip = format!(" {face} {} ", r.count);
-        let cw = width(&chip);
         let style: Style = if r.mine { t.reaction_mine() } else { t.reaction() };
+        let mut runs = match emoji::get(name) {
+            Some(face) => vec![(face.to_string(), style)],
+            None => super::custom::runs(app, ws, &format!(":{name}:"), style),
+        };
+        runs.insert(0, (" ".to_string(), style));
+        runs.push((format!(" {} ", r.count), style));
+        let mut cw: usize = runs.iter().map(|(s, _)| width(s)).sum();
+        // A chip wider than the pane is its text, cut.
+        if cw > w.max(1) {
+            let face = emoji::get(name).map_or_else(|| format!(":{name}:"), str::to_string);
+            let text = format!(" {face} {} ", r.count);
+            (runs, cw) = (vec![(clip(&text, w.max(1)), style)], width(&text));
+        }
         if lines.is_empty() || (used > 0 && used + 1 + cw > w) {
             lines.push(Vec::new());
             used = 0;
@@ -462,7 +474,7 @@ pub fn chips(app: &App, m: &Shown, w: usize) -> Vec<Vec<Span<'static>>> {
             line.push(Span::raw(" "));
             used += 1;
         }
-        line.push(Span::styled(clip(&chip, w.max(1)), style));
+        line.extend(runs.into_iter().map(|(s, st)| Span::styled(s, st)));
         used += cw;
     }
     lines

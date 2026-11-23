@@ -35,3 +35,14 @@ fn the_colour_says_the_id() {
     assert_eq!(color(0x01_02_03), Color::Rgb(1, 2, 3));
     assert_eq!(color(ID_MAX), Color::Rgb(255, 255, 255));
 }
+
+#[test]
+fn a_picture_s_later_cells_go_with_the_one_before() {
+    assert!(!continues(&cell(0, 0)));
+    assert!(continues(&cell(0, 1)));
+    assert!(continues(&cell(3, 7)));
+    assert!(!continues(&cell(2, 0)));
+    for other in ["a", ":", "\u{2705}", ""] {
+        assert!(!continues(other), "{other:?}");
+    }
+}

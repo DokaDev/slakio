@@ -42,6 +42,13 @@ pub fn is_placeholder(symbol: &str) -> bool {
     symbol.starts_with(PLACEHOLDER)
 }
 
+/// `g` (a grapheme) is a picture's placeholder past its first column: it goes with the cell
+/// before it (a line never breaks inside a picture).
+pub fn continues(g: &str) -> bool {
+    let mut chars = g.chars();
+    chars.next() == Some(PLACEHOLDER) && chars.nth(1).is_some_and(|col| col != DIACRITICS[0])
+}
+
 /// The placeholder of row `row`, column `col` of a picture (both under [`MARKS`]).
 pub fn cell(row: u16, col: u16) -> String {
     let mark = |i: u16| DIACRITICS[usize::from(i.min(MARKS - 1))];

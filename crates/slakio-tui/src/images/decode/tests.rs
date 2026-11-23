@@ -94,3 +94,21 @@ proptest::proptest! {
         let _ = decode(&p, Shape::Preview, None);
     }
 }
+
+#[test]
+fn an_emoji_fits_whole_in_two_cells_of_a_row_in_their_middle() {
+    for (w, h) in [(64, 64), (128, 32), (20, 90)] {
+        let d = decode(&png("e", w, h), Shape::Emoji, Some((9, 18))).unwrap();
+        assert_eq!((d.cols, d.rows), (2, 1), "{w}x{h}");
+        assert_eq!(size_of(&d), (18, 18), "{w}x{h}: the two cells' canvas");
+        let img = image::load_from_memory_with_format(&d.png, ImageFormat::Png).unwrap().to_rgba8();
+        // The picture keeps its proportions: what is left of the canvas is clear.
+        let clear = img.pixels().filter(|p| p.0[3] == 0).count();
+        if w == h {
+            assert_eq!(clear, 0, "a square one fills them");
+        } else {
+            assert!(clear > 0, "{w}x{h}: not stretched");
+        }
+        assert_ne!(img.get_pixel(9, 9).0[3], 0, "{w}x{h}: in their middle");
+    }
+}
