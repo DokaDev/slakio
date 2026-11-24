@@ -325,6 +325,20 @@ pub fn own_private_dir(dir: &Path) -> io::Result<bool> {
     Ok(ok)
 }
 
+/// `dir` is a folder (not a link to one) as [`own_private_dir`] leaves it: the user's own, and no
+/// one else may write in it (Unix; elsewhere a folder always is). Nothing is made or changed.
+pub fn is_own_dir(dir: &Path) -> bool {
+    let Ok(m) = fs::symlink_metadata(dir) else { return false };
+    #[cfg(unix)]
+    let ok = {
+        use std::os::unix::fs::MetadataExt;
+        is_mine(m.uid()) && m.mode() & 0o022 == 0
+    };
+    #[cfg(not(unix))]
+    let ok = true;
+    m.is_dir() && ok
+}
+
 /// The user id `uid` is the one slakio runs as.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn is_mine(uid: u32) -> bool {

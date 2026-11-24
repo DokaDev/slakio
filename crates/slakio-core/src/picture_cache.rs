@@ -7,7 +7,8 @@
 //!   cells it fills, then `.png`): never the address, a name or an id. It holds a header
 //!   ([`MAGIC`], the whole key, the time it was written, the kind) and the PNG, nothing else.
 //! * The folder is private (0700) and each file too (0600), written whole or not at all, never
-//!   through a link; a folder that is a link is neither read nor written. It is made once, when
+//!   through a link; a folder that is a link, or not the user's own, or one others may write in,
+//!   is neither read nor written. It is made once, when
 //!   a run starts ([`PictureCache::open`]), never by a write: one removed while slakio runs
 //!   (`slakio logout`) stays removed, and nothing more is written.
 //! * A file is read only when it is a plain file (not a link, opened without following one) of
@@ -196,7 +197,7 @@ impl PictureCache {
             Err(e) if e.kind() == io::ErrorKind::NotFound => true,
             Err(_) => return None,
         };
-        if crate::fsutil::private_dir(&self.dir).is_err() || !self.dir_ok() {
+        if !crate::fsutil::own_private_dir(&self.dir).unwrap_or(false) || !self.dir_ok() {
             return None;
         }
         self.opened.store(true, Ordering::Relaxed);
@@ -224,9 +225,10 @@ impl PictureCache {
         self.dir.join(file_name(source, shape))
     }
 
-    /// The folder is there and is a folder (not a link to one).
+    /// The folder is there, a folder (not a link to one), the user's own and no one else's to
+    /// write in.
     fn dir_ok(&self) -> bool {
-        fs::symlink_metadata(&self.dir).is_ok_and(|m| m.is_dir())
+        crate::fsutil::is_own_dir(&self.dir)
     }
 
     /// The PNG kept for `source` as `shape`, when there is one that may be read; a file that is

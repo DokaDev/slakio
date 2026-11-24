@@ -274,3 +274,19 @@ fn the_folder_is_made_once_at_the_start_and_never_again_by_a_write() {
     assert!(!dir.exists(), "not made again");
     assert_eq!(c.load(&photo, "x"), Loaded::Miss);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_folder_others_may_write_in_is_neither_read_nor_written() {
+    use std::os::unix::fs::PermissionsExt;
+    let (c, _) = cache("shared");
+    let photo = Source::Avatar(AVATAR.into());
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)));
+    fs::set_permissions(c.dir(), fs::Permissions::from_mode(0o777)).unwrap();
+    assert_eq!(c.store(&photo, "x", &png(80)), Stored::Refused("folder"));
+    assert_eq!(c.load(&photo, "x"), Loaded::Miss, "not read");
+    assert_eq!(c.sweep(), None);
+    fs::set_permissions(c.dir(), fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(matches!(c.load(&photo, "x"), Loaded::Hit(b) if b == png(64)), "the file left as it was");
+    let _ = fs::remove_dir_all(c.dir());
+}
