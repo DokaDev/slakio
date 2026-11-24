@@ -18,22 +18,50 @@ const NAMES: [&str; 8] = ["s", "size", "d", "default", "r", "rating", "f", "forc
 /// it must be one of [`NAMES`] exactly (not padded with spaces, no NUL), and no `;` may stand in
 /// the query (some servers split there too).
 pub(super) fn fallbacks_allowed(url: &str) -> bool {
-    let Some((_, query)) = url.split_once('?') else { return true };
+    refusal(url).is_none()
+}
+
+/// Why [`fallbacks_allowed`] refuses `url`, in a word (`semicolon`, `param`, `escape`,
+/// `d-host`); `None` when it does not.
+pub(crate) fn refusal(url: &str) -> Option<&'static str> {
+    let (_, query) = url.split_once('?')?;
     if query.contains(';') {
-        return false;
+        return Some("semicolon");
     }
-    query.split('&').filter(|pair| !pair.is_empty()).all(|pair| {
+    query.split('&').filter(|pair| !pair.is_empty()).find_map(|pair| {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-        let Some(key) = decode(key) else { return false };
+        let Some(key) = decode(key) else { return Some("escape") };
         if key.trim() != key || key.contains('\0') || !NAMES.iter().any(|n| key.eq_ignore_ascii_case(n)) {
-            return false;
+            return Some("param");
         }
-        if !key.eq_ignore_ascii_case("d") && !key.eq_ignore_ascii_case("default") {
-            return true;
+        if !fallback_key(&key) {
+            return None;
         }
-        let Some(value) = decode(value) else { return false };
-        value.bytes().all(|b| b.is_ascii_alphanumeric())
-            || [AVATAR_HOSTS[0], AVATAR_HOSTS[2]].iter().any(|h| on_host(&value, h, true).is_some())
+        let Some(value) = decode(value) else { return Some("escape") };
+        (!fallback_ok(&value)).then_some("d-host")
+    })
+}
+
+/// `key` names a fallback (`d`, `default`).
+fn fallback_key(key: &str) -> bool {
+    key.eq_ignore_ascii_case("d") || key.eq_ignore_ascii_case("default")
+}
+
+/// A decoded fallback `value` is a keyword or an address on Slack's avatar hosts.
+fn fallback_ok(value: &str) -> bool {
+    value.bytes().all(|b| b.is_ascii_alphanumeric())
+        || [AVATAR_HOSTS[0], AVATAR_HOSTS[2]].iter().any(|h| on_host(value, h, true).is_some())
+}
+
+/// The first fallback `url` names, decoded, and whether it is one [`fallbacks_allowed`] takes;
+/// `None` when it names none (or its escape is broken).
+pub(crate) fn fallback(url: &str) -> Option<(String, bool)> {
+    let (_, query) = url.split_once('?')?;
+    query.split(['&', ';']).find_map(|pair| {
+        let (key, value) = pair.split_once('=')?;
+        let value = decode(value).filter(|_| decode(key).is_some_and(|k| fallback_key(&k)))?;
+        let ok = fallback_ok(&value);
+        Some((value, ok))
     })
 }
 

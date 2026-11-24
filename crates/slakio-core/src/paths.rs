@@ -100,6 +100,12 @@ impl Paths {
         self.state.as_ref().map(|s| s.join("errors.log"))
     }
 
+    /// `<state>/pictures.log`: the picture diagnostics, written only when they are switched on
+    /// ([`crate::diag`]).
+    pub fn pictures_log(&self) -> Option<PathBuf> {
+        self.state.as_ref().map(|s| s.join("pictures.log"))
+    }
+
     /// Whether the one-time notice `key` was not shown on this machine yet; records that it
     /// is now. Without a state directory every run counts as the first. A file that cannot be
     /// read or parsed is never written over: the notice shows, and is not recorded.

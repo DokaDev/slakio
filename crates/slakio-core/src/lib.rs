@@ -11,7 +11,8 @@
 //!   `SLAKIO_SECRET_STORE` switch.
 //! * [`sanitize`] — the terminal-escape sanitiser and the [`sanitize::Remote`] text type that
 //!   makes it mandatory for anything remote.
-//! * [`fault`] — failures as data (a kind the UI words, a detail for the error log).
+//! * [`fault`] — failures as data (a kind the UI words, a detail for the error log); [`diag`] —
+//!   the opt-in picture diagnostics (stages and hosts only).
 //! * [`i18n`] — the embedded en/ko message catalogs.
 //! * [`theme_file`] — theme files (`themes/<name>.toml`), read and checked strictly.
 //!
@@ -20,6 +21,7 @@
 
 pub mod backend;
 pub mod config;
+pub mod diag;
 pub mod download;
 pub mod fault;
 pub mod fsutil;

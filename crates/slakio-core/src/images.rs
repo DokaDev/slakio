@@ -102,7 +102,7 @@ pub fn previewed(filetype: &str) -> bool {
 }
 
 pub mod emoji;
-mod gravatar;
+pub(crate) mod gravatar;
 
 #[cfg(test)]
 mod tests;

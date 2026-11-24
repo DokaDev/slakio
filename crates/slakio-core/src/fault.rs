@@ -125,15 +125,16 @@ impl ErrorLog {
     }
 }
 
-/// Append `bytes` to the private file at `path`, rotating it first when it would grow past `max`.
-fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
+/// Append `bytes` to the private file at `path`, rotating it first when it would grow past `max`
+/// (the picture diagnostics' log is written the same way, [`crate::diag`]).
+pub(crate) fn append(path: &Path, bytes: &[u8], max: u64) -> io::Result<()> {
     if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
         // One made looser before (or by hand) is made private too.
         crate::fsutil::private_dir(dir)?;
     }
     match std::fs::symlink_metadata(path) {
         // A link (or anything but a file) is not written through.
-        Ok(m) if !m.file_type().is_file() => return Err(io::Error::other("the error log is not a plain file")),
+        Ok(m) if !m.file_type().is_file() => return Err(io::Error::other("the log is not a plain file")),
         Ok(m) if m.len() + bytes.len() as u64 > max => {
             let mut old = path.as_os_str().to_owned();
             old.push(".1");
