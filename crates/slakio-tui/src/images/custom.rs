@@ -6,7 +6,8 @@
 //! request budget or one of Slack's passing errors ([`PASSING`]) is asked again, when such a
 //! shortcode shows again, after [`super::RETRY_AFTER`] ([`super::RETRY_SOON`] for a busy or
 //! offline backend, the pause Slack asked for when longer), each failure in a row twice as long,
-//! at most [`BACKOFF_MAX`]; a passing error at most [`PASSING_TRIES`] times in a row. Any other
+//! at most [`BACKOFF_MAX`]; a passing error at most [`PASSING_TRIES`] times in a row (a busy or
+//! offline backend asked nothing of Slack, so it counts toward neither). Any other
 //! failure (a refused sign-in, a missing scope) leaves the shortcodes as text for the run.
 //! Nothing of it is ever said in the status line: until a list comes, `:name:` stays text.
 
@@ -37,7 +38,7 @@ pub struct Customs {
     asked: HashMap<Generation, WorkspaceId>,
     /// The workspaces whose list failed, and when it may be asked for again (never: `None`).
     failed: HashMap<WorkspaceId, Option<Instant>>,
-    /// How many times in a row each workspace's list failed.
+    /// How many times in a row each workspace's list failed (busy or offline not counted).
     tries: HashMap<WorkspaceId, u32>,
     /// The workspaces a frame showed a shortcode of that no list says yet (`false`: only laid
     /// out, not shown).
@@ -147,8 +148,11 @@ impl Customs {
     pub fn failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
         let Some(ws) = self.asked.remove(&id) else { return false };
         let tries = self.tries.entry(ws.clone()).or_insert(0);
-        *tries += 1;
-        let backoff = |base: Duration| base.saturating_mul(1 << (*tries - 1).min(16)).min(BACKOFF_MAX);
+        // A busy or offline backend never asked Slack: no try of the list.
+        if !matches!(kind, FailKind::Busy | FailKind::Offline) {
+            *tries = tries.saturating_add(1);
+        }
+        let backoff = |base: Duration| base.saturating_mul(1 << tries.saturating_sub(1).min(16)).min(BACKOFF_MAX);
         let wait = match kind {
             FailKind::Busy | FailKind::Offline => Some(super::RETRY_SOON),
             FailKind::RateLimited { retry_after } => {

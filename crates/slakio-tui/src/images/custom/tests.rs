@@ -165,6 +165,23 @@ fn slack_s_passing_errors_are_asked_again_a_few_times_and_a_refusal_never() {
 }
 
 #[test]
+fn a_busy_or_offline_backend_is_no_try_of_the_list() {
+    use super::super::{RETRY_AFTER, RETRY_SOON};
+    let (mut c, mut r, now) = (Customs::default(), Requests::default(), Instant::now());
+    let busy = fail_at(&mut c, &mut r, now, &FailKind::Busy).unwrap();
+    assert_eq!(busy - now, RETRY_SOON);
+    let offline = fail_at(&mut c, &mut r, busy, &FailKind::Offline).unwrap();
+    assert_eq!(fail_at(&mut c, &mut r, offline, &FailKind::Network).unwrap() - offline, RETRY_AFTER, "the first try");
+    // Three passing errors in a row, a busy backend between them: still asked after the second.
+    c.forget(&ws("T1"));
+    let passing = FailKind::Api { code: "internal_error".into() };
+    let first = fail_at(&mut c, &mut r, now, &passing).unwrap();
+    let soon = fail_at(&mut c, &mut r, first, &FailKind::Busy).unwrap();
+    let second = fail_at(&mut c, &mut r, soon, &passing).expect("the second passing error is asked again");
+    assert_eq!(fail_at(&mut c, &mut r, second, &passing), None, "the third in a row is the last");
+}
+
+#[test]
 fn a_list_that_keeps_failing_waits_longer_each_time_up_to_a_cap_and_heeds_slack_s_pause() {
     use super::super::RETRY_AFTER;
     use std::time::Duration;
