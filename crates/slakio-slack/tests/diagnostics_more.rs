@@ -39,10 +39,15 @@ struct Run {
 impl Run {
     /// The fake Slack, diagnostics on; requests go to `to` (the fake's own address when `None`).
     async fn new(name: &str, to: Option<SocketAddr>) -> Self {
+        Self::limited(name, to, Limits::default()).await
+    }
+
+    /// [`Run::new`] with the governor's `limits`.
+    async fn limited(name: &str, to: Option<SocketAddr>, limits: Limits) -> Self {
         let path = scratch(name);
         let diag = Diag::to(path.clone());
         let fake = FakeSlack::start(World::demo()).await.unwrap();
-        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let governor = Governor::new(limits, Box::new(FakeClock::default()), true);
         let endpoints = Endpoints::local(to.unwrap_or(fake.addr())).unwrap();
         let client = Client::new(Credentials::new(TOKEN, "cookie-TEST"), endpoints, Arc::clone(&governor))
             .with_diag(diag.clone());
@@ -166,5 +171,69 @@ fn the_sidebar_probe_refused_never_signs_out() {
             slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() };
         let page = r.ask(Command::History { target, before: None, limit: 20 }).await;
         assert!(matches!(page, Event::History(_)), "{page:?}");
+    });
+}
+
+/// The world's `general` conversation.
+fn general() -> slakio_core::model::Target {
+    let world = World::demo();
+    let s = world.snapshot();
+    let c = s.conversations.iter().find(|c| c.workspace == s.workspaces[0].id && c.name == "general").unwrap();
+    slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() }
+}
+
+#[test]
+fn a_list_asked_before_the_boot_and_slack_s_error_code_are_told() {
+    rt().block_on(async {
+        let mut r = Run::new("before-boot", None).await;
+        r.fake.fail_next("emoji.list", Fault::Api("internal_error".to_string()));
+        assert!(matches!(r.ask(Command::Emoji).await, Event::Failed { .. }));
+        let text = r.text();
+        has(&text, "emoji-list asked ok after_boot=no");
+        has(&text, "emoji-list api error code=internal_error");
+        has(&text, "emoji-list failed api-internal_error");
+    });
+}
+
+#[test]
+fn a_failed_lookup_and_where_the_own_photo_came_from_are_told() {
+    rt().block_on(async {
+        let mut r = Run::new("sources", None).await;
+        // The first boot's lookup fails: no photo of the user.
+        r.fake.fail_next("users/info", Fault::Status { status: 503, retry_after: None });
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        let text = r.text();
+        has(&text, "avatar failed http lookup=users-info asked=");
+        has(&text, "self-photo source none host=- id=-");
+        // A page tells the user's photo; the next boot takes it from there.
+        let (me, team) = (b.workspaces[0].me.as_str().to_string(), b.workspaces[0].id.as_str().to_string());
+        let photo = format!("https://{}/avatars/me_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+        let view = json!({
+            "ok": true,
+            "history": {"messages": [{"type": "message", "user": me, "text": "mine", "ts": "1767603600.000100"}], "has_more": false},
+            "users": [{"id": me, "team_id": team, "profile": {"display_name": "Me", "image_72": photo}}],
+        });
+        r.fake.fail_next("conversations.view", Fault::Answer(view));
+        assert!(matches!(r.ask(Command::History { target: general(), before: None, limit: 20 }).await, Event::History(_)));
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        has(&r.text(), "self-photo source page host=");
+    });
+}
+
+#[test]
+fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
+    rt().block_on(async {
+        let limits = Limits { lane_picture_per_minute: 0, ..Limits::default() };
+        let mut r = Run::limited("share", None, limits).await;
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        has(&r.text(), "self-photo source lookup host=");
+        let photo = b.users.iter().find_map(|u| u.avatar.clone()).expect("a photo");
+        let image =
+            Command::Image { source: slakio_core::images::Source::Avatar(photo), max: slakio_core::images::BYTES_MAX };
+        assert!(matches!(r.ask(image).await, Event::Failed { .. }));
+        let text = r.text();
+        has(&text, "avatar cap-reached lane-picture");
+        has(&text, "lane=workspace");
+        assert!(!text.contains("[secret]"), "{text}");
     });
 }
