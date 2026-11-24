@@ -179,7 +179,7 @@ fn a_broken_config_file_never_says_a_change_applies_on_next_launch() {
     d.keys("space ,");
     assert!(d.screen().contains("unsaved: not used next launch"), "{}", d.screen());
     // language
-    d.keys("j j j j j j l");
+    d.keys("j j j j j j j l");
     assert_eq!(d.app.prefs.config.language, "en");
     let screen = d.screen();
     assert!(!screen.contains("applies on next launch"), "{screen}");
@@ -231,7 +231,7 @@ fn a_theme_file_that_cannot_be_used_is_shown_never_kept() {
 
 #[test]
 fn set_errors_say_what_is_wrong_in_both_languages() {
-    let keys = "theme, density, nav_rows, icons, avatars, images, language, downloads, download_max_mb, network, live, restore, cache";
+    let keys = "theme, density, nav_rows, icons, avatars, images, animate, language, downloads, download_max_mb, network, live, restore, cache";
     let cases = [
         ("set colour=red", format!("No setting colour (one of {keys})")),
         ("set live=maybe", "live cannot be maybe (one of on, off)".to_string()),
@@ -345,13 +345,13 @@ fn the_frame_says_the_keys_of_the_folder_and_the_name_typed() {
             d.keys("space ,");
             let list = border(&d);
             // downloads: type a folder.
-            d.keys("j j j j j j j enter");
+            d.keys("j j j j j j j j enter");
             assert!(d.app.prefs.screen.as_ref().is_some_and(|s| s.folder.is_some()), "{w} {lang:?}");
             let folder = border(&d);
             d.keys("esc");
             assert_eq!(border(&d), list, "{w} {lang:?}: the list's keys again");
             // theme: the name of a copy.
-            d.keys("k k k k k k k c");
+            d.keys("k k k k k k k k c");
             assert!(d.app.prefs.screen.as_ref().is_some_and(|s| s.name.is_some()), "{w} {lang:?}");
             assert_eq!(border(&d), folder, "{w} {lang:?}: the same keys");
             got.push(folder);
@@ -407,7 +407,7 @@ fn a_long_folder_is_cut_by_its_middle_never_widening_the_column() {
         for lang in [Lang::En, Lang::Ko] {
             let mut d = booted(w, h, lang, shown_config(), true);
             // The downloads row selected, so it is in view.
-            d.keys("space , j j j j j j j");
+            d.keys("space , j j j j j j j j");
             let before = d.snap();
             d.app.prefs.config.downloads = long.to_string();
             let screen = d.snap();
@@ -432,7 +432,7 @@ fn the_read_only_folder_reads_in_the_muted_colour() {
             d.app.prefs.download_env = Some("/srv/files".to_string());
             d.command("theme nord");
             // The row under it selected: the folder's row in view, not under the selection bar.
-            d.keys("space , j j j j j j j j");
+            d.keys("space , j j j j j j j j j");
             let screen = d.snap();
             let label = folder_label(&d);
             let y = screen
@@ -552,9 +552,9 @@ fn rows_are_named_by_label_and_the_selected_one_says_its_set_key() {
             got.push(names.join(" | "));
         }
     }
-    let en = "Theme | Density | View rows | Nerd Font icons | Avatars | Images | Language | Download folder | \
+    let en = "Theme | Density | View rows | Nerd Font icons | Avatars | Images | Animate | Language | Download folder | \
               Download limit | Network | Live updates | Restore tabs | Message cache";
-    let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
+    let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
               ＊＊＊ ＊＊＊＊ | ＊ ＊＊ | ＊＊＊ ＊＊";
     assert_eq!(got, [en, ko, en, ko], "at 80 and 120 columns, in English and Korean");
     // The keys stay findable: `:images` and `:avatars` in the help.

@@ -71,9 +71,12 @@ pub fn run_then_keep(
     };
     send(Ok(super::made(job, &d)));
     let key = (job.source.clone(), job.shape);
-    match cache.store(&job.source, &shape_tag(job.shape, cell), &d.png) {
+    // A picture that moves is kept with all its frames (an animated PNG), decoded again within
+    // the same bounds when read.
+    let png = super::frames::kept(&d.png, &d.moving);
+    match cache.store(&job.source, &shape_tag(job.shape, cell), &png) {
         Stored::Stored(swept) => {
-            note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", d.png.len().to_string())]);
+            note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", png.len().to_string())]);
             swept.into_iter().for_each(|s| swept_line(diag, s));
         }
         Stored::Refused(why) => note::line(diag, &key, Stage::CacheRefused, why, &[]),

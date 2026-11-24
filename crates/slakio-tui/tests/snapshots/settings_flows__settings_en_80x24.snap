@@ -12,9 +12,9 @@ expression: d.snap()
 │ │ Pictures                                                                 │ │
 │ │   Avatars          ‹ initials           ›  Coloured initials (default)   │ │
 │ │   Images           ‹ auto               ›  Where known to work (default) │ │
+│ │   Animate          ‹ on                 ›  GIF emoji and photos move     │ │
 │ │ Locale                                                                   │ │
 │ │   Language         ‹ auto               ›  applies on next launch        │ │
-│ │                                                                          │ │
 │ │                                                            8 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter keeps the one shown; c   │ │

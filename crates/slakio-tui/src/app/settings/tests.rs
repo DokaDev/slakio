@@ -255,6 +255,7 @@ fn every_fixed_row_takes_the_config_file_s_values_and_the_palette_suggests_them(
         ("nav_rows", config::NAV_ROWS),
         ("avatars", config::AVATARS),
         ("images", config::IMAGES),
+        ("animate", config::ANIMATE),
         ("language", config::LANGUAGES),
         ("network", config::NETWORK),
         ("live", config::LIVE),
@@ -332,4 +333,29 @@ fn small_things_of_the_screen() {
     a.tab_drag = Some(0);
     a.open_settings();
     assert_eq!(a.tab_drag, None);
+}
+
+#[test]
+fn animate_is_a_pictures_row_and_set_turns_it_off_and_on() {
+    let mut a = app();
+    let k = find("animate").unwrap();
+    assert_eq!(SETTINGS[k].group, table::Group::Pictures);
+    assert_eq!(a.setting_value(k), "on", "on by default");
+    let Some(Ok((row, value))) = table::parse_set("set animate=OFF") else { panic!(":set animate=OFF") };
+    a.apply_setting(row, &value, Instant::now()).unwrap();
+    assert!(!a.images.animates());
+    assert_eq!(a.setting_value(k), "off");
+    assert_eq!(a.prefs.config.animate, "off");
+    assert_eq!(saved(&mut a), [("animate", "off".to_string())]);
+    select(&mut a, "animate");
+    key(&mut a, "l");
+    assert!(a.images.animates(), "the screen turns it on again");
+    assert_eq!(saved(&mut a), [("animate", "on".to_string())]);
+    for (lang, word) in [(Lang::En, "Animate"), (Lang::Ko, "\u{c6c0}\u{c9c1}\u{c784}")] {
+        let i18n = slakio_core::i18n::I18n::new(lang);
+        assert_eq!(i18n.label(Label::SettingsLabelAnimate).to_string(), word, "{lang:?}");
+        for l in [Label::SettingsAboutAnimate, Label::AnimateOn, Label::AnimateOff] {
+            assert!(!i18n.label(l).to_string().is_empty(), "{lang:?} {l:?}");
+        }
+    }
 }

@@ -23,6 +23,7 @@ fn ready(job: &Job, png: usize) -> Prepared {
         bytes: png,
         transmit: graphics::transmit(job.id, 3, 2, &bytes),
         from: (6, 4, "png"),
+        moving: Default::default(),
     }
 }
 
@@ -195,6 +196,7 @@ fn a_photo_in_the_list_s_chip_is_a_picture_of_its_own_beside_the_slot_s() {
         bytes: 5,
         transmit: graphics::transmit(job.id, cols, rows, &[0; 5]),
         from: (4, 4, "png"),
+        moving: Default::default(),
     };
     images.decoded(key(&chip), Ok(made(&chip, 2, 1)));
     images.decoded(key(&slot), Ok(made(&slot, 4, 2)));

@@ -12,25 +12,25 @@ expression: d.snap()
 │ ▾ Favori│ ＊＊                                                                                             │         │
 │   # back│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊)                                │         │
 │   # inci│   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊)                              │         │
-│         │ ＊＊                                                                                             │         │
-│ ▾ Ops   │   ＊＊ ＊＊         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│   # depl│ ＊＊                                                                                             │         │
-│   # aler│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
-│   # part│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
-│   # host│ ＊＊                                                                                             │         │
-│   # big-│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│   # long│   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│         │   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│ ▾ Channe│   ＊＊＊ ＊＊       ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│   # anno│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
-│   # desi│ ＊＊＊ ＊＊: terminal-copy                                                                       │         │
+│         │   ＊＊＊            ‹ on                 ›  GIF ＊＊＊＊ ＊＊＊ ＊＊＊                           │         │
+│ ▾ Ops   │ ＊＊                                                                                             │         │
+│   # depl│   ＊＊ ＊＊         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│   # aler│ ＊＊                                                                                             │         │
+│   # part│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
+│   # host│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
+│   # big-│ ＊＊                                                                                             │         │
+│   # long│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│         │   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│ ▾ Channe│   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│   # anno│   ＊＊＊ ＊＊       ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│   # desi│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│   # feed│ ＊＊＊ ＊＊: terminal-copy                                                                       │         │
 │   # feed│ terminal＊ ＊＊＊: Enter＊ ＊＊ ＊＊, Esc＊ ＊＊                                                 │         │
 │   # feed│ ＊. h/l＊ ＊＊＊ ＊＊ ＊＊ ＊＊ Enter＊ ＊＊＊ ＊＊＊ ＊＊＊＊, c＊ ＊ ＊＊ ＊＊＊ ＊＊＊＊＊.   │         │
 │   # feed│ ＊＊ ＊＊＊ ＊＊ ＊＊ ＊ themes/＊ ＊＊＊.                                                       │         │
 │   # feed│ ＊＊＊＊ ＊＊＊: :set theme=…                                                                    │         │
 │   # feed│ /home/me/.config/slakio/config.toml＊ ＊＊＊＊＊                                                 │         │
 │   # feed│ ＊ ＊＊ ＊＊: /home/me/.config/slakio/config.toml                                                │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

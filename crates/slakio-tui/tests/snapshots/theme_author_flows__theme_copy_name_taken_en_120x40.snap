@@ -13,17 +13,18 @@ expression: d.snap()
 │   # back│ Pictures                                                                                         │         │
 │   # inci│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
 │         │   Images           ‹ auto               ›  Where known to work (default)                         │         │
-│ ▾ Ops   │ Locale                                                                                           │         │
-│   # depl│   Language         ‹ auto               ›  applies on next launch                                │         │
-│   # aler│ Files                                                                                            │         │
-│   # part│   Download folder  ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
-│   # host│   Download limit   ‹ 1024               ›  MB: largest file downloaded                           │         │
-│   # big-│ Connection                                                                                       │         │
-│   # long│   Network          ‹ on                 ›  applies on next launch                                │         │
-│         │   Live updates     ‹ on                 ›  applies on next launch                                │         │
-│ ▾ Channe│   Restore tabs     ‹ on                 ›  applies on next launch                                │         │
-│   # anno│   Message cache    ‹ on                 ›  applies on next launch                                │         │
-│   # desi│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│ ▾ Ops   │   Animate          ‹ on                 ›  GIF emoji and photos move                             │         │
+│   # depl│ Locale                                                                                           │         │
+│   # aler│   Language         ‹ auto               ›  applies on next launch                                │         │
+│   # part│ Files                                                                                            │         │
+│   # host│   Download folder  ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
+│   # big-│   Download limit   ‹ 1024               ›  MB: largest file downloaded                           │         │
+│   # long│ Connection                                                                                       │         │
+│         │   Network          ‹ on                 ›  applies on next launch                                │         │
+│ ▾ Channe│   Live updates     ‹ on                 ›  applies on next launch                                │         │
+│   # anno│   Restore tabs     ‹ on                 ›  applies on next launch                                │         │
+│   # desi│   Message cache    ‹ on                 ›  applies on next launch                                │         │
+│   # feed│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # feed│ Copy to: Nord                                                                                    │         │
 │   # feed│ A copy of terminal: Enter writes it and uses it, Esc cancels                                     │         │
 │   # feed│ The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme  │         │
@@ -31,7 +32,6 @@ expression: d.snap()
 │   # feed│ Set with :set theme=…                                                                            │         │
 │   # feed│ Saved to /home/me/.config/slakio/config.toml                                                     │         │
 │   # feed│ More settings in /home/me/.config/slakio/config.toml                                             │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

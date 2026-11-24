@@ -29,12 +29,14 @@
 //! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
 //! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a profile photo or an
 //! emoji is looked for there before it is asked for, within the same bounds (a file's preview
-//! never is: it is never kept on disk).
+//! never is: it is never kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
 
+pub mod animate;
 pub mod cached;
 pub mod custom;
 pub mod decode;
 pub mod detect;
+pub mod frames;
 pub mod graphics;
 mod note;
 mod room;
@@ -148,6 +150,8 @@ pub struct Prepared {
     pub transmit: String,
     /// What it was read from: width and height in pixels, format (the diagnostics say it).
     pub from: (u32, u32, &'static str),
+    /// Its frames, when it moves ([`animate`]; `bytes` counts them all).
+    pub moving: animate::Sent,
 }
 
 /// `job` decoded ([`decode::decode`], for cells of `cell` pixels) and made into the commands
@@ -159,8 +163,9 @@ pub fn prepare(job: &Job, cell: Option<(u16, u16)>) -> Result<Prepared, Refused>
 /// `d`, decoded for `job`, made into the commands that send it.
 fn made(job: &Job, d: &decode::Decoded) -> Prepared {
     let (cols, rows) = (d.cols.min(graphics::MARKS), d.rows.min(graphics::MARKS));
-    let transmit = graphics::transmit(job.id, cols, rows, &d.png);
-    Prepared { id: job.id, cols, rows, bytes: d.png.len(), transmit, from: d.from }
+    let (transmit, moving) =
+        (graphics::transmit(job.id, cols, rows, &d.png), animate::sent(job.id, cols, rows, &d.moving));
+    Prepared { id: job.id, cols, rows, bytes: d.png.len().max(d.moving.bytes()), transmit, from: d.from, moving }
 }
 
 /// What `:images` changed, for the app to say.
@@ -235,6 +240,7 @@ pub struct Images {
     missed: HashSet<Key>,
     /// Looks there to hand to the binary ([`Images::take_lookups`]).
     lookups: Vec<Job>,
+    anims: animate::Anims,
 }
 
 impl Images {
@@ -430,8 +436,10 @@ impl Images {
                 let s = self.held.remove(i).expect("found");
                 self.held.push_back(s);
             }
+            self.anims.saw(&key);
             screen.insert(key);
         }
+        self.moving(now);
         self.last_screen = std::mem::replace(&mut self.screen, screen);
         self.unpark();
         self.emoji_frame.take();
@@ -538,7 +546,7 @@ impl Images {
         else {
             return;
         };
-        let p = match result {
+        let mut p = match result {
             Ok(p) => p,
             Err(Refused::NotCached) => return self.not_cached(key),
             Err(refused) => {
@@ -565,6 +573,7 @@ impl Images {
                 self.graphics.push_str(&graphics::delete(id));
             }
         }
+        self.anims.add(&key, p.id, std::mem::take(&mut p.moving.frames));
         self.graphics.push_str(&p.transmit);
         self.highest = self.highest.max(p.id);
         self.bytes += p.bytes;
@@ -575,16 +584,6 @@ impl Images {
     /// The commands for the terminal not written yet (sending and removing pictures).
     pub fn take_graphics(&mut self) -> String {
         std::mem::take(&mut self.graphics)
-    }
-
-    /// The pictures the terminal holds and their bytes.
-    pub fn held(&self) -> (usize, usize) {
-        (self.held.len(), self.bytes)
-    }
-
-    /// The pictures whose failure is kept.
-    pub fn failures(&self) -> usize {
-        self.failed.len()
     }
 }
 

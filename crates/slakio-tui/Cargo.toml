@@ -26,6 +26,7 @@ futures.workspace = true
 image.workspace = true
 jiff.workspace = true
 lexopt.workspace = true
+png.workspace = true
 ratatui.workspace = true
 # Signing in (the binary's wiring only, as the transport).
 slakio-auth.workspace = true

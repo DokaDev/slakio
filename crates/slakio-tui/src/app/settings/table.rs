@@ -115,6 +115,13 @@ pub const SETTINGS: &[Spec] = &[
         ]),
         Label::SettingsAboutImages,
     ),
+    row(
+        "animate",
+        Label::SettingsLabelAnimate,
+        Group::Pictures,
+        Values::Fixed(&[("on", Some(Label::AnimateOn)), ("off", Some(Label::AnimateOff))]),
+        Label::SettingsAboutAnimate,
+    ),
     on_restart(
         "language",
         Label::SettingsLabelLanguage,

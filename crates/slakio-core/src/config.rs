@@ -22,6 +22,7 @@
 //! download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
 //! images = "auto"          # pictures where the terminal surely draws them; "on" always, "off" never
 //!                          # (SLAKIO_IMAGES=auto|on|off wins over it)
+//! animate = "on"           # GIF emoji and photos move where pictures are drawn; "off": first frame
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -89,6 +90,8 @@ pub struct Config {
     /// Pictures (previews, photos): `auto` where the terminal surely draws them, `on`, `off`
     /// ([`IMAGES`]).
     pub images: String,
+    /// `off`: a GIF emoji or photo shows its first frame only ([`ANIMATE`]).
+    pub animate: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
     /// Keys of an older version the file still has, ignored ([`RETIRED`]): the app says they
@@ -115,6 +118,7 @@ impl Default for Config {
             downloads: String::new(),
             download_max_mb: 1024,
             images: "auto".to_string(),
+            animate: "on".to_string(),
             path: None,
             retired: Vec::new(),
         }
@@ -168,6 +172,9 @@ pub const CACHE: &[&str] = &["on", "off"];
 
 /// The values `images` takes.
 pub const IMAGES: &[&str] = &["auto", "on", "off"];
+
+/// The values `animate` takes.
+pub const ANIMATE: &[&str] = &["on", "off"];
 
 /// The values `restore` takes.
 pub const RESTORE: &[&str] = &["on", "off"];
@@ -248,6 +255,7 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "live" => cfg.live = one_of(item, LIVE).ok_or_else(|| bad(LIVE.join(", ")))?,
             "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,
             "images" => cfg.images = one_of(item, IMAGES).ok_or_else(|| bad(IMAGES.join(", ")))?,
+            "animate" => cfg.animate = one_of(item, ANIMATE).ok_or_else(|| bad(ANIMATE.join(", ")))?,
             "restore" => cfg.restore = one_of(item, RESTORE).ok_or_else(|| bad(RESTORE.join(", ")))?,
             "cache_messages" => {
                 cfg.cache_messages = within(item, &CACHE_MESSAGES).ok_or_else(|| bad(span(&CACHE_MESSAGES)))?

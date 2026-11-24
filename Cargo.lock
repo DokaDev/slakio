@@ -2525,6 +2525,7 @@ dependencies = [
  "insta",
  "jiff",
  "lexopt",
+ "png",
  "proptest",
  "ratatui",
  "serde_json",

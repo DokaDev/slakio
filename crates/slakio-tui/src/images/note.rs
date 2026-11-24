@@ -25,14 +25,24 @@ pub(crate) fn once(diag: &Diag, key: &(Source, Shape), stage: Stage, result: &st
     }
 }
 
-/// Picture `key` was read from `p.from` (width, height, format) into `p.bytes` sent.
+/// Picture `key` was read from `p.from` (width, height, format) into `p.bytes` sent, with its
+/// frames (how many were read, whether it moves, why not).
 pub(crate) fn decoded(diag: &Diag, key: &(Source, Shape), p: &super::Prepared) {
     if !diag.on() {
         return;
     }
     let (w, h, format) = p.from;
-    let pairs =
-        [("w", w.to_string()), ("h", h.to_string()), ("format", format.to_string()), ("bytes", p.bytes.to_string())];
+    let m = &p.moving;
+    let animated = if m.frames.is_empty() { "no" } else { "yes" };
+    let pairs = [
+        ("w", w.to_string()),
+        ("h", h.to_string()),
+        ("format", format.to_string()),
+        ("bytes", p.bytes.to_string()),
+        ("frames", m.seen.to_string()),
+        ("animated", animated.to_string()),
+        ("why", if m.why.is_empty() { "none" } else { m.why }.to_string()),
+    ];
     line(diag, key, Stage::Decoded, "ok", &pairs);
 }
 

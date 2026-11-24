@@ -110,6 +110,8 @@ impl App {
             "avatars" => "initials",
             "images" if self.images.setting.is_empty() => "auto",
             "images" => &self.images.setting,
+            "animate" if self.images.animates() => "on",
+            "animate" => "off",
             "language" => &c.language,
             "downloads" => &c.downloads,
             "download_max_mb" => return c.download_max_mb.to_string(),
@@ -153,6 +155,10 @@ impl App {
                 Some(env) => return Err(Msg::SettingsNetworkEnv { env: format!("{NETWORK_ENV}={env}") }),
                 None => self.prefs.config.network.clone_from(&value),
             },
+            "animate" => {
+                self.images.set_animate(value == "on");
+                self.prefs.config.animate.clone_from(&value);
+            }
             "live" => self.prefs.config.live.clone_from(&value),
             "restore" => self.prefs.config.restore.clone_from(&value),
             "cache" => self.prefs.config.cache.clone_from(&value),

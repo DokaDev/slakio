@@ -209,6 +209,16 @@ fn restoring_the_last_layout_is_on_unless_turned_off() {
 }
 
 #[test]
+fn moving_pictures_are_on_unless_turned_off() {
+    assert_eq!(Config::default().animate, "on");
+    assert_eq!(parse("animate = \"OFF\"").unwrap().animate, "off");
+    assert_eq!(parse("animate = \"on\"").unwrap().animate, "on");
+    for bad in ["animate = true", "animate = \"slow\""] {
+        assert!(matches!(parse(bad), Err(ConfigError::Value { .. })), "{bad}");
+    }
+}
+
+#[test]
 fn the_download_settings_are_read_within_their_ranges() {
     let d = Config::default();
     assert_eq!((d.downloads.as_str(), d.download_max_mb), ("", 1024));

@@ -556,7 +556,7 @@ impl App {
     }
 
     /// When the screen changes next by itself, if ever (the loop sleeps until then): a notice
-    /// goes away, or the which-key popup shows.
+    /// goes away, the which-key popup shows, or a moving picture's next frame is due.
     pub fn deadline(&self) -> Option<Instant> {
         let guide = self.guide.at.filter(|_| !self.guide.shown && !self.keys.pending().is_empty());
         let pictures = self.images.retry_at();
@@ -567,6 +567,7 @@ impl App {
             self.search_deadline(),
             self.activity_deadline(),
             pictures,
+            self.images.frame_at(),
         ];
         soon.into_iter().flatten().min()
     }
@@ -578,6 +579,7 @@ impl App {
         changed |= self.search_tick(now);
         changed |= self.activity_tick(now);
         changed |= self.images.woke(now);
+        changed |= self.images.advance(now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

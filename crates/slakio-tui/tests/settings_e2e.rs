@@ -36,8 +36,8 @@ fn the_language_set_on_the_settings_screen_is_used_at_the_next_start() {
     run.wait_for("the demo", |s| s.contains("backend"));
     run.type_bytes(b" ,");
     run.wait_for("the settings screen", |s| s.contains("Settings") && s.contains("Language"));
-    // The language row is the seventh: down six, then the value after `auto` twice.
-    run.type_bytes(b"jjjjjj");
+    // The language row is the eighth: down seven, then the value after `auto` twice.
+    run.type_bytes(b"jjjjjjj");
     run.type_bytes(b"ll");
     run.wait_for("ko, for the next launch", |s| s.contains("‹ ko") && s.contains("applies on next launch"));
     assert!(run.output().contains("j/k move"), "the language stays until the next launch");

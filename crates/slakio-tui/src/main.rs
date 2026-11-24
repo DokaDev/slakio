@@ -139,6 +139,7 @@ fn main() -> ExitCode {
     app.images.set_diag(wiring.diag.clone());
     (app.images.setting, app.images.demo, app.images.tty) = (cfg.images.clone(), demo, io::stdout().is_terminal());
     app.images.resolve();
+    app.images.set_animate(cfg.animate != "off");
     app.fold_views(cfg.nav_rows == "collapsed");
     // Times in the user's zone, read once; "today" from this machine's clock.
     app.zone = slakio_tui::time::Zone::from_env(env);

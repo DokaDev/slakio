@@ -5,6 +5,16 @@
 use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, Images, Key};
 
 impl Images {
+    /// The pictures the terminal holds and their bytes.
+    pub fn held(&self) -> (usize, usize) {
+        (self.held.len(), self.bytes)
+    }
+
+    /// The pictures whose failure is kept.
+    pub fn failures(&self) -> usize {
+        self.failed.len()
+    }
+
     /// The pictures held that stay on screen for `key` (a list photo yields its room to the
     /// timeline's pictures, never the other way): how many, and their bytes.
     pub(super) fn staying(&self, key: &Key) -> (usize, usize) {
