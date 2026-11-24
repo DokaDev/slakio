@@ -93,8 +93,11 @@ pub fn size_words(bytes: u64) -> String {
 impl App {
     /// After a frame: ask the backend for the pictures it would have shown and does not have
     /// ([`crate::images::Images::ask`]), and for the lists of the workspaces' own emoji it showed
-    /// a shortcode of ([`crate::images::custom::Customs::ask`]). `true` when something was asked.
+    /// a shortcode of, once booted ([`crate::images::custom::Customs::ask`]). `true` when something
+    /// was asked.
     pub fn ask_images(&mut self, now: Instant) -> bool {
+        let model = &self.model;
+        self.images.customs.booted_only(|ws| model.is_fresh(ws));
         let lists = self.images.customs.ask(&mut self.work.requests, now);
         self.images.ask(&mut self.work.requests, now) | lists
     }

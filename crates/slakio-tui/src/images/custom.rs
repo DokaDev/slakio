@@ -1,10 +1,13 @@
 //! A workspace's own emoji, as the backend read them (`emoji.list`, [`Command::Emoji`]): what
 //! each name draws, kept in memory for the run. A workspace's list is asked for once, after the
 //! first frame that shows a shortcode the standard emoji do not know (a workspace whose messages
-//! use none asks for nothing), and again once it is signed in again ([`Customs::forget`]). One
-//! that failed for the network or the request budget is asked again after
-//! [`super::RETRY_AFTER`] ([`super::RETRY_SOON`] for a busy or offline backend), when such a
-//! shortcode shows again; any other failure leaves the workspace's shortcodes as text for the run.
+//! use none asks for nothing) once that workspace has booted ([`Customs::booted_only`]), and
+//! again once it is signed in again ([`Customs::forget`]). One that failed for the network, the
+//! request budget or one of Slack's passing errors ([`PASSING`]) is asked again, when such a
+//! shortcode shows again, after [`super::RETRY_AFTER`] ([`super::RETRY_SOON`] for a busy or
+//! offline backend, the pause Slack asked for when longer), each failure in a row twice as long,
+//! at most [`BACKOFF_MAX`]; a passing error at most [`PASSING_TRIES`] times in a row. Any other
+//! failure (a refused sign-in, a missing scope) leaves the shortcodes as text for the run.
 //! Nothing of it is ever said in the status line: until a list comes, `:name:` stays text.
 
 use crate::app::requests::Requests;
@@ -14,7 +17,17 @@ use slakio_core::images::emoji::Custom;
 use slakio_core::model::WorkspaceId;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// Slack's error codes that pass (its own trouble, an answer that was not its JSON): asked again.
+pub const PASSING: &[&str] =
+    &["internal_error", "fatal_error", "request_timeout", "service_unavailable", "not_slack_json"];
+
+/// How many passing errors in a row a workspace's list is asked again after.
+pub const PASSING_TRIES: u32 = 3;
+
+/// The longest wait before a failed list is asked again.
+pub const BACKOFF_MAX: Duration = Duration::from_secs(15 * 60);
 
 /// The workspaces' own emoji.
 #[derive(Debug, Default)]
@@ -24,6 +37,8 @@ pub struct Customs {
     asked: HashMap<Generation, WorkspaceId>,
     /// The workspaces whose list failed, and when it may be asked for again (never: `None`).
     failed: HashMap<WorkspaceId, Option<Instant>>,
+    /// How many times in a row each workspace's list failed.
+    tries: HashMap<WorkspaceId, u32>,
     /// The workspaces a frame showed a shortcode of that no list says yet (`false`: only laid
     /// out, not shown).
     seen: RefCell<Vec<(WorkspaceId, bool)>>,
@@ -62,6 +77,30 @@ impl Customs {
         }
     }
 
+    /// Before [`Customs::ask`]: what a frame wanted of a workspace that has not booted yet (shown
+    /// from the local cache) is let go, so its list is asked only with the request the booted
+    /// workspace sends (the next frame after the boot wants it again).
+    pub fn booted_only(&mut self, booted: impl Fn(&WorkspaceId) -> bool) {
+        let seen = self.seen.get_mut();
+        let before = seen.len();
+        let mut waiting = Vec::new();
+        seen.retain(|(ws, shown)| {
+            let up = booted(ws);
+            if !up && *shown && !waiting.contains(ws) {
+                waiting.push(ws.clone());
+            }
+            up
+        });
+        if seen.len() == before {
+            return;
+        }
+        for ws in waiting {
+            if self.diag.first(Kind::EmojiList, Stage::Skipped, &format!("boot{}", ws.as_str())) {
+                self.note(&ws, Stage::Skipped, "not-booted", &[]);
+            }
+        }
+    }
+
     /// After a frame: the lists it wanted are asked for, each workspace's once (a failed one once
     /// its wait is over). `true` when something was asked.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
@@ -92,6 +131,7 @@ impl Customs {
             let pictures = emoji.iter().filter(|(_, c)| matches!(c, Custom::Picture(_))).count().to_string();
             self.note(&ws, Stage::Applied, "ok", &[("names", &emoji.len().to_string()), ("pictures", &pictures)]);
         }
+        self.tries.remove(&ws);
         self.sets.insert(ws, emoji.into_iter().collect());
         true
     }
@@ -99,11 +139,21 @@ impl Customs {
     /// List request `id` failed (`kind`) at `now`: `true` when it was one of these.
     pub fn failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
         let Some(ws) = self.asked.remove(&id) else { return false };
-        let again = match kind {
-            FailKind::Busy | FailKind::Offline => Some(now + super::RETRY_SOON),
-            k if k.retryable() || *k == FailKind::CapReached => Some(now + super::RETRY_AFTER),
+        let tries = self.tries.entry(ws.clone()).or_insert(0);
+        *tries += 1;
+        let backoff = |base: Duration| base.saturating_mul(1 << (*tries - 1).min(16)).min(BACKOFF_MAX);
+        let wait = match kind {
+            FailKind::Busy | FailKind::Offline => Some(super::RETRY_SOON),
+            FailKind::RateLimited { retry_after } => {
+                Some(backoff(super::RETRY_AFTER).max(retry_after.unwrap_or_default().min(BACKOFF_MAX)))
+            }
+            FailKind::Api { code } if PASSING.contains(&code.as_str()) && *tries < PASSING_TRIES => {
+                Some(backoff(super::RETRY_AFTER))
+            }
+            k if k.retryable() || *k == FailKind::CapReached => Some(backoff(super::RETRY_AFTER)),
             _ => None,
         };
+        let again = wait.map(|w| now + w);
         self.note(&ws, Stage::Failed, &super::note::fail_word(kind), &[("retry", &super::note::retry(again, now))]);
         self.failed.insert(ws, again);
         true
@@ -125,6 +175,7 @@ impl Customs {
     pub fn forget(&mut self, ws: &WorkspaceId) {
         self.sets.remove(ws);
         self.failed.remove(ws);
+        self.tries.remove(ws);
         self.asked.retain(|_, w| w != ws);
     }
 

@@ -118,10 +118,72 @@ fn with_the_diagnostics_on_the_list_says_wanted_asked_applied_and_failed_by_a_ha
         format!("emoji-list wanted ui ws={one}"),
         format!("emoji-list asked ui ws={one}"),
         format!("emoji-list applied ok ws={one} names=2 pictures=1"),
-        format!("emoji-list failed api-internal_error ws={two} retry=never"),
-        format!("emoji-list skipped barred ws={two} retry=never"),
+        format!("emoji-list failed api-internal_error ws={two} retry=60"),
+        format!("emoji-list skipped barred ws={two} retry=60"),
     ] {
         assert!(text.contains(&line), "no `{line}` in\n{text}");
     }
     assert!(!text.contains("SECRET") && !text.contains("secret") && !text.contains("example"), "{text}");
+}
+
+/// Ask workspace `T1`'s list at `at` and fail it with `kind`; when it may be asked again.
+fn fail_at(c: &mut Customs, r: &mut Requests, at: Instant, kind: &FailKind) -> Option<Instant> {
+    c.get(&ws("T1"), "party");
+    assert!(c.ask(r, at), "asked at {at:?}");
+    let id = asked(r)[0].0;
+    assert!(c.failed(id, kind, at));
+    c.failed.get(&ws("T1")).copied().flatten()
+}
+
+#[test]
+fn slack_s_passing_errors_are_asked_again_a_few_times_and_a_refusal_never() {
+    use super::super::RETRY_AFTER;
+    let (mut c, mut r, now) = (Customs::default(), Requests::default(), Instant::now());
+    let passing = FailKind::Api { code: "internal_error".into() };
+    let first = fail_at(&mut c, &mut r, now, &passing).expect("asked again");
+    assert_eq!(first - now, RETRY_AFTER);
+    let second = fail_at(&mut c, &mut r, first, &passing).expect("asked again");
+    assert_eq!(second - first, RETRY_AFTER * 2, "twice as long");
+    assert_eq!(fail_at(&mut c, &mut r, second, &passing), None, "the third in a row is the last");
+    c.get(&ws("T1"), "party");
+    assert!(!c.ask(&mut r, second + BACKOFF_MAX * 10));
+    for code in ["not_authed", "invalid_auth", "missing_scope", "not_allowed_token_type", "account_inactive"] {
+        c.forget(&ws("T1"));
+        let kind = FailKind::Api { code: code.into() };
+        assert_eq!(fail_at(&mut c, &mut r, now, &kind), None, "{code}: never");
+    }
+    c.forget(&ws("T1"));
+    assert_eq!(fail_at(&mut c, &mut r, now, &FailKind::Auth), None);
+    // A success ends the run of failures.
+    c.forget(&ws("T1"));
+    let at = fail_at(&mut c, &mut r, now, &passing).unwrap();
+    c.get(&ws("T1"), "party");
+    assert!(c.ask(&mut r, at));
+    let id = asked(&mut r)[0].0;
+    assert!(c.answered(id, Vec::new()));
+    assert_eq!(c.tries.get(&ws("T1")), None);
+}
+
+#[test]
+fn a_list_that_keeps_failing_waits_longer_each_time_up_to_a_cap_and_heeds_slack_s_pause() {
+    use super::super::RETRY_AFTER;
+    use std::time::Duration;
+    let (mut c, mut r, mut at) = (Customs::default(), Requests::default(), Instant::now());
+    let mut waits = Vec::new();
+    for _ in 0..8 {
+        let again = fail_at(&mut c, &mut r, at, &FailKind::Network).expect("the network is asked again");
+        waits.push((again - at).as_secs());
+        at = again;
+    }
+    assert_eq!(waits, [60, 120, 240, 480, 900, 900, 900, 900], "doubling, at most {BACKOFF_MAX:?}");
+    c.forget(&ws("T1"));
+    let slow = FailKind::RateLimited { retry_after: Some(Duration::from_secs(600)) };
+    let now = Instant::now();
+    assert_eq!(fail_at(&mut c, &mut r, now, &slow).unwrap() - now, Duration::from_secs(600), "Slack's pause");
+    c.forget(&ws("T1"));
+    let quick = FailKind::RateLimited { retry_after: Some(Duration::from_secs(5)) };
+    assert_eq!(fail_at(&mut c, &mut r, now, &quick).unwrap() - now, RETRY_AFTER, "never sooner than the wait");
+    c.forget(&ws("T1"));
+    let long = FailKind::RateLimited { retry_after: Some(Duration::from_secs(7200)) };
+    assert_eq!(fail_at(&mut c, &mut r, now, &long).unwrap() - now, BACKOFF_MAX);
 }

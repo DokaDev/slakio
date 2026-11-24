@@ -216,3 +216,17 @@ fn an_emoji_never_comes_from_elsewhere_nor_follows_a_redirect_there() {
         assert_eq!(r.governor.sent(), 8);
     });
 }
+
+#[test]
+fn an_answer_that_is_not_slack_s_json_is_told_apart_from_the_network() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.fake.fail_next("emoji.list", Fault::Malformed);
+        assert_eq!(r.emoji().await, Err(api("not_slack_json")));
+        r.fake.fail_next("emoji.list", Fault::Status { status: 503, retry_after: None });
+        assert_eq!(r.emoji().await, Err(FailKind::Network), "a server's trouble stays the network");
+        r.fake.fail_next("emoji.list", Fault::Api("internal_error".to_string()));
+        assert_eq!(r.emoji().await, Err(api("internal_error")));
+        assert!(r.emoji().await.is_ok());
+    });
+}

@@ -97,13 +97,21 @@ impl<'de> Deserialize<'de> for Text {
     }
 }
 
-/// The workspace's own emoji, by name, as [`Event::Emoji`].
+/// The workspace's own emoji, by name, as [`Event::Emoji`]; an answer that is not Slack's JSON
+/// fails as Slack's `not_slack_json`.
 pub(crate) async fn emoji(client: &Client) -> Result<Event, SlackError> {
     let listed: Listed = match client.call(&Call::form(Method::EmojiList, &[]), Priority::Background).await {
         Ok(listed) => listed,
         Err(e) => {
             crate::shape::failed(client.diag(), slakio_core::diag::Kind::EmojiList, &e, &[]);
-            return Err(e);
+            // An answer that is not Slack's JSON comes the same next time: told apart from the
+            // network, so the UI asks again only a few times.
+            return Err(match e {
+                SlackError::Network { detail } if detail.contains("JSON") => {
+                    SlackError::Api { code: "not_slack_json".to_string() }
+                }
+                e => e,
+            });
         }
     };
     let emoji = resolve(&listed.emoji.0);

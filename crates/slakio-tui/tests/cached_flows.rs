@@ -189,6 +189,26 @@ fn every_korean_cache_notice_fits_forty_cells() {
 }
 
 #[test]
+fn a_workspace_s_own_emoji_are_asked_for_only_once_it_has_booted() {
+    let mut s = cached_boot();
+    let ws = earlier_snapshot().workspaces[0].id.clone();
+    let lists = |s: &Scripted| s.b.held.iter().filter(|r| r.command == Command::Emoji).count();
+    // A frame from the cache shows a shortcode: nothing is asked before the boot.
+    let _ = s.d.app.images.customs.get(&ws, "party");
+    s.d.app.ask_images(s.d.now);
+    s.pump();
+    assert_eq!(lists(&s), 0, "not with the pre-boot request");
+    s.b.answer(0);
+    assert!(s.pump());
+    let _ = s.d.app.images.customs.get(&ws, "party");
+    s.d.app.ask_images(s.d.now);
+    s.pump();
+    assert_eq!(lists(&s), 1, "asked once booted");
+    let r = s.b.held.iter().find(|r| r.command == Command::Emoji).unwrap();
+    assert_eq!(r.workspace.as_ref(), Some(&ws));
+}
+
+#[test]
 fn a_photo_the_cache_showed_stays_when_the_backend_s_boot_has_none() {
     let mut s = Scripted::connected(true);
     s.pump();
