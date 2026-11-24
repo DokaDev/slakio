@@ -376,3 +376,17 @@ fn a_sweep_that_panicked_leaves_the_next_one_to_run() {
     drop(running);
     let _ = fs::remove_dir_all(c.dir());
 }
+
+#[test]
+fn emptied_every_file_goes_and_the_folder_stays_for_what_comes_next() {
+    let (c, _) = cache("emptied");
+    let (photo, emoji) = (Source::Avatar(AVATAR.into()), Source::Emoji(EMOJI.into()));
+    c.store(&photo, "x", &png(64));
+    c.store(&emoji, "x", &png(64));
+    c.empty();
+    assert_eq!(fs::read_dir(c.dir()).unwrap().count(), 0);
+    assert_eq!(c.load(&photo, "x"), Loaded::Miss);
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(None)), "kept again from now on");
+    assert_eq!(fs::read_dir(c.dir()).unwrap().count(), 1);
+    let _ = fs::remove_dir_all(c.dir());
+}

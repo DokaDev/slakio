@@ -54,6 +54,10 @@ pub fn run_then_keep(
     diag: &Diag,
     send: impl FnOnce(Result<Prepared, Refused>),
 ) {
+    if job.empty {
+        cache.into_iter().for_each(PictureCache::empty);
+        return send(Err(Refused::NotCached));
+    }
     // A file's preview is never kept: fetched each run, with the session's cookie.
     let Some(cache) = cache.filter(|_| kept(&job.source)) else {
         return send(if job.from_cache { Err(Refused::NotCached) } else { super::prepare(job, cell) });
@@ -168,7 +172,19 @@ impl Images {
         let request = Generation(u64::MAX - u64::from(id));
         self.entries.insert(key.clone(), Entry::Decoding(request));
         let (source, shape) = key;
-        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true });
+        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: false });
+    }
+
+    /// Someone else signed in to a workspace: the pictures kept on disk go (off the loop's
+    /// thread, a job of its own that answers nothing), whoever's they were.
+    pub fn forget_kept(&mut self) {
+        if self.cache.is_none() {
+            return;
+        }
+        let id = self.next_id();
+        let request = Generation(u64::MAX - u64::from(id));
+        let (source, shape) = (Source::Emoji(String::new()), Shape::Emoji);
+        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: true });
     }
 
     /// `key` is not in the cache: the next frame that wants it asks the backend.

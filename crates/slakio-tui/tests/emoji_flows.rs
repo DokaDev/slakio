@@ -600,3 +600,50 @@ fn an_alias_of_a_standard_emoji_takes_the_skin_tone_after_it() {
     assert!(screen.contains("\u{1F44D}\u{1F3FC}"), "{screen}");
     assert!(screen.contains("\u{1F44D}\u{1F3FB}"), "{screen}");
 }
+
+/// The decode jobs the app handed over or still holds.
+fn jobs(s: &mut Scripted) -> Vec<slakio_tui::images::Job> {
+    let mut jobs: Vec<_> = s.d.app.images.take_lookups();
+    for effect in s.d.app.take_effects() {
+        if let Effect::Decode(job) = effect {
+            jobs.push(job);
+        }
+    }
+    jobs
+}
+
+#[test]
+fn signed_in_again_as_someone_else_the_pictures_kept_on_disk_go() {
+    use slakio_core::picture_cache::PictureCache;
+    let text: &[(&str, &[&str])] = &[("ship :party-blob:", &[])];
+    let (mut s, ws) = shown_signed_in(text);
+    let dir = std::env::temp_dir().join(format!("slakio-emoji-flows-kept-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cache = PictureCache::new(dir.clone());
+    cache.open().unwrap();
+    let png = slakio_world::pictures::png("e", 64, 64);
+    let _ = cache.store(&emoji(&ws, "party-blob"), "emoji@9x18", &png);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+    s.d.app.images.cache = Some(cache.clone());
+    // The same user again: nothing kept goes.
+    let me = s.d.app.model.me(&ws).expect("booted").as_str().to_string();
+    let same = SignedIn { id: ws.clone(), name: "A".into(), read_only: true, host: String::new(), user: me };
+    s.d.app.signed_in_again(&[same], &["A".to_string()], s.d.now);
+    assert!(jobs(&mut s).iter().all(|j| !j.empty));
+    s.pump();
+    let boot = s.b.held.iter().position(|r| r.command == Command::Boot).expect("booted again");
+    s.b.answer(boot);
+    s.pump();
+    open(&mut s, text);
+    // Someone else: a job that empties the folder, run off the loop's thread as any.
+    signed_in_as_someone_else(&mut s, &ws, text);
+    let empty: Vec<_> = jobs(&mut s).into_iter().filter(|j| j.empty).collect();
+    assert_eq!(empty.len(), 1, "{empty:?}");
+    let diag = s.d.app.images.diag().clone();
+    let result = slakio_tui::images::cached::run(&empty[0], Some((9, 18)), Some(&cache), &diag);
+    assert!(result.is_err(), "it shows nothing");
+    s.d.app.images.decoded((empty[0].source.clone(), empty[0].request), result);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "the user before's pictures left the disk");
+    assert!(dir.is_dir(), "the folder stays for the new user's");
+    let _ = std::fs::remove_dir_all(&dir);
+}

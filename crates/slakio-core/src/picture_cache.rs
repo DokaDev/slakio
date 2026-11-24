@@ -367,6 +367,21 @@ impl PictureCache {
         Some(swept)
     }
 
+    /// Remove every file in the folder and keep the folder, for what is kept from now on (someone
+    /// else signed in). Best effort.
+    pub fn empty(&self) {
+        if !self.dir_ok() {
+            return;
+        }
+        for entry in fs::read_dir(&self.dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if fs::symlink_metadata(&path).is_ok_and(|m| !m.is_dir()) {
+                remove(&path);
+            }
+        }
+        self.total.store(0, Ordering::Relaxed);
+    }
+
     /// Remove the folder and everything in it (a link in its place: the link only).
     pub fn clear(&self) -> io::Result<()> {
         match fs::symlink_metadata(&self.dir) {

@@ -294,6 +294,7 @@ impl App {
                 self.work.forget_workspace(&s.id);
                 self.model.forget_workspace(&s.id);
                 self.images.forget_customs(&s.id);
+                self.images.forget_kept();
                 self.shell.clamp(&self.model, self.list_height());
             }
             let id = self.work.requests.ask(Some(s.id.clone()), Command::Boot);

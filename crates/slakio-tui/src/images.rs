@@ -133,6 +133,8 @@ pub struct Job {
     pub shape: Shape,
     /// No bytes: the picture is looked for in the cache on disk ([`cached::run`]).
     pub from_cache: bool,
+    /// No picture: every picture kept on disk is removed ([`Images::forget_kept`]).
+    pub empty: bool,
 }
 
 /// A picture ready for the terminal: the commands that send it (base64 and all, made off the
@@ -483,7 +485,7 @@ impl Images {
         }
         self.entries.insert(key.clone(), Entry::Decoding(id));
         let (source, shape) = key;
-        Some(Job { source, request: id, id: self.next_id(), bytes, shape, from_cache: false })
+        Some(Job { source, request: id, id: self.next_id(), bytes, shape, from_cache: false, empty: false })
     }
 
     /// The id of the next picture sent.

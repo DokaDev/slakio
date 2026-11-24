@@ -352,8 +352,9 @@ background and decoded off the screen's thread.
   (`0700`, the files `0600`) and on macOS is excluded from Time Machine backups when it is made
   (the error log says when that fails); a file is named by a hash, never by its address or
   name, and a link or a damaged file in it is removed, never read. `cache = "off"` keeps none
-  of them, `slakio --demo` writes none, and every `slakio logout` removes the folder. Deleting
-  the folder is always safe; it only means fetching them again.
+  of them, `slakio --demo` writes none, every `slakio logout` removes the folder, and signing
+  in to a workspace as someone else empties it. Deleting the folder is always safe; it only
+  means fetching them again.
 - When a picture does not show and you want to find out why, start slakio with
   `SLAKIO_DEBUG_PICTURES=1` (off by default). slakio then writes one line for each step a
   photo, an emoji, a file preview, the emoji list and your own photo went through to

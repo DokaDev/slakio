@@ -158,6 +158,7 @@ fn a_late_or_unknown_answer_changes_nothing() {
         bytes: Vec::new(),
         shape: Shape::Preview,
         from_cache: false,
+        empty: false,
     };
     images.decoded(key(&stray), Ok(ready(&stray, 10)));
     assert_eq!(images.take_graphics(), "", "never asked: not sent");
