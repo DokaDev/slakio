@@ -159,8 +159,39 @@ fn times_and_reasons_in_plain_words() {
     let at = UNIX_EPOCH + Duration::from_millis(1_767_603_600_123);
     assert_eq!(rfc3339(at), "2026-01-05T09:00:00.123Z");
     assert_eq!(rfc3339(UNIX_EPOCH + Duration::from_secs(951_782_400)), "2000-02-29T00:00:00.000Z");
-    assert_eq!(slug("this workspace's picture share is reached"), "workspace-picture-share-reached");
-    assert_eq!(slug("the pictures' share is reached"), "pictures-share-reached");
+    assert_eq!(slug("this workspace's picture share is reached"), "lane-picture");
+    assert_eq!(slug("the pictures' share is reached"), "pictures");
+    assert_eq!(slug("something else entirely"), "other");
     assert_eq!(value(""), "-");
     assert_eq!(value(&"x".repeat(100)).len(), VALUE_MAX);
+}
+
+/// The request governor's reasons, as it words them.
+const REASONS: [(&str, &str); 7] = [
+    ("the request cap of this run is reached", "run-cap"),
+    ("the hourly request budget is reached", "hourly-budget"),
+    ("the hourly background share is reached", "hourly-background"),
+    ("the per-minute request cap is reached", "per-minute"),
+    ("the pictures' share is reached", "pictures"),
+    ("this workspace's background share is reached", "lane-background"),
+    ("this workspace's picture share is reached", "lane-picture"),
+];
+
+#[test]
+fn every_governor_reason_is_a_short_word_the_log_keeps() {
+    let dir = std::env::temp_dir().join(format!("slakio-diag-slug-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    let diag = Diag::to(path.clone());
+    for (why, word) in REASONS {
+        assert_eq!(slug(why), word, "{why}");
+        diag.line(Kind::Avatar, Stage::CapReached, &slug(why), &[("lane", "workspace")]);
+    }
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(!text.contains("[secret]"), "{text}");
+    for (_, word) in REASONS {
+        assert!(text.contains(&format!("avatar cap-reached {word} lane=workspace")), "{word}: {text}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

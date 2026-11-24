@@ -360,14 +360,20 @@ pub fn gravatar_fallback(url: &str) -> Option<(String, bool)> {
     Some((host, ok))
 }
 
-/// A short word for the governor's reason `why` (its words joined by `-`, letters only).
+/// A short fixed word for the request governor's reason `why` (`per-minute`, `lane-picture`):
+/// each reason is named by a word of its own, short enough that the log's redaction never takes
+/// it for a secret; `other` for a reason not named here.
 pub fn slug(why: &str) -> String {
-    let words: Vec<String> = why
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .filter(|w| !w.is_empty() && !matches!(*w, "the" | "is" | "s" | "of" | "this"))
-        .map(str::to_ascii_lowercase)
-        .collect();
-    value(&words.join("-"))
+    let words: &[(&str, &str)] = &[
+        ("request cap of this run", "run-cap"),
+        ("hourly request budget", "hourly-budget"),
+        ("hourly background share", "hourly-background"),
+        ("per-minute request cap", "per-minute"),
+        ("pictures' share", "pictures"),
+        ("workspace's background share", "lane-background"),
+        ("workspace's picture share", "lane-picture"),
+    ];
+    words.iter().find(|(says, _)| why.contains(says)).map_or("other", |(_, word)| word).to_string()
 }
 
 /// `at` in RFC 3339, UTC, to the millisecond (`2026-01-05T09:00:00.000Z`).
