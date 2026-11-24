@@ -89,6 +89,9 @@ pub(crate) async fn activity(client: &Client, ctx: &Session, cursor: Option<&str
         .filter(|u| !u.is_empty() && me.as_ref().is_none_or(|me| me.as_str() != u) && !bots.contains_key(u))
         .collect();
     let mut users = ctx.people.names(client, &authors, Priority::User).await;
+    // The user's own record, when a photo of them is known (nothing asked).
+    let mine = me.as_ref().filter(|me| notices.iter().any(|n| &n.user == *me));
+    users.extend(mine.and_then(|me| ctx.people.pictured(me.as_str())));
     if let Some(ws) = ctx.people.team() {
         users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
     }

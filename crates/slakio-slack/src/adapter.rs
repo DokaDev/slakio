@@ -449,6 +449,8 @@ pub(crate) async fn history(
 
 /// `page` with its authors by name (`everyone`'s, when given, else its messages'): what the view
 /// brought, else looked up (in batches); not the user, nor a bot (named by the name it posts as).
+/// The user's own record comes along when a photo of them is known (a page told it; nothing is
+/// asked), so a photo the start had not is shown once one is known.
 pub(crate) async fn named(
     client: &Client,
     ctx: &Session,
@@ -459,11 +461,18 @@ pub(crate) async fn named(
     priority: Priority,
 ) -> Page {
     let everyone = everyone.unwrap_or_else(|| page.messages.iter().map(|m| m.user.as_str().to_string()).collect());
+    let mine = me.filter(|me| everyone.iter().any(|u| u == me.as_str()));
     let authors: Vec<String> = everyone
         .into_iter()
         .filter(|u| !u.is_empty() && me.is_none_or(|me| me.as_str() != u) && !bots.contains_key(u))
         .collect();
     page.users = ctx.people.names(client, &authors, priority).await;
+    if let Some(own) = mine.and_then(|me| ctx.people.pictured(me.as_str())) {
+        if client.diag().first(slakio_core::diag::Kind::SelfPhoto, slakio_core::diag::Stage::Source, "after-boot") {
+            crate::shape::own_source(client.diag(), "after-boot", own.avatar.as_deref());
+        }
+        page.users.push(own);
+    }
     if let Some(ws) = ctx.people.team() {
         page.users.extend(bots.into_iter().map(|(id, b)| bot(&ws, id, b)));
     }

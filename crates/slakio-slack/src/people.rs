@@ -2,8 +2,9 @@
 //! memory): never a directory listing. What a view brings along is kept as it comes; the rest
 //! is asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's
 //! batch), each id once. A lookup that fails is not kept, so the id shows until a later page
-//! asks again; unknown is not absent. An id Slack answered for without a name to show is not
-//! asked again this session.
+//! asks again; unknown is not absent. An id Slack answered for without a name to show, or listed
+//! as failed (an id it does not know), is not asked again this session; one it left out or listed
+//! as pending (not ready yet) is asked again by a later lookup, at most [`OMITTED_MAX`] times.
 
 use crate::client::Client;
 use crate::governor::Priority;
@@ -20,12 +21,17 @@ use std::sync::{Mutex, PoisonError};
 /// How many people one edge lookup asks for.
 pub const LOOKUP_BATCH: usize = 80;
 
+/// How many lookups may leave an id out (or list it as pending) before it is not asked again.
+pub const OMITTED_MAX: u8 = 3;
+
 /// The people known this session, and the team they were looked up for.
 #[derive(Debug, Default)]
 pub(crate) struct People {
     known: Mutex<HashMap<String, User>>,
     /// Ids Slack was asked about and gave no name for.
     unnamed: Mutex<HashSet<String>>,
+    /// Ids lookups left out or listed as pending, and how many times.
+    omitted: Mutex<HashMap<String, u8>>,
     team: Mutex<Option<String>>,
 }
 
@@ -51,12 +57,20 @@ impl People {
     }
 
     /// Forget person `id` when no photo of them is known, so the next [`People::names`] asks
-    /// Slack for them again (the user's own record, when the start bundle has no photo).
+    /// Slack for them again (the user's own record, when the start bundle has no photo): also
+    /// when an earlier lookup gave no name for them.
     pub(crate) fn forget_unpictured(&self, id: &str) {
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
-        if known.get(id).is_some_and(|u| u.avatar.is_none()) {
+        if known.get(id).is_none_or(|u| u.avatar.is_none()) {
             known.remove(id);
+            self.unnamed.lock().unwrap_or_else(PoisonError::into_inner).remove(id);
+            self.omitted.lock().unwrap_or_else(PoisonError::into_inner).remove(id);
         }
+    }
+
+    /// Person `id` as known now, when a photo of them is: nothing is asked.
+    pub(crate) fn pictured(&self, id: &str) -> Option<User> {
+        self.known.lock().unwrap_or_else(PoisonError::into_inner).get(id).filter(|u| u.avatar.is_some()).cloned()
     }
 
     /// Where person `id` stands before a lookup: `pictured` / `unpictured` (known, with a photo or
@@ -100,17 +114,37 @@ impl People {
                 }
             };
             crate::shape::photos(client.diag(), found.results.as_deref().unwrap_or_default(), "lookup");
-            let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
-            for p in found.results.unwrap_or_default() {
-                if let Some(u) = user(&p, &team) {
-                    keep(&mut known, &p.id, u);
-                }
-            }
-            let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
-            unnamed.extend(batch.iter().filter(|id| !known.contains_key(**id)).map(|id| (*id).clone()));
+            self.take(&team, batch, found);
         }
         let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         wanted.iter().filter_map(|id| known.get(*id).cloned()).collect()
+    }
+
+    /// What one lookup of `batch` found: the people named kept; an id answered without a name,
+    /// or listed as failed, not asked again; one left out or pending asked again later, at most
+    /// [`OMITTED_MAX`] lookups.
+    fn take(&self, team: &str, batch: &[&String], found: wire::EdgeUsers) {
+        let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut omitted = self.omitted.lock().unwrap_or_else(PoisonError::into_inner);
+        let failed = found.failed_ids.unwrap_or_default();
+        let mut answered = HashSet::new();
+        for p in found.results.unwrap_or_default() {
+            answered.insert(p.id.clone());
+            match user(&p, team) {
+                Some(u) => keep(&mut known, &p.id, u),
+                None => {
+                    unnamed.insert(p.id.clone());
+                }
+            }
+        }
+        for id in batch.iter().filter(|id| !known.contains_key(**id) && !answered.contains(**id)) {
+            let times = omitted.entry((*id).clone()).or_insert(0);
+            *times += 1;
+            if failed.contains(*id) || *times >= OMITTED_MAX {
+                unnamed.insert((*id).clone());
+            }
+        }
     }
 }
 

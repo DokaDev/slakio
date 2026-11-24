@@ -224,6 +224,12 @@ impl Person {
 pub struct EdgeUsers {
     #[serde(default, deserialize_with = "lenient")]
     pub results: Option<Vec<Person>>,
+    /// The ids it does not know.
+    #[serde(default, deserialize_with = "lenient")]
+    pub failed_ids: Option<Vec<String>>,
+    /// The ids it has no answer for yet (asked again later).
+    #[serde(default, deserialize_with = "lenient")]
+    pub pending_ids: Option<Vec<String>>,
 }
 
 /// `conversations.history` and `conversations.replies` (and `history` of a view).

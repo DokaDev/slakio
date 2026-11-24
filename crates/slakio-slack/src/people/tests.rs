@@ -98,3 +98,70 @@ fn only_a_person_known_without_a_photo_is_forgotten_to_be_asked_again() {
     assert!(!known.contains_key("U1"));
     assert!(known.contains_key("U2"));
 }
+
+/// A fake Slack, a client and the people of its team; the fake's first edge lookup answers `first`.
+async fn looking(first: serde_json::Value) -> (FakeSlack, Client, People) {
+    let fake = FakeSlack::start(World::new(7)).await.unwrap();
+    let team = World::new(7).snapshot().workspaces[0].id.as_str().to_string();
+    let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+    let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+    client.set_team(&team);
+    let people = People::default();
+    people.set_team(&team);
+    fake.fail_next("users/info", slakio_fake::Fault::Answer(first));
+    (fake, client, people)
+}
+
+fn asked_for(fake: &FakeSlack, id: &str) -> usize {
+    fake.log().iter().filter(|l| l.method() == "users/info" && l.body.contains(id)).count()
+}
+
+#[test]
+fn a_person_forgotten_for_their_photo_is_asked_again_though_once_unnamed() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let me = World::new(7).snapshot().workspaces[0].me.as_str().to_string();
+        // The first lookup names no one: Slack answered for the user without a name.
+        let (fake, client, people) = looking(json!({"ok": true, "results": [{"id": me}]})).await;
+        let ids = [me.clone()];
+        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
+        assert_eq!(people.standing(&me), "unnamed");
+        people.forget_unpictured(&me);
+        assert_eq!(people.standing(&me), "unknown");
+        let named = people.names(&client, &ids, Priority::User).await;
+        assert_eq!(asked_for(&fake, &me), 2, "asked again after it was forgotten");
+        assert_eq!(named.len(), 1);
+    });
+}
+
+#[test]
+fn an_id_left_out_or_pending_is_asked_again_and_a_failed_one_is_not() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let me = World::new(7).snapshot().workspaces[0].me.as_str().to_string();
+        let (fake, client, people) = looking(json!({"ok": true, "results": [], "pending_ids": [me]})).await;
+        let ids = [me.clone()];
+        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
+        assert_eq!(people.standing(&me), "unknown", "pending is not unnamed");
+        assert_eq!(people.names(&client, &ids, Priority::User).await.len(), 1, "asked again, named");
+        assert_eq!(asked_for(&fake, &me), 2);
+        // Left out with no word: asked again, up to the cap.
+        fake.fail_next("users/info", slakio_fake::Fault::Answer(json!({"ok": true, "results": []})));
+        fake.fail_next("users/info", slakio_fake::Fault::Answer(json!({"ok": true, "results": []})));
+        fake.fail_next("users/info", slakio_fake::Fault::Answer(json!({"ok": true, "results": []})));
+        let other = ["UOMITTED".to_string()];
+        for _ in 0..5 {
+            let _ = people.names(&client, &other, Priority::User).await;
+        }
+        assert_eq!(asked_for(&fake, "UOMITTED"), usize::from(OMITTED_MAX), "at most the cap");
+        // Listed as failed (an id Slack does not know): not asked again.
+        let gone = ["UGONE".to_string()];
+        fake.fail_next(
+            "users/info",
+            slakio_fake::Fault::Answer(json!({"ok": true, "results": [], "failed_ids": ["UGONE"]})),
+        );
+        let _ = people.names(&client, &gone, Priority::User).await;
+        let _ = people.names(&client, &gone, Priority::User).await;
+        assert_eq!(asked_for(&fake, "UGONE"), 1);
+    });
+}

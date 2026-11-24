@@ -457,3 +457,33 @@ fn the_gravatar_fallback_stays_within_the_hop_cap() {
         assert_eq!(r.governor.sent(), 3);
     });
 }
+
+#[test]
+fn the_user_s_own_photo_a_page_tells_reaches_the_screen_when_the_start_had_none() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        // The start's lookup fails: the user's own record has no photo.
+        r.fake.fail_next("users/info", Fault::Status { status: 503, retry_after: None });
+        let Event::Booted(s) = r.ask(Command::Boot).await else { panic!("booted") };
+        let me = s.workspaces[0].me.clone();
+        assert_eq!(s.users.iter().find(|u| u.id == me).and_then(|u| u.avatar.clone()), None, "no photo at the start");
+        let photo = format!("https://{}/avatars/me_72.png", AVATAR_HOSTS[0]);
+        let view = json!({
+            "ok": true,
+            "history": {"messages": [{"type": "message", "user": me.as_str(), "text": "mine", "ts": "1767603600.000100"}], "has_more": false},
+            "users": [{"id": me.as_str(), "team_id": s.workspaces[0].id.as_str(), "name": "me", "profile": {"display_name": "Me", "image_72": photo}}],
+            "channels": [],
+        });
+        r.fake.fail_next("conversations.view", Fault::Answer(view));
+        let lookups = r.fake.log().iter().filter(|l| l.method() == "users/info").count();
+        let Event::History(page) = r.ask(Command::History { target: r.target("general"), before: None, limit: 20 }).await
+        else {
+            panic!("a page")
+        };
+        let mine: Vec<_> = page.users.iter().filter(|u| u.id == me).collect();
+        assert_eq!(mine.len(), 1, "the user's own record comes along");
+        assert_eq!(mine[0].avatar.as_deref(), Some(photo.as_str()));
+        let after = r.fake.log().iter().filter(|l| l.method() == "users/info").count();
+        assert_eq!(after, lookups, "nothing asked for it");
+    });
+}
