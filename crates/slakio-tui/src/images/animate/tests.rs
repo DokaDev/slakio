@@ -186,3 +186,17 @@ fn a_coarse_tick_from_an_offset_start_still_shows_ten_frames_a_second() {
     let n = sent.get(&1).copied().unwrap_or(0);
     assert!((98..=101).contains(&n), "{n} frames in ten seconds");
 }
+
+#[test]
+fn a_picture_under_a_covering_popup_stops() {
+    let (mut images, now) = held(1, 3, Duration::from_millis(100));
+    draw(&mut images, [0], now);
+    assert!(images.frame_at().is_some());
+    images.cover(true);
+    draw(&mut images, [0], now);
+    assert_eq!(images.frame_at(), None, "drawn under the popup, not seen");
+    assert!(run(&mut images, now, SECOND, TICK).is_empty());
+    images.cover(false);
+    draw(&mut images, [0], now + SECOND);
+    assert!(images.frame_at().is_some(), "uncovered, it moves again");
+}

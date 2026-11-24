@@ -63,6 +63,9 @@ pub(super) struct Anims {
     moving: Vec<Key>,
     /// The start of the grid.
     epoch: Option<Instant>,
+    /// A popup covers the messages (settings, the help, a question, the files to pick): what is
+    /// drawn under it is not seen.
+    covered: bool,
 }
 
 impl Anims {
@@ -78,7 +81,12 @@ impl Anims {
 
     /// The frame being noted showed `key`.
     pub(super) fn saw(&mut self, key: &Key) {
-        if !self.still && self.seen.len() < MOVING_MAX && self.list.contains_key(key) && !self.seen.contains(key) {
+        if !self.still
+            && !self.covered
+            && self.seen.len() < MOVING_MAX
+            && self.list.contains_key(key)
+            && !self.seen.contains(key)
+        {
             self.seen.push(key.clone());
         }
     }
@@ -186,6 +194,17 @@ impl Images {
     /// `animate` is on.
     pub fn animates(&self) -> bool {
         !self.anims.still
+    }
+
+    /// A popup covers the messages (`true`) or not, from the next frame on: nothing under it
+    /// moves.
+    pub fn cover(&mut self, covered: bool) {
+        self.anims.covered = covered;
+    }
+
+    /// A popup covers the messages.
+    pub fn covered(&self) -> bool {
+        self.anims.covered
     }
 }
 

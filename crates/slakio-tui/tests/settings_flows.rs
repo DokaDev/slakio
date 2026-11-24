@@ -652,3 +652,19 @@ fn the_network_switched_off_by_the_environment_reads_off_in_the_muted_colour() {
         }
     }
 }
+
+#[test]
+fn pictures_under_a_screen_that_covers_the_messages_do_not_move() {
+    let mut d = booted(120, 40, Lang::En, shown_config(), true);
+    d.app.ask_images(d.now);
+    assert!(!d.app.images.covered());
+    d.keys("space ,");
+    d.app.ask_images(d.now);
+    assert!(d.app.images.covered(), "the settings screen covers them");
+    d.keys("esc");
+    d.app.ask_images(d.now);
+    assert!(!d.app.images.covered());
+    d.keys("?");
+    d.app.ask_images(d.now);
+    assert!(d.app.images.covered(), "so does the keyboard help");
+}

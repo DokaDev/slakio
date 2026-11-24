@@ -18,6 +18,7 @@
 //! are never offered to open.
 
 use super::dialog::{Dialog, Question};
+use super::overlay::Layer;
 use super::picker::{LETTERS, hint_letters, list_rect};
 use super::status::{INFO_FOR, Level, Notice};
 use super::{App, Effect};
@@ -99,6 +100,9 @@ impl App {
         let model = &self.model;
         self.images.customs.booted_only(|ws| model.is_fresh(ws));
         let lists = self.images.customs.ask(&mut self.work.requests, now);
+        // Under a popup that covers the messages, nothing moves.
+        let covers = |l: &Layer| matches!(l, Layer::Dialog | Layer::Settings | Layer::Help | Layer::Files);
+        self.images.cover(self.layers(None).iter().any(covers));
         let asked = self.images.ask(&mut self.work.requests, now) | lists;
         // Looks in the cache on disk run off the loop's thread, as decodes do.
         self.effects.extend(self.images.take_lookups().into_iter().map(Effect::Decode));
