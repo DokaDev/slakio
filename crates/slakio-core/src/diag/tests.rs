@@ -229,3 +229,20 @@ fn the_end_of_a_run_writes_what_was_handed_over() {
     assert!(std::fs::read_to_string(&path).unwrap().contains("avatar asked ok"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn only_a_content_type_holds_a_slash_and_nothing_a_colon() {
+    assert_eq!(value("a/b:c"), "a?b?c");
+    assert_eq!(value("https://x.y/p"), "https???x.y?p");
+    let dir = std::env::temp_dir().join(format!("slakio-diag-slash-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    let diag = Diag::to(path.clone());
+    diag.line(Kind::Avatar, Stage::ContentType, "image/png", &[("id", "a/b")]);
+    diag.line(Kind::Avatar, Stage::Refused, "x/y:z", &[]);
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("avatar content-type image/png id=a?b"), "{text}");
+    assert!(text.contains("avatar refused x?y?z"), "{text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

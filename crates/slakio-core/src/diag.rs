@@ -292,7 +292,10 @@ impl Diag {
     pub fn line(&self, kind: Kind, stage: Stage, result: &str, pairs: &[(&str, &str)]) {
         let Some(inner) = &self.0 else { return };
         let Some(tx) = &inner.tx else { return };
-        let mut line = format!("{} {} {} {}", rfc3339(SystemTime::now()), kind.as_str(), stage.as_str(), value(result));
+        // A content type is `type/subtype`; no other value holds a `/` (nor a `:`), so no path
+        // or address can ever be put together from the line.
+        let result = if stage == Stage::ContentType { content_type(result) } else { value(result) };
+        let mut line = format!("{} {} {} {}", rfc3339(SystemTime::now()), kind.as_str(), stage.as_str(), result);
         for (k, v) in pairs {
             line.push(' ');
             line.push_str(&value(k));
@@ -315,13 +318,24 @@ impl Diag {
     }
 }
 
-/// `v` as a line may hold it: letters, digits and `. _ - / + : , *` only (anything else is `?`),
+/// `v` as a line may hold it: letters, digits and `. _ - + , *` only (anything else is `?`),
 /// at most [`VALUE_MAX`] characters; empty is `-`.
 pub fn value(v: &str) -> String {
+    kept(v, "._-+,*")
+}
+
+/// A content type (`image/png`) as a line holds it: [`value`]'s characters and `/`.
+fn content_type(v: &str) -> String {
+    kept(v, "._-+,*/")
+}
+
+/// `v` with every character but ASCII letters, digits and `extra` as `?`, at most [`VALUE_MAX`]
+/// of them; `-` when empty.
+fn kept(v: &str, extra: &str) -> String {
     let mut out: String = v
         .chars()
         .take(VALUE_MAX)
-        .map(|c| if c.is_ascii_alphanumeric() || "._-/+:,*".contains(c) { c } else { '?' })
+        .map(|c| if c.is_ascii_alphanumeric() || extra.contains(c) { c } else { '?' })
         .collect();
     if out.is_empty() {
         out.push('-');
