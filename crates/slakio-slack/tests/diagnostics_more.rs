@@ -128,3 +128,19 @@ fn the_user_s_own_record_in_a_view_is_told_once() {
         assert_eq!(text.matches("self-photo seen").count(), 1, "once a run: {text}");
     });
 }
+
+#[test]
+fn an_emoji_list_that_is_not_json_is_told_once() {
+    rt().block_on(async {
+        let mut r = Run::new("parse", None).await;
+        r.fake.fail_next("emoji.list", Fault::Malformed);
+        assert!(matches!(r.ask(Command::Emoji).await, Event::Failed { .. }));
+        r.fake.fail_next("emoji.list", Fault::Status { status: 503, retry_after: None });
+        assert!(matches!(r.ask(Command::Emoji).await, Event::Failed { .. }));
+        let text = r.text();
+        assert_eq!(text.matches("emoji-list failed parse").count(), 1, "{text}");
+        assert_eq!(text.matches("emoji-list failed").count(), 2, "one each: {text}");
+        has(&text, "emoji-list failed http");
+        has(&text, "emoji-list status 503");
+    });
+}

@@ -144,7 +144,8 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw) {
                     let code = code.map_or_else(|| "no_error_code".to_string(), enum_like);
                     diag.line(Kind::EmojiList, Stage::Api, "error", &[("code", &code)]);
                 }
-                _ => diag.line(Kind::EmojiList, Stage::Failed, "parse", &[]),
+                // Not Slack's JSON: the call's failure says so (`failed parse`, `failed http`).
+                _ => {}
             }
         }
         Method::EdgeUsersInfo => match serde_json::from_slice::<Value>(&raw.body) {
