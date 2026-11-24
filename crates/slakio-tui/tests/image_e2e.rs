@@ -213,6 +213,26 @@ fn a_decoder_panic_leaves_the_screen_as_it_is_and_the_app_goes_on() {
 }
 
 #[test]
+fn a_panic_while_a_picture_is_kept_leaves_it_shown_and_says_so() {
+    let m = Machine::new("keep-panic");
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty"), ("SLAKIO_DEBUG_DECODE_PANIC", "keep")];
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(300));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("the picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
+    let errors = m.dir.join("state").join("slakio").join("errors.log");
+    let log = || std::fs::read_to_string(&errors).unwrap_or_default();
+    wait_until("the panic logged", || log().contains("keeping a picture on disk panicked"));
+    run.quit();
+    let log = log();
+    assert!(!log.contains("the picture decoder panicked"), "shown, so not the decoder: {log}");
+    assert!(!log.contains("https://") && !log.contains("files-tmb") && !log.contains("avatars/"), "{log}");
+}
+
+#[test]
 fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let m = Machine::new("kept");
     let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();

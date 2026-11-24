@@ -10,7 +10,8 @@
 //!
 //! A panic in the decoder is caught there ([`slakio_tui::terminal::catching`]: the panic hook
 //! leaves the terminal as it is): the picture is not shown (one read from the disk is removed
-//! there), and the error log says so in one line that names no address.
+//! there), and the error log says so in one line that names no address. One after the picture
+//! was handed over (while it is kept on disk) leaves it shown, and the error log says that.
 
 use ratatui::crossterm::terminal::window_size;
 use slakio_core::backend::Generation;
@@ -38,8 +39,10 @@ pub(crate) struct Pictures {
     cache: Option<PictureCache>,
     diag: Diag,
     /// Debug builds only (`SLAKIO_DEBUG_DECODE_PANIC=1`): the decoder panics, for the test that
-    /// a panic there leaves the terminal as it is.
+    /// a panic there leaves the terminal as it is; `=keep`: the job panics once the picture is
+    /// handed over, as keeping it on disk might.
     panic: bool,
+    panic_keep: bool,
 }
 
 /// A cell's size in pixels, when the terminal says the window's (an `ioctl`, not a question on
@@ -54,31 +57,38 @@ impl Pictures {
     /// one and this is not the demo (swept now, off the loop's thread).
     pub(crate) fn new(errors: Option<PathBuf>, images: &mut Images, local: &crate::store::Local) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        let panic = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_DECODE_PANIC").is_some_and(|v| v == "1");
+        let asked = std::env::var_os("SLAKIO_DEBUG_DECODE_PANIC").filter(|_| cfg!(debug_assertions));
+        let (panic, panic_keep) = (asked.as_ref().is_some_and(|v| v == "1"), asked.is_some_and(|v| v == "keep"));
         images.cache = local.pictures().filter(|_| !images.demo);
         let (cache, diag) = (images.cache.clone(), images.diag().clone());
         if let Some(c) = cache.clone().filter(|_| images.on) {
             let (d, made) = (diag.clone(), local.exclude_pictures());
             tokio::task::spawn_blocking(move || cached::start(&c, &d, made));
         }
-        Self { tx, rx, errors, cache, diag, panic }
+        Self { tx, rx, errors, cache, diag, panic, panic_keep }
     }
 
     /// Make `job` ready on a blocking task; its result comes from [`Pictures::next`].
     pub(crate) fn start(&self, job: Job) {
-        let (tx, cell, panic) = (self.tx.clone(), cell(), self.panic);
-        let (cache, diag) = (self.cache.clone(), self.diag.clone());
+        let (tx, cell, panic, panic_keep) = (self.tx.clone(), cell(), self.panic, self.panic_keep);
+        let (cache, diag, errors) = (self.cache.clone(), self.diag.clone(), self.errors.clone());
         tokio::task::spawn_blocking(move || {
             // The cache holds nothing a panic part way leaves broken (a write is whole or not
             // at all). The picture goes to the UI before it is kept on disk.
+            let sent = std::cell::Cell::new(false);
             let made = slakio_tui::terminal::catching(std::panic::AssertUnwindSafe(|| {
                 assert!(!panic, "SLAKIO_DEBUG_DECODE_PANIC: a panic in the decoder");
                 cached::run_then_keep(&job, cell, cache.as_ref(), &diag, |result| {
                     let _ = tx.send((((job.source.clone(), job.request), result), false));
+                    sent.set(true);
+                    assert!(!panic_keep, "SLAKIO_DEBUG_DECODE_PANIC=keep: a panic while it is kept");
                 });
             }));
-            // A result sent already stands (a later one for the request changes nothing).
-            if made.is_err() {
+            // A result sent already stands: the panic came while the picture was kept on disk.
+            if made.is_err() && sent.get() {
+                let fault = Fault::other("keeping a picture on disk panicked; it is shown, not kept");
+                ErrorLog::new(errors).record("picture", &fault);
+            } else if made.is_err() {
                 cached::panicked(&job, cell, cache.as_ref());
                 let _ = tx.send((((job.source, job.request), Err(Refused::Unreadable)), true));
             }
