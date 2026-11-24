@@ -50,8 +50,8 @@ const REFUSED: &[(char, char)] = &[
     // Letters and digits that look like ASCII ones: fullwidth forms (digits too), the halfwidth
     // Hangul and symbols, enclosed and mathematical alphanumerics. The halfwidth katakana
     // letters and prolonged sound mark (U+FF66 to U+FF9D) are real letters and left out here;
-    // the halfwidth middle dot (U+FF65, punctuation) and voiced marks (U+FF9E and U+FF9F, which
-    // join the letter before) are no letters and stay refused.
+    // the halfwidth middle dot (U+FF65, punctuation, not a letter) and voiced marks (U+FF9E and
+    // U+FF9F, which join the letter before) are left out too: the other rules refuse them.
     ('\u{2460}', '\u{24FF}'),
     ('\u{FF00}', '\u{FF64}'),
     ('\u{FFA0}', '\u{FFEF}'),
