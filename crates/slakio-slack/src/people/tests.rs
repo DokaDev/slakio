@@ -31,10 +31,13 @@ fn many_ids_go_in_batches_of_eighty_and_unknown_ones_stay_unnamed() {
             })
             .collect();
         assert_eq!(sizes, [80, 80, 40], "200 distinct ids, 80 a request");
-        // Known ones are not asked again, nor those Slack answered for without a name.
+        // Known ones are not asked again; those Slack has no answer for, at most the cap.
         let _ = people.names(&client, &real, Priority::User).await;
-        let _ = people.names(&client, &ids, Priority::User).await;
         assert_eq!(fake.log().len(), 3);
+        for _ in 0..4 {
+            let _ = people.names(&client, &ids, Priority::User).await;
+        }
+        assert_eq!(fake.log().len(), 3 * usize::from(OMITTED_MAX), "190 ids, 80 a request, each at most 3 times");
     });
 }
 
@@ -51,10 +54,10 @@ fn an_id_whose_lookup_failed_is_asked_again() {
         people.set_team(&team);
         fake.fail_next("users/info", slakio_fake::Fault::Status { status: 503, retry_after: None });
         let ids = ["UNKNOWN001".to_string()];
-        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
-        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
-        let _ = people.names(&client, &ids, Priority::User).await;
-        assert_eq!(fake.log().len(), 2, "asked again after the failure, then known as unnamed");
+        for _ in 0..5 {
+            assert!(people.names(&client, &ids, Priority::User).await.is_empty());
+        }
+        assert_eq!(fake.log().len(), 1 + usize::from(OMITTED_MAX), "asked again after the failure, up to the cap");
     });
 }
 
@@ -154,14 +157,51 @@ fn an_id_left_out_or_pending_is_asked_again_and_a_failed_one_is_not() {
             let _ = people.names(&client, &other, Priority::User).await;
         }
         assert_eq!(asked_for(&fake, "UOMITTED"), usize::from(OMITTED_MAX), "at most the cap");
-        // Listed as failed (an id Slack does not know): not asked again.
+        // Listed as failed (which may pass): asked again like a pending one, up to the cap.
         let gone = ["UGONE".to_string()];
-        fake.fail_next(
-            "users/info",
-            slakio_fake::Fault::Answer(json!({"ok": true, "results": [], "failed_ids": ["UGONE"]})),
-        );
-        let _ = people.names(&client, &gone, Priority::User).await;
-        let _ = people.names(&client, &gone, Priority::User).await;
-        assert_eq!(asked_for(&fake, "UGONE"), 1);
+        for _ in 0..3 {
+            fake.fail_next(
+                "users/info",
+                slakio_fake::Fault::Answer(json!({"ok": true, "results": [], "failed_ids": ["UGONE"]})),
+            );
+        }
+        for _ in 0..5 {
+            let _ = people.names(&client, &gone, Priority::User).await;
+        }
+        assert_eq!(asked_for(&fake, "UGONE"), usize::from(OMITTED_MAX));
     });
+}
+
+#[test]
+fn an_id_listed_as_failed_twice_is_named_by_the_third_lookup() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let me = World::new(7).snapshot().workspaces[0].me.as_str().to_string();
+        let failed = json!({"ok": true, "results": [], "failed_ids": [me]});
+        let (fake, client, people) = looking(failed.clone()).await;
+        fake.fail_next("users/info", slakio_fake::Fault::Answer(failed));
+        let ids = [me.clone()];
+        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
+        assert!(people.names(&client, &ids, Priority::User).await.is_empty());
+        assert_eq!(people.standing(&me), "unknown", "failed twice is not unnamed");
+        assert_eq!(people.names(&client, &ids, Priority::User).await.len(), 1, "named on the third");
+        assert_eq!(asked_for(&fake, &me), 3);
+    });
+}
+
+#[test]
+fn only_the_ids_asked_for_are_taken_and_a_named_one_never_becomes_unnamed() {
+    let people = People::default();
+    people.set_team("T1");
+    let asked = "UASKED".to_string();
+    let named = |id: &str| json!({"id": id, "team_id": "T1", "profile": {"display_name": "Minsu"}});
+    let found: wire::EdgeUsers = serde_json::from_value(json!({
+        "ok": true,
+        "results": [named("UASKED"), {"id": "UASKED"}, named("UOTHER")],
+    }))
+    .unwrap();
+    people.take("T1", &[&asked], found);
+    assert_eq!(people.standing("UASKED"), "unpictured");
+    assert!(!people.unnamed.lock().unwrap().contains("UASKED"), "its nameless duplicate is not unnamed");
+    assert_eq!(people.standing("UOTHER"), "unknown", "not asked for: not taken");
 }

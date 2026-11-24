@@ -2,9 +2,10 @@
 //! memory): never a directory listing. What a view brings along is kept as it comes; the rest
 //! is asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's
 //! batch), each id once. A lookup that fails is not kept, so the id shows until a later page
-//! asks again; unknown is not absent. An id Slack answered for without a name to show, or listed
-//! as failed (an id it does not know), is not asked again this session; one it left out or listed
-//! as pending (not ready yet) is asked again by a later lookup, at most [`OMITTED_MAX`] times.
+//! asks again; unknown is not absent. An id Slack answered for without a name to show is not
+//! asked again this session; one it left out, listed as pending (not ready yet) or as failed
+//! (which may pass) is asked again by a later lookup, at most [`OMITTED_MAX`] times. Only what
+//! a lookup asked for is taken from its answer.
 
 use crate::client::Client;
 use crate::governor::Priority;
@@ -21,7 +22,8 @@ use std::sync::{Mutex, PoisonError};
 /// How many people one edge lookup asks for.
 pub const LOOKUP_BATCH: usize = 80;
 
-/// How many lookups may leave an id out (or list it as pending) before it is not asked again.
+/// How many lookups may leave an id out (or list it as pending or failed) before it is not asked
+/// again.
 pub const OMITTED_MAX: u8 = 3;
 
 /// The people known this session, and the team they were looked up for.
@@ -30,7 +32,7 @@ pub(crate) struct People {
     known: Mutex<HashMap<String, User>>,
     /// Ids Slack was asked about and gave no name for.
     unnamed: Mutex<HashSet<String>>,
-    /// Ids lookups left out or listed as pending, and how many times.
+    /// Ids lookups left out or listed as pending or failed, and how many times.
     omitted: Mutex<HashMap<String, u8>>,
     team: Mutex<Option<String>>,
 }
@@ -120,28 +122,29 @@ impl People {
         wanted.iter().filter_map(|id| known.get(*id).cloned()).collect()
     }
 
-    /// What one lookup of `batch` found: the people named kept; an id answered without a name,
-    /// or listed as failed, not asked again; one left out or pending asked again later, at most
-    /// [`OMITTED_MAX`] lookups.
+    /// What one lookup of `batch` found (only the ids it asked for): the people named kept; an
+    /// id answered without a name not asked again, unless a name of it is known; one left out,
+    /// pending or failed asked again later, at most [`OMITTED_MAX`] lookups.
     fn take(&self, team: &str, batch: &[&String], found: wire::EdgeUsers) {
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
         let mut omitted = self.omitted.lock().unwrap_or_else(PoisonError::into_inner);
-        let failed = found.failed_ids.unwrap_or_default();
+        let asked: HashSet<&str> = batch.iter().map(|id| id.as_str()).collect();
         let mut answered = HashSet::new();
-        for p in found.results.unwrap_or_default() {
+        for p in found.results.unwrap_or_default().into_iter().filter(|p| asked.contains(p.id.as_str())) {
             answered.insert(p.id.clone());
             match user(&p, team) {
                 Some(u) => keep(&mut known, &p.id, u),
-                None => {
+                None if !known.contains_key(&p.id) => {
                     unnamed.insert(p.id.clone());
                 }
+                None => {}
             }
         }
         for id in batch.iter().filter(|id| !known.contains_key(**id) && !answered.contains(**id)) {
             let times = omitted.entry((*id).clone()).or_insert(0);
             *times += 1;
-            if failed.contains(*id) || *times >= OMITTED_MAX {
+            if *times >= OMITTED_MAX {
                 unnamed.insert((*id).clone());
             }
         }
