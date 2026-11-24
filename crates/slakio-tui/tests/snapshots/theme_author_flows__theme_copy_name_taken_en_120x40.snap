@@ -13,7 +13,7 @@ expression: d.snap()
 │   # back│ Pictures                                                                                         │         │
 │   # inci│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
 │         │   Images           ‹ auto               ›  Where known to work (default)                         │         │
-│ ▾ Ops   │   Animate          ‹ on                 ›  GIF emoji and photos move                             │         │
+│ ▾ Ops   │   Animate          ‹ on                 ›  GIF/APNG pictures move                                │         │
 │   # depl│ Locale                                                                                           │         │
 │   # aler│   Language         ‹ auto               ›  applies on next launch                                │         │
 │   # part│ Files                                                                                            │         │

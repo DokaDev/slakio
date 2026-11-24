@@ -22,7 +22,7 @@
 //! download_max_mb = 1024   # the largest file downloaded, in megabytes (1 to 100000)
 //! images = "auto"          # pictures where the terminal surely draws them; "on" always, "off" never
 //!                          # (SLAKIO_IMAGES=auto|on|off wins over it)
-//! animate = "on"           # GIF emoji and photos move where pictures are drawn; "off": first frame
+//! animate = "on"           # GIF and animated PNG emoji and photos move; "off": first frame
 //! ```
 //!
 //! `theme = "auto"` takes `tokyo-night` on a terminal that says it shows 24-bit color, else the
@@ -90,7 +90,7 @@ pub struct Config {
     /// Pictures (previews, photos): `auto` where the terminal surely draws them, `on`, `off`
     /// ([`IMAGES`]).
     pub images: String,
-    /// `off`: a GIF emoji or photo shows its first frame only ([`ANIMATE`]).
+    /// `off`: a GIF or animated PNG emoji or photo shows its first frame only ([`ANIMATE`]).
     pub animate: String,
     /// The file the settings came from (or would be written to), when known.
     pub path: Option<PathBuf>,
