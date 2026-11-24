@@ -190,9 +190,6 @@ impl Model {
         self.index_users();
     }
 
-    /// The boot answer of workspace `ws` alone (from the local cache when `cached`): its part
-    /// of the model is replaced, the other workspaces' stay as they are. What the answer says
-    /// of another workspace is not taken. Its place and color stay those it was listed with.
     /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of.
     pub fn with_photos(&self, mut snapshot: Snapshot) -> Snapshot {
         let photos: HashMap<(&WorkspaceId, &UserId), &String> =
@@ -203,6 +200,9 @@ impl Model {
         snapshot
     }
 
+    /// The boot answer of workspace `ws` alone (from the local cache when `cached`): its part
+    /// of the model is replaced, the other workspaces' stay as they are. What the answer says
+    /// of another workspace is not taken. Its place and color stay those it was listed with.
     pub fn merge(&mut self, ws: &WorkspaceId, snapshot: &Snapshot, cached: bool) {
         let new = snapshot.only(ws);
         let s = &mut self.snapshot;
