@@ -19,9 +19,9 @@
 //! [`BYTES_CAP`] bytes of them; past that the least recently drawn is removed from the terminal
 //! (and fetched again if it is drawn again), but never one the latest frame or the one before it
 //! looked at: when every picture held is on screen, a list photo makes room for a timeline
-//! picture, and otherwise the new picture is not sent and waits, parked, until the screen
-//! changes (the set of pictures a shown frame looks at differs from the frame before's). While
-//! the pictures on screen fill the terminal's room, nothing more is asked for. A frame draws at
+//! picture, and otherwise the new picture is not sent and waits, parked, until it
+//! fits beside those on screen. While the pictures on screen (their count or their bytes) fill the
+//! terminal's room, nothing more is asked for ([`room`]). A frame draws at
 //! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]), counting only
 //! what it shows ([`Images::not_shown`]); the rest stay text. The timeline's pictures are asked for before the list's photos, which yield their room
 //! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
@@ -36,6 +36,7 @@ pub mod decode;
 pub mod detect;
 pub mod graphics;
 mod note;
+mod room;
 mod wake;
 
 use crate::app::requests::Requests;
@@ -113,9 +114,11 @@ enum Entry {
         why: Why,
         again: Option<Instant>,
     },
-    /// Fetched while every picture held was on screen: not sent, and not asked again until the
-    /// screen changes (drawn as not here yet meanwhile).
-    Parked,
+    /// Fetched while every picture held was on screen: not sent, and not asked again until its
+    /// `bytes` would fit beside those on screen ([`room`]; drawn as not here yet meanwhile).
+    Parked {
+        bytes: usize,
+    },
 }
 
 /// A picture to decode and make ready for the terminal, for the binary to run off the loop's
@@ -338,8 +341,8 @@ impl Images {
                 }
                 Look::Failed(why)
             }
-            Some(Entry::Asked(_) | Entry::Decoding(_) | Entry::Parked) => Look::Pending,
-            None => {
+            Some(Entry::Asked(_) | Entry::Decoding(_)) => Look::Pending,
+            Some(Entry::Parked { .. }) | None => {
                 self.wanted.borrow_mut().push((ws.clone(), key, true));
                 Look::Pending
             }
@@ -416,8 +419,7 @@ impl Images {
     /// is asked for, the timeline's pictures before the list's photos (at most [`IN_FLIGHT_MAX`]
     /// at once, and none while the pictures on screen and those on their way fill the
     /// terminal's room; a failed one once its wait is over); what it only laid out is neither.
-    /// When what it showed differs from the frame before, the parked pictures may be asked
-    /// again. `true` when something was asked.
+    /// A parked picture that would now fit may be asked again. `true` when something was asked.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
         let mut screen = HashSet::new();
         for (key, _) in self.drawn.take().into_iter().filter(|d| d.1) {
@@ -427,10 +429,8 @@ impl Images {
             }
             screen.insert(key);
         }
-        if screen != self.screen {
-            self.entries.retain(|_, e| *e != Entry::Parked);
-        }
         self.last_screen = std::mem::replace(&mut self.screen, screen);
+        self.unpark();
         self.emoji_frame.take();
         let mut asked = false;
         let mut wanted: Vec<_> = self.wanted.take().into_iter().filter(|w| w.2).collect();
@@ -443,12 +443,10 @@ impl Images {
                 }
                 break;
             }
-            // A list photo yields its room to the timeline's pictures, never the other way.
-            let chip = key.1 == CHIP_PHOTO;
-            let staying = self.held.iter().filter(|k| self.on_screen(k) && (chip || k.1 != CHIP_PHOTO)).count();
-            if staying + in_flight >= ENTRIES_MAX {
+            if self.full(&key, in_flight) {
                 if self.diag.on() {
-                    note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying.to_string())]);
+                    let staying = self.staying(&key).0.to_string();
+                    note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying)]);
                 }
                 continue;
             }
@@ -555,7 +553,7 @@ impl Images {
                 // Never sent, so nothing to remove from the terminal.
                 let held = [("held", self.held.len().to_string()), ("bytes", self.bytes.to_string())];
                 note::line(&self.diag, &key, Stage::Parked, "room", &held);
-                self.entries.insert(key, Entry::Parked);
+                self.entries.insert(key, Entry::Parked { bytes: p.bytes });
                 return;
             };
             let old = self.held.remove(i).expect("found");

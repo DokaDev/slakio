@@ -425,7 +425,7 @@ fn a_picture_with_no_room_left_is_parked_until_the_screen_changes() {
     // The same screen: parked, not asked.
     for _ in 0..3 {
         assert!(frame_of(&mut images, &mut requests, &all, true).is_empty());
-        assert_eq!(images.entries.get(&(extra[0].clone(), Shape::Preview)), Some(&Entry::Parked));
+        assert_eq!(images.entries.get(&(extra[0].clone(), Shape::Preview)), Some(&Entry::Parked { bytes: 10 }));
     }
     // The screen changes: asked again once there is room (the frame before still showed the
     // others).
@@ -599,3 +599,5 @@ fn with_the_diagnostics_on_the_frame_s_emoji_share_and_the_in_flight_cap_are_tol
     assert_eq!(fifth, 1, "the first one past the cap, once: {text}");
     assert!(!text.contains("example"), "{text}");
 }
+
+mod room;
