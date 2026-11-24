@@ -99,7 +99,10 @@ impl App {
         let model = &self.model;
         self.images.customs.booted_only(|ws| model.is_fresh(ws));
         let lists = self.images.customs.ask(&mut self.work.requests, now);
-        self.images.ask(&mut self.work.requests, now) | lists
+        let asked = self.images.ask(&mut self.work.requests, now) | lists;
+        // Looks in the cache on disk run off the loop's thread, as decodes do.
+        self.effects.extend(self.images.take_lookups().into_iter().map(Effect::Decode));
+        asked
     }
 
     /// `f`: download a file of the selected message (the one it has, or the one picked).

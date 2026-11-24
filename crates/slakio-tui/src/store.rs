@@ -12,6 +12,7 @@ use slakio_core::fault::{ErrorLog, Fault};
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::WorkspaceId;
 use slakio_core::paths::Paths;
+use slakio_core::picture_cache::PictureCache;
 use slakio_store::cache::system_clock;
 use slakio_store::layer::Waits;
 use slakio_store::{Cache, Caps, OpenError, Store, Tmutil};
@@ -82,6 +83,11 @@ impl Local {
             max_days: cfg.cache_days,
         };
         Self { on: cfg.cache == "on", caps, paths: paths.clone(), opened: Arc::default() }
+    }
+
+    /// The pictures kept on disk between runs, beside the cache (none when it is off).
+    pub(crate) fn pictures(&self) -> Option<PictureCache> {
+        self.paths.pictures_cache().filter(|_| self.on).map(PictureCache::new)
     }
 
     fn record(&self, fault: &Fault) {
@@ -199,12 +205,21 @@ fn exclusion() -> Option<Tmutil> {
     cfg!(target_os = "macos").then(Tmutil::default)
 }
 
-/// `slakio logout`: nothing of the cache is left.
+/// `slakio logout`: nothing of the cache is left, the pictures kept on disk neither.
 pub(crate) fn remove(paths: &Paths) -> Result<(), Fault> {
-    match &paths.cache {
+    let pictures = remove_pictures(paths);
+    let store = match &paths.cache {
         Some(dir) if dir.exists() => slakio_store::db::remove(dir),
         _ => Ok(()),
-    }
+    };
+    store.and(pictures)
+}
+
+/// Every `slakio logout`: the pictures kept on disk go, whichever workspace they were of (a
+/// file's preview is the signed-in user's).
+pub(crate) fn remove_pictures(paths: &Paths) -> Result<(), Fault> {
+    let Some(dir) = paths.pictures_cache() else { return Ok(()) };
+    PictureCache::new(dir).clear().map_err(|e| Fault::other(format!("the pictures kept could not be removed: {e}")))
 }
 
 /// `slakio logout <workspace>` while other workspaces stay signed in: the cache, held as its

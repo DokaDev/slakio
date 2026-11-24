@@ -27,8 +27,10 @@
 //! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
 //! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
 //! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
-//! [`FAILED_MAX`] failures are kept.
+//! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a picture is looked for
+//! there before it is asked for, within the same bounds.
 
+pub mod cached;
 pub mod custom;
 pub mod decode;
 pub mod detect;
@@ -42,6 +44,7 @@ use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::diag::{Diag, Stage};
 use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
+use slakio_core::picture_cache::PictureCache;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -124,6 +127,8 @@ pub struct Job {
     pub id: u32,
     pub bytes: Vec<u8>,
     pub shape: Shape,
+    /// No bytes: the picture is looked for in the cache on disk ([`cached::run`]).
+    pub from_cache: bool,
 }
 
 /// A picture ready for the terminal: the commands that send it (base64 and all, made off the
@@ -142,10 +147,14 @@ pub struct Prepared {
 /// `job` decoded ([`decode::decode`], for cells of `cell` pixels) and made into the commands
 /// that send it. Blocking work: never on the loop's thread.
 pub fn prepare(job: &Job, cell: Option<(u16, u16)>) -> Result<Prepared, Refused> {
-    let d = decode::decode(&job.bytes, job.shape, cell)?;
+    decode::decode(&job.bytes, job.shape, cell).map(|d| made(job, &d))
+}
+
+/// `d`, decoded for `job`, made into the commands that send it.
+fn made(job: &Job, d: &decode::Decoded) -> Prepared {
     let (cols, rows) = (d.cols.min(graphics::MARKS), d.rows.min(graphics::MARKS));
     let transmit = graphics::transmit(job.id, cols, rows, &d.png);
-    Ok(Prepared { id: job.id, cols, rows, bytes: d.png.len(), transmit, from: d.from })
+    Prepared { id: job.id, cols, rows, bytes: d.png.len(), transmit, from: d.from }
 }
 
 /// What `:images` changed, for the app to say.
@@ -214,6 +223,12 @@ pub struct Images {
     diag: Diag,
     /// The last time the loop woke for a failed picture's or list's wait ([`Images::woke`]).
     woken: Option<Instant>,
+    /// The pictures kept on disk between runs (none in the demo or with `cache = "off"`).
+    pub cache: Option<PictureCache>,
+    /// Looked for there and not found: asked of the backend when next wanted.
+    missed: HashSet<Key>,
+    /// Looks there to hand to the binary ([`Images::take_lookups`]).
+    lookups: Vec<Job>,
 }
 
 impl Images {
@@ -442,6 +457,11 @@ impl Images {
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
+            if self.cache.is_some() && !self.entries.contains_key(&key) && !self.missed.remove(&key) {
+                self.look_up(key);
+                asked = true;
+                continue;
+            }
             if self.diag.on() {
                 let again = self.entries.contains_key(&key).to_string();
                 note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", again)]);
@@ -464,8 +484,13 @@ impl Images {
         }
         self.entries.insert(key.clone(), Entry::Decoding(id));
         let (source, shape) = key;
+        Some(Job { source, request: id, id: self.next_id(), bytes, shape, from_cache: false })
+    }
+
+    /// The id of the next picture sent.
+    fn next_id(&mut self) -> u32 {
         self.last_id = if self.last_id >= graphics::ID_MAX { 1 } else { self.last_id + 1 };
-        Some(Job { source, request: id, id: self.last_id, bytes, shape })
+        self.last_id
     }
 
     /// `source` failed for `why`; asked again after `again`, if ever. At most [`FAILED_MAX`]
@@ -514,11 +539,9 @@ impl Images {
         };
         let p = match result {
             Ok(p) => p,
+            Err(Refused::NotCached) => return self.not_cached(key),
             Err(refused) => {
-                let why = match refused {
-                    Refused::TooLarge => Why::TooLarge,
-                    Refused::Unreadable => Why::Unreadable,
-                };
+                let why = if refused == Refused::TooLarge { Why::TooLarge } else { Why::Unreadable };
                 let result = if why == Why::TooLarge { "decode-too-large" } else { "decode-unreadable" };
                 note::line(&self.diag, &key, Stage::Refused, result, &[]);
                 return self.fail(key, why, None);

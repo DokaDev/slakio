@@ -55,6 +55,8 @@ pub enum Refused {
     TooLarge,
     /// Not a PNG, JPEG or GIF, or not one that can be read.
     Unreadable,
+    /// Looked for in the cache on disk, and nothing there could be shown: asked for instead.
+    NotCached,
 }
 
 /// The format of `bytes`, when it is one slakio reads.

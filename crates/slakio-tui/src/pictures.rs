@@ -3,17 +3,23 @@
 //! most a few at once) and writing those commands before a frame is drawn, the only part left on
 //! the loop's thread.
 //!
+//! With the local cache on (not in the demo), the pictures made are kept on disk and looked for
+//! there first ([`slakio_tui::images::cached`]); the folder is swept once at the start, on a
+//! blocking task too.
+//!
 //! A panic in the decoder is caught there ([`slakio_tui::terminal::catching`]: the panic hook
 //! leaves the terminal as it is): the picture is not shown, and the error log says so in one
 //! line that names no address.
 
 use ratatui::crossterm::terminal::window_size;
 use slakio_core::backend::Generation;
+use slakio_core::diag::Diag;
 use slakio_core::fault::{ErrorLog, Fault};
 use slakio_core::images::Source;
+use slakio_core::picture_cache::PictureCache;
 use slakio_tui::app::App;
 use slakio_tui::images::decode::Refused;
-use slakio_tui::images::{Job, Prepared, prepare};
+use slakio_tui::images::{Images, Job, Prepared, cached};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
@@ -27,6 +33,9 @@ pub(crate) struct Pictures {
     rx: mpsc::UnboundedReceiver<(Done, bool)>,
     /// The error log.
     errors: Option<PathBuf>,
+    /// The pictures kept on disk, and the diagnostics the jobs write to.
+    cache: Option<PictureCache>,
+    diag: Diag,
     /// Debug builds only (`SLAKIO_DEBUG_DECODE_PANIC=1`): the decoder panics, for the test that
     /// a panic there leaves the terminal as it is.
     panic: bool,
@@ -40,20 +49,31 @@ fn cell() -> Option<(u16, u16)> {
 }
 
 impl Pictures {
-    pub(crate) fn new(errors: Option<PathBuf>) -> Self {
+    /// The decodes of `images`, which from now on look in the cache on disk when `local` keeps
+    /// one and this is not the demo (swept now, off the loop's thread).
+    pub(crate) fn new(errors: Option<PathBuf>, images: &mut Images, local: &crate::store::Local) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         let panic = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_DECODE_PANIC").is_some_and(|v| v == "1");
-        Self { tx, rx, errors, panic }
+        images.cache = local.pictures().filter(|_| !images.demo);
+        let (cache, diag) = (images.cache.clone(), images.diag().clone());
+        if let Some(c) = cache.clone() {
+            let d = diag.clone();
+            tokio::task::spawn_blocking(move || cached::sweep(&c, &d));
+        }
+        Self { tx, rx, errors, cache, diag, panic }
     }
 
     /// Make `job` ready on a blocking task; its result comes from [`Pictures::next`].
     pub(crate) fn start(&self, job: Job) {
         let (tx, cell, panic) = (self.tx.clone(), cell(), self.panic);
+        let (cache, diag) = (self.cache.clone(), self.diag.clone());
         tokio::task::spawn_blocking(move || {
-            let made = slakio_tui::terminal::catching(|| {
+            // The cache holds nothing a panic part way leaves broken (a write is whole or not
+            // at all).
+            let made = slakio_tui::terminal::catching(std::panic::AssertUnwindSafe(|| {
                 assert!(!panic, "SLAKIO_DEBUG_DECODE_PANIC: a panic in the decoder");
-                prepare(&job, cell)
-            });
+                cached::run(&job, cell, cache.as_ref(), &diag)
+            }));
             let (result, panicked) = match made {
                 Ok(result) => (result, false),
                 Err(_) => (Err(Refused::Unreadable), true),

@@ -211,3 +211,48 @@ fn a_decoder_panic_leaves_the_screen_as_it_is_and_the_app_goes_on() {
     assert!(log.contains("the picture decoder panicked"), "{log}");
     assert!(!log.contains("https://") && !log.contains("files-tmb") && !log.contains("avatars/"), "{log}");
 }
+
+#[test]
+fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
+    let m = Machine::new("kept");
+    let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();
+    std::fs::write(m.dir.join("config.toml"), config.replace("cache = \"off\"", "cache = \"on\"")).unwrap();
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")];
+    let pictures = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).count();
+    let kept = m.dir.join("cache").join("slakio").join("pictures");
+    let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(300));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
+    // Everything fetched is kept before the run ends.
+    wait_until("each picture kept", || files() > 0 && files() == pictures());
+    std::thread::sleep(Duration::from_millis(800));
+    assert_eq!(files(), pictures());
+    run.quit();
+    let fetched = pictures();
+    assert!(fetched >= 2, "a preview and photos: {fetched}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(std::fs::metadata(&kept).unwrap().permissions().mode() & 0o777, 0o700);
+        for f in std::fs::read_dir(&kept).unwrap().flatten() {
+            let name = f.file_name().to_string_lossy().into_owned();
+            assert!(name.len() == 20 && name.ends_with(".png"), "{name}");
+            assert_eq!(f.metadata().unwrap().permissions().mode() & 0o777, 0o600, "{name}");
+        }
+    }
+    let _ = std::fs::remove_file(m.dir.join("typescript"));
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
+    wait_until("placeholders drawn", || contains(&m.written(), "\u{10EEEE}".as_bytes()));
+    std::thread::sleep(Duration::from_millis(800));
+    run.quit();
+    assert_eq!(pictures(), fetched, "nothing fetched again: every picture came from the disk");
+}

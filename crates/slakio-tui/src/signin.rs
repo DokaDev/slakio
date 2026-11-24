@@ -103,8 +103,8 @@ pub(crate) fn sign_out(
 }
 
 /// Sign out of `a` alone (others stay signed in): its credentials and line first, then its part
-/// of the cache. Not while a slakio runs and writes the cache: nothing is changed then, and the
-/// user is told to quit it first.
+/// of the cache and every picture kept on disk. Not while a slakio runs and writes the cache:
+/// nothing is changed then, and the user is told to quit it first.
 fn sign_out_one(
     store: &dyn SecretStore,
     path: Option<&std::path::Path>,
@@ -131,7 +131,8 @@ fn sign_out_one(
         return ExitCode::FAILURE;
     }
     let workspace = shown(&a.name);
-    match held.and_then(|held| held.map_or(Ok(()), |mut cache| cache.forget(&a.team))) {
+    let forgot = held.and_then(|held| held.map_or(Ok(()), |mut cache| cache.forget(&a.team)));
+    match forgot.and_then(|()| crate::store::remove_pictures(paths)) {
         Ok(()) => {
             println!("{}", i18n.msg(&Msg::LogoutDoneOne { workspace }));
             ExitCode::SUCCESS

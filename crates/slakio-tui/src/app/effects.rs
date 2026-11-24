@@ -30,7 +30,7 @@ pub enum Effect {
     /// Open this file, saved and of a kind a viewer shows, in the app the system uses for it
     /// (the user said yes).
     OpenFile(std::path::PathBuf),
-    /// Decode this picture off the loop's thread and hand the result back
-    /// ([`crate::images::Images::decoded`]).
+    /// Decode this picture (or look for it in the cache on disk) off the loop's thread and
+    /// hand the result back ([`crate::images::cached::run`], [`crate::images::Images::decoded`]).
     Decode(crate::images::Job),
 }

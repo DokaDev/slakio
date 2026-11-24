@@ -515,7 +515,7 @@ async fn run(
     let mut signals = term::Signals::new()?;
     let mut cursor = Cursor::default();
     let mut redraw = true;
-    let mut decodes = pictures::Pictures::new(saved.errors.clone());
+    let mut decodes = pictures::Pictures::new(saved.errors.clone(), &mut app.images, &wiring.local);
     // A paste being checked with Slack; the desktop app's workspaces being read for `:login`.
     let mut signing_in: inapp::Signing = None;
     let mut scanning: Option<inapp::Scan> = None;

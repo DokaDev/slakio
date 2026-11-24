@@ -26,7 +26,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, TryLockError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The folder's name in the cache directory.
@@ -293,7 +293,12 @@ impl PictureCache {
     /// recently used until the rest fits in the room. `None` when another sweep runs or the
     /// folder is not one (a link is never read).
     pub fn sweep(&self) -> Option<Swept> {
-        let _one = self.sweeping.try_lock().ok()?;
+        let _one = match self.sweeping.try_lock() {
+            Ok(one) => one,
+            // A sweep that panicked left nothing half done: the next one runs.
+            Err(TryLockError::Poisoned(p)) => p.into_inner(),
+            Err(TryLockError::WouldBlock) => return None,
+        };
         if !self.dir_ok() {
             return None;
         }

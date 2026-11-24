@@ -151,7 +151,14 @@ fn the_least_recently_drawn_goes_first() {
 fn a_late_or_unknown_answer_changes_nothing() {
     let (mut images, mut requests) = (on(), Requests::default());
     assert!(images.answered(Generation(5), vec![1]).is_none());
-    let stray = Job { source: thumb(1), request: Generation(77), id: 9, bytes: Vec::new(), shape: Shape::Preview };
+    let stray = Job {
+        source: thumb(1),
+        request: Generation(77),
+        id: 9,
+        bytes: Vec::new(),
+        shape: Shape::Preview,
+        from_cache: false,
+    };
     images.decoded(key(&stray), Ok(ready(&stray, 10)));
     assert_eq!(images.take_graphics(), "", "never asked: not sent");
     let job = fetch(&mut images, &mut requests, &thumb(2));
