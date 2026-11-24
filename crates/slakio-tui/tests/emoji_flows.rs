@@ -524,6 +524,8 @@ fn a_korean_name_asks_for_the_list_and_is_drawn_in_the_text_and_the_chip() {
     assert_eq!(next, "work", "two cells, not the name's");
 }
 
+/// A guard, not a regression test: it passes with the names as text before and after they were
+/// read, and pins that a name of double-width letters is measured by its cells when it wraps.
 #[test]
 fn a_korean_name_left_as_text_wraps_by_its_double_width_cells() {
     let text = format!("{} :{CLAP}: :{MIXED}: {}", "word ".repeat(8), "tail ".repeat(8));
@@ -538,5 +540,48 @@ fn a_korean_name_left_as_text_wraps_by_its_double_width_cells() {
         assert_eq!(words.iter().filter(|t| **t == "word").count(), 8, "{w}:\n{screen}");
         assert_eq!(words.iter().filter(|t| **t == "tail").count(), 8, "{w}:\n{screen}");
         assert!(words.contains(&format!(":{MIXED}:").as_str()), "{w}:\n{screen}");
+    }
+}
+
+#[test]
+fn a_skin_tone_right_after_a_korean_name_is_left_out_in_the_text_and_the_chip() {
+    use slakio_core::images::emoji::Custom;
+    let text = format!("great :{CLAP}::skin-tone-3: work");
+    let chip = format!("{CLAP}::skin-tone-2");
+    let (mut s, ws) = shown(&[(text.as_str(), &[chip.as_str()])], 120, 40, true);
+    let asked = frame(&mut s);
+    let named = vec![(CLAP.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "clap")))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.pump();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            give_picture(&mut s, &r);
+        }
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains("skin-tone") && !screen.contains(CLAP), "{screen}");
+    let rows = cells(&s);
+    assert_eq!(rows.len(), 2, "the text's picture and the chip's: {rows:?}");
+    assert!(rows.iter().all(|(_, xs)| xs.len() == 2), "{rows:?}");
+}
+
+#[test]
+fn prose_with_colons_stays_as_it_is_and_digits_only_ask_nothing() {
+    // Korean prose (synthetic): "time: 3 o'clock: check", with and without spaces.
+    let spaced = "\u{C2DC}\u{AC04}: 3\u{C2DC}: \u{D655}\u{C778}";
+    let tight = "\u{C2DC}\u{AC04}:3\u{C2DC}:\u{D655}\u{C778}";
+    for (text, asks) in
+        [(spaced, false), (tight, true), ("see https://x.y:8080/a:b now", false), ("at 10:30:00 sharp", false)]
+    {
+        let (mut s, _) = shown(&[(text, &[])], 120, 40, true);
+        let asked = frame(&mut s);
+        assert_eq!(lists(&asked).len(), usize::from(asks), "{text:?}");
+        for r in lists(&asked) {
+            give_list(&mut s, r);
+        }
+        let _ = frame(&mut s);
+        let screen = s.d.screen();
+        assert!(screen.contains(text), "{text:?} unchanged:\n{screen}");
+        assert!(cells(&s).is_empty(), "{text:?}: no picture");
     }
 }

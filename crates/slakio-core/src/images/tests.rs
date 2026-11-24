@@ -185,3 +185,22 @@ fn a_gravatar_address_gives_its_slack_fallback_and_nothing_else() {
         assert_eq!(gravatar_fallback(&none), None, "{none}");
     }
 }
+
+#[test]
+fn an_emoji_address_of_another_script_is_kept_percent_encoded_on_the_same_host_only() {
+    let host = EMOJI_HOSTS[0];
+    let raw = format!("https://{host}/T1/\u{AC10}\u{C0AC}/ab.png");
+    assert_eq!(emoji_address(&raw), Some(format!("https://{host}/T1/%EA%B0%90%EC%82%AC/ab.png")));
+    let plain = format!("https://{host}/T1/party/ab.png");
+    assert_eq!(emoji_address(&plain).as_deref(), Some(plain.as_str()), "ASCII as it is");
+    for bad in [
+        format!("https://{host}\u{2024}evil.example/T1/a.png"),
+        format!("https://\u{0435}{}/T1/a.png", &host[1..]),
+        format!("https://{host}.evil.example/T1/\u{AC10}.png"),
+        format!("https://evil.example/{host}/\u{AC10}.png"),
+        format!("https://{host}/T1/\u{AC10} b.png"),
+        format!("https://{host}/T1/\u{AC10}#x.png"),
+    ] {
+        assert_eq!(emoji_address(&bad), None, "{bad}");
+    }
+}

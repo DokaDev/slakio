@@ -30,13 +30,33 @@ pub fn list(team: &str) -> Vec<(String, String)> {
     .collect()
 }
 
-/// `path` is one of an emoji's picture's address ([`picture`]): `/<team>/<name>/<hex>.png`.
+/// `path` is one of an emoji's picture's address ([`picture`]): `/<team>/<name>/<hex>.png`, the
+/// name read percent-decoded (as a request names one of another script).
 pub fn is_path(path: &str) -> bool {
     let parts: Vec<&str> = path.split('/').collect();
     matches!(parts.as_slice(), ["", team, name, file]
         if team.starts_with('T') && team.bytes().all(|b| b.is_ascii_alphanumeric())
-            && slakio_core::images::emoji::shortcode(name)
+            && decoded(name).is_some_and(|n| slakio_core::images::emoji::shortcode(&n))
             && file.strip_suffix(".png").is_some_and(|h| !h.is_empty() && h.bytes().all(|b| b.is_ascii_hexdigit())))
+}
+
+/// `s` with its `%XX` escapes decoded (a name of another script comes encoded); `None` when an
+/// escape is broken or the result is not UTF-8.
+fn decoded(s: &str) -> Option<String> {
+    let mut out = Vec::with_capacity(s.len());
+    let mut bytes = s.bytes();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let hex = [bytes.next()?, bytes.next()?];
+            if !hex.iter().all(u8::is_ascii_hexdigit) {
+                return None;
+            }
+            out.push(u8::from_str_radix(std::str::from_utf8(&hex).ok()?, 16).ok()?);
+        } else {
+            out.push(b);
+        }
+    }
+    String::from_utf8(out).ok()
 }
 
 #[cfg(test)]

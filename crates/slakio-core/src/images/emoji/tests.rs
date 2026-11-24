@@ -111,7 +111,7 @@ const KOREAN: &[&str] = &[
 
 #[test]
 fn a_name_of_any_script_s_letters_is_a_shortcode() {
-    for name in KOREAN.iter().copied().chain(["+1", "it's", "party-blob", "\u{1100}\u{1161}", "caf\u{E9}"]) {
+    for name in KOREAN.iter().copied().chain(["+1", "it's", "party-blob", "caf\u{E9}", "a1", "\u{3042}\u{3044}"]) {
         assert!(shortcode(name), "{name:?}");
     }
 }
@@ -184,4 +184,47 @@ fn korean_names_and_aliases_are_read_and_followed() {
 fn an_alias_to_a_name_hiding_characters_draws_nothing() {
     let r = resolve(&list(&[("a", "alias:b\u{202E}c"), ("d", "alias:e\u{200D}f"), ("g", "alias:\u{E000}")]));
     assert_eq!(r, Vec::new());
+}
+
+#[test]
+fn conjoining_jamo_and_hangul_fillers_are_no_shortcode_and_syllables_are() {
+    for name in [
+        "\u{1100}\u{1161}",
+        "\u{1100}",
+        "\u{11A8}",
+        "a\u{115F}",
+        "a\u{1160}",
+        "a\u{3164}",
+        "a\u{FFA0}",
+        "\u{A960}",
+        "\u{A97C}",
+        "\u{D7B0}",
+        "\u{D7FB}",
+    ] {
+        assert!(!shortcode(name), "{name:?}");
+    }
+    for name in ["\u{AC00}", "\u{D7A3}", "\u{AC00}\u{D7A3}"] {
+        assert!(shortcode(name), "{name:?}");
+    }
+}
+
+#[test]
+fn lookalikes_of_ascii_letters_and_digits_are_no_shortcode() {
+    for name in [
+        "\u{FF50}arty",
+        "\u{FF11}",
+        "\u{1D41A}",
+        "\u{1D7CE}",
+        "\u{2460}",
+        "\u{24D0}",
+        "\u{1F130}",
+        "\u{1F189}",
+        "\u{2160}",
+        "\u{2170}",
+        "\u{00B2}",
+        "\u{0663}",
+        "\u{FF41}",
+    ] {
+        assert!(!shortcode(name), "{name:?}");
+    }
 }

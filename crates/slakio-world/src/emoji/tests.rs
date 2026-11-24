@@ -19,3 +19,15 @@ fn the_world_s_emoji_resolve_as_slack_s_would() {
         assert!(!is_path(other), "{other}");
     }
 }
+
+#[test]
+fn a_name_of_another_script_is_a_path_once_decoded() {
+    let path = "/TDEMOA/%EA%B0%90%EC%82%AC/00ab.png";
+    assert!(is_path(path), "{path}");
+    assert!(crate::pictures::served(path).is_some());
+    for bad in
+        ["/TDEMOA/%EA%B0/00ab.png", "/TDEMOA/%zz/00ab.png", "/TDEMOA/%E1%84%80/00ab.png", "/TDEMOA/a%3Ab/00ab.png"]
+    {
+        assert!(!is_path(bad), "{bad}");
+    }
+}

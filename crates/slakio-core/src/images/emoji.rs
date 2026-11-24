@@ -36,10 +36,23 @@ pub const SHORTCODE_CHARS: usize = 64;
 /// The most bytes a shortcode has: 64 characters of a Latin name, about 33 of a Korean one.
 pub const SHORTCODE_BYTES: usize = 100;
 
-/// The format characters (Unicode's `Cf`: joiners, bidi controls, invisible operators, tags) and
-/// the private-use planes: named here so they stay refused, though no letter or digit is one.
+/// The format characters (Unicode's `Cf`: joiners, bidi controls, invisible operators, tags),
+/// the private-use planes, the conjoining Hangul jamo and fillers, and the lookalikes of ASCII
+/// letters and digits: refused, though some are letters.
 const REFUSED: &[(char, char)] = &[
     ('\u{00AD}', '\u{00AD}'),
+    // Hangul jamo that conjoin into a syllable, and the Hangul fillers: a name built of them
+    // looks like one of precomposed syllables (U+AC00 to U+D7A3), which stay letters.
+    ('\u{1100}', '\u{11FF}'),
+    ('\u{3164}', '\u{3164}'),
+    ('\u{A960}', '\u{A97F}'),
+    ('\u{D7B0}', '\u{D7FF}'),
+    // Letters and digits that look like ASCII ones: fullwidth and halfwidth forms, enclosed and
+    // mathematical alphanumerics.
+    ('\u{2460}', '\u{24FF}'),
+    ('\u{FF00}', '\u{FFEF}'),
+    ('\u{1D400}', '\u{1D7FF}'),
+    ('\u{1F130}', '\u{1F189}'),
     ('\u{0600}', '\u{0605}'),
     ('\u{061C}', '\u{061C}'),
     ('\u{06DD}', '\u{06DD}'),
@@ -63,8 +76,8 @@ const REFUSED: &[(char, char)] = &[
     ('\u{F0000}', '\u{10FFFF}'),
 ];
 
-/// `name` is one a shortcode may have, as Slack names emoji: letters and digits of any script
-/// (a Korean name too) and `_ + - '`, at most [`SHORTCODE_CHARS`] characters and
+/// `name` is one a shortcode may have, as Slack names emoji: letters of any script (a Korean
+/// name of precomposed syllables too), ASCII digits and `_ + - '`, at most [`SHORTCODE_CHARS`] characters and
 /// [`SHORTCODE_BYTES`] bytes. Never a control, format or private-use character, a blank, a `:`,
 /// or a mark that joins the character before it (an accent, a vowel sign, a variation selector):
 /// a precomposed Hangul syllable is one letter, and a name of stacked marks draws nothing.
@@ -75,14 +88,22 @@ pub fn shortcode(name: &str) -> bool {
         && name.chars().all(|c| matches!(c, '_' | '+' | '-' | '\'') || letter(c))
 }
 
-/// `c` is a letter or a digit a shortcode may hold.
+/// `c` is a letter (of any script, not a number written as letters, as Roman numerals) or an
+/// ASCII digit a shortcode may hold.
 fn letter(c: char) -> bool {
-    c.is_alphanumeric()
+    (c.is_ascii_digit() || (c.is_alphabetic() && !c.is_numeric()))
         && !c.is_control()
         && !c.is_whitespace()
         && !REFUSED.iter().any(|(from, to)| (*from..=*to).contains(&c))
-        // A mark joins the character before it: after `a`, the two stay one cluster.
-        && ['a', c].iter().collect::<String>().graphemes(true).count() == 2
+        && !joins(c)
+}
+
+/// `c` is a mark that joins the character before it: after `a`, the two stay one cluster.
+fn joins(c: char) -> bool {
+    let mut buf = [0u8; 5];
+    buf[0] = b'a';
+    let n = 1 + c.encode_utf8(&mut buf[1..]).len();
+    !std::str::from_utf8(&buf[..n]).is_ok_and(|s| s.graphemes(true).count() == 2)
 }
 
 /// What each name of `list` (`emoji.list`'s `name → address or alias:other`) draws, by name; a

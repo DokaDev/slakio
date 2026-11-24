@@ -96,9 +96,28 @@ pub fn gravatar_fallback(url: &str) -> Option<String> {
 }
 
 /// `url` when a workspace's own emoji may be fetched from it: an address on one of
-/// [`EMOJI_HOSTS`].
+/// [`EMOJI_HOSTS`]. Bytes outside ASCII (a name of another script in the path, as Slack may
+/// write it raw) are percent-encoded first, as a browser sends them; the host is matched as
+/// before, so no other host passes.
 pub fn emoji_address(url: &str) -> Option<String> {
-    EMOJI_HOSTS.iter().find_map(|h| on_host(url, h, true))
+    let url = encoded(url);
+    EMOJI_HOSTS.iter().find_map(|h| on_host(&url, h, true))
+}
+
+/// `url` with each byte outside ASCII percent-encoded (`%EC%95%88`).
+fn encoded(url: &str) -> std::borrow::Cow<'_, str> {
+    if url.is_ascii() {
+        return std::borrow::Cow::Borrowed(url);
+    }
+    let mut out = String::with_capacity(url.len() * 3);
+    for b in url.bytes() {
+        if b.is_ascii() {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    std::borrow::Cow::Owned(out)
 }
 
 /// The host of an address [`thumb_address`], [`avatar_address`] or [`emoji_address`] kept.
