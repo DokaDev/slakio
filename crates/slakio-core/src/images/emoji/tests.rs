@@ -222,8 +222,41 @@ fn lookalikes_of_ascii_letters_and_digits_are_no_shortcode() {
         "\u{2160}",
         "\u{2170}",
         "\u{00B2}",
-        "\u{0663}",
         "\u{FF41}",
+    ] {
+        assert!(!shortcode(name), "{name:?}");
+    }
+}
+
+#[test]
+fn decimal_digits_of_any_script_and_halfwidth_katakana_are_letters_of_a_shortcode() {
+    // Arabic-Indic, Devanagari, Myanmar, the last Unicode 15 range (segmented digits).
+    for name in ["\u{0660}", "\u{0669}", "a\u{0663}", "\u{0966}", "\u{1040}\u{1049}", "\u{1FBF0}", "\u{1FBF9}"] {
+        assert!(shortcode(name), "{name:?}");
+    }
+    // Halfwidth katakana letters and the prolonged sound mark, U+FF66 to U+FF9D.
+    for name in ["\u{FF66}", "\u{FF70}", "\u{FF71}\u{FF72}", "\u{FF9D}"] {
+        assert!(shortcode(name), "{name:?}");
+    }
+    // Fullwidth digits (U+FF10 to U+FF19), the halfwidth comma, middle dot and voiced marks that
+    // join, the halfwidth Hangul filler (U+FFA0) and letters, superscripts, subscripts, fractions,
+    // and what lies just past a digit range.
+    for name in [
+        "\u{FF10}",
+        "\u{FF19}",
+        "\u{FF64}",
+        "\u{FF65}",
+        "a\u{FF9E}",
+        "a\u{FF9F}",
+        "\u{FFA0}",
+        "\u{FFA1}",
+        "\u{FFDC}",
+        "\u{00B9}",
+        "\u{2080}",
+        "\u{00BD}",
+        "\u{066A}",
+        "\u{065F}",
+        "\u{1D7CE}",
     ] {
         assert!(!shortcode(name), "{name:?}");
     }

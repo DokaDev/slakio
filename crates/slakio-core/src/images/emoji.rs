@@ -47,10 +47,12 @@ const REFUSED: &[(char, char)] = &[
     ('\u{3164}', '\u{3164}'),
     ('\u{A960}', '\u{A97F}'),
     ('\u{D7B0}', '\u{D7FF}'),
-    // Letters and digits that look like ASCII ones: fullwidth and halfwidth forms, enclosed and
-    // mathematical alphanumerics.
+    // Letters and digits that look like ASCII ones: fullwidth forms (digits too), the halfwidth
+    // Hangul and symbols (not the halfwidth katakana, U+FF65 to U+FF9F, real letters), enclosed
+    // and mathematical alphanumerics.
     ('\u{2460}', '\u{24FF}'),
-    ('\u{FF00}', '\u{FFEF}'),
+    ('\u{FF00}', '\u{FF64}'),
+    ('\u{FFA0}', '\u{FFEF}'),
     ('\u{1D400}', '\u{1D7FF}'),
     ('\u{1F130}', '\u{1F189}'),
     ('\u{0600}', '\u{0605}'),
@@ -76,8 +78,77 @@ const REFUSED: &[(char, char)] = &[
     ('\u{F0000}', '\u{10FFFF}'),
 ];
 
+/// The decimal digits of every script (Unicode 15.0's `Nd`): the fullwidth ones
+/// and the mathematical ones are refused all the same ([`REFUSED`]).
+const DIGITS: &[(char, char)] = &[
+    ('\u{0030}', '\u{0039}'),
+    ('\u{0660}', '\u{0669}'),
+    ('\u{06F0}', '\u{06F9}'),
+    ('\u{07C0}', '\u{07C9}'),
+    ('\u{0966}', '\u{096F}'),
+    ('\u{09E6}', '\u{09EF}'),
+    ('\u{0A66}', '\u{0A6F}'),
+    ('\u{0AE6}', '\u{0AEF}'),
+    ('\u{0B66}', '\u{0B6F}'),
+    ('\u{0BE6}', '\u{0BEF}'),
+    ('\u{0C66}', '\u{0C6F}'),
+    ('\u{0CE6}', '\u{0CEF}'),
+    ('\u{0D66}', '\u{0D6F}'),
+    ('\u{0DE6}', '\u{0DEF}'),
+    ('\u{0E50}', '\u{0E59}'),
+    ('\u{0ED0}', '\u{0ED9}'),
+    ('\u{0F20}', '\u{0F29}'),
+    ('\u{1040}', '\u{1049}'),
+    ('\u{1090}', '\u{1099}'),
+    ('\u{17E0}', '\u{17E9}'),
+    ('\u{1810}', '\u{1819}'),
+    ('\u{1946}', '\u{194F}'),
+    ('\u{19D0}', '\u{19D9}'),
+    ('\u{1A80}', '\u{1A89}'),
+    ('\u{1A90}', '\u{1A99}'),
+    ('\u{1B50}', '\u{1B59}'),
+    ('\u{1BB0}', '\u{1BB9}'),
+    ('\u{1C40}', '\u{1C49}'),
+    ('\u{1C50}', '\u{1C59}'),
+    ('\u{A620}', '\u{A629}'),
+    ('\u{A8D0}', '\u{A8D9}'),
+    ('\u{A900}', '\u{A909}'),
+    ('\u{A9D0}', '\u{A9D9}'),
+    ('\u{A9F0}', '\u{A9F9}'),
+    ('\u{AA50}', '\u{AA59}'),
+    ('\u{ABF0}', '\u{ABF9}'),
+    ('\u{FF10}', '\u{FF19}'),
+    ('\u{104A0}', '\u{104A9}'),
+    ('\u{10D30}', '\u{10D39}'),
+    ('\u{11066}', '\u{1106F}'),
+    ('\u{110F0}', '\u{110F9}'),
+    ('\u{11136}', '\u{1113F}'),
+    ('\u{111D0}', '\u{111D9}'),
+    ('\u{112F0}', '\u{112F9}'),
+    ('\u{11450}', '\u{11459}'),
+    ('\u{114D0}', '\u{114D9}'),
+    ('\u{11650}', '\u{11659}'),
+    ('\u{116C0}', '\u{116C9}'),
+    ('\u{11730}', '\u{11739}'),
+    ('\u{118E0}', '\u{118E9}'),
+    ('\u{11950}', '\u{11959}'),
+    ('\u{11C50}', '\u{11C59}'),
+    ('\u{11D50}', '\u{11D59}'),
+    ('\u{11DA0}', '\u{11DA9}'),
+    ('\u{11F50}', '\u{11F59}'),
+    ('\u{16A60}', '\u{16A69}'),
+    ('\u{16AC0}', '\u{16AC9}'),
+    ('\u{16B50}', '\u{16B59}'),
+    ('\u{1D7CE}', '\u{1D7FF}'),
+    ('\u{1E140}', '\u{1E149}'),
+    ('\u{1E2F0}', '\u{1E2F9}'),
+    ('\u{1E4F0}', '\u{1E4F9}'),
+    ('\u{1E950}', '\u{1E959}'),
+    ('\u{1FBF0}', '\u{1FBF9}'),
+];
+
 /// `name` is one a shortcode may have, as Slack names emoji: letters of any script (a Korean
-/// name of precomposed syllables too), ASCII digits and `_ + - '`, at most [`SHORTCODE_CHARS`] characters and
+/// name of precomposed syllables too), decimal digits of any script and `_ + - '`, at most [`SHORTCODE_CHARS`] characters and
 /// [`SHORTCODE_BYTES`] bytes. Never a control, format or private-use character, a blank, a `:`,
 /// or a mark that joins the character before it (an accent, a vowel sign, a variation selector):
 /// a precomposed Hangul syllable is one letter, and a name of stacked marks draws nothing.
@@ -88,10 +159,10 @@ pub fn shortcode(name: &str) -> bool {
         && name.chars().all(|c| matches!(c, '_' | '+' | '-' | '\'') || letter(c))
 }
 
-/// `c` is a letter (of any script, not a number written as letters, as Roman numerals) or an
-/// ASCII digit a shortcode may hold.
+/// `c` is a letter (of any script, not a number written as letters, as Roman numerals) or a
+/// decimal digit (not a superscript, a fraction or a circled number) a shortcode may hold.
 fn letter(c: char) -> bool {
-    (c.is_ascii_digit() || (c.is_alphabetic() && !c.is_numeric()))
+    (DIGITS.iter().any(|(from, to)| (*from..=*to).contains(&c)) || (c.is_alphabetic() && !c.is_numeric()))
         && !c.is_control()
         && !c.is_whitespace()
         && !REFUSED.iter().any(|(from, to)| (*from..=*to).contains(&c))
