@@ -277,25 +277,35 @@ fn a_picture_on_disk_that_makes_the_decoder_panic_is_removed() {
     let m = Machine::new("kept-panic");
     let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();
     std::fs::write(m.dir.join("config.toml"), config.replace("cache = \"off\"", "cache = \"on\"")).unwrap();
-    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")];
     let kept = m.dir.join("cache").join("slakio").join("pictures");
-    let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
-    let Some(mut run) = m.start(&env) else { return };
-    run.wait_for("the list", |t| t.contains("deploys"));
-    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
-    std::thread::sleep(Duration::from_millis(300));
-    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
-    run.wait_for("the message", |t| t.contains("design-review"));
+    // The pictures kept (not a write's temporary file, which a run that ends may leave).
+    let files = || {
+        let names = std::fs::read_dir(&kept).into_iter().flatten().flatten();
+        names.filter(|e| !e.file_name().to_string_lossy().starts_with('.')).count()
+    };
+    // Both runs go the same way, so the second looks for what the first kept.
+    let go = |env: &[(&str, &str)]| {
+        let mut run = m.start(env)?;
+        run.wait_for("the list", |t| t.contains("deploys"));
+        wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+        std::thread::sleep(Duration::from_millis(300));
+        run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+        run.wait_for("the message", |t| t.contains("design-review"));
+        Some(run)
+    };
+    let Some(run) = go(&[("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")]) else { return };
     wait_until("a photo kept", || files() > 0);
-    std::thread::sleep(Duration::from_millis(800));
+    // Until nothing more is kept.
+    let mut before = 0;
+    while files() != before {
+        before = files();
+        std::thread::sleep(Duration::from_millis(800));
+    }
     run.quit();
     // The next run's decoder panics on every picture, those read from the disk too.
     let _ = std::fs::remove_file(m.dir.join("typescript"));
     let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty"), ("SLAKIO_DEBUG_DECODE_PANIC", "1")];
-    let Some(mut run) = m.start(&env) else { return };
-    run.wait_for("the list", |t| t.contains("deploys"));
-    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
-    run.wait_for("the message", |t| t.contains("design-review"));
+    let Some(run) = go(&env) else { return };
     wait_until("each picture that set it off removed", || files() == 0);
     run.quit();
 }
