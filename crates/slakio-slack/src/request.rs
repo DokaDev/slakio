@@ -210,7 +210,7 @@ pub struct Call {
     json: Map<String, Value>,
     /// The diagnostics' read of an answer's shape ([`Call::probe`]): Slack refusing it never
     /// ends the sign-in.
-    pub probe: bool,
+    pub(crate) probe: bool,
 }
 
 impl Call {
