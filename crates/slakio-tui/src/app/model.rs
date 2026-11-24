@@ -193,6 +193,16 @@ impl Model {
     /// The boot answer of workspace `ws` alone (from the local cache when `cached`): its part
     /// of the model is replaced, the other workspaces' stay as they are. What the answer says
     /// of another workspace is not taken. Its place and color stay those it was listed with.
+    /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of.
+    pub fn with_photos(&self, mut snapshot: Snapshot) -> Snapshot {
+        let photos: HashMap<(&WorkspaceId, &UserId), &String> =
+            (self.snapshot.users.iter()).filter_map(|u| Some(((&u.workspace, &u.id), u.avatar.as_ref()?))).collect();
+        for u in snapshot.users.iter_mut().filter(|u| u.avatar.is_none()) {
+            u.avatar = photos.get(&(&u.workspace, &u.id)).map(|a| (*a).clone());
+        }
+        snapshot
+    }
+
     pub fn merge(&mut self, ws: &WorkspaceId, snapshot: &Snapshot, cached: bool) {
         let new = snapshot.only(ws);
         let s = &mut self.snapshot;

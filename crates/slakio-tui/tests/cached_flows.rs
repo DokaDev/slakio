@@ -187,3 +187,25 @@ fn every_korean_cache_notice_fits_forty_cells() {
         }
     }
 }
+
+#[test]
+fn a_photo_the_cache_showed_stays_when_the_backend_s_boot_has_none() {
+    let mut s = Scripted::connected(true);
+    s.pump();
+    let id = s.b.held[0].id;
+    let mut earlier = earlier_snapshot();
+    let me = earlier.workspaces[0].me.clone();
+    let photo = "https://example.invalid/me_72.png".to_string();
+    earlier.users.iter_mut().filter(|u| u.id == me).for_each(|u| u.avatar = Some(photo.clone()));
+    assert!(earlier.users.iter().any(|u| u.id == me), "the user is listed");
+    s.b.push(Envelope { generation: id, event: Event::CachedBoot(Box::new(earlier)) });
+    assert!(s.pump());
+    let mut fresh = World::demo().snapshot().clone();
+    fresh.users.iter_mut().filter(|u| u.id == me).for_each(|u| u.avatar = None);
+    s.b.snapshot = Some(fresh);
+    s.b.answer(0);
+    assert!(s.pump());
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let user = s.d.app.model.user(&ws, &me).expect("the user");
+    assert_eq!(user.avatar.as_deref(), Some(photo.as_str()), "a known photo is never replaced by none");
+}

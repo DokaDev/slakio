@@ -248,7 +248,7 @@ impl App {
         let (anchor, net) = (self.shell.anchor(&self.model), self.model.net);
         let notices = std::mem::take(&mut self.model.notices);
         match self.boots[b].workspace.clone() {
-            None if !cached => self.model = Model::new(snapshot.clone()),
+            None if !cached => self.model = Model::new(self.model.with_photos(snapshot.clone())),
             None if !self.model.is_loaded() || self.model.is_cached() => self.model = Model::cached(snapshot.clone()),
             Some(ws) if !cached || !self.model.is_fresh(&ws) => self.model.merge(&ws, snapshot, cached),
             _ => {
