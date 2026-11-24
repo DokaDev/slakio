@@ -343,3 +343,19 @@ fn closing_a_thread_panel_brings_its_message_into_view_in_a_wheeled_pane() {
     assert_eq!(chosen(&d, PaneKind::Conversation), Some(root));
     assert!(shows(&d, PaneKind::Conversation, root), "back in view");
 }
+
+#[test]
+fn the_wheel_over_a_pane_still_loading_does_nothing_later() {
+    let mut s = Scripted::booted(true, None);
+    s.d.list_cursor_on("big-history");
+    s.keys("enter");
+    s.d.screen();
+    assert!(s.d.pane(PaneKind::Conversation).unwrap().messages().is_empty(), "loading");
+    wheel(&mut s.d, PaneKind::Conversation, true, 30);
+    let i = s.b.held.len() - 1;
+    s.b.answer(i);
+    s.pump();
+    s.d.screen();
+    let newest = s.d.pane(PaneKind::Conversation).unwrap().messages().last().unwrap().ts;
+    assert!(shows(&s.d, PaneKind::Conversation, newest), "the page shows at its newest, as without the wheel");
+}

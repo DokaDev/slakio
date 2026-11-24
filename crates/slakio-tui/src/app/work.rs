@@ -459,6 +459,10 @@ impl Work {
     pub fn scroll_in(&mut self, id: Option<PaneId>, rows: isize) {
         if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
             let tl = self.timelines.get(&p.target).unwrap_or(&EMPTY);
+            // Nothing to scroll yet: nothing is kept for when it comes.
+            if tl.items.is_empty() {
+                return;
+            }
             let past =
                 rows > 0 && !p.is_thread() && tl.cut && p.free.get().unwrap_or(0) == 0 && p.bottom.get().is_none();
             p.scroll(rows);
