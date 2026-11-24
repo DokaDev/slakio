@@ -16,14 +16,16 @@ pub fn place(
     let (mut b, mut c) = (bottom.min(n.saturating_sub(1)), cut);
     if by > 0 {
         (b, c) = down((b, c), by.unsigned_abs(), n, height);
-    } else if by < 0 {
+    } else {
         c += by.unsigned_abs();
-        while b > 0 && c >= height(b) {
-            c -= height(b);
-            b -= 1;
-        }
-        c = c.min(height(b).saturating_sub(1));
     }
+    // A cut past its message (up, or the message drawn shorter since: edited, deleted) goes on
+    // into the ones above it.
+    while b > 0 && c >= height(b) {
+        c -= height(b);
+        b -= 1;
+    }
+    c = c.min(height(b).saturating_sub(1));
     // Rows from the oldest message's first one to the last row: fewer than the area holds,
     // and the view moves down until it is full from the top.
     let mut rows = height(b).saturating_sub(c);
@@ -84,6 +86,13 @@ mod tests {
         assert_eq!(at((2, 2), 100), None);
         assert_eq!(at((8, 2), 3), Some((9, 2)));
         assert_eq!(at((8, 2), 5), None);
+    }
+
+    #[test]
+    fn a_cut_past_its_message_goes_on_into_the_ones_above() {
+        // The message on the last row was drawn shorter since: five rows cut off a message of
+        // three.
+        assert_eq!(at((8, 5), 0), Some((7, 2)));
     }
 
     #[test]
