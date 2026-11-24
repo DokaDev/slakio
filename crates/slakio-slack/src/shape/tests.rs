@@ -83,4 +83,9 @@ fn names_and_values_are_told_only_when_plain() {
     assert_eq!(enum_like(&json!("standard")), "standard");
     assert_eq!(enum_like(&json!("Free text")), "text");
     assert_eq!(enum_like(&json!(3)), "number");
+    let (long, longer) = ("a".repeat(31), "a".repeat(32));
+    assert_eq!(key(&long), long);
+    assert_eq!(key(&longer), "other", "the redaction would blank it");
+    assert_eq!(enum_like(&json!(long)), long);
+    assert_eq!(enum_like(&json!(longer)), "text");
 }

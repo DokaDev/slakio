@@ -26,6 +26,10 @@ const ENTRIES_MAX: usize = 200;
 /// The most field names of one object described.
 const KEYS_MAX: usize = 40;
 
+/// The longest field name or enum-like value told: under the 32 characters the log's redaction
+/// takes for a secret, so what is told is never blanked.
+const PLAIN_MAX: usize = 31;
+
 /// `yes` / `no`.
 fn yn(b: bool) -> &'static str {
     if b { "yes" } else { "no" }
@@ -45,18 +49,19 @@ fn type_of(v: &Value) -> &'static str {
 
 /// A field's name as a line may hold it: a plain `snake_case` name, else `other`.
 fn key(k: &str) -> &str {
-    let plain =
-        !k.is_empty() && k.len() <= 40 && k.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+    let plain = !k.is_empty()
+        && k.len() <= PLAIN_MAX
+        && k.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
     if plain { k } else { "other" }
 }
 
 /// An enum-like value (`standard`, `direct_messages`): lowercase letters, digits and `_`, at
-/// most 32; anything else (free text) is never told, only that it is `text`.
+/// most [`PLAIN_MAX`]; anything else (free text) is never told, only that it is `text`.
 fn enum_like(v: &Value) -> String {
     match v.as_str() {
         Some(s)
             if !s.is_empty()
-                && s.len() <= 32
+                && s.len() <= PLAIN_MAX
                 && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') =>
         {
             s.to_string()
