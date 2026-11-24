@@ -345,6 +345,9 @@ impl Images {
             let mut share = self.emoji_frame.borrow_mut();
             let EmojiShare { live, looks } = &mut *share;
             if !live.contains_key(&key) && live.len() >= EMOJI_PER_FRAME {
+                if self.diag.on() {
+                    note::once(&self.diag, &key, Stage::Skipped, "share", &[("share", EMOJI_PER_FRAME.to_string())]);
+                }
                 return Look::Pending;
             }
             *live.entry(key.clone()).or_default() += 1;
@@ -420,13 +423,18 @@ impl Images {
         for (ws, key, _) in wanted {
             let in_flight = self.in_flight();
             if in_flight >= IN_FLIGHT_MAX {
+                if self.diag.on() {
+                    note::once(&self.diag, &key, Stage::Skipped, "in-flight", &[("in_flight", in_flight.to_string())]);
+                }
                 break;
             }
             // A list photo yields its room to the timeline's pictures, never the other way.
             let chip = key.1 == CHIP_PHOTO;
             let staying = self.held.iter().filter(|k| self.on_screen(k) && (chip || k.1 != CHIP_PHOTO)).count();
             if staying + in_flight >= ENTRIES_MAX {
-                note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying.to_string())]);
+                if self.diag.on() {
+                    note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying.to_string())]);
+                }
                 continue;
             }
             match self.entries.get(&key) {
@@ -434,7 +442,10 @@ impl Images {
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
-            note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", self.entries.contains_key(&key).to_string())]);
+            if self.diag.on() {
+                let again = self.entries.contains_key(&key).to_string();
+                note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", again)]);
+            }
             let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
             self.asked.insert(id, key.clone());
             self.failed.retain(|k| *k != key);

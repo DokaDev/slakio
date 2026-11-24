@@ -570,3 +570,25 @@ fn with_the_diagnostics_on_a_parked_picture_says_so() {
         format!("thumb parked room id={} shape=preview held={ENTRIES_MAX} bytes=640", diag.id(extra[0].address()));
     assert!(text.contains(&line), "no `{line}` in\n{text}");
 }
+
+#[test]
+fn with_the_diagnostics_on_the_frame_s_emoji_share_and_the_in_flight_cap_are_told_once() {
+    let (diag, path) = diag_file("skips");
+    let (mut images, mut requests) = (on(), Requests::default());
+    images.set_diag(diag.clone());
+    let emoji = |n: usize| format!("https://emoji.example/T1/e{n}/x.png");
+    for _ in 0..2 {
+        for n in 0..=EMOJI_PER_FRAME {
+            let _ = images.look_emoji(&ws(), &emoji(n));
+        }
+        images.ask(&mut requests, Instant::now());
+    }
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let past = diag.id(&emoji(EMOJI_PER_FRAME));
+    let share = format!("emoji skipped share id={past} shape=emoji share={EMOJI_PER_FRAME}");
+    assert_eq!(text.matches(&share).count(), 1, "once: {text}");
+    let fifth = text.lines().filter(|l| l.contains("emoji skipped in-flight") && l.contains("in_flight=4")).count();
+    assert_eq!(fifth, 1, "the first one past the cap, once: {text}");
+    assert!(!text.contains("example"), "{text}");
+}
