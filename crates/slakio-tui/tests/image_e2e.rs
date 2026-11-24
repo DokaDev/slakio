@@ -271,3 +271,31 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let line = format!("addexclusion\n{}\n", kept.display());
     assert_eq!(excluded.matches(&line).count(), 1, "the pictures excluded once: {excluded}");
 }
+
+#[test]
+fn a_picture_on_disk_that_makes_the_decoder_panic_is_removed() {
+    let m = Machine::new("kept-panic");
+    let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();
+    std::fs::write(m.dir.join("config.toml"), config.replace("cache = \"off\"", "cache = \"on\"")).unwrap();
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")];
+    let kept = m.dir.join("cache").join("slakio").join("pictures");
+    let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+    std::thread::sleep(Duration::from_millis(300));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("a photo kept", || files() > 0);
+    std::thread::sleep(Duration::from_millis(800));
+    run.quit();
+    // The next run's decoder panics on every picture, those read from the disk too.
+    let _ = std::fs::remove_file(m.dir.join("typescript"));
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty"), ("SLAKIO_DEBUG_DECODE_PANIC", "1")];
+    let Some(mut run) = m.start(&env) else { return };
+    run.wait_for("the list", |t| t.contains("deploys"));
+    run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
+    run.wait_for("the message", |t| t.contains("design-review"));
+    wait_until("each picture that set it off removed", || files() == 0);
+    run.quit();
+}

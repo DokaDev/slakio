@@ -9,8 +9,8 @@
 //! task too.
 //!
 //! A panic in the decoder is caught there ([`slakio_tui::terminal::catching`]: the panic hook
-//! leaves the terminal as it is): the picture is not shown, and the error log says so in one
-//! line that names no address.
+//! leaves the terminal as it is): the picture is not shown (one read from the disk is removed
+//! there), and the error log says so in one line that names no address.
 
 use ratatui::crossterm::terminal::window_size;
 use slakio_core::backend::Generation;
@@ -79,6 +79,7 @@ impl Pictures {
             }));
             // A result sent already stands (a later one for the request changes nothing).
             if made.is_err() {
+                cached::panicked(&job, cell, cache.as_ref());
                 let _ = tx.send((((job.source, job.request), Err(Refused::Unreadable)), true));
             }
         });

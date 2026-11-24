@@ -76,6 +76,14 @@ pub fn run_then_keep(
     }
 }
 
+/// Making `job` ready for cells of `cell` pixels panicked: a picture read from `cache` that set
+/// it off is removed, so the next run does not read it again.
+pub fn panicked(job: &Job, cell: Option<(u16, u16)>, cache: Option<&PictureCache>) {
+    if let Some(cache) = cache.filter(|_| job.from_cache && kept(&job.source)) {
+        cache.forget(&job.source, &shape_tag(job.shape, cell));
+    }
+}
+
 /// The picture of `job` read from `cache` and decoded for cells of `cell` pixels;
 /// [`Refused::NotCached`] when nothing there can be shown (one that does not decode is removed).
 fn load(job: &Job, cell: Option<(u16, u16)>, cache: &PictureCache, diag: &Diag) -> Result<Prepared, Refused> {
