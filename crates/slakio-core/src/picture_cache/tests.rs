@@ -144,7 +144,8 @@ fn the_sweep_keeps_the_folder_within_its_room_least_recently_used_first() {
     assert!(matches!(c.load(&sources[4], "emoji"), Loaded::Hit(_)), "just used: kept");
     assert_eq!(c.load(&sources[5], "emoji"), Loaded::Miss, "the least recently used went");
     let swept = c.sweep().unwrap();
-    assert!(swept.bytes <= 10_000 && swept.kept == 4, "{swept:?}");
+    // Swept down to four fifths of the room when the new one took it over.
+    assert!(swept.bytes <= 8_000 && swept.kept == 3, "{swept:?}");
     let _ = fs::remove_dir_all(c.dir());
 }
 
@@ -316,5 +317,41 @@ fn a_file_of_the_first_format_is_refused_and_removed() {
     assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)));
     assert_eq!(c.sweep().unwrap(), Swept { removed: 1, kept: 1, bytes: (HEADER + 64) as u64 });
     assert!(!c.dir().join("0123456789abcdef.png").exists());
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn a_full_folder_is_swept_to_a_low_mark_so_writes_seldom_sweep() {
+    let (now, at) = clock(START);
+    let c = PictureCache::new(scratch("low-mark")).with_clock(now).with_budget(100_000);
+    c.open().unwrap();
+    let mut sweeps = 0;
+    for n in 0..100 {
+        at.store(START + n, Ordering::Relaxed);
+        let s = Source::Emoji(format!("{EMOJI}?n={n}"));
+        match c.store(&s, "emoji", &png(2_000)) {
+            Stored::Stored(Some(swept)) => {
+                sweeps += 1;
+                assert!(swept.bytes <= 80_000, "{swept:?}");
+            }
+            Stored::Stored(None) => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    // About 49 fit; each sweep frees room for about 10 more.
+    assert!((1..=6).contains(&sweeps), "{sweeps} sweeps for 50 writes past the room");
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn a_picture_written_again_counts_once() {
+    let (now, _) = clock(START);
+    let c = PictureCache::new(scratch("rewrite")).with_clock(now).with_budget(10_000);
+    c.open().unwrap();
+    let photo = Source::Avatar(AVATAR.into());
+    for _ in 0..50 {
+        assert_eq!(c.store(&photo, "x", &png(2_000)), Stored::Stored(None), "one file, well within the room");
+    }
+    assert_eq!(c.load(&photo, "x"), Loaded::Hit(png(2_000)));
     let _ = fs::remove_dir_all(c.dir());
 }

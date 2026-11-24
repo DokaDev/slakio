@@ -19,8 +19,10 @@
 //! * A file is too old after [`AVATAR_AGE`] (photos), [`EMOJI_AGE`] (emoji, whose addresses
 //!   change with the picture) or [`THUMB_AGE`] (previews): a miss, and removed.
 //! * At most [`BUDGET`] bytes in all: [`PictureCache::sweep`] (at the start, and whenever a write
-//!   takes the total over) removes what is too old, then the least recently used (by the time a
-//!   file was last read or written, set here) until the rest fits.
+//!   takes the total over) removes what is too old, then, once the folder holds more than that,
+//!   the least recently used (by the time a file was last read or written, set here) until the
+//!   rest takes at most four fifths of it: the next sweep is many writes away. A file written
+//!   again counts once.
 //!
 //! Everything here reads or writes the disk: never on the UI's thread.
 
@@ -301,17 +303,20 @@ impl PictureCache {
         bytes.push(kind_byte(source));
         bytes.extend_from_slice(png);
         let path = self.path(source, shape);
+        // A file written again replaces the one counted.
+        let old = fs::symlink_metadata(&path).ok().filter(fs::Metadata::is_file).map_or(0, |m| m.len());
         if crate::fsutil::atomic_replace_private_nofollow(&path, &bytes).is_err() {
             return Stored::Refused("write");
         }
         touch(&path, now);
         let len = bytes.len() as u64;
-        let total = self.total.fetch_add(len, Ordering::Relaxed) + len;
+        let next = |t: u64| t.saturating_add(len).saturating_sub(old);
+        let total = next(self.total.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| Some(next(t))).unwrap_or(0));
         Stored::Stored(if total > self.budget { self.sweep() } else { None })
     }
 
-    /// Remove what is too old, not a file this writes, or a write's leftover, then the least
-    /// recently used until the rest fits in the room. `None` when another sweep runs or the
+    /// Remove what is too old, not a file this writes, or a write's leftover, then, when the rest
+    /// does not fit in the room, the least recently used until four fifths of it are left. `None` when another sweep runs or the
     /// folder is not one (a link is never read).
     pub fn sweep(&self) -> Option<Swept> {
         let _one = match self.sweeping.try_lock() {
@@ -349,7 +354,8 @@ impl PictureCache {
         kept.sort_by_key(|k| k.0);
         let mut bytes: u64 = kept.iter().map(|k| k.1).sum();
         let mut oldest = kept.iter();
-        while bytes > self.budget {
+        let low = if bytes > self.budget { self.budget / 5 * 4 } else { bytes };
+        while bytes > low {
             let Some((_, len, path)) = oldest.next() else { break };
             remove(path);
             bytes -= len;
