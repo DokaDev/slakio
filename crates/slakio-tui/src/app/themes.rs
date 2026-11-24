@@ -37,6 +37,8 @@ impl App {
         self.prefs.config = cfg.clone();
         self.prefs.writable = writable;
         self.prefs.download_env = std::env::var(super::settings::DOWNLOAD_ENV).ok().filter(|v| !v.is_empty());
+        self.prefs.network_env =
+            std::env::var(super::settings::NETWORK_ENV).ok().filter(|v| v.eq_ignore_ascii_case("off"));
         let name = cfg.theme.as_str();
         self.theme_setting = name.to_string();
         match self.theme_named(name) {

@@ -18,13 +18,15 @@ fn app(lang: Lang) -> App {
     let look = Look { truecolor: true, background: Background::Dark, no_color: false };
     a.load_at_start(look, &Config::default(), true, Instant::now());
     a.prefs.download_env = None;
+    a.prefs.network_env = None;
     a.prefs.screen = Some(Screen::default());
     a
 }
 
 /// Every state a row can be in, one after another: every built-in theme and a theme file (with
 /// and without an error), every fixed value, every preset size and the widest and narrowest
-/// size `:set` takes, the folder set by the environment, a config file that cannot be saved.
+/// size `:set` takes, the folder and the network set by the environment, a config file that
+/// cannot be saved.
 /// Hands back, for each state, every row's value and what it means.
 fn states(a: &mut App) -> Vec<Vec<(String, String)>> {
     let now = Instant::now();
@@ -47,6 +49,11 @@ fn states(a: &mut App) -> Vec<Vec<(String, String)>> {
                 for (v, _) in values {
                     a.apply_setting(k, v, now).unwrap();
                     out.push(shown(a));
+                }
+                if SETTINGS[k].key == "network" {
+                    a.prefs.network_env = Some("OFF".into());
+                    out.push(shown(a));
+                    a.prefs.network_env = None;
                 }
             }
             Values::Megabytes(presets) => {

@@ -24,6 +24,9 @@ use table::{SETTINGS, Values};
 
 /// The environment variable that wins over the `downloads` setting.
 pub const DOWNLOAD_ENV: &str = "SLAKIO_DOWNLOAD_DIR";
+/// The environment variable that switches the network off whatever the `network` setting (the
+/// request governor's; the UI does not name the network crate).
+pub const NETWORK_ENV: &str = "SLAKIO_NETWORK";
 
 /// The config file's settings and the settings screen.
 #[derive(Clone, Debug, Default)]
@@ -36,6 +39,8 @@ pub struct Prefs {
     pub theme_dir: Option<PathBuf>,
     /// `SLAKIO_DOWNLOAD_DIR`, when set: the downloads row only shows it.
     pub download_env: Option<String>,
+    /// `SLAKIO_NETWORK`, when it switches the network off: the network row only shows it.
+    pub network_env: Option<String>,
     /// The settings screen, while it is open.
     pub screen: Option<Screen>,
 }
@@ -144,7 +149,10 @@ impl App {
                 self.downloads.max = u64::from(mb) * 1_000_000;
             }
             "language" => self.prefs.config.language.clone_from(&value),
-            "network" => self.prefs.config.network.clone_from(&value),
+            "network" => match &self.prefs.network_env {
+                Some(env) => return Err(Msg::SettingsNetworkEnv { env: format!("{NETWORK_ENV}={env}") }),
+                None => self.prefs.config.network.clone_from(&value),
+            },
             "live" => self.prefs.config.live.clone_from(&value),
             "restore" => self.prefs.config.restore.clone_from(&value),
             "cache" => self.prefs.config.cache.clone_from(&value),
@@ -349,6 +357,11 @@ impl App {
                 (self.i18n.msg(&Msg::SettingsCustom { value }).to_string(), label(Label::SettingsMaxMb))
             }
             Values::Megabytes(_) => (value, label(Label::SettingsMaxMb)),
+            // `SLAKIO_NETWORK=off` wins for this run, whatever is saved.
+            Values::Fixed(_) if spec.key == "network" && self.prefs.network_env.is_some() => {
+                let env = format!("{NETWORK_ENV}={}", self.prefs.network_env.as_deref().unwrap_or_default());
+                ("off".to_string(), self.i18n.msg(&Msg::SettingsNetworkEnv { env }).to_string())
+            }
             // A file with errors is never written: the next launch does not see the change.
             Values::Fixed(_) if spec.restart && !self.prefs.writable => (value, label(Label::SettingsOnRestartUnsaved)),
             Values::Fixed(_) if spec.restart => (value, label(Label::SettingsOnRestart)),

@@ -40,6 +40,7 @@ fn booted(w: u16, h: u16, lang: Lang, cfg: Config, writable: bool) -> Demo {
     let mut d = Demo::with(w, h, lang, Settings::default());
     d.app.load_at_start(TRUECOLOR, &cfg, writable, d.now);
     d.app.prefs.download_env = None;
+    d.app.prefs.network_env = None;
     d
 }
 
@@ -621,5 +622,33 @@ fn a_heading_is_never_alone_at_the_bottom_of_the_list() {
         let shown = headings_and_next(&d);
         assert!(shown.len() >= 3, "{lang:?}:\n{}", d.screen());
         assert!(shown.iter().all(|(_, next)| next.contains('‹')), "{lang:?}:\n{}", d.screen());
+    }
+}
+
+#[test]
+fn the_network_switched_off_by_the_environment_reads_off_in_the_muted_colour() {
+    use slakio_tui::app::settings::table::{SETTINGS, find};
+    let k = find("network").unwrap();
+    for (w, h) in [(80, 24), (120, 40)] {
+        for lang in [Lang::En, Lang::Ko] {
+            let mut d = booted(w, h, lang, shown_config(), true);
+            d.app.prefs.network_env = Some("off".to_string());
+            d.command("theme nord");
+            // The row under it selected: the network row in view, not under the selection bar.
+            d.keys(&format!("space , {}", "j ".repeat(k + 1)));
+            let screen = d.snap();
+            let label = demo::mask_hangul(&d.app.i18n.label(SETTINGS[k].label));
+            assert_eq!(value_of(&screen, &label).trim(), "off", "{w} {lang:?}");
+            let y = screen
+                .lines()
+                .position(|l| l.split_once('‹').is_some_and(|(name, _)| name.trim_end().ends_with(&label)))
+                .unwrap();
+            let buf = d.buffer();
+            let x = (0..w).find(|&x| buf[(x, y as u16)].symbol() == "‹").unwrap();
+            for dx in 0..5 {
+                assert_eq!(buf[(x + dx, y as u16)].fg, d.app.theme.fg_muted, "{w} {lang:?} at {dx}");
+            }
+            assert!(screen.contains("SLAKIO_NETWORK=off"), "{w} {lang:?}: what it means says why\n{screen}");
+        }
     }
 }

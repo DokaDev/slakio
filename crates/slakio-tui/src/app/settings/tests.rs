@@ -9,6 +9,7 @@ fn app() -> App {
     let mut a = App::new(Lang::En, Theme::terminal());
     a.load_at_start(TRUECOLOR, &Config::default(), true, Instant::now());
     a.prefs.download_env = None;
+    a.prefs.network_env = None;
     a.open_settings();
     a
 }
@@ -153,6 +154,22 @@ fn the_downloads_folder_is_typed_and_checked() {
     key(&mut a, "enter esc");
     assert_eq!(a.prefs.screen.as_ref().unwrap().folder, None, "Esc leaves the folder as it was");
     assert_eq!(a.prefs.config.downloads, "~/x");
+}
+
+#[test]
+fn the_environment_s_network_off_is_shown_over_the_saved_value_and_not_changed() {
+    let mut a = app();
+    let k = find("network").unwrap();
+    assert_eq!(a.setting_shown(k).0, "on", "the saved value, nothing over it");
+    a.prefs.network_env = Some("off".to_string());
+    let (value, what) = a.setting_shown(k);
+    assert_eq!((value.as_str(), what.as_str()), ("off", "Fixed by SLAKIO_NETWORK=off"));
+    select(&mut a, "network");
+    key(&mut a, "l h");
+    assert_eq!(a.prefs.config.network, "on", "the saved value stays");
+    let e = a.apply_setting(k, "off", Instant::now()).unwrap_err();
+    assert_eq!(e, Msg::SettingsNetworkEnv { env: "SLAKIO_NETWORK=off".to_string() }, ":set cannot change it either");
+    assert!(saved(&mut a).is_empty());
 }
 
 #[test]

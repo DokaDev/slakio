@@ -731,6 +731,7 @@
 "settings.max_mb" = "MB: largest file downloaded"
 "settings.downloads_edit" = "Enter: type a folder"
 "settings.downloads_env" = "Fixed by {env}"
+"settings.network_env" = "Fixed by {env}"
 "settings.downloads_prompt" = "Folder:"
 "settings.downloads_relative" = "Not a folder slakio can use: {path} (an absolute path, or one that starts with ~/)"
 "settings.changed" = "{key}: {value}"

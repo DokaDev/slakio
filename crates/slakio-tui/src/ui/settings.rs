@@ -240,7 +240,8 @@ fn draw_row(f: &mut Frame, app: &App, row: Rect, k: usize, shown: &(String, Stri
     let (x, y) = (row.x + 1, row.y);
     let tw = usize::from(row.width).saturating_sub(2);
     let (value, what) = shown;
-    let read_only = SETTINGS[k].values == Values::Folder && app.prefs.download_env.is_some();
+    let read_only = (SETTINGS[k].values == Values::Folder && app.prefs.download_env.is_some())
+        || (SETTINGS[k].key == "network" && app.prefs.network_env.is_some());
     let value = if SETTINGS[k].values == Values::Folder { clip_middle(value, widths.1) } else { clip(value, widths.1) };
     let value = format!("‹ {} ›", pad(&value, widths.1));
     let text = format!("  {}  ", pad(&app.i18n.label(SETTINGS[k].label), widths.0));
