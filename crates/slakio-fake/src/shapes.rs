@@ -364,8 +364,8 @@ fn person(world: &World, id: &str) -> Option<Value> {
 
 /// The edge cache's people lookup: `updated_ids` (id → version) in the JSON body; every id it
 /// knows comes back, the others are listed as failed. Asked with `include_profile_only_if_stale`,
-/// it judges every record current and leaves the profile's photo fields out, as a real
-/// workspace answered.
+/// it judges every record current and leaves the profile's photo fields out: a model of the
+/// answer seen for ids sent at version 0.
 fn edge_users(world: &World, request: &Logged) -> Value {
     let body: Value = serde_json::from_str(&request.body).unwrap_or_default();
     let Some(ids) = body.get("updated_ids").and_then(Value::as_object) else {

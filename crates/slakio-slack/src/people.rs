@@ -1,11 +1,11 @@
 //! The people a workspace's messages and DMs name, looked up by id and kept for the session (in
-//! memory): never a directory listing. What a view brings along is kept as it comes; the rest
-//! is asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's
-//! batch), each id once, at version 0 and for the whole profile (its photo with it). A lookup that fails is not kept, so the id shows until a later page
-//! asks again; unknown is not absent. An id Slack answered for without a name to show is not
-//! asked again this session; one it left out, listed as pending (not ready yet) or as failed
-//! (which may pass) is asked again by a later lookup, at most [`OMITTED_MAX`] times. Only what
-//! a lookup asked for is taken from its answer.
+//! memory): never a directory listing. What a view brings along is kept as it comes; the rest is
+//! asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's batch),
+//! each id once, at version 0 and for the whole profile (its photo with it). A lookup that fails is
+//! not kept, so the id shows until a later page asks again; unknown is not absent. An id Slack
+//! answered for without a name to show is not asked again this session; one it left out, listed as
+//! pending (not ready yet) or as failed (which may pass) is asked again by a later lookup, at most
+//! [`OMITTED_MAX`] times. Only what a lookup asked for is taken from its answer.
 
 use crate::client::Client;
 use crate::governor::Priority;
