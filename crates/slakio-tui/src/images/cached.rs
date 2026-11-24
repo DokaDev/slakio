@@ -40,23 +40,47 @@ pub fn run(
     cache: Option<&PictureCache>,
     diag: &Diag,
 ) -> Result<Prepared, Refused> {
+    let mut out = Err(Refused::NotCached);
+    run_then_keep(job, cell, cache, diag, |result| out = result);
+    out
+}
+
+/// [`run`], its result handed to `send` before anything is written: the UI has a fetched
+/// picture before it is kept on disk (a write, and the sweep it may set off, take a while).
+pub fn run_then_keep(
+    job: &Job,
+    cell: Option<(u16, u16)>,
+    cache: Option<&PictureCache>,
+    diag: &Diag,
+    send: impl FnOnce(Result<Prepared, Refused>),
+) {
     // A file's preview is never kept: fetched each run, with the session's cookie.
     let Some(cache) = cache.filter(|_| kept(&job.source)) else {
-        return if job.from_cache { Err(Refused::NotCached) } else { super::prepare(job, cell) };
+        return send(if job.from_cache { Err(Refused::NotCached) } else { super::prepare(job, cell) });
     };
+    if job.from_cache {
+        return send(load(job, cell, cache, diag));
+    }
+    let d = match decode::decode(&job.bytes, job.shape, cell) {
+        Ok(d) => d,
+        Err(refused) => return send(Err(refused)),
+    };
+    send(Ok(super::made(job, &d)));
+    let key = (job.source.clone(), job.shape);
+    match cache.store(&job.source, &shape_tag(job.shape, cell), &d.png) {
+        Stored::Stored(swept) => {
+            note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", d.png.len().to_string())]);
+            swept.into_iter().for_each(|s| swept_line(diag, s));
+        }
+        Stored::Refused(why) => note::line(diag, &key, Stage::CacheRefused, why, &[]),
+    }
+}
+
+/// The picture of `job` read from `cache` and decoded for cells of `cell` pixels;
+/// [`Refused::NotCached`] when nothing there can be shown (one that does not decode is removed).
+fn load(job: &Job, cell: Option<(u16, u16)>, cache: &PictureCache, diag: &Diag) -> Result<Prepared, Refused> {
     let key = (job.source.clone(), job.shape);
     let tag = shape_tag(job.shape, cell);
-    if !job.from_cache {
-        let d = decode::decode(&job.bytes, job.shape, cell)?;
-        match cache.store(&job.source, &tag, &d.png) {
-            Stored::Stored(swept) => {
-                note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", d.png.len().to_string())]);
-                swept.into_iter().for_each(|s| swept_line(diag, s));
-            }
-            Stored::Refused(why) => note::line(diag, &key, Stage::CacheRefused, why, &[]),
-        }
-        return Ok(super::made(job, &d));
-    }
     match cache.load(&job.source, &tag) {
         Loaded::Hit(png) => match decode::decode(&png, job.shape, cell) {
             Ok(d) => {

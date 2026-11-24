@@ -238,3 +238,23 @@ fn a_picture_made_for_cells_of_another_size_is_another_picture() {
     assert!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).unwrap().transmit == small.transmit);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_fetched_picture_goes_to_the_ui_before_it_is_kept_on_disk() {
+    let dir = scratch("send-first");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    images.look(&ws(), &photo);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    let fetched = Job { from_cache: false, bytes: slakio_world::pictures::png(photo.address(), 64, 64), ..look };
+    let files = || std::fs::read_dir(&dir).unwrap().count();
+    let mut sent = None;
+    run_then_keep(&fetched, Some((9, 18)), images.cache.as_ref(), &diag, |result| {
+        sent = Some((result.is_ok(), files()));
+    });
+    assert_eq!(sent, Some((true, 0)), "handed over while nothing was written yet");
+    assert_eq!(files(), 1, "kept afterwards");
+    let _ = std::fs::remove_dir_all(&dir);
+}

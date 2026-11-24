@@ -70,16 +70,17 @@ impl Pictures {
         let (cache, diag) = (self.cache.clone(), self.diag.clone());
         tokio::task::spawn_blocking(move || {
             // The cache holds nothing a panic part way leaves broken (a write is whole or not
-            // at all).
+            // at all). The picture goes to the UI before it is kept on disk.
             let made = slakio_tui::terminal::catching(std::panic::AssertUnwindSafe(|| {
                 assert!(!panic, "SLAKIO_DEBUG_DECODE_PANIC: a panic in the decoder");
-                cached::run(&job, cell, cache.as_ref(), &diag)
+                cached::run_then_keep(&job, cell, cache.as_ref(), &diag, |result| {
+                    let _ = tx.send((((job.source.clone(), job.request), result), false));
+                });
             }));
-            let (result, panicked) = match made {
-                Ok(result) => (result, false),
-                Err(_) => (Err(Refused::Unreadable), true),
-            };
-            let _ = tx.send((((job.source, job.request), result), panicked));
+            // A result sent already stands (a later one for the request changes nothing).
+            if made.is_err() {
+                let _ = tx.send((((job.source, job.request), Err(Refused::Unreadable)), true));
+            }
         });
     }
 
