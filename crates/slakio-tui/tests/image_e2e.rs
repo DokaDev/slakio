@@ -218,7 +218,10 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();
     std::fs::write(m.dir.join("config.toml"), config.replace("cache = \"off\"", "cache = \"on\"")).unwrap();
     let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")];
-    let pictures = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).count();
+    // A file's preview is never kept on disk: fetched each run.
+    let fetches = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).collect::<Vec<_>>();
+    let previews = || fetches().iter().filter(|l| l.path.starts_with("/files-tmb/")).count();
+    let pictures = || fetches().len() - previews();
     let kept = m.dir.join("cache").join("slakio").join("pictures");
     let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
     let Some(mut run) = m.start(&env) else { return };
@@ -233,8 +236,8 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     std::thread::sleep(Duration::from_millis(800));
     assert_eq!(files(), pictures());
     run.quit();
-    let fetched = pictures();
-    assert!(fetched >= 2, "a preview and photos: {fetched}");
+    let (fetched, previewed) = (pictures(), previews());
+    assert!(fetched >= 1 && previewed >= 1, "a preview and photos: {fetched} {previewed}");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -254,5 +257,6 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     wait_until("placeholders drawn", || contains(&m.written(), "\u{10EEEE}".as_bytes()));
     std::thread::sleep(Duration::from_millis(800));
     run.quit();
-    assert_eq!(pictures(), fetched, "nothing fetched again: every picture came from the disk");
+    assert_eq!(pictures(), fetched, "nothing fetched again: every photo came from the disk");
+    assert!(previews() > previewed, "the preview fetched again: never kept");
 }

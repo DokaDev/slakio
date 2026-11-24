@@ -27,8 +27,9 @@
 //! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
 //! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
 //! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
-//! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a picture is looked for
-//! there before it is asked for, within the same bounds.
+//! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a profile photo or an
+//! emoji is looked for there before it is asked for, within the same bounds (a file's preview
+//! never is: it is never kept on disk).
 
 pub mod cached;
 pub mod custom;
@@ -455,7 +456,7 @@ impl Images {
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
-            if self.cache.is_some() && !self.entries.contains_key(&key) && !self.missed.remove(&key) {
+            if self.on_disk(&key) && !self.entries.contains_key(&key) && !self.missed.remove(&key) {
                 self.look_up(key);
                 asked = true;
                 continue;

@@ -182,3 +182,30 @@ fn the_diagnostics_tell_misses_writes_hits_and_the_sweep_by_id_only() {
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(log.parent().unwrap());
 }
+
+#[test]
+fn a_file_s_preview_is_never_kept_on_disk_nor_looked_for_there() {
+    let dir = scratch("no-thumbs");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let mut requests = Requests::default();
+    let thumb = Source::Thumb(format!("https://{}/files-tmb/T1-F1/x.png", slakio_core::model::FILE_HOST));
+    images.look(&ws(), &thumb);
+    assert!(images.ask(&mut requests, Instant::now()));
+    assert!(images.take_lookups().is_empty(), "not looked for on disk");
+    let r = requests.take().pop().expect("asked of the backend at once");
+    assert_eq!(r.command, Command::Image { source: thumb.clone(), max: slakio_core::images::BYTES_MAX });
+    let png = slakio_world::pictures::png(thumb.address(), 64, 64);
+    let job = images.answered(r.id, png).expect("a job");
+    let result = run(&job, Some((9, 18)), images.cache.as_ref(), &diag);
+    assert!(result.is_ok(), "shown all the same");
+    assert!(!dir.exists(), "nothing written: {:?}", std::fs::read_dir(&dir).map(|d| d.count()));
+    // A preview someone else left there is never read either.
+    let cache = PictureCache::new(dir.clone());
+    let png = slakio_world::pictures::png(thumb.address(), 64, 64);
+    let d = super::decode::decode(&png, job.shape, Some((9, 18))).unwrap();
+    assert!(matches!(cache.store(&thumb, &shape_tag(job.shape), &d.png), Stored::Stored(_)));
+    let look = Job { from_cache: true, bytes: Vec::new(), ..job };
+    assert_eq!(run(&look, Some((9, 18)), Some(&cache), &diag), Err(Refused::NotCached));
+    let _ = std::fs::remove_dir_all(&dir);
+}

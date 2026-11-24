@@ -341,16 +341,16 @@ background and decoded off the screen's thread.
   pictures are fetched before the list's photos. A screen draws at most 32 emoji pictures; more
   stay `:name:`. A person shown in both the timeline and the list is fetched at most twice, once
   per size.
-- Pictures kept between runs: each picture slakio made for the terminal (a small PNG of a photo,
-  an emoji or a file's preview, at the size it is drawn) is kept in `pictures` in the cache
-  directory ([Local cache](#local-cache)), so the next start draws it without fetching it (and
-  without counting it against the shares above, also with the network off). Photos and previews
+- Pictures kept between runs: each profile photo and emoji picture slakio made for the terminal
+  (a small PNG, at the size it is drawn) is kept in `pictures` in the cache directory
+  ([Local cache](#local-cache)), so the next start draws it without fetching it (and without
+  counting it against the shares above, also with the network off). A file's preview is never
+  kept: it is a copy of a file of your workspace, fetched with your session each run. Photos
   are kept for up to 7 days, emoji for up to 30, at most 1 MiB a picture and 64 MiB in all (the
   least recently shown go first); the folder is readable by you only (`0700`, the files
   `0600`), a file is named by a hash, never by its address or name, and a link or a damaged
-  file in it is removed, never read. A file's preview is a copy of a file of your workspace:
-  `cache = "off"` keeps none of them, `slakio --demo` writes none, and every `slakio logout`
-  removes the folder. Deleting the folder is always safe; it only means fetching them again.
+  file in it is removed, never read. `cache = "off"` keeps none of them, `slakio --demo` writes
+  none, and every `slakio logout` removes the folder. Deleting the folder is always safe; it only means fetching them again.
 - When a picture does not show and you want to find out why, start slakio with
   `SLAKIO_DEBUG_PICTURES=1` (off by default). slakio then writes one line for each step a
   photo, an emoji, a file preview, the emoji list and your own photo went through to

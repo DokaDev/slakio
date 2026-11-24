@@ -1,4 +1,6 @@
-//! The pictures kept on disk between runs ([`slakio_core::picture_cache`]), as the UI uses them.
+//! The pictures kept on disk between runs ([`slakio_core::picture_cache`]), as the UI uses them:
+//! profile photos and a workspace's own emoji, never a file's preview (a copy of a file of the
+//! signed-in user's workspace, which another account on the same machine must not be shown).
 //! A picture a frame wants and does not have is looked for there first: the look is a job like
 //! a decode ([`Job::from_cache`], counted among the pictures on their way, so the same bounds on
 //! what is asked hold), which the binary runs off the loop's thread with [`run`]. Found, it is
@@ -12,6 +14,7 @@ use super::decode::{self, Refused, Shape};
 use super::{Entry, Images, Job, Key, Prepared, note};
 use slakio_core::backend::Generation;
 use slakio_core::diag::{Diag, Kind, Stage};
+use slakio_core::images::Source;
 use slakio_core::picture_cache::{Loaded, PictureCache, Stored, Swept};
 
 /// The cells a picture fills, as part of its key on disk.
@@ -32,7 +35,8 @@ pub fn run(
     cache: Option<&PictureCache>,
     diag: &Diag,
 ) -> Result<Prepared, Refused> {
-    let Some(cache) = cache else {
+    // A file's preview is never kept: fetched each run, with the session's cookie.
+    let Some(cache) = cache.filter(|_| kept(&job.source)) else {
         return if job.from_cache { Err(Refused::NotCached) } else { super::prepare(job, cell) };
     };
     let key = (job.source.clone(), job.shape);
@@ -87,7 +91,17 @@ fn swept_line(diag: &Diag, s: Swept) {
     diag.line(Kind::PictureCache, Stage::CacheSwept, "ok", &[("n", &n), ("kept", &kept), ("bytes", &bytes)]);
 }
 
+/// Pictures of `source`'s kind are kept on disk: photos and emoji, never a file's preview.
+fn kept(source: &Source) -> bool {
+    !matches!(source, Source::Thumb(_))
+}
+
 impl Images {
+    /// `key` is looked for on disk before it is asked for: there is a cache and it keeps the kind.
+    pub(super) fn on_disk(&self, key: &Key) -> bool {
+        self.cache.is_some() && kept(&key.0)
+    }
+
     /// The picture diagnostics (the binary's jobs write to them too).
     pub fn diag(&self) -> &Diag {
         &self.diag
