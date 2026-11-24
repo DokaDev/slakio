@@ -1,7 +1,8 @@
 //! The binary's part of the pictures ([`slakio_tui::images`]): making them ready off the loop's
 //! thread (a blocking task each, decode and the commands that send them; the app asks for at
-//! most a few at once) and writing those commands before a frame is drawn, the only part left on
-//! the loop's thread.
+//! most a few at once, and a look in the cache on disk waits for one of
+//! [`cached::DISK_LOADERS`] loaders) and writing those commands before a frame is drawn, the
+//! only part left on the loop's thread.
 //!
 //! With the local cache on (not in the demo), the pictures made are kept on disk and looked for
 //! there first ([`slakio_tui::images::cached`]); the folder is made (when pictures are on at
@@ -24,7 +25,8 @@ use slakio_tui::images::decode::Refused;
 use slakio_tui::images::{Images, Job, Prepared, cached};
 use std::io::{self, Write};
 use std::path::PathBuf;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{Semaphore, mpsc};
 
 /// A job's picture and request, and what came of it.
 type Done = ((Source, Generation), Result<Prepared, Refused>);
@@ -43,6 +45,8 @@ pub(crate) struct Pictures {
     /// handed over, as keeping it on disk might.
     panic: bool,
     panic_keep: bool,
+    /// The looks in the cache on disk that may run at once ([`cached::DISK_LOADERS`]).
+    loaders: Arc<Semaphore>,
 }
 
 /// A cell's size in pixels, when the terminal says the window's (an `ioctl`, not a question on
@@ -65,14 +69,16 @@ impl Pictures {
             let (d, made) = (diag.clone(), local.exclude_pictures());
             tokio::task::spawn_blocking(move || cached::start(&c, &d, made));
         }
-        Self { tx, rx, errors, cache, diag, panic, panic_keep }
+        let loaders = Arc::new(Semaphore::new(cached::DISK_LOADERS));
+        Self { tx, rx, errors, cache, diag, panic, panic_keep, loaders }
     }
 
     /// Make `job` ready on a blocking task; its result comes from [`Pictures::next`].
     pub(crate) fn start(&self, job: Job) {
         let (tx, cell, panic, panic_keep) = (self.tx.clone(), cell(), self.panic, self.panic_keep);
         let (cache, diag, errors) = (self.cache.clone(), self.diag.clone(), self.errors.clone());
-        tokio::task::spawn_blocking(move || {
+        let disk = job.from_cache;
+        blocking(&self.loaders, disk, move || {
             // The cache holds nothing a panic part way leaves broken (a write is whole or not
             // at all). The picture goes to the UI before it is kept on disk.
             let sent = std::cell::Cell::new(false);
@@ -111,6 +117,21 @@ impl Pictures {
     }
 }
 
+/// `work` on a blocking task; one that reads the disk (`disk`) first waits for one of the
+/// `loaders`, held until it ends.
+fn blocking(loaders: &Arc<Semaphore>, disk: bool, work: impl FnOnce() + Send + 'static) {
+    if !disk {
+        tokio::task::spawn_blocking(work);
+        return;
+    }
+    let loaders = loaders.clone();
+    tokio::spawn(async move {
+        // Never closed: a permit always comes.
+        let Ok(_loader) = loaders.acquire_owned().await else { return };
+        let _ = tokio::task::spawn_blocking(work).await;
+    });
+}
+
 /// Write what the terminal is to be sent (pictures, and their removal) before the next frame.
 pub(crate) fn write(app: &mut App) -> io::Result<()> {
     if app.images.on {
@@ -126,4 +147,51 @@ pub(crate) fn write(app: &mut App) -> io::Result<()> {
     let mut out = io::stdout();
     out.write_all(graphics.as_bytes())?;
     out.flush()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst};
+    use std::time::{Duration, Instant};
+
+    #[tokio::test]
+    async fn at_most_disk_loaders_reads_run_at_once() {
+        let loaders = Arc::new(Semaphore::new(cached::DISK_LOADERS));
+        let (running, most, open) =
+            (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)), Arc::new(AtomicBool::new(false)));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let reads = cached::DISK_LOADERS * 4;
+        for _ in 0..reads {
+            let (running, most, open, tx) = (running.clone(), most.clone(), open.clone(), tx.clone());
+            blocking(&loaders, true, move || {
+                most.fetch_max(running.fetch_add(1, SeqCst) + 1, SeqCst);
+                // Held until the test opens the way (or 5 s at most, so nothing hangs).
+                let until = Instant::now() + Duration::from_secs(5);
+                while !open.load(SeqCst) && Instant::now() < until {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                running.fetch_sub(1, SeqCst);
+                let _ = tx.send(true);
+            });
+        }
+        let until = Instant::now() + Duration::from_secs(5);
+        while running.load(SeqCst) < cached::DISK_LOADERS && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        // A picture fetched from the network is decoded while every loader is busy.
+        let decode = tx.clone();
+        blocking(&loaders, false, move || {
+            let _ = decode.send(false);
+        });
+        let first = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await;
+        assert_eq!(first, Ok(Some(false)), "the decode does not wait for the disk");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(running.load(SeqCst), cached::DISK_LOADERS, "the others wait their turn");
+        open.store(true, SeqCst);
+        for _ in 0..reads {
+            assert_eq!(tokio::time::timeout(Duration::from_secs(5), rx.recv()).await, Ok(Some(true)));
+        }
+        assert_eq!(most.load(SeqCst), cached::DISK_LOADERS, "{reads} reads, at most so many at once");
+    }
 }

@@ -1,25 +1,59 @@
 //! Asking for the pictures a frame wanted ([`Images::ask`]), and what the backend answered
 //! ([`Images::answered`], [`Images::failed`]).
 
-use super::{CHIP_PHOTO, Entry, IN_FLIGHT_MAX, Images, Job, RETRY_AFTER, RETRY_SOON, Why, note};
+use super::cached::LOOKUPS_MAX;
+use super::{CHIP_PHOTO, Entry, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why, note};
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::diag::Stage;
 use slakio_core::images::BYTES_MAX;
+use slakio_core::model::WorkspaceId;
 use slakio_core::picture_cache::PictureCache;
 use std::collections::HashSet;
 use std::time::Instant;
 
 impl Images {
+    /// The pictures asked of the backend or being decoded from its answer (the network's share).
     fn in_flight(&self) -> usize {
         self.entries.values().filter(|e| matches!(e, Entry::Asked(_) | Entry::Decoding(_))).count()
     }
 
+    /// The looks in the cache on disk not ended yet.
+    fn looking(&self) -> usize {
+        self.entries.values().filter(|e| matches!(e, Entry::Looking(_))).count()
+    }
+
+    /// Each picture of `wanted` the cache on disk may hold, not there yet (or failed, its wait
+    /// over) and not missed there since, is looked for there now: no wait for the network's
+    /// share or the room (a picture found that does not fit is parked), at most [`LOOKUPS_MAX`]
+    /// looks at once. `true` when one was.
+    fn look_up_all(&mut self, wanted: &[(WorkspaceId, Key, bool)], now: Instant) -> bool {
+        let (mut looking, mut any) = (self.looking(), false);
+        for (_, key, _) in wanted {
+            if looking >= LOOKUPS_MAX {
+                break;
+            }
+            if !self.on_disk(key) || self.missed.contains(key) {
+                continue;
+            }
+            match self.entries.get(key) {
+                None => {}
+                Some(Entry::Failed { again: Some(at), .. }) if *at <= now => self.failed.retain(|k| k != key),
+                Some(_) => continue,
+            }
+            self.look_up(key.clone());
+            (looking, any) = (looking + 1, true);
+        }
+        any
+    }
+
     /// After a frame: what it showed is the most recently drawn, and what it would have shown
-    /// is asked for, the timeline's pictures before the list's photos (at most [`IN_FLIGHT_MAX`]
-    /// at once, and none while the pictures on screen and those on their way fill the
-    /// terminal's room; a failed one once its wait is over); what it only laid out is neither.
-    /// A parked picture that would now fit may be asked again. `true` when something was asked.
+    /// is asked for, the timeline's pictures before the list's photos: first everything the
+    /// cache on disk may hold is looked for there ([`Images::look_up_all`]), then the rest is
+    /// asked of the backend (at most [`IN_FLIGHT_MAX`] at once, and none while the pictures on
+    /// screen and those on their way fill the terminal's room; a failed one once its wait is
+    /// over); what it only laid out is neither. A parked picture that would now fit may be
+    /// asked again. `true` when something was asked or looked for.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
         let mut screen = HashSet::new();
         for (key, _) in self.drawn.take().into_iter().filter(|d| d.1) {
@@ -34,9 +68,9 @@ impl Images {
         self.last_screen = std::mem::replace(&mut self.screen, screen);
         self.unpark();
         self.emoji_frame.take();
-        let mut asked = false;
         let mut wanted: Vec<_> = self.wanted.take().into_iter().filter(|w| w.2).collect();
         wanted.sort_by_key(|w| w.1.1 == CHIP_PHOTO);
+        let mut asked = self.look_up_all(&wanted, now);
         for (ws, key, _) in wanted {
             let in_flight = self.in_flight();
             if in_flight >= IN_FLIGHT_MAX {
@@ -45,7 +79,7 @@ impl Images {
                 }
                 break;
             }
-            if self.full(&key, in_flight) {
+            if self.full(&key, in_flight + self.looking()) {
                 if self.diag.on() {
                     let staying = self.staying(&key).0.to_string();
                     note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying)]);
@@ -57,9 +91,8 @@ impl Images {
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
-            if self.on_disk(&key) && !self.entries.contains_key(&key) && !self.missed.remove(&key) {
-                self.look_up(key);
-                asked = true;
+            // Looked for on disk first (next frame, past [`LOOKUPS_MAX`]); not found there, asked.
+            if self.on_disk(&key) && !self.missed.remove(&key) {
                 continue;
             }
             if self.diag.on() {

@@ -28,8 +28,8 @@
 //! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
 //! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
 //! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a profile photo or an
-//! emoji is looked for there before it is asked for, within the same bounds (a file's preview
-//! never is: it is never kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
+//! emoji is looked for there before it is asked for, at once and outside the network's
+//! [`IN_FLIGHT_MAX`] (a file's preview never is: it is never kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
 
 pub mod animate;
 mod ask;
@@ -107,6 +107,8 @@ enum Entry {
     Asked(Generation),
     /// The bytes of request `.0` are being decoded.
     Decoding(Generation),
+    /// Looked for in the cache on disk, as request `.0` of its own (not the network's share).
+    Looking(Generation),
     Ready {
         id: u32,
         cols: u16,
@@ -253,7 +255,8 @@ impl Images {
     }
 
     /// [`Images::on`] from what decides it ([`detect::images_on`]). Turned off, every picture
-    /// leaves the terminal at once (each by its id, then all) and nothing asked is waited for.
+    /// leaves the terminal at once (each by its id, then all) and nothing asked or looked for is
+    /// waited for.
     pub fn resolve(&mut self) {
         let on = self.tty && detect::images_on(&self.env, &self.setting, self.demo);
         if self.on && !on {
@@ -274,6 +277,9 @@ impl Images {
             self.last_screen.clear();
             self.emoji_frame.take();
             self.anims.forget();
+            // Looks not handed over yet are not run; the emptying of the disk always is.
+            self.lookups.retain(|j| j.empty);
+            self.missed.clear();
         }
         self.on = on;
     }
@@ -353,7 +359,7 @@ impl Images {
                 }
                 Look::Failed(why)
             }
-            Some(Entry::Asked(_) | Entry::Decoding(_)) => Look::Pending,
+            Some(Entry::Asked(_) | Entry::Decoding(_) | Entry::Looking(_)) => Look::Pending,
             Some(Entry::Parked { .. }) | None => {
                 self.wanted.borrow_mut().push((ws.clone(), key, true));
                 Look::Pending
@@ -450,9 +456,8 @@ impl Images {
     pub fn decoded(&mut self, job: (Source, Generation), result: Result<Prepared, Refused>) {
         let (source, request) = job;
         // Request ids are never used twice: the one decoding it is the picture.
-        let Some(key) =
-            self.entries.iter().find(|(k, e)| k.0 == source && **e == Entry::Decoding(request)).map(|(k, _)| k.clone())
-        else {
+        let mine = |e: &Entry| *e == Entry::Decoding(request) || *e == Entry::Looking(request);
+        let Some(key) = self.entries.iter().find(|(k, e)| k.0 == source && mine(e)).map(|(k, _)| k.clone()) else {
             return;
         };
         let mut p = match result {

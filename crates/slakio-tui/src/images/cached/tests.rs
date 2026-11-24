@@ -1,10 +1,11 @@
 use super::*;
 use crate::app::requests::Requests;
-use crate::images::{IN_FLIGHT_MAX, Look};
+use crate::images::{CHIP_PHOTO, IN_FLIGHT_MAX, Look, PHOTO, RETRY_SOON, detect};
 use slakio_core::backend::{Command, FailKind};
 use slakio_core::images::{AVATAR_HOSTS, EMOJI_HOSTS, Source};
 use slakio_core::model::WorkspaceId;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::time::Instant;
 
 fn scratch(name: &str) -> PathBuf {
@@ -58,7 +59,8 @@ fn settle(images: &mut Images, requests: &mut Requests, offline: bool) -> usize 
         images.ask(requests, Instant::now());
         let lookups = images.take_lookups();
         let asked = requests.take();
-        assert!(lookups.len() + asked.len() <= IN_FLIGHT_MAX, "the bound on what is on its way holds");
+        assert!(asked.len() <= IN_FLIGHT_MAX, "the network's bound holds");
+        assert!(lookups.len() <= LOOKUPS_MAX, "the bound on looks waiting holds");
         // Both screens drawn whole, and nothing asked for either: settled.
         quiet = if ready == 40 && lookups.is_empty() && asked.is_empty() { quiet + 1 } else { 0 };
         if quiet == 2 {
@@ -151,7 +153,7 @@ fn the_loop_only_hands_looks_over_never_reading_the_disk_itself() {
     assert!(images.ask(&mut requests, Instant::now()));
     assert!(requests.take().is_empty(), "nothing asked of the backend before the look");
     let lookups = images.take_lookups();
-    assert_eq!(lookups.len(), IN_FLIGHT_MAX, "looks count among what is on its way");
+    assert_eq!(lookups.len(), photos().len(), "every photo looked for at once");
     assert!(lookups.iter().all(|j| j.from_cache && j.bytes.is_empty()));
     assert!(!dir.exists(), "the UI's side never touched the disk");
     // Without a cache (the demo, `cache = "off"`): asked of the backend as before.
@@ -280,5 +282,176 @@ fn a_picture_on_its_way_while_the_kept_ones_are_removed_is_not_kept() {
     let after = Job { epoch: images.cache.as_ref().unwrap().epoch(), ..fetched };
     assert!(run(&after, Some((9, 18)), images.cache.as_ref(), &diag).is_ok());
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn thumb(n: usize) -> Source {
+    Source::Thumb(format!("https://{}/files-tmb/T1-F{n}/x.png", slakio_core::model::FILE_HOST))
+}
+
+fn people(n: usize) -> Vec<Source> {
+    (0..n).map(|n| Source::Avatar(format!("https://{}/T1/P{n}-face_72.png", AVATAR_HOSTS[0]))).collect()
+}
+
+/// `sources` kept in `dir` as photos for the picture slot, as a run before this one left them.
+fn kept_photos(dir: &std::path::Path, sources: &[Source]) {
+    let cache = PictureCache::new(dir.to_path_buf());
+    cache.open().unwrap();
+    for s in sources {
+        let png = slakio_world::pictures::png(s.address(), 64, 64);
+        assert!(matches!(cache.store(s, &shape_tag(PHOTO, Some((9, 18))), &png), Stored::Stored(_)));
+    }
+}
+
+/// The looks handed over, each run against the disk and its result taken in.
+fn run_looks(images: &mut Images) -> usize {
+    let (cache, diag) = (images.cache.clone(), images.diag().clone());
+    let lookups = images.take_lookups();
+    for job in &lookups {
+        let result = run(job, Some((9, 18)), cache.as_ref(), &diag);
+        images.decoded((job.source.clone(), job.request), result);
+    }
+    lookups.len()
+}
+
+#[test]
+fn forty_cached_photos_are_all_looked_up_in_the_first_frame_asking_nothing() {
+    let dir = scratch("forty");
+    let shown = people(40);
+    kept_photos(&dir, &shown);
+    let mut images = images(&dir, &Diag::default());
+    let mut requests = Requests::default();
+    for p in &shown {
+        assert_eq!(images.look(&ws(), p), Look::Pending);
+    }
+    assert!(images.ask(&mut requests, Instant::now()));
+    assert_eq!(run_looks(&mut images), 40, "all looked for in one frame");
+    assert!(requests.take().is_empty(), "nothing asked of the network");
+    let ready = shown.iter().filter(|p| matches!(images.look(&ws(), p), Look::Ready { .. })).count();
+    assert_eq!(ready, 40, "all drawn on the next frame");
+    images.ask(&mut requests, Instant::now());
+    assert!(requests.take().is_empty() && images.take_lookups().is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn disk_looks_do_not_wait_for_pictures_on_the_network() {
+    let dir = scratch("not-behind");
+    let shown = people(10);
+    kept_photos(&dir, &shown);
+    let mut images = images(&dir, &Diag::default());
+    let mut requests = Requests::default();
+    for n in 0..IN_FLIGHT_MAX {
+        images.look(&ws(), &thumb(n));
+    }
+    images.ask(&mut requests, Instant::now());
+    assert_eq!(requests.take().len(), IN_FLIGHT_MAX, "the network's share is out, unanswered");
+    for n in 0..IN_FLIGHT_MAX {
+        images.look(&ws(), &thumb(n));
+    }
+    for p in &shown {
+        images.look(&ws(), p);
+    }
+    assert!(images.ask(&mut requests, Instant::now()));
+    assert_eq!(run_looks(&mut images), 10, "looked for while the network is busy");
+    assert!(requests.take().is_empty());
+    assert!(shown.iter().all(|p| matches!(images.look(&ws(), p), Look::Ready { .. })));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn disk_looks_leave_the_network_its_four_slots() {
+    let dir = scratch("four-slots");
+    let shown = people(10);
+    kept_photos(&dir, &shown);
+    let mut images = images(&dir, &Diag::default());
+    let mut requests = Requests::default();
+    // The photos come first in the frame, the previews (never on disk) after them.
+    for p in &shown {
+        images.look(&ws(), p);
+    }
+    for n in 0..IN_FLIGHT_MAX {
+        images.look(&ws(), &thumb(n));
+    }
+    images.ask(&mut requests, Instant::now());
+    assert_eq!(images.take_lookups().len(), 10);
+    let asked: Vec<_> = requests.take().into_iter().map(|r| r.command).collect();
+    let thumbs: Vec<_> =
+        (0..IN_FLIGHT_MAX).map(|n| Command::Image { source: thumb(n), max: slakio_core::images::BYTES_MAX }).collect();
+    assert_eq!(asked, thumbs, "the previews take all {IN_FLIGHT_MAX} slots beside the looks");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_disk_miss_is_asked_of_the_network_on_the_next_frame() {
+    let dir = scratch("miss-next");
+    let shown = people(6);
+    let mut images = images(&dir, &Diag::default());
+    let mut requests = Requests::default();
+    let frame = |images: &mut Images, requests: &mut Requests| {
+        for p in &shown {
+            images.look(&ws(), p);
+        }
+        images.ask(requests, Instant::now());
+        (run_looks(images), requests.take())
+    };
+    let (looked, asked) = frame(&mut images, &mut requests);
+    assert_eq!((looked, asked.len()), (6, 0), "all looked for first, none there");
+    let (looked, asked) = frame(&mut images, &mut requests);
+    assert_eq!((looked, asked.len()), (0, IN_FLIGHT_MAX), "then asked, within the network's share");
+    let (looked, asked) = frame(&mut images, &mut requests);
+    assert_eq!((looked, asked.len()), (0, 0), "not looked for again while the others wait");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn turning_pictures_off_drops_looks_on_their_way() {
+    let dir = scratch("off-drops");
+    let kitty = detect::Env { term: "xterm-kitty".into(), ..detect::Env::default() };
+    let mut images = Images { env: kitty, setting: "auto".into(), tty: true, ..images(&dir, &Diag::default()) };
+    images.resolve();
+    assert!(images.on);
+    let mut requests = Requests::default();
+    // A miss first: its key is noted as missed.
+    images.look(&ws(), &photos()[0]);
+    images.ask(&mut requests, Instant::now());
+    assert_eq!(run_looks(&mut images), 1);
+    assert!(images.missed.contains(&(photos()[0].clone(), PHOTO)));
+    // Looks noted, not handed over yet, and the disk emptied for someone else.
+    for p in &photos()[1..] {
+        images.look_as(&ws(), p, CHIP_PHOTO);
+    }
+    images.ask(&mut requests, Instant::now());
+    images.forget_kept();
+    images.choose("off");
+    let left = images.take_lookups();
+    assert!(left.iter().all(|j| j.empty) && left.len() == 1, "only the emptying stays: {}", left.len());
+    assert!(images.missed.is_empty(), "nothing missed is remembered");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_failed_picture_tries_the_disk_before_the_network_again() {
+    let dir = scratch("retry-disk");
+    let mut images = images(&dir, &Diag::default());
+    let mut requests = Requests::default();
+    let photo = photos()[0].clone();
+    let t0 = Instant::now();
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, t0);
+    assert_eq!(run_looks(&mut images), 1, "not there");
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, t0);
+    let r = requests.take().pop().expect("asked of the network");
+    assert!(images.failed(r.id, &FailKind::Offline, t0));
+    // Kept meanwhile (another run fetched it).
+    kept_photos(&dir, std::slice::from_ref(&photo));
+    let later = t0 + RETRY_SOON + Duration::from_secs(1);
+    images.look(&ws(), &photo);
+    assert!(images.ask(&mut requests, later));
+    assert!(requests.take().is_empty(), "not asked of the network first");
+    assert_eq!(run_looks(&mut images), 1, "looked for on disk again");
+    assert!(matches!(images.look(&ws(), &photo), Look::Ready { .. }));
+    assert_eq!(images.failures(), 0, "no longer a failure");
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -2,11 +2,13 @@
 //! profile photos and a workspace's own emoji, never a file's preview (a copy of a file of the
 //! signed-in user's workspace, which another account on the same machine must not be shown).
 //! A picture a frame wants and does not have is looked for there first: the look is a job like
-//! a decode ([`Job::from_cache`], counted among the pictures on their way, so the same bounds on
-//! what is asked hold), which the binary runs off the loop's thread with [`run`]. Found, it is
-//! decoded within the same bounds as a fetched picture (what is on disk is not trusted: one
-//! that does not decode is removed); not found, the next frame that still wants it asks the
-//! backend ([`Images::ask`]), and the picture made from the answer is kept for the next time.
+//! a decode ([`Job::from_cache`]), which the binary runs off the loop's thread with [`run`], at
+//! most [`DISK_LOADERS`] at once. Every picture a frame wants that may be there is looked for at
+//! once (at most [`LOOKUPS_MAX`] looks waiting), never behind the pictures asked of the network
+//! nor in their [`super::IN_FLIGHT_MAX`]. Found, it is decoded within the same bounds as a
+//! fetched picture (what is on disk is not trusted: one that does not decode is removed); not
+//! found, the next frame that still wants it asks the backend ([`Images::ask`]), and the
+//! picture made from the answer is kept for the next time.
 //! A picture parked or removed from the terminal comes back from there, not from the network.
 //! Nothing here reads or writes the disk on the loop's thread.
 
@@ -16,6 +18,11 @@ use slakio_core::backend::Generation;
 use slakio_core::diag::{Diag, Kind, Stage};
 use slakio_core::images::Source;
 use slakio_core::picture_cache::{Loaded, PictureCache, Stored, Swept};
+
+/// The most looks in the cache waiting at once (a safety net: a frame wants fewer).
+pub const LOOKUPS_MAX: usize = super::ENTRIES_MAX;
+/// The most looks in the cache the binary reads and decodes at once.
+pub const DISK_LOADERS: usize = 4;
 
 /// The cells a picture fills and a cell's size in pixels (what it is decoded for), as part of
 /// its key on disk: a picture made for other cells is another picture.
@@ -173,7 +180,7 @@ impl Images {
         let id = self.next_id();
         // Never a backend's request id (those count up from one), and never two at once.
         let request = Generation(u64::MAX - u64::from(id));
-        self.entries.insert(key.clone(), Entry::Decoding(request));
+        self.entries.insert(key.clone(), Entry::Looking(request));
         let (source, shape) = key;
         let epoch = self.cache.as_ref().map_or(0, PictureCache::epoch);
         self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: false, epoch });
