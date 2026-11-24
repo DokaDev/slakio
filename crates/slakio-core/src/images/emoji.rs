@@ -13,6 +13,7 @@
 
 use super::emoji_address;
 use std::collections::HashMap;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The most aliases followed from one name.
 pub const ALIAS_DEPTH: usize = 4;
@@ -29,9 +30,59 @@ pub enum Custom {
     Standard(String),
 }
 
-/// `name` is one a shortcode may have: letters, digits and `_ + - '`, at most 64 bytes.
+/// The most characters a shortcode has.
+pub const SHORTCODE_CHARS: usize = 64;
+
+/// The most bytes a shortcode has: 64 characters of a Latin name, about 33 of a Korean one.
+pub const SHORTCODE_BYTES: usize = 100;
+
+/// The format characters (Unicode's `Cf`: joiners, bidi controls, invisible operators, tags) and
+/// the private-use planes: named here so they stay refused, though no letter or digit is one.
+const REFUSED: &[(char, char)] = &[
+    ('\u{00AD}', '\u{00AD}'),
+    ('\u{0600}', '\u{0605}'),
+    ('\u{061C}', '\u{061C}'),
+    ('\u{06DD}', '\u{06DD}'),
+    ('\u{070F}', '\u{070F}'),
+    ('\u{0890}', '\u{0891}'),
+    ('\u{08E2}', '\u{08E2}'),
+    ('\u{180E}', '\u{180E}'),
+    ('\u{200B}', '\u{200F}'),
+    ('\u{202A}', '\u{202E}'),
+    ('\u{2060}', '\u{2064}'),
+    ('\u{2066}', '\u{206F}'),
+    ('\u{E000}', '\u{F8FF}'),
+    ('\u{FEFF}', '\u{FEFF}'),
+    ('\u{FFF9}', '\u{FFFB}'),
+    ('\u{110BD}', '\u{110BD}'),
+    ('\u{110CD}', '\u{110CD}'),
+    ('\u{13430}', '\u{1343F}'),
+    ('\u{1BCA0}', '\u{1BCA3}'),
+    ('\u{1D173}', '\u{1D17A}'),
+    ('\u{E0001}', '\u{E007F}'),
+    ('\u{F0000}', '\u{10FFFF}'),
+];
+
+/// `name` is one a shortcode may have, as Slack names emoji: letters and digits of any script
+/// (a Korean name too) and `_ + - '`, at most [`SHORTCODE_CHARS`] characters and
+/// [`SHORTCODE_BYTES`] bytes. Never a control, format or private-use character, a blank, a `:`,
+/// or a mark that joins the character before it (an accent, a vowel sign, a variation selector):
+/// a precomposed Hangul syllable is one letter, and a name of stacked marks draws nothing.
 pub fn shortcode(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || "_+-'".contains(c))
+    !name.is_empty()
+        && name.len() <= SHORTCODE_BYTES
+        && name.chars().count() <= SHORTCODE_CHARS
+        && name.chars().all(|c| matches!(c, '_' | '+' | '-' | '\'') || letter(c))
+}
+
+/// `c` is a letter or a digit a shortcode may hold.
+fn letter(c: char) -> bool {
+    c.is_alphanumeric()
+        && !c.is_control()
+        && !c.is_whitespace()
+        && !REFUSED.iter().any(|(from, to)| (*from..=*to).contains(&c))
+        // A mark joins the character before it: after `a`, the two stay one cluster.
+        && ['a', c].iter().collect::<String>().graphemes(true).count() == 2
 }
 
 /// What each name of `list` (`emoji.list`'s `name → address or alias:other`) draws, by name; a

@@ -31,12 +31,12 @@ pub struct Customs {
 impl Customs {
     /// What `name` (a shortcode the standard emoji do not know) draws in workspace `ws`. While
     /// the workspace's list has not come, nothing; the frame notes that one is wanted (a name of
-    /// digits only, as `10:30:` reads, is no emoji's).
+    /// digits only, as `10:30:` reads, is no emoji's; a letter of any script counts, Hangul too).
     pub fn get(&self, ws: &WorkspaceId, name: &str) -> Option<&Custom> {
         match self.sets.get(ws) {
             Some(set) => set.get(name),
             None => {
-                if name.bytes().any(|b| b.is_ascii_alphabetic()) {
+                if name.chars().any(char::is_alphabetic) {
                     self.seen.borrow_mut().push((ws.clone(), true));
                 }
                 None

@@ -83,3 +83,13 @@ fn a_shortcode_only_laid_out_asks_for_no_list() {
     assert!(c.ask(&mut r, now), "shown once: asked");
     assert_eq!(asked(&mut r).len(), 1);
 }
+
+#[test]
+fn a_name_of_korean_letters_only_asks_for_the_list() {
+    let (mut c, mut r, now) = (Customs::default(), Requests::default(), Instant::now());
+    assert_eq!(c.get(&ws("T1"), "\u{CD95}\u{D558}\u{CD95}\u{D558}"), None);
+    assert!(c.ask(&mut r, now), "a Hangul letter is a letter");
+    assert_eq!(asked(&mut r).len(), 1);
+    c.get(&ws("T2"), "\u{0663}\u{0660}");
+    assert!(!c.ask(&mut r, now), "digits of another script only: still no emoji's");
+}

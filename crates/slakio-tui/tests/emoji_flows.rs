@@ -492,3 +492,51 @@ fn a_skin_tone_or_a_joining_mark_right_after_a_picture_is_left_out() {
         assert!(line.contains("ship") && line.contains("now"), "{text:?}: {line}");
     }
 }
+
+/// Korean names of a workspace's own emoji (synthetic): a clap, a mixed one.
+const CLAP: &str = "\u{C9DD}\u{C9DD}-\u{BCD1}\u{C544}\u{B9AC}";
+const MIXED: &str = "\u{C9F1}\u{AD6C}_wow-2";
+
+#[test]
+fn a_korean_name_asks_for_the_list_and_is_drawn_in_the_text_and_the_chip() {
+    use slakio_core::images::emoji::Custom;
+    let text = format!("great :{CLAP}: work");
+    let (mut s, ws) = shown(&[(text.as_str(), &[MIXED])], 120, 40, true);
+    let asked = frame(&mut s);
+    assert_eq!(lists(&asked).len(), 1, "a frame showing only Korean names wants the list");
+    let named = [(CLAP, "clap"), (MIXED, "mixed")]
+        .map(|(n, p)| (n.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), p))));
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named.to_vec() } });
+    s.pump();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            give_picture(&mut s, &r);
+        }
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains(CLAP) && !screen.contains(MIXED), "{screen}");
+    let rows = cells(&s);
+    assert_eq!(rows.len(), 2, "one in the text, one in the chip: {rows:?}");
+    assert!(rows.iter().all(|(_, xs)| xs.len() == 2), "{rows:?}");
+    let buf = s.d.buffer();
+    let (y, xs) = &rows[0];
+    let next: String = (xs[1] + 2..xs[1] + 6).map(|x| buf[(x, *y)].symbol().to_string()).collect();
+    assert_eq!(next, "work", "two cells, not the name's");
+}
+
+#[test]
+fn a_korean_name_left_as_text_wraps_by_its_double_width_cells() {
+    let text = format!("{} :{CLAP}: :{MIXED}: {}", "word ".repeat(8), "tail ".repeat(8));
+    for w in 70..=110u16 {
+        let (s, _) = shown(&[(text.as_str(), &[CLAP])], w, 60, false);
+        let screen = s.d.screen();
+        assert!(screen.contains(&format!(":{CLAP}:")), "{w}: text with pictures off\n{screen}");
+        assert!(screen.contains(&format!(" :{CLAP}: 2 ")), "{w}: the chip\n{screen}");
+        // Measured as one cell a byte or a character, the line would run past the pane and lose
+        // what the edge cuts: every word stays, the names whole.
+        let words: Vec<&str> = screen.split_whitespace().collect();
+        assert_eq!(words.iter().filter(|t| **t == "word").count(), 8, "{w}:\n{screen}");
+        assert_eq!(words.iter().filter(|t| **t == "tail").count(), 8, "{w}:\n{screen}");
+        assert!(words.contains(&format!(":{MIXED}:").as_str()), "{w}:\n{screen}");
+    }
+}

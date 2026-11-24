@@ -16,3 +16,17 @@ fn at_most_the_names_cap_is_kept_and_long_or_odd_values_are_read_past() {
     let empty: Listed = serde_json::from_str("{\"ok\":true}").expect("read");
     assert!(empty.emoji.0.is_empty());
 }
+
+#[test]
+fn korean_names_are_kept_and_names_hiding_characters_read_past() {
+    let body = concat!(
+        "{\"ok\":true,\"emoji\":{",
+        "\"\u{C9DD}\u{C9DD}-\u{BCD1}\u{C544}\u{B9AC}\":\"alias:party\",",
+        "\"\u{C9F1}\u{AD6C}_wow-2\":\"alias:\u{C9DD}\u{C9DD}-\u{BCD1}\u{C544}\u{B9AC}\",",
+        "\"a\u{202E}b\":\"alias:party\",\"a\u{200D}b\":\"alias:party\",\"\u{E000}\":\"alias:party\"",
+        "}}"
+    );
+    let listed: Listed = serde_json::from_str(body).expect("read");
+    let names: Vec<&str> = listed.emoji.0.iter().map(|(n, _)| n.as_str()).collect();
+    assert_eq!(names, ["\u{C9DD}\u{C9DD}-\u{BCD1}\u{C544}\u{B9AC}", "\u{C9F1}\u{AD6C}_wow-2"]);
+}

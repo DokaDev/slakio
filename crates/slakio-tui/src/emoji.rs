@@ -9,6 +9,7 @@
 //! a skin-toned one and a ZWJ sequence are two cells, like a CJK character.
 
 use emojis::SkinTone;
+use slakio_core::images::emoji::shortcode;
 
 /// Slack's names that gemoji spells otherwise (the common ones).
 const ALIASES: &[(&str, &str)] = &[
@@ -95,7 +96,7 @@ pub fn replace(text: &str) -> String {
         out.push_str(&rest[..start]);
         let after = &rest[start + 1..];
         let end = after.find(':');
-        let name = end.map(|e| &after[..e]).filter(|n| valid(n));
+        let name = end.map(|e| &after[..e]).filter(|n| shortcode(n));
         match name.and_then(get) {
             Some(mut emoji) => {
                 let mut next = &after[name.unwrap_or_default().len() + 1..];
@@ -119,11 +120,6 @@ pub fn replace(text: &str) -> String {
     }
     out.push_str(rest);
     out
-}
-
-/// A shortcode: letters, digits and `_ + - '`, as Slack names them.
-fn valid(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || "_+-'".contains(c))
 }
 
 #[cfg(test)]
