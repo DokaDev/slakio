@@ -204,3 +204,17 @@ fn an_emoji_address_of_another_script_is_kept_percent_encoded_on_the_same_host_o
         assert_eq!(emoji_address(&bad), None, "{bad}");
     }
 }
+
+#[test]
+fn an_emoji_address_too_long_is_refused_before_it_is_encoded() {
+    let host = EMOJI_HOSTS[0];
+    let huge = format!("https://{host}/T1/{}/a.png", "\u{C548}".repeat(350_000));
+    assert!(huge.len() > 1_000_000);
+    assert_eq!(emoji_address(&huge), None);
+    // Within the cap before encoding, over it after: refused too (by the encoded length).
+    let near = format!("https://{host}/T1/{}/a.png", "\u{C548}".repeat(600));
+    assert!(near.len() <= ADDRESS_MAX);
+    assert_eq!(emoji_address(&near), None);
+    let fits = format!("https://{host}/T1/{}/a.png", "\u{C548}".repeat(200));
+    assert!(emoji_address(&fits).is_some_and(|a| a.len() <= ADDRESS_MAX));
+}

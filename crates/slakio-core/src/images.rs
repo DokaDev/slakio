@@ -100,6 +100,10 @@ pub fn gravatar_fallback(url: &str) -> Option<String> {
 /// write it raw) are percent-encoded first, as a browser sends them; the host is matched as
 /// before, so no other host passes.
 pub fn emoji_address(url: &str) -> Option<String> {
+    // Too long already: never encoded (that would make it up to three times longer first).
+    if url.len() > ADDRESS_MAX {
+        return None;
+    }
     let url = encoded(url);
     EMOJI_HOSTS.iter().find_map(|h| on_host(&url, h, true))
 }
