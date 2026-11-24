@@ -159,6 +159,11 @@ impl Customs {
         true
     }
 
+    /// When each failed list may be asked again.
+    pub(super) fn retry_times(&self) -> impl Iterator<Item = Instant> + '_ {
+        self.failed.values().filter_map(|again| *again)
+    }
+
     /// One diagnostics line about workspace `ws`'s list.
     fn note(&self, ws: &WorkspaceId, stage: Stage, result: &str, pairs: &[(&str, &str)]) {
         if !self.diag.on() {

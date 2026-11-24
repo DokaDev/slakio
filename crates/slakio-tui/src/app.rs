@@ -559,8 +559,15 @@ impl App {
     /// goes away, or the which-key popup shows.
     pub fn deadline(&self) -> Option<Instant> {
         let guide = self.guide.at.filter(|_| !self.guide.shown && !self.keys.pending().is_empty());
-        let soon =
-            [self.status.deadline(), guide, self.work.deadline(), self.search_deadline(), self.activity_deadline()];
+        let pictures = self.images.retry_at();
+        let soon = [
+            self.status.deadline(),
+            guide,
+            self.work.deadline(),
+            self.search_deadline(),
+            self.activity_deadline(),
+            pictures,
+        ];
         soon.into_iter().flatten().min()
     }
 
@@ -570,6 +577,7 @@ impl App {
         changed |= self.work.expire_flash(now);
         changed |= self.search_tick(now);
         changed |= self.activity_tick(now);
+        changed |= self.images.woke(now);
         if let Some(at) = self.guide.at
             && !self.guide.shown
             && now >= at

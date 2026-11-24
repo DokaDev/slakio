@@ -34,6 +34,7 @@ pub mod decode;
 pub mod detect;
 pub mod graphics;
 mod note;
+mod wake;
 
 use crate::app::requests::Requests;
 use decode::{Refused, Shape};
@@ -211,6 +212,8 @@ pub struct Images {
     pub customs: custom::Customs,
     /// The picture diagnostics (off unless asked for, [`Images::set_diag`]).
     diag: Diag,
+    /// The last time the loop woke for a failed picture's or list's wait ([`Images::woke`]).
+    woken: Option<Instant>,
 }
 
 impl Images {
