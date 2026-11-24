@@ -208,6 +208,25 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
     }
 }
 
+/// The user's own record (`me`) among a view's `persons`: once a run, whether it had a photo
+/// slakio takes (`yes`), one it refuses (`refused`) or none (`no`).
+pub(crate) fn own_seen(diag: &Diag, persons: &[wire::Person], me: Option<&slakio_core::model::UserId>) {
+    if !diag.on() {
+        return;
+    }
+    let Some(p) = me.and_then(|me| persons.iter().find(|p| p.id == me.as_str())) else { return };
+    if !diag.first(Kind::SelfPhoto, Stage::Seen, "view") {
+        return;
+    }
+    let raw = p.profile.as_ref().is_some_and(|f| f.image_72.is_some() || f.image_48.is_some());
+    let photo = match (p.profile.as_ref().and_then(wire::Profile::avatar), raw) {
+        (Some(_), _) => "yes",
+        (None, true) => "refused",
+        (None, false) => "no",
+    };
+    diag.line(Kind::SelfPhoto, Stage::Seen, "ok", &[("from", "view"), ("photo", photo)]);
+}
+
 /// The user's own photo in the start bundle: whether its profile was read, and its photo
 /// taken (and from which host) or why not.
 pub(crate) fn own_profile(diag: &Diag, me: &wire::Me) {

@@ -125,6 +125,8 @@ pub enum Stage {
     Field,
     /// What a lookup gave (of the user's own record).
     Lookup,
+    /// The user's own record came in an answer (a view's people).
+    Seen,
     /// Kept for the local picture cache: found there.
     CacheHit,
     /// Kept for the local picture cache: not there.
@@ -154,6 +156,7 @@ impl Stage {
             Stage::Source => "source",
             Stage::Field => "field",
             Stage::Lookup => "lookup",
+            Stage::Seen => "seen",
             Stage::CacheHit => "cache-hit",
             Stage::CacheMiss => "cache-miss",
         }

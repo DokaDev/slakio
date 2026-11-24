@@ -102,3 +102,29 @@ fn the_user_s_own_lookup_says_what_it_gave_and_the_answer_s_counts() {
         assert!(r.calls("users/info") >= 1);
     });
 }
+
+#[test]
+fn the_user_s_own_record_in_a_view_is_told_once() {
+    rt().block_on(async {
+        let mut r = Run::new("seen", None).await;
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        let (me, team) = (b.workspaces[0].me.as_str().to_string(), b.workspaces[0].id.as_str().to_string());
+        let photo = format!("https://{}/avatars/me_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+        let view = json!({
+            "ok": true,
+            "history": {"messages": [{"type": "message", "user": me, "text": "mine", "ts": "1767603600.000100"}], "has_more": false},
+            "users": [{"id": me, "team_id": team, "profile": {"display_name": "Me", "image_72": photo}}],
+        });
+        let world = World::demo();
+        let s = world.snapshot();
+        let c = s.conversations.iter().find(|c| c.workspace == s.workspaces[0].id && c.name == "general").unwrap();
+        let target = slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() };
+        for _ in 0..2 {
+            r.fake.fail_next("conversations.view", Fault::Answer(view.clone()));
+            assert!(matches!(r.ask(Command::History { target: target.clone(), before: None, limit: 20 }).await, Event::History(_)));
+        }
+        let text = r.text();
+        has(&text, "self-photo seen ok from=view photo=yes");
+        assert_eq!(text.matches("self-photo seen").count(), 1, "once a run: {text}");
+    });
+}

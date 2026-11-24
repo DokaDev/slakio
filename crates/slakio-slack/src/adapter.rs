@@ -426,6 +426,7 @@ pub(crate) async fn history(
             let view: wire::View = client.call(&call, Priority::User).await?;
             ctx.people.learn(view.users.as_deref().unwrap_or_default());
             crate::shape::photos(client.diag(), view.users.as_deref().unwrap_or_default(), "view");
+            crate::shape::own_seen(client.diag(), view.users.as_deref().unwrap_or_default(), me.as_ref());
             let history = view.history.unwrap_or_default();
             // Unknown is not complete: only Slack's own "no more" says the start is in this page.
             let complete = history.has_more == Some(false);
