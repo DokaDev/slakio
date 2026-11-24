@@ -167,3 +167,21 @@ fn a_picture_removed_from_the_terminal_is_never_sent_a_frame_again() {
     images.take_graphics();
     assert!(run(&mut images, now, SECOND, TICK).is_empty());
 }
+
+#[test]
+fn a_late_wake_does_not_push_the_next_frame_back() {
+    let (mut images, now) = held(1, 3, Duration::from_millis(100));
+    draw(&mut images, [0], now);
+    let at = images.frame_at().expect("a frame due");
+    assert!(images.advance(at + Duration::from_millis(1)));
+    assert_eq!(images.frame_at(), Some(at + Duration::from_millis(100)), "from when it was due, not from the wake");
+}
+
+#[test]
+fn a_coarse_tick_from_an_offset_start_still_shows_ten_frames_a_second() {
+    let (mut images, now) = held(1, 3, Duration::from_millis(100));
+    draw(&mut images, [0], now);
+    let sent = run(&mut images, now + Duration::from_millis(7), 10 * SECOND, Duration::from_millis(13));
+    let n = sent.get(&1).copied().unwrap_or(0);
+    assert!((98..=101).contains(&n), "{n} frames in ten seconds");
+}

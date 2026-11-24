@@ -140,12 +140,15 @@ impl Images {
         let mut sent = false;
         for key in self.anims.moving.clone() {
             let Some(a) = self.anims.list.get_mut(&key) else { continue };
-            if a.next.is_none_or(|at| at > now) || !held(&self.entries, &key, a.id) {
+            let Some(was) = a.next.filter(|at| *at <= now) else { continue };
+            if !held(&self.entries, &key, a.id) {
                 continue;
             }
             a.at = (a.at + 1) % a.frames.len();
             self.graphics.push_str(&a.frames[a.at].0);
-            let due = now + a.frames[a.at].1;
+            // From when this one was due, not from a late wake (that would slow every frame);
+            // one already past is due at once.
+            let due = (was + a.frames[a.at].1).max(now);
             let due = self.anims.on_grid(due);
             if let Some(a) = self.anims.list.get_mut(&key) {
                 a.next = Some(due);
