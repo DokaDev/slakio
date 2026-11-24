@@ -144,3 +144,27 @@ fn an_emoji_list_that_is_not_json_is_told_once() {
         has(&text, "emoji-list status 503");
     });
 }
+
+#[test]
+fn the_sidebar_probe_refused_never_signs_out() {
+    rt().block_on(async {
+        let mut r = Run::new("probe-auth", None).await;
+        r.fake.fail_next("users.channelSections.list", Fault::Api("invalid_auth".to_string()));
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        for _ in 0..200 {
+            if r.calls("users.channelSections.list") >= 1 && r.text().contains("sections failed") {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        has(&r.text(), "sections failed signed-out page=1");
+        // Still signed in: the next request goes out and is answered.
+        let s = World::demo();
+        let snap = s.snapshot();
+        let c = snap.conversations.iter().find(|c| c.workspace == b.workspaces[0].id && c.name == "general").unwrap();
+        let target =
+            slakio_core::model::Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() };
+        let page = r.ask(Command::History { target, before: None, limit: 20 }).await;
+        assert!(matches!(page, Event::History(_)), "{page:?}");
+    });
+}
