@@ -390,3 +390,15 @@ fn emptied_every_file_goes_and_the_folder_stays_for_what_comes_next() {
     assert_eq!(fs::read_dir(c.dir()).unwrap().count(), 1);
     let _ = fs::remove_dir_all(c.dir());
 }
+
+#[test]
+fn a_write_asked_before_the_folder_was_emptied_is_refused() {
+    let (c, _) = cache("epoch");
+    let before = c.epoch();
+    c.empty();
+    let src = Source::Avatar("https://x.test/a.png".into());
+    assert_eq!(c.store_as_of(before, &src, "photo", &png(10)), Stored::Refused("stale"));
+    assert_eq!(c.load(&src, "photo"), Loaded::Miss);
+    assert!(matches!(c.store_as_of(c.epoch(), &src, "photo", &png(10)), Stored::Stored(_)));
+    let _ = std::fs::remove_dir_all(c.dir());
+}

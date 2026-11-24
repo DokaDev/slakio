@@ -258,3 +258,27 @@ fn a_fetched_picture_goes_to_the_ui_before_it_is_kept_on_disk() {
     assert_eq!(files(), 1, "kept afterwards");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_picture_on_its_way_while_the_kept_ones_are_removed_is_not_kept() {
+    let dir = scratch("stale");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    images.look(&ws(), &photo);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    let fetched = Job { from_cache: false, bytes: slakio_world::pictures::png(photo.address(), 64, 64), ..look };
+    // Someone else signs in while it is decoded: the kept pictures go first.
+    images.forget_kept();
+    let empty = images.take_lookups().pop().expect("the emptying job");
+    assert_eq!(run(&empty, Some((9, 18)), images.cache.as_ref(), &diag), Err(Refused::NotCached));
+    let shown = run(&fetched, Some((9, 18)), images.cache.as_ref(), &diag);
+    assert!(shown.is_ok(), "shown all the same");
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "the old sign-in's picture is not written back");
+    // A job made after the emptying is kept as before.
+    let after = Job { epoch: images.cache.as_ref().unwrap().epoch(), ..fetched };
+    assert!(run(&after, Some((9, 18)), images.cache.as_ref(), &diag).is_ok());
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -32,7 +32,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, TryLockError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The folder's name in the cache directory.
@@ -148,6 +148,11 @@ pub struct PictureCache {
     sweeping: Arc<Mutex<()>>,
     /// The folder was made or found at the start ([`PictureCache::open`]): writes may follow.
     opened: Arc<AtomicBool>,
+    /// How many times the folder was emptied ([`PictureCache::empty`]): a write made for an
+    /// earlier count is refused ([`PictureCache::store_as_of`]).
+    epoch: Arc<AtomicU64>,
+    /// Held to write (shared) and to empty (alone): no write lands after an emptying it predates.
+    gate: Arc<RwLock<()>>,
 }
 
 impl fmt::Debug for PictureCache {
@@ -188,7 +193,8 @@ impl PictureCache {
     /// clock.
     pub fn new(dir: PathBuf) -> Self {
         let (total, sweeping, opened) = (Arc::default(), Arc::default(), Arc::default());
-        Self { dir, budget: BUDGET, now: Arc::new(SystemTime::now), total, sweeping, opened }
+        let (epoch, gate) = (Arc::default(), Arc::default());
+        Self { dir, budget: BUDGET, now: Arc::new(SystemTime::now), total, sweeping, opened, epoch, gate }
     }
 
     /// Make the folder (private) or find it, at the start of a run: only then are pictures
@@ -282,9 +288,29 @@ impl PictureCache {
         }
     }
 
+    /// How many times the folder was emptied so far: what a picture's job notes when it is made,
+    /// for [`PictureCache::store_as_of`].
+    pub fn epoch(&self) -> u64 {
+        self.epoch.load(Ordering::SeqCst)
+    }
+
     /// Keep `png`, the picture of `source` as `shape`, in the folder opened at the start (one
     /// gone since is not made again). A write that takes the folder over its room sweeps it.
     pub fn store(&self, source: &Source, shape: &str, png: &[u8]) -> Stored {
+        self.store_as_of(self.epoch(), source, shape, png)
+    }
+
+    /// [`PictureCache::store`], for a picture asked for when the folder had been emptied `epoch`
+    /// times: emptied since (someone else signed in), it is not written.
+    pub fn store_as_of(&self, epoch: u64, source: &Source, shape: &str, png: &[u8]) -> Stored {
+        let _writing = self.gate.read().unwrap_or_else(PoisonError::into_inner);
+        if epoch != self.epoch() {
+            return Stored::Refused("stale");
+        }
+        self.write(source, shape, png)
+    }
+
+    fn write(&self, source: &Source, shape: &str, png: &[u8]) -> Stored {
         if (HEADER + png.len()) as u64 > FILE_MAX {
             return Stored::Refused("too-large");
         }
@@ -368,8 +394,10 @@ impl PictureCache {
     }
 
     /// Remove every file in the folder and keep the folder, for what is kept from now on (someone
-    /// else signed in). Best effort.
+    /// else signed in); a write of a picture asked for before is refused from now on. Best effort.
     pub fn empty(&self) {
+        let _alone = self.gate.write().unwrap_or_else(PoisonError::into_inner);
+        self.epoch.fetch_add(1, Ordering::SeqCst);
         if !self.dir_ok() {
             return;
         }

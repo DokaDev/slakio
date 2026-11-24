@@ -74,7 +74,7 @@ pub fn run_then_keep(
     // A picture that moves is kept with all its frames (an animated PNG), decoded again within
     // the same bounds when read.
     let png = super::frames::kept(&d.png, &d.moving);
-    match cache.store(&job.source, &shape_tag(job.shape, cell), &png) {
+    match cache.store_as_of(job.epoch, &job.source, &shape_tag(job.shape, cell), &png) {
         Stored::Stored(swept) => {
             note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", png.len().to_string())]);
             swept.into_iter().for_each(|s| swept_line(diag, s));
@@ -175,7 +175,8 @@ impl Images {
         let request = Generation(u64::MAX - u64::from(id));
         self.entries.insert(key.clone(), Entry::Decoding(request));
         let (source, shape) = key;
-        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: false });
+        let epoch = self.cache.as_ref().map_or(0, PictureCache::epoch);
+        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: false, epoch });
     }
 
     /// Someone else signed in to a workspace: the pictures kept on disk go (off the loop's
@@ -187,7 +188,16 @@ impl Images {
         let id = self.next_id();
         let request = Generation(u64::MAX - u64::from(id));
         let (source, shape) = (Source::Emoji(String::new()), Shape::Emoji);
-        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: true });
+        self.lookups.push(Job {
+            source,
+            request,
+            id,
+            bytes: Vec::new(),
+            shape,
+            from_cache: true,
+            empty: true,
+            epoch: 0,
+        });
     }
 
     /// `key` is not in the cache: the next frame that wants it asks the backend.

@@ -137,6 +137,8 @@ pub struct Job {
     pub from_cache: bool,
     /// No picture: every picture kept on disk is removed ([`Images::forget_kept`]).
     pub empty: bool,
+    /// The cache's count of emptyings when the job was made: emptied since, nothing is kept.
+    pub epoch: u64,
 }
 
 /// A picture ready for the terminal: the commands that send it (base64 and all, made off the
@@ -493,7 +495,8 @@ impl Images {
         }
         self.entries.insert(key.clone(), Entry::Decoding(id));
         let (source, shape) = key;
-        Some(Job { source, request: id, id: self.next_id(), bytes, shape, from_cache: false, empty: false })
+        let (picture, epoch) = (self.next_id(), self.cache.as_ref().map_or(0, PictureCache::epoch));
+        Some(Job { source, request: id, id: picture, bytes, shape, from_cache: false, empty: false, epoch })
     }
 
     /// The id of the next picture sent.
