@@ -355,3 +355,24 @@ fn a_picture_written_again_counts_once() {
     assert_eq!(c.load(&photo, "x"), Loaded::Hit(png(2_000)));
     let _ = fs::remove_dir_all(c.dir());
 }
+
+#[test]
+fn a_sweep_that_panicked_leaves_the_next_one_to_run() {
+    let (c, _) = cache("poisoned");
+    let photo = Source::Avatar(AVATAR.into());
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)));
+    let held = c.clone();
+    let panicked = std::thread::spawn(move || {
+        let _one = held.sweeping.lock().unwrap();
+        panic!("a sweep panicked part way");
+    })
+    .join();
+    assert!(panicked.is_err() && c.sweeping.is_poisoned());
+    let swept = c.sweep().expect("the next sweep runs");
+    assert_eq!((swept.removed, swept.kept), (0, 1));
+    // Another sweep running meanwhile: this one does not wait for it.
+    let running = c.sweeping.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    assert_eq!(c.sweep(), None);
+    drop(running);
+    let _ = fs::remove_dir_all(c.dir());
+}
