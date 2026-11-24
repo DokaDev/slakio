@@ -104,6 +104,8 @@ pub(crate) struct Session {
     pub(crate) booted: tokio::sync::Notify,
     /// The conversations the UI read this session: the live updates name new authors only there.
     pub(crate) opened: std::sync::Mutex<std::collections::HashSet<ConversationId>>,
+    /// The sidebar's shape was described (picture diagnostics on, [`crate::shape::sections`]).
+    probed: AtomicBool,
 }
 
 pub use crate::people::LOOKUP_BATCH;
@@ -251,10 +253,15 @@ fn spawn_boot(
 ) {
     tasks.spawn(async move {
         let booted = boot(&client, &ctx.me, &ctx.people).await;
+        let probe = booted.is_ok() && client.diag().on() && !ctx.probed.swap(true, Ordering::SeqCst);
         if booted.is_ok() {
             ctx.booted.notify_one();
         }
         answer(&tx, id, booted).await;
+        // Diagnostics only, after the answer: once per workspace, nothing of it kept.
+        if probe {
+            crate::shape::sections(&client).await;
+        }
     });
 }
 
@@ -270,6 +277,8 @@ async fn picture(
 ) -> bool {
     pictures.retain(|p| !p.task.is_finished());
     if pictures.len() >= PICTURES_MAX {
+        let (diag, kind) = (client.diag(), slakio_core::diag::Kind::of(&source));
+        crate::shape::failed(diag, kind, &SlackError::Busy, &[("id", &diag.id(source.address()))]);
         let e = SlackError::Busy;
         return tx.send(Envelope::failed(id, e.kind(), e.detail())).await.is_ok();
     }
@@ -416,6 +425,7 @@ pub(crate) async fn history(
             );
             let view: wire::View = client.call(&call, Priority::User).await?;
             ctx.people.learn(view.users.as_deref().unwrap_or_default());
+            crate::shape::photos(client.diag(), view.users.as_deref().unwrap_or_default(), "view");
             let history = view.history.unwrap_or_default();
             // Unknown is not complete: only Slack's own "no more" says the start is in this page.
             let complete = history.has_more == Some(false);

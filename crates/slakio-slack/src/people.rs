@@ -11,6 +11,7 @@ use crate::method::Method;
 use crate::request::Call;
 use crate::wire;
 use serde_json::{Map, Value, json};
+use slakio_core::diag::Kind;
 use slakio_core::model::{Org, Presence, User, UserId, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
@@ -58,6 +59,15 @@ impl People {
         }
     }
 
+    /// Where person `id` stands before a lookup: `pictured` / `unpictured` (known, with a photo or
+    /// without), `unnamed` (Slack gave no name for them: not asked again), or `unknown` (asked).
+    pub(crate) fn standing(&self, id: &str) -> &'static str {
+        if let Some(u) = self.known.lock().unwrap_or_else(PoisonError::into_inner).get(id) {
+            return if u.avatar.is_some() { "pictured" } else { "unpictured" };
+        }
+        if self.unnamed.lock().unwrap_or_else(PoisonError::into_inner).contains(id) { "unnamed" } else { "unknown" }
+    }
+
     /// The people of `ids` (in no order), those not known yet looked up first: in batches of
     /// [`LOOKUP_BATCH`], each id once. Those Slack does not name are left out.
     pub(crate) async fn names(&self, client: &Client, ids: &[String], priority: Priority) -> Vec<User> {
@@ -76,10 +86,20 @@ impl People {
             body.insert("check_interaction".into(), json!(true));
             body.insert("include_profile_only_if_stale".into(), json!(true));
             body.insert("updated_ids".into(), Value::Object(updated));
-            let Ok(found) = client.call::<wire::EdgeUsers>(&Call::json(Method::EdgeUsersInfo, body), priority).await
-            else {
-                continue;
+            let found = match client.call::<wire::EdgeUsers>(&Call::json(Method::EdgeUsersInfo, body), priority).await {
+                Ok(found) => found,
+                Err(e) => {
+                    let asked = batch.len().to_string();
+                    crate::shape::failed(
+                        client.diag(),
+                        Kind::Avatar,
+                        &e,
+                        &[("lookup", "users-info"), ("asked", &asked)],
+                    );
+                    continue;
+                }
             };
+            crate::shape::photos(client.diag(), found.results.as_deref().unwrap_or_default(), "lookup");
             let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
             for p in found.results.unwrap_or_default() {
                 if let Some(u) = user(&p, &team) {

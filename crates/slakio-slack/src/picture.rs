@@ -73,44 +73,134 @@ pub(crate) fn avatar_headers(os: Os) -> Vec<(&'static str, String)> {
 
 /// The bytes of the picture at `source`, at most `max` of them, within [`DEADLINE`].
 pub(crate) async fn picture(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, SlackError> {
-    match tokio::time::timeout(DEADLINE, read(client, source, max)).await {
+    let note = Note::new(client.diag(), source);
+    let read = match tokio::time::timeout(DEADLINE, read(client, source, max, &note)).await {
         Ok(read) => read,
         Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
+    };
+    if let Err(e) = &read {
+        note.failed(e);
+    }
+    read
+}
+
+/// The picture diagnostics' lines of one picture ([`slakio_core::diag`]; nothing when off).
+struct Note<'a> {
+    diag: &'a slakio_core::diag::Diag,
+    source: &'a Source,
+    kind: slakio_core::diag::Kind,
+    id: String,
+}
+
+impl<'a> Note<'a> {
+    fn new(diag: &'a slakio_core::diag::Diag, source: &'a Source) -> Self {
+        let id = if diag.on() { diag.id(source.address()) } else { String::new() };
+        Self { diag, source, kind: slakio_core::diag::Kind::of(source), id }
+    }
+
+    fn line(&self, stage: slakio_core::diag::Stage, result: &str, pairs: &[(&str, &str)]) {
+        let mut all = vec![("id", self.id.as_str())];
+        all.extend_from_slice(pairs);
+        self.diag.line(self.kind, stage, result, &all);
+    }
+
+    /// Hop `hop` asks `url` (for Gravatar, also where its fallback goes and whether it is taken).
+    fn asked(&self, url: &str, hop: usize) {
+        if !self.diag.on() {
+            return;
+        }
+        let (host, hop) = (slakio_core::diag::host(url), hop.to_string());
+        match slakio_core::diag::gravatar_fallback(url) {
+            Some((d_host, ok)) => {
+                let d_allowed = if ok { "yes" } else { "no" };
+                let pairs = [("hop", hop.as_str()), ("host", &host), ("d_host", &d_host), ("d_allowed", d_allowed)];
+                self.line(slakio_core::diag::Stage::Asked, "ok", &pairs);
+            }
+            None => self.line(slakio_core::diag::Stage::Asked, "ok", &[("hop", &hop), ("host", &host)]),
+        }
+    }
+
+    /// Hop `hop` was answered `status`; a redirect's `location` is followed (`to`) or not.
+    fn answered(&self, hop: usize, status: u16, location: Option<&str>, to: Option<&str>) {
+        if !self.diag.on() {
+            return;
+        }
+        let hop = hop.to_string();
+        self.line(slakio_core::diag::Stage::Status, &status.to_string(), &[("hop", &hop)]);
+        if let Some(location) = location.filter(|_| (300..400).contains(&status)) {
+            let host = slakio_core::diag::host(location);
+            let result = if to.is_some() { "followed" } else { "refused" };
+            self.line(slakio_core::diag::Stage::Redirected, result, &[("hop", &hop), ("host", &host)]);
+        }
+    }
+
+    /// The answer says it is `content_type` (its `type/subtype` only).
+    fn content_type(&self, content_type: Option<&str>) {
+        if !self.diag.on() {
+            return;
+        }
+        let t = content_type.map_or("none", |t| t.split(';').next().unwrap_or("").trim());
+        self.line(slakio_core::diag::Stage::ContentType, &t.to_ascii_lowercase(), &[]);
+    }
+
+    /// The picture failed with `e`.
+    fn failed(&self, e: &SlackError) {
+        if !self.diag.on() {
+            return;
+        }
+        match e {
+            SlackError::Api { code } if code == "not_a_picture_address" => {
+                let why = slakio_core::diag::refusal(self.source).unwrap_or("other");
+                self.line(slakio_core::diag::Stage::AddressRefused, why, &[]);
+            }
+            SlackError::Api { code } => self.line(slakio_core::diag::Stage::Refused, code, &[]),
+            SlackError::TooLarge => self.line(slakio_core::diag::Stage::Refused, "too-large", &[]),
+            e => crate::shape::failed(self.diag, self.kind, e, &[("id", &self.id)]),
+        }
     }
 }
 
-async fn read(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, SlackError> {
+async fn read(client: &Client, source: &Source, max: u64, note: &Note<'_>) -> Result<Vec<u8>, SlackError> {
     let mut url = source.checked().ok_or_else(|| api("not_a_picture_address"))?;
     let mut hops = 0;
     let mut answer = loop {
+        note.asked(&url, hops);
         let answer = client.fetch_picture(&url, source).await?;
-        match (answer.status, source) {
-            (200, _) => break answer,
-            (301 | 302 | 303 | 307 | 308, Source::Thumb(_)) if hops < crate::download::REDIRECTS => {
+        let to = match (answer.status, source) {
+            (301 | 302 | 303 | 307 | 308, Source::Thumb(_)) => {
+                answer.location.as_deref().and_then(crate::download::redirect)
+            }
+            (301 | 302 | 303 | 307 | 308, Source::Avatar(_)) => {
+                answer.location.as_deref().and_then(slakio_core::images::avatar_address)
+            }
+            (301 | 302 | 303 | 307 | 308, Source::Emoji(_)) => {
+                answer.location.as_deref().and_then(slakio_core::images::emoji_address)
+            }
+            _ => None,
+        };
+        let most = match source {
+            Source::Thumb(_) => crate::download::REDIRECTS,
+            Source::Avatar(_) => AVATAR_REDIRECTS,
+            Source::Emoji(_) => EMOJI_REDIRECTS,
+        };
+        note.answered(hops, answer.status, answer.location.as_deref(), to.as_deref().filter(|_| hops < most));
+        match answer.status {
+            200 => break answer,
+            301 | 302 | 303 | 307 | 308 if hops < most => {
                 hops += 1;
-                let to = answer.location.as_deref().and_then(crate::download::redirect);
                 url = to.ok_or_else(|| api("redirected_elsewhere"))?;
             }
-            (301 | 302 | 303 | 307 | 308, Source::Avatar(_)) if hops < AVATAR_REDIRECTS => {
-                hops += 1;
-                let to = answer.location.as_deref().and_then(slakio_core::images::avatar_address);
-                url = to.ok_or_else(|| api("redirected_elsewhere"))?;
-            }
-            (301 | 302 | 303 | 307 | 308, Source::Emoji(_)) if hops < EMOJI_REDIRECTS => {
-                hops += 1;
-                let to = answer.location.as_deref().and_then(slakio_core::images::emoji_address);
-                url = to.ok_or_else(|| api("redirected_elsewhere"))?;
-            }
-            (301 | 302 | 303 | 307 | 308, _) => return Err(api("redirected_elsewhere")),
-            (429, _) => {
+            301 | 302 | 303 | 307 | 308 => return Err(api("redirected_elsewhere")),
+            429 => {
                 return Err(SlackError::RateLimited {
                     retry_after: crate::response::retry_after(answer.retry_after.as_deref()),
                 });
             }
-            (401 | 403 | 404 | 410, _) => return Err(api("file_not_available")),
-            (status, _) => return Err(SlackError::Network { detail: format!("the picture host answered {status}") }),
+            401 | 403 | 404 | 410 => return Err(api("file_not_available")),
+            status => return Err(SlackError::Network { detail: format!("the picture host answered {status}") }),
         }
     };
+    note.content_type(answer.content_type.as_deref());
     let image = answer.content_type.as_deref().is_some_and(|t| t.trim().to_ascii_lowercase().starts_with("image/"));
     if !image {
         return Err(api("not_an_image"));

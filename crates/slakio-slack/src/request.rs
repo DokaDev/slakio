@@ -189,6 +189,11 @@ impl Session {
         Self { client_id, session_id, team: None, version_ts: DEFAULT_VERSION_TS.to_string() }
     }
 
+    /// Whether the requests carry the post-boot parameters (signed in to a team).
+    pub(crate) fn signed_in(&self) -> bool {
+        self.team.is_some()
+    }
+
     /// Signed in to `team`: the requests after it carry the post-boot parameters.
     pub(crate) fn set_team(&mut self, team: &str) {
         if !team.is_empty() {

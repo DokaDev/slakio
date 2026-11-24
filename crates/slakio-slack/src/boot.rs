@@ -20,6 +20,7 @@ use crate::people::People;
 use crate::request::Call;
 use crate::wire;
 use slakio_core::backend::{Event, Snapshot};
+use slakio_core::diag::{Kind, Stage};
 use slakio_core::model::{
     Conversation, ConversationId, ConversationKind, Org, Presence, Section, SectionId, SectionKind, Ts, User, UserId,
     Workspace, WorkspaceColor, WorkspaceId,
@@ -48,12 +49,28 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
     // The user too, when the start bundle has no photo of them.
     let mut asked = peers.clone();
-    if self_.profile.as_ref().and_then(wire::Profile::avatar).is_none() {
+    let bundled = self_.profile.as_ref().and_then(wire::Profile::avatar).is_some();
+    crate::shape::own_profile(client.diag(), self_);
+    let before = people.standing(&self_.id);
+    if !bundled {
         // A page may have named them already without a photo: asked all the same.
         people.forget_unpictured(&self_.id);
         asked.push(self_.id.clone());
+        let standing = people.standing(&self_.id);
+        let lookup = [("before", before), ("now", standing)];
+        client.diag().line(Kind::SelfPhoto, Stage::Asked, if standing == "unknown" { "yes" } else { "no" }, &lookup);
     }
     let mut known = people.names(client, &asked, Priority::Background).await;
+    if client.diag().on() {
+        let photo = own_photo(self_, &known);
+        let source = match (bundled, photo.is_some(), before) {
+            (true, _, _) => "profile",
+            (false, true, "pictured") => "page",
+            (false, true, _) => "lookup",
+            (false, false, _) => "none",
+        };
+        crate::shape::own_source(client.diag(), source, photo.as_deref());
+    }
     let now = now_micros() / 1_000_000;
     let dnd = dnd(client, &peers, now).await;
     for u in &mut known {

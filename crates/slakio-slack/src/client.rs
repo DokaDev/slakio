@@ -27,6 +27,8 @@ pub struct Client {
     signed_out: AtomicBool,
     /// Told when [`Client::signed_out`] becomes true.
     told: tokio::sync::Notify,
+    /// The picture diagnostics (off unless asked for, [`slakio_core::diag`]).
+    diag: slakio_core::diag::Diag,
 }
 
 impl Client {
@@ -46,7 +48,20 @@ impl Client {
         let mut ids = RandomIds::default();
         let session = Session::new(&mut ids);
         let (signed_out, told) = (AtomicBool::new(false), tokio::sync::Notify::new());
-        Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)), signed_out, told }
+        let diag = slakio_core::diag::Diag::default();
+        Self { credentials, endpoints, governor, lane, state: Mutex::new((session, ids)), signed_out, told, diag }
+    }
+
+    /// This client, writing the picture diagnostics to `diag` ([`slakio_core::diag`]).
+    #[must_use]
+    pub fn with_diag(mut self, diag: slakio_core::diag::Diag) -> Self {
+        self.diag = diag;
+        self
+    }
+
+    /// The picture diagnostics (off unless asked for).
+    pub(crate) fn diag(&self) -> &slakio_core::diag::Diag {
+        &self.diag
     }
 
     /// Signed in to `team`: later requests carry it.
@@ -63,6 +78,7 @@ impl Client {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;
             let ids: &mut dyn Ids = ids;
+            crate::shape::sending(&self.diag, call.method, session.signed_in());
             prepare(call, &self.credentials, session, &self.endpoints, now_ms(), ids, Os::current())?
         };
         // The switch is looked at first: once it is off, nothing more of the request is written.
@@ -71,6 +87,7 @@ impl Client {
             () = self.governor.stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
             raw = crate::http::send(&self.endpoints, &prepared) => raw?,
         };
+        crate::shape::answered(&self.diag, call.method, &raw);
         let answer = decode(&raw);
         match &answer {
             Err(SlackError::RateLimited { retry_after }) => self.governor.pause(call.method, *retry_after),

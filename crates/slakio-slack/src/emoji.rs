@@ -25,9 +25,10 @@ struct Listed {
 }
 
 /// The names of `emoji.list` kept as they are read: at most [`NAMES_MAX`], each a shortcode
-/// with a text value of at most [`ADDRESS_MAX`] bytes; the rest is read past, not kept.
+/// with a text value of at most [`ADDRESS_MAX`] bytes; the rest is read past, not kept (and how
+/// many names were read in all).
 #[derive(Default)]
-struct Names(Vec<(String, String)>);
+struct Names(Vec<(String, String)>, usize);
 
 impl<'de> Deserialize<'de> for Names {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -38,14 +39,15 @@ impl<'de> Deserialize<'de> for Names {
                 f.write_str("a map of emoji names")
             }
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Names, A::Error> {
-                let mut kept = Vec::new();
+                let (mut kept, mut read) = (Vec::new(), 0);
                 while let Some(name) = map.next_key::<String>()? {
+                    read += 1;
                     let Text(value) = map.next_value()?;
                     if let Some(value) = value.filter(|_| kept.len() < NAMES_MAX && shortcode(&name)) {
                         kept.push((name, value));
                     }
                 }
-                Ok(Names(kept))
+                Ok(Names(kept, read))
             }
         }
         d.deserialize_map(Map)
@@ -97,8 +99,16 @@ impl<'de> Deserialize<'de> for Text {
 
 /// The workspace's own emoji, by name, as [`Event::Emoji`].
 pub(crate) async fn emoji(client: &Client) -> Result<Event, SlackError> {
-    let listed: Listed = client.call(&Call::form(Method::EmojiList, &[]), Priority::Background).await?;
-    Ok(Event::Emoji { emoji: resolve(&listed.emoji.0) })
+    let listed: Listed = match client.call(&Call::form(Method::EmojiList, &[]), Priority::Background).await {
+        Ok(listed) => listed,
+        Err(e) => {
+            crate::shape::failed(client.diag(), slakio_core::diag::Kind::EmojiList, &e, &[]);
+            return Err(e);
+        }
+    };
+    let emoji = resolve(&listed.emoji.0);
+    crate::shape::emoji_counts(client.diag(), listed.emoji.1, &listed.emoji.0, &emoji);
+    Ok(Event::Emoji { emoji })
 }
 
 #[cfg(test)]
