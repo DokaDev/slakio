@@ -187,3 +187,25 @@ fn a_list_that_keeps_failing_waits_longer_each_time_up_to_a_cap_and_heeds_slack_
     let long = FailKind::RateLimited { retry_after: Some(Duration::from_secs(7200)) };
     assert_eq!(fail_at(&mut c, &mut r, now, &long).unwrap() - now, BACKOFF_MAX);
 }
+
+#[test]
+fn a_name_the_list_has_not_is_told_once_a_workspace() {
+    let dir = std::env::temp_dir().join(format!("slakio-tui-diag-missing-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    let diag = Diag::to(path.clone());
+    let (mut c, mut r, now) =
+        (Customs { diag: diag.clone(), ..Customs::default() }, Requests::default(), Instant::now());
+    c.get(&ws("T1"), "party");
+    c.ask(&mut r, now);
+    let id = asked(&mut r)[0].0;
+    c.answered(id, vec![("party".into(), Custom::Standard("tada".into()))]);
+    for name in ["gone", "other", "30"] {
+        assert_eq!(c.get(&ws("T1"), name), None);
+    }
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let line = format!("emoji-list missing ui ws={}", diag.id("T1"));
+    assert_eq!(text.matches(&line).count(), 1, "once: {text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

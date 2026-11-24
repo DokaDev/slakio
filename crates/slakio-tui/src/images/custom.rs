@@ -52,7 +52,14 @@ impl Customs {
     /// digits only, as `10:30:` reads, is no emoji's; a letter of any script counts, Hangul too).
     pub fn get(&self, ws: &WorkspaceId, name: &str) -> Option<&Custom> {
         match self.sets.get(ws) {
-            Some(set) => set.get(name),
+            Some(set) => {
+                let got = set.get(name);
+                let lettered = || name.chars().any(char::is_alphabetic);
+                if got.is_none() && lettered() && self.diag.first(Kind::EmojiList, Stage::Missing, ws.as_str()) {
+                    self.note(ws, Stage::Missing, "ui", &[]);
+                }
+                got
+            }
             None => {
                 if name.chars().any(char::is_alphabetic) {
                     self.seen.borrow_mut().push((ws.clone(), true));

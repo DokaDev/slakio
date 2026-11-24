@@ -127,6 +127,8 @@ pub enum Stage {
     Lookup,
     /// The user's own record came in an answer (a view's people).
     Seen,
+    /// Not in what came (a name the workspace's emoji list does not have).
+    Missing,
     /// Kept for the local picture cache: found there.
     CacheHit,
     /// Kept for the local picture cache: not there.
@@ -157,6 +159,7 @@ impl Stage {
             Stage::Field => "field",
             Stage::Lookup => "lookup",
             Stage::Seen => "seen",
+            Stage::Missing => "missing",
             Stage::CacheHit => "cache-hit",
             Stage::CacheMiss => "cache-miss",
         }
