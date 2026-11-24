@@ -273,6 +273,7 @@ impl Images {
             self.screen.clear();
             self.last_screen.clear();
             self.emoji_frame.take();
+            self.anims.forget();
         }
         self.on = on;
     }

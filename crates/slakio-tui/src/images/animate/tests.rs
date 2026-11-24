@@ -157,6 +157,7 @@ fn pictures_off_stops_every_frame() {
     assert!(images.take_graphics().contains("a=d,d=A"), "every picture leaves the terminal");
     assert_eq!(images.frame_at(), None);
     assert!(run(&mut images, now, SECOND, TICK).is_empty(), "no frame after");
+    assert!(images.anims.list.is_empty() && images.anims.moving.is_empty(), "no frame is kept either");
 }
 
 #[test]

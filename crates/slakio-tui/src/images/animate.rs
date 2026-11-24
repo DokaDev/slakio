@@ -83,6 +83,11 @@ impl Anims {
         }
     }
 
+    /// Pictures are off: no frame is kept (`animate` stays as chosen).
+    pub(super) fn forget(&mut self) {
+        *self = Self { still: self.still, ..Self::default() };
+    }
+
     /// `at` moved up to the grid.
     fn on_grid(&mut self, at: Instant) -> Instant {
         let epoch = *self.epoch.get_or_insert(at);
