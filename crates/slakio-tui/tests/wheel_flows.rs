@@ -327,3 +327,19 @@ fn a_to_do_opened_in_a_wheeled_pane_brings_its_message_into_view() {
     assert_eq!(chosen(&d, PaneKind::Conversation), Some(ts));
     assert!(shows(&d, PaneKind::Conversation, ts), "opened again, its message is in view");
 }
+
+#[test]
+fn closing_a_thread_panel_brings_its_message_into_view_in_a_wheeled_pane() {
+    let mut d = Demo::new(120, 40);
+    d.open("long-threads");
+    d.keys("g g enter");
+    d.screen();
+    let root = chosen(&d, PaneKind::Conversation).expect("the thread's message");
+    wheel(&mut d, PaneKind::Conversation, false, 200);
+    assert!(!shows(&d, PaneKind::Conversation, root), "wheeled away");
+    assert_eq!(d.focused_kind(), Some(PaneKind::Thread));
+    d.keys("ctrl+w");
+    d.screen();
+    assert_eq!(chosen(&d, PaneKind::Conversation), Some(root));
+    assert!(shows(&d, PaneKind::Conversation, root), "back in view");
+}

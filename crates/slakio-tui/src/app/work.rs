@@ -400,6 +400,7 @@ impl Work {
                     && self.timelines.get(&pane.target).is_some_and(|tl| tl.position(thread).is_some())
                 {
                     pane.selected = Some(thread);
+                    pane.follow();
                 }
             }
             self.prune();
