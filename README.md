@@ -341,6 +341,17 @@ background and decoded off the screen's thread.
   pictures are fetched before the list's photos. A screen draws at most 32 emoji pictures; more
   stay `:name:`. A person shown in both the timeline and the list is fetched at most twice, once
   per size. Nothing of them is written to disk.
+- When a picture does not show and you want to find out why, start slakio with
+  `SLAKIO_DEBUG_PICTURES=1` (off by default). slakio then writes one line for each step a
+  photo, an emoji, a file preview, the emoji list and your own photo went through to
+  `pictures.log` in the state directory (`$SLAKIO_STATE_DIR`, else `$XDG_STATE_HOME/slakio`,
+  else `~/Library/Application Support/slakio/state` on macOS, `~/.local/state/slakio` on Linux,
+  `%LOCALAPPDATA%\slakio` on Windows), readable by you only and kept under 1 MiB (then
+  `pictures.log.1`). It holds stages, counts, HTTP statuses and host names only: no address
+  past its host, no token, cookie, name, id, emoji name or message text; a picture is told apart
+  by a short hash that changes every run. With it on, slakio also reads the shape of your
+  sidebar's sections once per workspace (field names and counts only) and nothing else changes.
+  Have a look at the file before you share it, and delete it when you are done.
 
 ## Keys
 
