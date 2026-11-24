@@ -15,6 +15,7 @@ pub mod body;
 pub mod custom;
 pub mod files;
 pub mod message;
+pub mod wheel;
 
 use super::highlight;
 use crate::action::{Action, PaneAction};
@@ -109,12 +110,19 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     // A selection held on its row (messages came in between it and the bottom) stays there:
     // the bottom is the message that many rows below it, its last rows cut off when it does
     // not end there.
-    let held = pane.held.get().filter(|(ts, below)| pane.selected == Some(*ts) && *below < h);
+    // A view the wheel moved stays where it was moved to, wherever the selection is.
+    let free = pane.free.get();
+    let held = pane.held.get().filter(|(ts, below)| pane.selected == Some(*ts) && *below < h && free.is_none());
     pane.held.set(held);
     let mut cut = 0;
     // Keep the selection on screen: below the view, it becomes the bottom; above it, the top.
     let mut bottom = pane.bottom.get().and_then(|ts| tl.index_near(ts)).unwrap_or(n - 1).min(n - 1);
-    if let (Some((_, below)), Some(sel)) = (held, selected.map(|s| s.min(n - 1))) {
+    if let Some(was) = free {
+        let by = pane.wheel.replace(0);
+        let moved = wheel::place((bottom, was), by, n, h, &mut |i| height(i, &mut laid));
+        (bottom, cut) = moved.unwrap_or((n - 1, 0));
+        pane.free.set(moved.map(|(_, c)| c));
+    } else if let (Some((_, below)), Some(sel)) = (held, selected.map(|s| s.min(n - 1))) {
         let (mut total, mut j) = (0, sel);
         while total < below && j + 1 < n {
             j += 1;
@@ -164,7 +172,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     }
     // At the newest, new messages stay in view (none is new below it any more); elsewhere the
     // view stays put.
-    pane.bottom.set((bottom != n - 1).then(|| tl.items[bottom].ts));
+    pane.bottom.set((bottom != n - 1 || cut > 0 && pane.free.get().is_some()).then(|| tl.items[bottom].ts));
     if bottom == n - 1 && cut == 0 {
         pane.fresh.set(None);
         pane.seen.borrow_mut().clear();
@@ -184,6 +192,7 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         i -= 1;
     }
     shown.reverse();
+    pane.top.set(shown.first().map(|(i, _)| tl.items[*i].ts));
     // The oldest is on screen with rows to spare and newer messages below the bottom one (after
     // `gg`): those fill the rest, so the history starts on the first row with no gap above it.
     // A conversation that fits whole stays at the bottom, as in any chat; a thread starts at

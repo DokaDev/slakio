@@ -336,25 +336,15 @@ impl Shell {
         }
     }
 
-    /// Scroll the list by `by` rows (the mouse wheel); the cursor stays on screen.
+    /// Scroll the list by `by` rows (the mouse wheel); the cursor stays on its row, on screen or
+    /// not (a key brings it back into view).
     pub fn scroll_by(&mut self, model: &Model, by: isize, list_height: usize) {
-        let rows = self.rows(model);
-        let max_top = rows.len().saturating_sub(list_height.max(1));
+        let rows = self.rows(model).len();
+        let max_top = rows.saturating_sub(list_height.max(1));
         self.list_top = self.list_top.saturating_add_signed(by).min(max_top);
         // Activity's list starts on a notice's first row.
         if self.view == View::Activity {
             self.list_top -= self.list_top % 2;
-        }
-        let bottom = self.list_top + list_height.max(1) - 1;
-        let want = self.list_cursor.clamp(self.list_top, bottom.min(rows.len().saturating_sub(1)));
-        if want != self.list_cursor {
-            // Onto a row the cursor can stop on, toward the screen.
-            let dir = if want > self.list_cursor { 1 } else { -1 };
-            let mut at = want;
-            while rows.get(at).is_some_and(|r| !r.is_selectable()) {
-                at = at.saturating_add_signed(dir);
-            }
-            self.list_cursor = at.min(rows.len().saturating_sub(1));
         }
     }
 

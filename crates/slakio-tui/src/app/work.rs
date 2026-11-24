@@ -452,9 +452,24 @@ impl Work {
         self.step_in(id, by);
     }
 
-    /// Move the selection of pane `id`, if any, by `by` messages (the mouse wheel). Down from
-    /// the newest loaded of a conversation whose newer messages were not read reads on
-    /// ([`Work::read_on`]).
+    /// The wheel over pane `id`, if any: its view moves `rows` rows, the selection stays. Down
+    /// with the newest loaded of a conversation whose newer messages were not read in view
+    /// reads on ([`Work::read_on`]).
+    pub fn scroll_in(&mut self, id: Option<PaneId>, rows: isize) {
+        if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
+            let tl = self.timelines.get(&p.target).unwrap_or(&EMPTY);
+            let past = rows > 0 && !p.is_thread() && tl.cut && p.free.get().is_none() && p.bottom.get().is_none();
+            p.scroll(rows);
+            if past {
+                let target = p.target.clone();
+                self.read_on(&target);
+            }
+        }
+        self.fill();
+    }
+
+    /// Move the selection of pane `id`, if any, by `by` messages. Down from the newest loaded of
+    /// a conversation whose newer messages were not read reads on ([`Work::read_on`]).
     pub fn step_in(&mut self, id: Option<PaneId>, by: isize) {
         if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
             let tl = self.timelines.get(&p.target).unwrap_or(&EMPTY);

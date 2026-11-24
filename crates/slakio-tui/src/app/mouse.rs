@@ -79,8 +79,9 @@ impl App {
                     self.shell.scroll_by(&self.model, by * WHEEL_ROWS, height);
                     return true;
                 }
+                // The view moves, not the selection (a key brings it back into view).
                 let id = self.frame().pane_at(at).map(|p| p.id);
-                self.work.step_in(id, by);
+                self.work.scroll_in(id, by * WHEEL_ROWS);
                 true
             }
             MouseEventKind::Down(MouseButton::Left) => {

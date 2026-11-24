@@ -161,6 +161,16 @@ pub struct Pane {
     /// The messages below the selection when the view was held, oldest first: any other one
     /// below the view now came after (live, or spliced in by a catch-up) and counts as new.
     pub seen: RefCell<Vec<Ts>>,
+    /// The wheel moved the view away from the selection: `bottom` stays the message on the last
+    /// row, with this many of its rows cut off below, and drawing does not follow the selection
+    /// until a key moves it ([`Pane::step`] and the other moves take it back).
+    pub free: Cell<Option<usize>>,
+    /// Rows the wheel moved the view by (down when positive) since it was last drawn: only
+    /// drawing knows the rows' heights.
+    pub wheel: Cell<isize>,
+    /// The oldest message drawn last: with the view moved by the wheel, near the top it wants
+    /// one more older page, as the selection does.
+    pub top: Cell<Option<Ts>>,
     /// The last gesture moved up (or to the oldest): near the top, it wants one more older
     /// page. Asking for pages takes it back.
     pub older: bool,
@@ -203,6 +213,9 @@ impl Pane {
             held: Cell::new(None),
             fresh: Cell::new(None),
             seen: RefCell::new(Vec::new()),
+            free: Cell::new(None),
+            wheel: Cell::new(0),
+            top: Cell::new(None),
             older: false,
             to_root: false,
             insert: false,
@@ -251,7 +264,13 @@ impl Pane {
             return Some(None);
         }
         let Some(first) = tl.items.first() else { return Some(None) };
-        let near_top = self.selected_index(tl).is_some_and(|s| s < PREFETCH);
+        // With the view moved by the wheel, its top is what comes near the oldest; else the
+        // selection.
+        let near = match self.free.get() {
+            Some(_) => self.top.get().and_then(|ts| tl.index_near(ts)),
+            None => self.selected_index(tl),
+        };
+        let near_top = near.is_some_and(|s| s < PREFETCH);
         (self.to_root || self.seeking(tl) || (self.older && near_top)).then_some(Some(first.ts))
     }
 
@@ -270,6 +289,7 @@ impl Pane {
     pub fn step(&mut self, by: isize, tl: &Timeline) {
         self.older = by < 0;
         self.to_root = false;
+        self.follow();
         let Some(last) = tl.items.len().checked_sub(1) else { return };
         let i = match self.selected_index(tl) {
             None => last,
@@ -281,6 +301,7 @@ impl Pane {
     /// Select the newest message of `tl` (this pane's timeline).
     pub fn select_newest(&mut self, tl: &Timeline) {
         self.to_root = false;
+        self.follow();
         self.selected = tl.items.last().map(|m| m.ts);
     }
 
@@ -302,6 +323,7 @@ impl Pane {
             return;
         }
         self.select_index(0, tl);
+        self.follow();
         self.older = true;
         self.to_root = self.is_thread() && !tl.complete;
     }
@@ -329,6 +351,7 @@ impl Pane {
         self.jump = None;
         (self.visual, self.older, self.to_root) = (None, false, false);
         self.held.set(None);
+        self.follow();
         self.selected = Some(tl.items[i].ts);
         if std::mem::take(&mut self.by_date) {
             self.flash = Some((tl.items[i].ts, None));
@@ -352,6 +375,24 @@ impl Pane {
         self.selected = None;
         self.visual = None;
         self.bottom.set(None);
+        self.follow();
+    }
+
+    /// The view follows the selection again (a key moved it): one the wheel moved away comes
+    /// back to it the least way, from where it is.
+    pub fn follow(&self) {
+        self.free.set(None);
+        self.wheel.set(0);
+    }
+
+    /// The wheel moves the view `rows` rows (down when positive), not the selection; up near
+    /// the top, it wants one more older page.
+    pub fn scroll(&mut self, rows: isize) {
+        if self.free.get().is_none() {
+            self.free.set(Some(0));
+        }
+        self.wheel.set(self.wheel.get().saturating_add(rows));
+        self.older = rows < 0;
     }
 }
 

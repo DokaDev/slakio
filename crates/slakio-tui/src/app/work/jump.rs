@@ -98,6 +98,7 @@ impl Work {
             p.bottom.set(None);
             p.held.set(None);
             p.fresh.set(None);
+            p.follow();
             p.seen.borrow_mut().clear();
         }
         self.fill();

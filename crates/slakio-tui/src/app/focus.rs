@@ -155,6 +155,7 @@ impl App {
         }
         if p.selected.take().is_some() {
             p.bottom.set(None);
+            p.follow();
             return;
         }
         if let Some(owner) = self.work.active().and_then(|a| self.work.owner(a)) {

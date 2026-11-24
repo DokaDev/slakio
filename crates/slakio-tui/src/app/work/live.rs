@@ -8,6 +8,7 @@
 
 use super::{Work, shown};
 use crate::app::model::Model;
+use crate::app::pane::Pane;
 use slakio_core::backend::{Command, Generation, Page};
 use slakio_core::model::{ConversationId, Message, Target, Ts, WorkspaceId};
 
@@ -86,12 +87,13 @@ impl Work {
         drawn
     }
 
-    /// The panes on `targets` where the user chose a message keep their view while what they
-    /// show changes: the selected message stays on its row (held there), whatever comes in
-    /// below it; until a pane is drawn, its bottom is pinned to the newest message shown. What is
-    /// newer than that newest one counts as new below the view.
+    /// The panes on `targets` where the user chose a message, or moved the view with the wheel,
+    /// keep their view while what they show changes: the selected message stays on its row (held
+    /// there), whatever comes in below it; until a pane is drawn, its bottom is pinned to the
+    /// newest message shown. What is newer than that newest one counts as new below the view.
     fn pin(&self, targets: &[Target]) {
-        for pane in self.panes.values().filter(|p| targets.contains(&p.target) && p.selected.is_some()) {
+        let chose = |p: &&Pane| p.selected.is_some() || p.free.get().is_some();
+        for pane in self.panes.values().filter(|p| targets.contains(&p.target)).filter(chose) {
             let newest = self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts);
             if pane.bottom.get().is_none() {
                 pane.bottom.set(newest);
@@ -102,7 +104,9 @@ impl Work {
             if pane.fresh.get().is_none() {
                 pane.fresh.set(newest);
                 let items = self.timelines.get(&pane.target).map(|tl| &tl.items);
-                let below = |ts: &Ts| pane.selected.is_some_and(|s| *ts > s);
+                // Below the view the wheel moved are the messages below its bottom.
+                let from = if pane.free.get().is_some() { pane.bottom.get() } else { pane.selected };
+                let below = |ts: &Ts| from.is_some_and(|s| *ts > s);
                 *pane.seen.borrow_mut() = items.into_iter().flatten().map(|m| m.ts).filter(below).collect();
             }
         }

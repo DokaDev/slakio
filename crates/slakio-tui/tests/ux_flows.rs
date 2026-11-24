@@ -186,8 +186,13 @@ fn the_mouse_wheel_scrolls_the_list_and_the_messages() {
     assert_eq!(d.app.list_top(), 3);
     d.open("backend");
     let work = d.app.areas().work;
+    d.screen();
+    let before = d.pane(PaneKind::Conversation).unwrap().drawn_rows();
     d.mouse(MouseEventKind::ScrollUp, work.x + 10, 10);
-    assert!(d.pane(PaneKind::Conversation).unwrap().selected().is_some(), "the wheel moves through the messages");
+    d.screen();
+    let pane = d.pane(PaneKind::Conversation).unwrap();
+    assert!(pane.selected().is_none(), "the wheel moves the view, not the selection");
+    assert_ne!(pane.drawn_rows(), before, "the wheel scrolls through the messages");
 }
 
 #[test]
