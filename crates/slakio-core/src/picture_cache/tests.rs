@@ -402,3 +402,24 @@ fn a_write_asked_before_the_folder_was_emptied_is_refused() {
     assert!(matches!(c.store_as_of(c.epoch(), &src, "photo", &png(10)), Stored::Stored(_)));
     let _ = std::fs::remove_dir_all(c.dir());
 }
+
+#[cfg(unix)]
+#[test]
+fn a_folder_there_already_is_used_by_a_run_that_did_not_open_it_and_one_missing_is_never_made() {
+    use std::os::unix::fs::DirBuilderExt;
+    let (now, _) = clock(START);
+    let photo = Source::Avatar(AVATAR.into());
+    // Pictures off at the start: the folder of an earlier run is used once they are turned on.
+    let dir = scratch("found-later");
+    fs::DirBuilder::new().mode(0o700).create(&dir).unwrap();
+    let c = PictureCache::new(dir.clone()).with_clock(now.clone());
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)), "found, not made");
+    assert!(matches!(c.load(&photo, "x"), Loaded::Hit(_)));
+    let _ = fs::remove_dir_all(&dir);
+    // None there: nothing is written and no folder is made.
+    let dir = scratch("absent-later");
+    let c = PictureCache::new(dir.clone()).with_clock(now);
+    assert!(!c.open_existing());
+    assert_eq!(c.store(&photo, "x", &png(64)), Stored::Refused("folder"));
+    assert!(!dir.exists());
+}

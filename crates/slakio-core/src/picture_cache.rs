@@ -214,6 +214,22 @@ impl PictureCache {
         Some(fresh)
     }
 
+    /// Find the folder without ever making it, for a run that did not open it at the start
+    /// (pictures were off then): there, a folder of the user's own that no one else writes in,
+    /// writes may follow (`true`), after a sweep as at a start. One `slakio logout` removed stays
+    /// removed.
+    pub fn open_existing(&self) -> bool {
+        if self.opened.load(Ordering::Relaxed) {
+            return true;
+        }
+        if !self.dir_ok() {
+            return false;
+        }
+        self.opened.store(true, Ordering::Relaxed);
+        self.sweep();
+        true
+    }
+
     /// The same, holding at most `budget` bytes.
     pub fn with_budget(mut self, budget: u64) -> Self {
         self.budget = budget;
@@ -294,8 +310,8 @@ impl PictureCache {
         self.epoch.load(Ordering::SeqCst)
     }
 
-    /// Keep `png`, the picture of `source` as `shape`, in the folder opened at the start (one
-    /// gone since is not made again). A write that takes the folder over its room sweeps it.
+    /// Keep `png`, the picture of `source` as `shape`, in the folder opened at the start or found
+    /// since ([`PictureCache::open_existing`]; one gone since is not made again). A write that takes the folder over its room sweeps it.
     pub fn store(&self, source: &Source, shape: &str, png: &[u8]) -> Stored {
         self.store_as_of(self.epoch(), source, shape, png)
     }
@@ -317,7 +333,7 @@ impl PictureCache {
         if !png.starts_with(&PNG) {
             return Stored::Refused("not-png");
         }
-        if !self.opened.load(Ordering::Relaxed) || !self.dir_ok() {
+        if !self.open_existing() || !self.dir_ok() {
             return Stored::Refused("folder");
         }
         let now = (self.now)();

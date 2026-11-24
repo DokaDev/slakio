@@ -344,13 +344,14 @@ background and decoded off the screen's thread.
   stay `:name:`. A person shown in both the timeline and the list is fetched at most twice, once
   per size.
 - Pictures kept between runs: each profile photo and emoji picture slakio made for the terminal
-  (a small PNG, at the size it is drawn) is kept in `pictures` in the cache directory
+  (a small PNG, at the size it is drawn; a moving one with all its frames) is kept in `pictures` in the cache directory
   ([Local cache](#local-cache)), so the next start draws it without fetching it (and without
   counting it against the shares above, also with the network off). A file's preview is never
   kept: it is a copy of a file of your workspace, fetched with your session each run. Photos
   are kept for up to 7 days, emoji for up to 30, at most 1 MiB a picture and 64 MiB in all (the
   least recently shown go first); the folder is made when slakio starts with pictures on (never
-  while it runs, so a folder removed by `slakio logout` stays removed), is readable by you only
+  while it runs, so a folder removed by `slakio logout` stays removed; started with pictures
+  off, a folder already there is used once they are turned on), is readable by you only
   (`0700`, the files `0600`) and on macOS is excluded from Time Machine backups when it is made
   (the error log says when that fails); a file is named by a hash, never by its address or
   name, and a link or a damaged file in it is removed, never read. `cache = "off"` keeps none
