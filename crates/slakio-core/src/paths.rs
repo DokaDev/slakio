@@ -106,6 +106,11 @@ impl Paths {
         self.state.as_ref().map(|s| s.join("pictures.log"))
     }
 
+    /// `<cache>/pictures`: the pictures kept between runs ([`crate::picture_cache`]).
+    pub fn pictures_cache(&self) -> Option<PathBuf> {
+        self.cache.as_ref().map(|c| c.join(crate::picture_cache::DIR))
+    }
+
     /// Whether the one-time notice `key` was not shown on this machine yet; records that it
     /// is now. Without a state directory every run counts as the first. A file that cannot be
     /// read or parsed is never written over: the notice shows, and is not recorded.

@@ -57,6 +57,8 @@ pub enum Kind {
     Sections,
     /// The shape of `client.userBoot`.
     BootShape,
+    /// The picture cache on disk as a whole (its sweep).
+    PictureCache,
 }
 
 impl Kind {
@@ -69,6 +71,7 @@ impl Kind {
             Kind::EmojiList => "emoji-list",
             Kind::Sections => "sections",
             Kind::BootShape => "boot-shape",
+            Kind::PictureCache => "picture-cache",
         }
     }
 
@@ -129,10 +132,16 @@ pub enum Stage {
     Seen,
     /// Not in what came (a name the workspace's emoji list does not have).
     Missing,
-    /// Kept for the local picture cache: found there.
+    /// Found in the picture cache on disk (read and decoded; nothing asked of the network).
     CacheHit,
-    /// Kept for the local picture cache: not there.
+    /// Not in the picture cache, or there but too old (the result says which).
     CacheMiss,
+    /// Written to the picture cache.
+    CacheStored,
+    /// A file of the picture cache refused, or not written (the result says why).
+    CacheRefused,
+    /// The picture cache swept: files past their age or over its room removed.
+    CacheSwept,
 }
 
 impl Stage {
@@ -162,6 +171,9 @@ impl Stage {
             Stage::Missing => "missing",
             Stage::CacheHit => "cache-hit",
             Stage::CacheMiss => "cache-miss",
+            Stage::CacheStored => "cache-stored",
+            Stage::CacheRefused => "cache-refused",
+            Stage::CacheSwept => "cache-swept",
         }
     }
 }

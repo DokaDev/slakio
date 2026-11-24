@@ -6,7 +6,8 @@
 //! * [`layout`] — the work area's panes as a tree, and where each one goes.
 //! * [`paths`] — the config, data, state and cache directories; [`fsutil`] — atomic file writes.
 //! * [`config`] — the config file; [`download`] — saving a downloaded file safely; [`images`] —
-//!   where pictures come from and how large they may be.
+//!   where pictures come from and how large they may be; [`picture_cache`] — the pictures kept
+//!   on disk between runs.
 //! * [`secret`] — the secret store interface, its in-memory implementation and the
 //!   `SLAKIO_SECRET_STORE` switch.
 //! * [`sanitize`] — the terminal-escape sanitiser and the [`sanitize::Remote`] text type that
@@ -30,6 +31,7 @@ pub mod images;
 pub mod layout;
 pub mod model;
 pub mod paths;
+pub mod picture_cache;
 pub mod sanitize;
 pub mod secret;
 pub mod theme_file;
