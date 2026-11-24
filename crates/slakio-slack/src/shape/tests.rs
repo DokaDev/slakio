@@ -38,8 +38,8 @@ fn a_section_says_its_shape_never_its_name_or_its_channels() {
         t.contains("n=1 type=direct_messages name_len=0 is_custom=no ids=0 ids_page=no ids_cursor=no next_id=no"),
         "{t}"
     );
-    assert!(t.contains("sections field sort n=0 name=sort_order value=alphabetical"), "{t}");
-    assert!(t.contains("sections field sort n=1 name=order_by value=text"), "{t}");
+    assert!(t.contains("sections field sort page=1 n=0 name=sort_order value=alphabetical"), "{t}");
+    assert!(t.contains("sections field sort page=1 n=1 name=order_by value=text"), "{t}");
     assert!(t.contains("sections counted sections page=1 count=2"), "{t}");
     assert!(t.contains("sections field page_key name=response_metadata entries=1 page=1"), "{t}");
     assert!(t.contains("sections field section_key name=channel_ids_page entries=1 page=1"), "{t}");
@@ -88,4 +88,21 @@ fn names_and_values_are_told_only_when_plain() {
     assert_eq!(key(&longer), "other", "the redaction would blank it");
     assert_eq!(enum_like(&json!(long)), long);
     assert_eq!(enum_like(&json!(longer)), "text");
+}
+
+#[test]
+fn a_section_s_sort_fields_and_a_profile_s_pictures_are_told_at_most_forty_times() {
+    let (d, path) = log();
+    let mut section = serde_json::Map::new();
+    let mut profile = serde_json::Map::new();
+    for i in 0..500 {
+        section.insert(format!("sort_{i}"), json!("alphabetical"));
+        profile.insert(format!("image_{i}"), json!("x"));
+    }
+    section_shape(&d, &json!({"ok": true, "channel_sections": [section]}), "1");
+    boot_shape(&d, &json!({"ok": true, "self": {"profile": profile}}));
+    let text = text(&d, &path);
+    assert_eq!(text.lines().filter(|l| l.contains("sections field sort")).count(), KEYS_MAX, "{text}");
+    assert!(text.lines().filter(|l| l.contains("sections field sort")).all(|l| l.contains(" page=1 ")), "{text}");
+    assert_eq!(text.lines().filter(|l| l.contains("self-photo field image")).count(), KEYS_MAX);
 }

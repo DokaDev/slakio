@@ -179,7 +179,9 @@ fn boot_shape(diag: &Diag, v: &Value) {
     }
     let profile = v.get("self").and_then(|s| s.get("profile"));
     diag.line(Kind::SelfPhoto, Stage::Parsed, "profile", &[("present", yn(profile.is_some_and(Value::is_object)))]);
-    for k in profile.and_then(Value::as_object).into_iter().flat_map(|o| o.keys()).filter(|k| k.starts_with("image_")) {
+    let images =
+        profile.and_then(Value::as_object).into_iter().flat_map(|o| o.keys()).filter(|k| k.starts_with("image_"));
+    for k in images.take(KEYS_MAX) {
         diag.line(Kind::SelfPhoto, Stage::Field, "image", &[("name", key(k))]);
     }
 }
@@ -405,13 +407,13 @@ fn section_shape(diag: &Diag, v: &Value, page: &str) {
             ("next_id", yn(next)),
         ];
         diag.line(Kind::Sections, Stage::Parsed, "section", &pairs);
-        for (k, value) in s.as_object().into_iter().flatten().filter(|(k, _)| k.contains("sort") || k.contains("order"))
-        {
+        let sorts = s.as_object().into_iter().flatten().filter(|(k, _)| k.contains("sort") || k.contains("order"));
+        for (k, value) in sorts.take(KEYS_MAX) {
             diag.line(
                 Kind::Sections,
                 Stage::Field,
                 "sort",
-                &[("n", &n), ("name", key(k)), ("value", &enum_like(value))],
+                &[("page", page), ("n", &n), ("name", key(k)), ("value", &enum_like(value))],
             );
         }
     }
