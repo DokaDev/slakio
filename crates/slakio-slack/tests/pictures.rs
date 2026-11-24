@@ -487,3 +487,46 @@ fn the_user_s_own_photo_a_page_tells_reaches_the_screen_when_the_start_had_none(
         assert_eq!(after, lookups, "nothing asked for it");
     });
 }
+
+#[test]
+fn a_dm_peer_s_photo_comes_with_the_boot_before_the_dm_is_opened() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let s = match r.ask(Command::Boot).await {
+            Event::Booted(s) => *s,
+            other => panic!("{other:?}"),
+        };
+        let world = r.world.snapshot();
+        let peers: Vec<_> = s
+            .conversations
+            .iter()
+            .filter_map(|c| match &c.kind {
+                slakio_core::model::ConversationKind::Dm { user } => Some(user.clone()),
+                _ => None,
+            })
+            .collect();
+        let mut pictured = 0;
+        for peer in &peers {
+            let want = world.users.iter().find(|u| &u.id == peer).and_then(|u| u.avatar.clone());
+            let want = want.filter(|_| !peer.as_str().ends_with("666"));
+            let got = s.users.iter().find(|u| &u.id == peer).and_then(|u| u.avatar.clone());
+            pictured += usize::from(want.is_some());
+            assert_eq!(got, want, "{}: the photo comes with the boot", peer.as_str());
+        }
+        assert!(pictured > 0, "the world gives some DM peers a photo");
+        let methods = r.fake.methods();
+        assert!(!methods.iter().any(|m| m.starts_with("conversations.")), "no DM opened: {methods:?}");
+        let lookups: Vec<serde_json::Value> = r
+            .fake
+            .log()
+            .into_iter()
+            .filter(|l| l.method() == "users/info")
+            .map(|l| serde_json::from_str(&l.body).unwrap())
+            .collect();
+        assert!(!lookups.is_empty());
+        for body in &lookups {
+            assert_eq!(body.get("include_profile_only_if_stale"), None, "the whole profile is asked for");
+            assert!(body["updated_ids"].as_object().unwrap().values().all(|v| v == &json!(0)), "{body}");
+        }
+    });
+}

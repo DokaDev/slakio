@@ -205,3 +205,99 @@ fn only_the_ids_asked_for_are_taken_and_a_named_one_never_becomes_unnamed() {
     assert!(!people.unnamed.lock().unwrap().contains("UASKED"), "its nameless duplicate is not unnamed");
     assert_eq!(people.standing("UOTHER"), "unknown", "not asked for: not taken");
 }
+
+/// The JSON body of each edge lookup `fake` was sent.
+fn lookup_bodies(fake: &FakeSlack) -> Vec<serde_json::Value> {
+    let log = fake.log().into_iter().filter(|l| l.method() == "users/info");
+    log.map(|l| serde_json::from_str(&l.body).unwrap()).collect()
+}
+
+#[test]
+fn a_lookup_asks_each_id_at_version_zero_for_the_whole_profile_and_keeps_the_photos() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let world = World::new(7);
+        let world = world.snapshot();
+        let team = world.workspaces[0].id.as_str().to_string();
+        let fake = FakeSlack::start(World::new(7)).await.unwrap();
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        client.set_team(&team);
+        let people = People::default();
+        people.set_team(&team);
+        let users: Vec<&User> = world.users.iter().filter(|u| u.workspace.as_str() == team).take(12).collect();
+        let ids: Vec<String> = users.iter().map(|u| u.id.as_str().to_string()).collect();
+        let named = people.names(&client, &ids, Priority::User).await;
+        let versions: Map<String, Value> = ids.iter().map(|id| (id.clone(), json!(0))).collect();
+        assert_eq!(
+            lookup_bodies(&fake),
+            [json!({"check_interaction": true, "token": "t", "updated_ids": versions})],
+            "every id at version 0, and the profile asked for whether or not it is stale"
+        );
+        assert_eq!(named.len(), ids.len());
+        let pictured = users.iter().filter(|u| u.avatar.is_some() && !u.id.as_str().ends_with("666")).count();
+        assert!(pictured > 0 && pictured < users.len(), "some with a photo, some without");
+        for u in &users {
+            let got = named.iter().find(|n| n.id == u.id).unwrap();
+            let want = u.avatar.clone().filter(|_| !u.id.as_str().ends_with("666"));
+            assert_eq!(got.avatar, want, "{}: the photo the lookup answered", u.id.as_str());
+            assert_eq!(people.standing(u.id.as_str()), if want.is_some() { "pictured" } else { "unpictured" });
+        }
+    });
+}
+
+#[test]
+fn the_fake_edge_cache_leaves_photos_out_only_when_asked_for_stale_profiles_only() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let world = World::new(7);
+        let world = world.snapshot();
+        let team = world.workspaces[0].id.as_str().to_string();
+        let fake = FakeSlack::start(World::new(7)).await.unwrap();
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        client.set_team(&team);
+        let pictured: Vec<&User> = world.users.iter().filter(|u| u.avatar.is_some()).take(5).collect();
+        assert!(!pictured.is_empty());
+        let versions: Map<String, Value> = pictured.iter().map(|u| (u.id.as_str().to_string(), json!(0))).collect();
+        let mut photos = Vec::new();
+        for stale_only in [true, false] {
+            let mut body = Map::new();
+            body.insert("check_interaction".into(), json!(true));
+            if stale_only {
+                body.insert("include_profile_only_if_stale".into(), json!(true));
+            }
+            body.insert("updated_ids".into(), Value::Object(versions.clone()));
+            let call = Call::json(Method::EdgeUsersInfo, body);
+            let found = client.call::<wire::EdgeUsers>(&call, Priority::User).await.unwrap();
+            let results = found.results.unwrap();
+            assert_eq!(results.len(), pictured.len(), "every person answered, with a name");
+            assert!(results.iter().all(|p| p.shown_name().is_some()));
+            photos.push(results.iter().filter_map(|p| p.profile.as_ref().and_then(wire::Profile::avatar)).count());
+        }
+        assert_eq!(photos, [0, pictured.len()], "stale profiles only: no photo; the whole profile: each photo");
+    });
+}
+
+#[test]
+fn a_looked_up_record_with_a_photo_is_pictured_and_one_without_is_named_unpictured() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let team = World::new(7).snapshot().workspaces[0].id.as_str().to_string();
+        let photo = format!("https://{}/photo_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+        let answer = json!({"ok": true, "results": [
+            {"id": "UPHOTO", "team_id": team, "profile": {"display_name": "Minsu", "image_72": photo}},
+            {"id": "UPLAIN", "team_id": team, "profile": {"display_name": "Jiwoo"}},
+        ]});
+        let (fake, client, people) = looking(answer).await;
+        let ids = ["UPHOTO".to_string(), "UPLAIN".to_string()];
+        let named = people.names(&client, &ids, Priority::User).await;
+        let versions = json!({"UPHOTO": 0, "UPLAIN": 0});
+        assert_eq!(lookup_bodies(&fake), [json!({"check_interaction": true, "token": "t", "updated_ids": versions})]);
+        assert_eq!(named.len(), 2);
+        assert_eq!(photo_of(&people, "UPHOTO").as_deref(), Some(photo.as_str()));
+        assert_eq!(people.standing("UPHOTO"), "pictured");
+        assert_eq!(photo_of(&people, "UPLAIN"), None, "no photo in the answer: none known");
+        assert_eq!(people.standing("UPLAIN"), "unpictured", "named all the same");
+    });
+}

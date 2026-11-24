@@ -1,7 +1,7 @@
 //! The people a workspace's messages and DMs name, looked up by id and kept for the session (in
 //! memory): never a directory listing. What a view brings along is kept as it comes; the rest
 //! is asked of the edge cache's `users/info`, [`LOOKUP_BATCH`] ids a request (the web client's
-//! batch), each id once. A lookup that fails is not kept, so the id shows until a later page
+//! batch), each id once, at version 0 and for the whole profile (its photo with it). A lookup that fails is not kept, so the id shows until a later page
 //! asks again; unknown is not absent. An id Slack answered for without a name to show is not
 //! asked again this session; one it left out, listed as pending (not ready yet) or as failed
 //! (which may pass) is asked again by a later lookup, at most [`OMITTED_MAX`] times. Only what
@@ -98,9 +98,10 @@ impl People {
         };
         for batch in missing.chunks(LOOKUP_BATCH) {
             let updated: Map<String, Value> = batch.iter().map(|id| ((*id).clone(), json!(0))).collect();
+            // No `include_profile_only_if_stale`: with it the edge cache may judge its record not
+            // stale and answer without the profile's photo, though no photo of the id is held here.
             let mut body = Map::new();
             body.insert("check_interaction".into(), json!(true));
-            body.insert("include_profile_only_if_stale".into(), json!(true));
             body.insert("updated_ids".into(), Value::Object(updated));
             let found = match client.call::<wire::EdgeUsers>(&Call::json(Method::EdgeUsersInfo, body), priority).await {
                 Ok(found) => found,
