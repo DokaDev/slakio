@@ -252,3 +252,24 @@ fn a_nofollow_replace_replaces_a_link_never_its_target() {
     assert!(writable_plain(&victim));
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn writes_of_one_file_from_several_threads_at_once_each_land_whole() {
+    let dir = temp_dir("racing");
+    let path = dir.join("a.png");
+    let threads: Vec<_> = (0..8u8)
+        .map(|t| {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                (0..40).filter(|_| atomic_replace_private_nofollow(&path, &vec![t; 64 * 1024]).is_err()).count()
+            })
+        })
+        .collect();
+    let failed: usize = threads.into_iter().map(|t| t.join().unwrap()).sum();
+    assert_eq!(failed, 0, "no write lost its temporary file to another");
+    let bytes = fs::read(&path).unwrap();
+    assert_eq!(bytes.len(), 64 * 1024);
+    assert!(bytes.iter().all(|b| *b == bytes[0]), "one write whole, never two mixed");
+    assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}

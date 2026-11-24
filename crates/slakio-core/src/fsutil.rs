@@ -26,16 +26,22 @@ pub fn atomic_write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     write_atomically(path, bytes, true)
 }
 
+/// The writes [`atomic_replace_private_nofollow`] made in this process: each has a temporary
+/// file of its own, also when two threads write the same file at once.
+static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// [`atomic_write_private`] that never writes through a symbolic link: a link at `path` is
 /// replaced by the new file (a rename replaces the link, never what it points to), so a link
-/// put there after the file was read is not followed. The folder must be there already.
+/// put there after the file was read is not followed. The folder must be there already. Its
+/// temporary file is `.<name>.tmp-<pid>-<n>`, one per write.
 pub fn atomic_replace_private_nofollow(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let dir = match path.parent().filter(|d| !d.as_os_str().is_empty()) {
         Some(d) => d.to_path_buf(),
         None => PathBuf::from("."),
     };
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let tmp = dir.join(format!(".{name}.tmp-{}", std::process::id()));
+    let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = dir.join(format!(".{name}.tmp-{}-{n}", std::process::id()));
     let result = write_then_rename(&tmp, path, bytes, true);
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
