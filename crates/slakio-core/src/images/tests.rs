@@ -161,3 +161,27 @@ fn a_gravatar_address_names_only_gravatar_s_parameters_plainly() {
         assert_eq!(avatar_address(&bad), None, "{bad}");
     }
 }
+
+#[test]
+fn a_gravatar_address_gives_its_slack_fallback_and_nothing_else() {
+    let slack = AVATAR_HOSTS[2];
+    let hash = "https://secure.gravatar.com/avatar/04939292775a6f4a1817e5e846c11609.jpg";
+    let fallback = format!("https://{slack}/df10d/img/avatars/ava_0010-72.png");
+    let encoded = format!("{hash}?s=72&d=https%3A%2F%2F{slack}%2Fdf10d%2Fimg%2Favatars%2Fava_0010-72.png");
+    assert_eq!(gravatar_fallback(&encoded).as_deref(), Some(fallback.as_str()));
+    assert_eq!(
+        gravatar_fallback(&format!("{hash}?s=72&d=https://{slack}/a.png")),
+        Some(format!("https://{slack}/a.png"))
+    );
+    for none in [
+        format!("{hash}?s=72&d=mp"),
+        format!("{hash}?d=404"),
+        format!("{hash}?s=72"),
+        format!("{hash}?s=72&d=https%3A%2F%2Fi0.wp.com%2F{slack}%2Fa.png"),
+        format!("{hash}?d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2Fx.png"),
+        format!("https://{slack}/img/a.png?d=https%3A%2F%2F{slack}%2Fb.png"),
+        format!("https://i0.wp.com/avatar/x.png?d=https%3A%2F%2F{slack}%2Fb.png"),
+    ] {
+        assert_eq!(gravatar_fallback(&none), None, "{none}");
+    }
+}

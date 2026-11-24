@@ -84,6 +84,17 @@ pub fn avatar_address(url: &str) -> Option<String> {
     (host_of(&kept) != Some(AVATAR_HOSTS[1]) || gravatar::fallbacks_allowed(&kept)).then_some(kept)
 }
 
+/// The Slack default avatar a Gravatar address `url` (one [`avatar_address`] keeps) names as its
+/// fallback (`d=`), decoded: asked instead when Gravatar sends the viewer to a host slakio does
+/// not ask. Only an address on Slack's avatar hosts, kept by [`avatar_address`] again; `None`
+/// for any other address, a keyword fallback (`mp`, `404`) or none.
+pub fn gravatar_fallback(url: &str) -> Option<String> {
+    let kept = avatar_address(url).filter(|k| host_of(k) == Some(AVATAR_HOSTS[1]))?;
+    let (value, ok) = gravatar::fallback(&kept)?;
+    let to = avatar_address(&value).filter(|_| ok)?;
+    [AVATAR_HOSTS[0], AVATAR_HOSTS[2]].contains(&host_of(&to)?).then_some(to)
+}
+
 /// `url` when a workspace's own emoji may be fetched from it: an address on one of
 /// [`EMOJI_HOSTS`].
 pub fn emoji_address(url: &str) -> Option<String> {

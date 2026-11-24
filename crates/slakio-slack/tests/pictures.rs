@@ -397,3 +397,63 @@ fn the_user_s_own_photo_is_looked_up_when_the_start_bundle_has_none() {
         assert!(asked, "asked of the edge cache with the DMs' people");
     });
 }
+
+/// A Gravatar address of `photo`'s path whose fallback (`d=`) is `fallback`, as written.
+fn gravatar_of(photo: &Source, fallback: &str) -> Source {
+    let path = photo.address().split_once(".com").unwrap().1;
+    Source::Avatar(format!("https://{}{path}?s=72&d={fallback}", AVATAR_HOSTS[1]))
+}
+
+#[test]
+fn gravatar_sending_elsewhere_asks_the_slack_fallback_it_named_and_nothing_elsewhere() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let (_, photo) = r.sources();
+        let slack = on(AVATAR_HOSTS[2], &photo);
+        let encoded = slack.replace(':', "%3A").replace('/', "%2F");
+        let cdn = format!("https://i0.wp.com/{}?ssl=1", &slack["https://".len()..]);
+        r.fake.fail_next(PICTURES, redirect(&cdn));
+        let bytes = r.picture(gravatar_of(&photo, &encoded), BYTES_MAX).await.unwrap();
+        assert_eq!(&bytes[..4], b"\x89PNG");
+        let log = r.picture_requests();
+        assert_eq!(log.len(), 2, "Gravatar, then the Slack default it named: {log:?}");
+        assert_eq!(r.governor.sent(), 2, "each hop counts");
+        assert_eq!(log[1].path, slack.split_once(".com").unwrap().1, "the fallback's own path");
+        for l in &log {
+            assert!(l.headers.iter().all(|(_, v)| !v.contains("wp.com")), "nothing of the CDN");
+            assert_eq!(header(l, "cookie"), None);
+        }
+        // A fallback that redirects elsewhere in its turn fails: no third ask.
+        r.fake.fail_next(PICTURES, redirect(&cdn));
+        r.fake.fail_next(PICTURES, redirect(&cdn));
+        assert_eq!(r.picture(gravatar_of(&photo, &encoded), BYTES_MAX).await, Err(api("redirected_elsewhere")));
+        assert_eq!(r.picture_requests().len(), 4);
+        // A keyword fallback (or none) has no Slack address to ask: the photo fails, one ask.
+        for keyword in ["mp", "404"] {
+            r.fake.fail_next(PICTURES, redirect(&cdn));
+            let source = gravatar_of(&photo, keyword);
+            assert_eq!(r.picture(source, BYTES_MAX).await, Err(api("redirected_elsewhere")), "{keyword}");
+        }
+        assert_eq!(r.picture_requests().len(), 6, "only Gravatar each time");
+        assert_eq!(r.governor.sent(), 6);
+    });
+}
+
+#[test]
+fn the_gravatar_fallback_stays_within_the_hop_cap() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let (_, photo) = r.sources();
+        let slack = on(AVATAR_HOSTS[2], &photo);
+        let encoded = slack.replace(':', "%3A").replace('/', "%2F");
+        let gravatar = gravatar_of(&photo, &encoded);
+        // Gravatar to Gravatar (allowed), to Gravatar again, then elsewhere: two hops used, no
+        // third for the fallback.
+        r.fake.fail_next(PICTURES, redirect(gravatar.address()));
+        r.fake.fail_next(PICTURES, redirect(gravatar.address()));
+        r.fake.fail_next(PICTURES, redirect("https://i0.wp.com/x.png"));
+        assert_eq!(r.picture(gravatar, BYTES_MAX).await, Err(api("redirected_elsewhere")));
+        assert_eq!(r.picture_requests().len(), 3);
+        assert_eq!(r.governor.sent(), 3);
+    });
+}

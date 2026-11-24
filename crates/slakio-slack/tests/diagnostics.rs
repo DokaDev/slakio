@@ -139,7 +139,7 @@ impl Run {
 /// pictures on).
 fn gravatar() -> String {
     format!(
-        "https://{}/avatars/0123456789abcdef0123456789abcdef.jpg?s=72&d=https%3A%2F%2F{}%2Fdf10d%2Fimg%2Favatars%2Fava_0001-72.png",
+        "https://{}/avatars/0123456789abcdef0123456789abcdef.jpg?s=72&d=https%3A%2F%2F{}%2Favatars%2Fava_0001-72.png",
         AVATAR_HOSTS[1], AVATAR_HOSTS[2]
     )
 }
@@ -184,8 +184,9 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
         let cdn = format!("https://i0.wp.com/{}/img/ava_0001-72.png?ssl=1", AVATAR_HOSTS[2]);
         let to_cdn = vec![("location".to_string(), cdn.clone())];
         r.fake.fail_next(PICTURES, Fault::Raw { status: 302, headers: to_cdn, body: Vec::new() });
-        let failed = r.ask(Command::Image { source: Source::Avatar(gravatar()), max: BYTES_MAX }).await;
-        assert!(matches!(failed, Event::Failed { .. }));
+        // Gravatar sending elsewhere: its Slack fallback is asked instead, and draws.
+        let fallen = r.ask(Command::Image { source: Source::Avatar(gravatar()), max: BYTES_MAX }).await;
+        assert!(matches!(fallen, Event::Image { .. }), "{fallen:?}");
         diag.flush();
         let text = std::fs::read_to_string(&path).unwrap();
         for line in [
@@ -214,11 +215,15 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
             &format!("d_host={} d_allowed=yes", AVATAR_HOSTS[2]),
             "avatar status 302 id=",
             "avatar redirected refused id=",
-            "avatar refused redirected_elsewhere",
+            "avatar redirected fallback id=",
         ] {
             assert!(text.contains(line), "no `{line}` in\n{text}");
         }
         assert!(text.contains("host=i0.wp.com"), "{text}");
+        let fallback = format!("hop=0 host={}", AVATAR_HOSTS[2]);
+        assert!(text.lines().any(|l| l.contains("avatar redirected fallback") && l.contains(&fallback)), "{text}");
+        let asked = format!("hop=1 host={}", AVATAR_HOSTS[2]);
+        assert!(text.lines().any(|l| l.contains("avatar asked ok") && l.contains(&asked)), "{text}");
         let secrets = r.secrets(&[gravatar(), cdn]);
         assert!(secrets.len() > 100, "the fixture's names, ids, texts and paths: {}", secrets.len());
         for secret in secrets {

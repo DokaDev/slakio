@@ -12,7 +12,9 @@
 //!   on the file host; a photo (at most [`AVATAR_REDIRECTS`]) only to another address on an
 //!   avatar host, checked again as a photo's address (`https`, the exact host, no port, no
 //!   userinfo, a Gravatar fallback only Slack's) and asked the same way, with nothing of the
-//!   session; an emoji (at most [`EMOJI_REDIRECTS`]) only to another address on the emoji host,
+//!   session (when Gravatar sends a photo to any other host, the Slack default avatar its
+//!   address already named as its fallback, checked the same way, is asked as the next hop
+//!   instead: nothing is asked of a host not on the list); an emoji (at most [`EMOJI_REDIRECTS`]) only to another address on the emoji host,
 //!   asked the same bare way. Each ask, and each hop, passes the kill switch and counts as one background
 //!   request of the workspace.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
@@ -120,8 +122,9 @@ impl<'a> Note<'a> {
         }
     }
 
-    /// Hop `hop` was answered `status`; a redirect's `location` is followed (`to`) or not.
-    fn answered(&self, hop: usize, status: u16, location: Option<&str>, to: Option<&str>) {
+    /// Hop `hop` was answered `status`; a redirect's `location` is followed (`to`) or not; when
+    /// `fallback`, it was refused and `to` is Gravatar's Slack fallback instead.
+    fn answered(&self, hop: usize, status: u16, location: Option<&str>, to: Option<&str>, fallback: bool) {
         if !self.diag.on() {
             return;
         }
@@ -129,8 +132,12 @@ impl<'a> Note<'a> {
         self.line(slakio_core::diag::Stage::Status, &status.to_string(), &[("hop", &hop)]);
         if let Some(location) = location.filter(|_| (300..400).contains(&status)) {
             let host = slakio_core::diag::host(location);
-            let result = if to.is_some() { "followed" } else { "refused" };
+            let result = if to.is_some() && !fallback { "followed" } else { "refused" };
             self.line(slakio_core::diag::Stage::Redirected, result, &[("hop", &hop), ("host", &host)]);
+        }
+        if let Some(to) = to.filter(|_| fallback) {
+            let host = slakio_core::diag::host(to);
+            self.line(slakio_core::diag::Stage::Redirected, "fallback", &[("hop", &hop), ("host", &host)]);
         }
     }
 
@@ -166,12 +173,15 @@ async fn read(client: &Client, source: &Source, max: u64, note: &Note<'_>) -> Re
     let mut answer = loop {
         note.asked(&url, hops);
         let answer = client.fetch_picture(&url, source).await?;
+        let mut fallback = None;
         let to = match (answer.status, source) {
             (301 | 302 | 303 | 307 | 308, Source::Thumb(_)) => {
                 answer.location.as_deref().and_then(crate::download::redirect)
             }
             (301 | 302 | 303 | 307 | 308, Source::Avatar(_)) => {
-                answer.location.as_deref().and_then(slakio_core::images::avatar_address)
+                let to = answer.location.as_deref().and_then(slakio_core::images::avatar_address);
+                fallback = to.is_none().then(|| slakio_core::images::gravatar_fallback(&url)).flatten();
+                to.or_else(|| fallback.clone())
             }
             (301 | 302 | 303 | 307 | 308, Source::Emoji(_)) => {
                 answer.location.as_deref().and_then(slakio_core::images::emoji_address)
@@ -183,7 +193,8 @@ async fn read(client: &Client, source: &Source, max: u64, note: &Note<'_>) -> Re
             Source::Avatar(_) => AVATAR_REDIRECTS,
             Source::Emoji(_) => EMOJI_REDIRECTS,
         };
-        note.answered(hops, answer.status, answer.location.as_deref(), to.as_deref().filter(|_| hops < most));
+        let taken = to.as_deref().filter(|_| hops < most);
+        note.answered(hops, answer.status, answer.location.as_deref(), taken, fallback.is_some());
         match answer.status {
             200 => break answer,
             301 | 302 | 303 | 307 | 308 if hops < most => {
