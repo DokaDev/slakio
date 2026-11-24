@@ -465,3 +465,78 @@ fn pictures_count_on_the_hour_and_the_run() {
         assert!(!g.is_on(), "the run's cap stops the network");
     });
 }
+
+/// No minute cap in the way: only the hours count.
+fn hours_only() -> Limits {
+    let free = 100_000;
+    Limits {
+        per_minute: free,
+        background_per_minute: free,
+        picture_per_minute: free,
+        lane_picture_per_minute: free,
+        lane_background_per_minute: free,
+        ..Limits::default()
+    }
+}
+
+#[test]
+fn pictures_keep_to_the_process_s_hour_and_each_workspace_s_part_of_it() {
+    let d = Limits::default();
+    assert_eq!((d.picture_per_hour, d.lane_picture_per_hour), (500, 350));
+    let (g, clock) = governor(hours_only(), true);
+    let (a, b, c) = (g.lane(), g.lane(), g.lane());
+    let let_through = (0..400).filter(|_| g.picture(&a).is_ok()).count();
+    assert_eq!(let_through, 350, "one workspace's pictures of an hour");
+    assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's picture share is reached" }));
+    let let_through = (0..400).filter(|_| g.picture(&b).is_ok()).count();
+    assert_eq!(350 + let_through, 500, "every workspace's pictures of an hour together");
+    let process = Err(SlackError::CapReached { why: "the pictures' share is reached" });
+    assert_eq!(g.picture(&b), process);
+    assert_eq!(g.picture(&c), process, "a workspace with none of its own yet waits too");
+    // The rest of the background hour stays for the socket and the rest.
+    g.dial(&c).unwrap();
+    g.dial(&a).unwrap();
+    clock.advance(HOUR);
+    g.picture(&c).unwrap();
+    g.picture(&a).unwrap();
+}
+
+#[test]
+fn a_picture_waits_when_its_workspace_s_share_is_full_of_other_work() {
+    let (g, _) = governor(Limits::default(), true);
+    let (a, b) = (g.lane(), g.lane());
+    for _ in 0..Limits::default().lane_background_per_minute {
+        g.dial(&a).unwrap();
+    }
+    assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's background share is reached" }));
+    g.picture(&b).unwrap();
+    // The hour's share too.
+    let limits = Limits { lane_background_per_hour: 20, ..hours_only() };
+    let (g, _) = governor(limits, true);
+    let a = g.lane();
+    for _ in 0..20 {
+        g.dial(&a).unwrap();
+    }
+    assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's background share is reached" }));
+}
+
+#[test]
+fn the_background_minute_holds_across_workspaces_and_leaves_the_user_room() {
+    let d = Limits::default();
+    assert_eq!((d.background_per_minute, d.lane_background_per_minute, d.per_minute), (90, 60, 120));
+    let (g, clock) = governor(d, true);
+    let (a, b, c) = (g.lane(), g.lane(), g.lane());
+    let let_through = (0..100).filter(|_| g.dial(&a).is_ok()).count();
+    assert_eq!(let_through, 60, "one workspace's part of the minute");
+    assert_eq!(g.dial(&a), Err(SlackError::CapReached { why: "this workspace's background share is reached" }));
+    let let_through = (0..100).filter(|_| g.dial(&b).is_ok()).count();
+    assert_eq!(60 + let_through, 90, "every workspace's background work of a minute together");
+    let minute = Err(SlackError::CapReached { why: "the per-minute request cap is reached" });
+    assert_eq!(g.dial(&c), minute);
+    assert_eq!(g.picture(&c), minute);
+    // The user's own requests keep the rest of the minute.
+    let let_through = (0..100).filter(|_| g.fetch().is_ok()).count();
+    assert_eq!(90 + let_through, 120);
+    clock.advance(WINDOW);
+    g.dial(&c).unwrap();
+}
