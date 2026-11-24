@@ -69,6 +69,15 @@ pub fn delay(numer: u32, denom: u32) -> Duration {
 
 /// The frames of `bytes` (a GIF, or an animated PNG), each made as `l` says, within the bounds.
 pub(super) fn read(bytes: &[u8], l: &Layout) -> Moving {
+    // Too many frames is known before any is decoded.
+    let counted = match image::guess_format(bytes) {
+        Ok(ImageFormat::Gif) => count::gif(bytes),
+        Ok(ImageFormat::Png) => count::apng(bytes),
+        _ => None,
+    };
+    if let Some(n) = counted.filter(|n| *n > FRAMES_MAX) {
+        return Moving::still(n, "frames");
+    }
     let frames = match image::guess_format(bytes) {
         Ok(ImageFormat::Gif) => {
             let Ok(mut d) = GifDecoder::new(Cursor::new(bytes)) else { return Moving::still(0, "unreadable") };
@@ -153,6 +162,8 @@ pub fn apng(m: &Moving) -> Option<Vec<u8>> {
 pub fn kept(png: &[u8], m: &Moving) -> Vec<u8> {
     apng(m).unwrap_or_else(|| png.to_vec())
 }
+
+mod count;
 
 #[cfg(test)]
 mod tests;

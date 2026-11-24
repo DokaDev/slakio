@@ -105,3 +105,26 @@ fn frames_past_the_source_pixel_budget_are_not_decoded() {
     assert!(d.moving.seen as u64 * each <= SOURCE_PIXELS_MAX, "no frame past the budget is read: {}", d.moving.seen);
     assert!(!d.png.is_empty(), "its first frame is shown");
 }
+
+#[test]
+fn a_frame_past_the_most_is_never_decoded() {
+    // Sixty-five frames, the last one broken where its pixels start: counted, not decoded.
+    let mut bytes = gif(8, 8, FRAMES_MAX + 1, 100);
+    let at = bytes.windows(3).rposition(|w| w == [0x21, 0xF9, 0x04]).expect("the last frame's control block");
+    let descriptor = at + 8;
+    assert_eq!(bytes[descriptor], 0x2C, "an image descriptor follows");
+    let packed = bytes[descriptor + 9];
+    let palette = if packed & 0x80 != 0 { 3 << ((packed & 7) + 1) } else { 0 };
+    bytes[descriptor + 10 + palette] = 0x0F;
+    let d = decode(&bytes, Shape::Emoji, CELL).unwrap();
+    assert_eq!((d.moving.seen, d.moving.why), (FRAMES_MAX + 1, "frames"), "not \"unreadable\"");
+}
+
+#[test]
+fn frames_are_counted_from_the_blocks() {
+    assert_eq!(count::gif(&gif(8, 8, 5, 100)), Some(5));
+    assert_eq!(count::gif(&gif(8, 8, 5, 100)[..40]), None, "cut short: not counted");
+    let d = decode(&gif(16, 16, 3, 100), Shape::Emoji, CELL).unwrap();
+    assert_eq!(count::apng(&apng(&d.moving).unwrap()), Some(3));
+    assert_eq!(count::apng(&d.png), None, "one picture");
+}
