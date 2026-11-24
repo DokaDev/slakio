@@ -2,10 +2,11 @@
 //! the governor's shares), the lookups of the user's own photo, the sidebar probe that never
 //! signs out, and caps on what an answer's shape may make the log write.
 
+use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Envelope, Event, Generation, Request};
 use slakio_core::diag::Diag;
 use slakio_core::secret::Credentials;
-use slakio_fake::FakeSlack;
+use slakio_fake::{FakeSlack, Fault};
 use slakio_slack::Client;
 use slakio_slack::governor::{FakeClock, Governor, Limits};
 use slakio_slack::request::Endpoints;
@@ -28,8 +29,7 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 struct Run {
-    /// Kept for the run: the fake Slack stops when it goes.
-    _fake: FakeSlack,
+    fake: FakeSlack,
     handle: BackendHandle,
     diag: Diag,
     path: PathBuf,
@@ -46,7 +46,7 @@ impl Run {
         let endpoints = Endpoints::local(to.unwrap_or(fake.addr())).unwrap();
         let client = Client::new(Credentials::new(TOKEN, "cookie-TEST"), endpoints, Arc::clone(&governor))
             .with_diag(diag.clone());
-        Self { _fake: fake, handle: slakio_slack::serve(client), diag, path, id: 0 }
+        Self { fake, handle: slakio_slack::serve(client), diag, path, id: 0 }
     }
 
     async fn ask(&mut self, command: Command) -> Event {
@@ -55,6 +55,10 @@ impl Run {
         let e: Envelope =
             tokio::time::timeout(Duration::from_secs(20), self.handle.rx.recv()).await.expect("an answer").unwrap();
         e.event
+    }
+
+    fn calls(&self, method: &str) -> usize {
+        self.fake.log().iter().filter(|l| l.method() == method).count()
     }
 
     /// What the file holds now.
@@ -80,5 +84,21 @@ fn a_host_that_cannot_be_reached_is_the_network() {
         let text = r.text();
         has(&text, "emoji-list failed network");
         assert!(!text.contains("failed other"), "{text}");
+    });
+}
+
+#[test]
+fn the_user_s_own_lookup_says_what_it_gave_and_the_answer_s_counts() {
+    rt().block_on(async {
+        let mut r = Run::new("lookup", None).await;
+        let me = World::demo().snapshot().workspaces[0].me.as_str().to_string();
+        r.fake.fail_next("users/info", Fault::Answer(json!({"ok": true, "results": [], "pending_ids": [me]})));
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        let text = r.text();
+        has(&text, "self-photo lookup result standing=unknown in_results=no photo=none");
+        has(&text, "avatar counted lookup results=0 pending_ids=1 failed_ids=-");
+        has(&text, "avatar field lookup_key name=pending_ids");
+        has(&text, "self-photo source none");
+        assert!(r.calls("users/info") >= 1);
     });
 }

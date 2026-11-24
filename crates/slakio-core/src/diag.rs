@@ -123,6 +123,8 @@ pub enum Stage {
     Source,
     /// A field of an answer: its name and what kind of value it holds.
     Field,
+    /// What a lookup gave (of the user's own record).
+    Lookup,
     /// Kept for the local picture cache: found there.
     CacheHit,
     /// Kept for the local picture cache: not there.
@@ -151,6 +153,7 @@ impl Stage {
             Stage::Failed => "failed",
             Stage::Source => "source",
             Stage::Field => "field",
+            Stage::Lookup => "lookup",
             Stage::CacheHit => "cache-hit",
             Stage::CacheMiss => "cache-miss",
         }

@@ -62,6 +62,9 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     }
     let mut known = people.names(client, &asked, Priority::Background).await;
     if client.diag().on() {
+        if !bundled {
+            crate::shape::own_lookup(client.diag(), people.standing(&self_.id));
+        }
         let photo = own_photo(self_, &known);
         let source = match (bundled, photo.is_some(), before) {
             (true, _, _) => "profile",

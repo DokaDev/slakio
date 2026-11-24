@@ -142,6 +142,10 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw) {
                 _ => diag.line(Kind::EmojiList, Stage::Failed, "parse", &[]),
             }
         }
+        Method::EdgeUsersInfo => match serde_json::from_slice::<Value>(&raw.body) {
+            Ok(v) => lookup_shape(diag, &v),
+            Err(_) => diag.line(Kind::Avatar, Stage::Failed, "parse", &[("lookup", "users-info")]),
+        },
         Method::ClientUserBoot => match serde_json::from_slice::<Value>(&raw.body) {
             Ok(v) => boot_shape(diag, &v),
             Err(_) => diag.line(Kind::BootShape, Stage::Failed, "parse", &[]),
@@ -227,6 +231,37 @@ pub(crate) fn own_profile(diag: &Diag, me: &wire::Me) {
         }
         (None, None) => diag.line(Kind::SelfPhoto, Stage::Parsed, "bundle", &[("read", "yes"), ("photo", "none")]),
     }
+}
+
+/// What the lookup gave of the user's own record: where they stand after it ([`People::standing`]
+/// words), whether the answer named them and whether a photo of them is known now.
+///
+/// [`People::standing`]: crate::people::People::standing
+pub(crate) fn own_lookup(diag: &Diag, standing: &str) {
+    let named = matches!(standing, "pictured" | "unpictured");
+    let photo = if standing == "pictured" { "ok" } else { "none" };
+    diag.line(
+        Kind::SelfPhoto,
+        Stage::Lookup,
+        "result",
+        &[("standing", standing), ("in_results", yn(named)), ("photo", photo)],
+    );
+}
+
+/// The shape of an edge `users/info` answer: its top-level field names, and how many ids it
+/// gave (`results`), has no answer for yet (`pending_ids`) or does not know (`failed_ids`).
+fn lookup_shape(diag: &Diag, v: &Value) {
+    let Some(o) = v.as_object() else {
+        return diag.line(Kind::Avatar, Stage::Failed, "parse", &[("lookup", "users-info")]);
+    };
+    for k in o.keys().take(KEYS_MAX) {
+        diag.line(Kind::Avatar, Stage::Field, "lookup_key", &[("name", key(k))]);
+    }
+    let count =
+        |name: &str| o.get(name).and_then(Value::as_array).map_or_else(|| "-".to_string(), |a| a.len().to_string());
+    let (results, pending, failed) = (count("results"), count("pending_ids"), count("failed_ids"));
+    let pairs = [("results", results.as_str()), ("pending_ids", pending.as_str()), ("failed_ids", failed.as_str())];
+    diag.line(Kind::Avatar, Stage::Counted, "lookup", &pairs);
 }
 
 /// Where the user's own photo came from: the start bundle's `profile`, a page read before the
