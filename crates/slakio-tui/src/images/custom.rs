@@ -9,6 +9,7 @@
 
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
+use slakio_core::diag::{Diag, Kind, Stage};
 use slakio_core::images::emoji::Custom;
 use slakio_core::model::WorkspaceId;
 use std::cell::RefCell;
@@ -26,6 +27,8 @@ pub struct Customs {
     /// The workspaces a frame showed a shortcode of that no list says yet (`false`: only laid
     /// out, not shown).
     seen: RefCell<Vec<(WorkspaceId, bool)>>,
+    /// The picture diagnostics (off unless asked for).
+    pub diag: Diag,
 }
 
 impl Customs {
@@ -38,6 +41,9 @@ impl Customs {
             None => {
                 if name.chars().any(char::is_alphabetic) {
                     self.seen.borrow_mut().push((ws.clone(), true));
+                    if self.diag.first(Kind::EmojiList, Stage::Wanted, ws.as_str()) {
+                        self.note(ws, Stage::Wanted, "ui", &[]);
+                    }
                 }
                 None
             }
@@ -64,9 +70,14 @@ impl Customs {
             let waiting = self.asked.values().any(|w| *w == ws);
             let barred = self.failed.get(&ws).is_some_and(|again| again.is_none_or(|at| at > now));
             if self.sets.contains_key(&ws) || waiting || barred {
+                if barred && self.diag.first(Kind::EmojiList, Stage::Skipped, ws.as_str()) {
+                    let again = self.failed.get(&ws).copied().flatten();
+                    self.note(&ws, Stage::Skipped, "barred", &[("retry", &super::note::retry(again, now))]);
+                }
                 continue;
             }
             self.failed.remove(&ws);
+            self.note(&ws, Stage::Asked, "ui", &[]);
             let id = requests.ask(Some(ws.clone()), Command::Emoji);
             self.asked.insert(id, ws);
             asked = true;
@@ -77,6 +88,10 @@ impl Customs {
     /// List request `id` came with `emoji`: `true` when it was one of these.
     pub fn answered(&mut self, id: Generation, emoji: Vec<(String, Custom)>) -> bool {
         let Some(ws) = self.asked.remove(&id) else { return false };
+        if self.diag.on() {
+            let pictures = emoji.iter().filter(|(_, c)| matches!(c, Custom::Picture(_))).count().to_string();
+            self.note(&ws, Stage::Applied, "ok", &[("names", &emoji.len().to_string()), ("pictures", &pictures)]);
+        }
         self.sets.insert(ws, emoji.into_iter().collect());
         true
     }
@@ -89,8 +104,20 @@ impl Customs {
             k if k.retryable() || *k == FailKind::CapReached => Some(now + super::RETRY_AFTER),
             _ => None,
         };
+        self.note(&ws, Stage::Failed, &super::note::fail_word(kind), &[("retry", &super::note::retry(again, now))]);
         self.failed.insert(ws, again);
         true
+    }
+
+    /// One diagnostics line about workspace `ws`'s list.
+    fn note(&self, ws: &WorkspaceId, stage: Stage, result: &str, pairs: &[(&str, &str)]) {
+        if !self.diag.on() {
+            return;
+        }
+        let id = self.diag.id(ws.as_str());
+        let mut all = vec![("ws", id.as_str())];
+        all.extend_from_slice(pairs);
+        self.diag.line(Kind::EmojiList, stage, result, &all);
     }
 
     /// Workspace `ws` was signed in again: its list is read again when next wanted (one asked

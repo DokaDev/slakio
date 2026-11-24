@@ -40,6 +40,8 @@ environment:
                                keychain (default: keychain)
   SLAKIO_NETWORK=off           never send anything to Slack (default: on, unless
                                the config file says network = \"off\")
+  SLAKIO_DEBUG_PICTURES=1      write picture diagnostics (stages and hosts only) to
+                               pictures.log in the state folder
   NO_COLOR=1                   draw without colours
 ";
 

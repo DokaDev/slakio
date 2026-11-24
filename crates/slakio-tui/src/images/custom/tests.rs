@@ -93,3 +93,35 @@ fn a_name_of_korean_letters_only_asks_for_the_list() {
     c.get(&ws("T2"), "\u{0663}\u{0660}");
     assert!(!c.ask(&mut r, now), "digits of another script only: still no emoji's");
 }
+
+#[test]
+fn with_the_diagnostics_on_the_list_says_wanted_asked_applied_and_failed_by_a_hash() {
+    let dir = std::env::temp_dir().join(format!("slakio-tui-diag-custom-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    let diag = Diag::to(path.clone());
+    let (mut c, mut r, now) =
+        (Customs { diag: diag.clone(), ..Customs::default() }, Requests::default(), Instant::now());
+    c.get(&ws("TSECRET1"), "secret_party");
+    c.get(&ws("TSECRET2"), "secret_party");
+    assert!(c.ask(&mut r, now));
+    let ids = asked(&mut r);
+    let blob = Custom::Picture("https://example.invalid/secret.png".into());
+    assert!(c.answered(ids[0].0, vec![("secret_party".into(), blob), ("yes".into(), Custom::Standard("+1".into()))]));
+    assert!(c.failed(ids[1].0, &FailKind::Api { code: "internal_error".into() }, now));
+    c.get(&ws("TSECRET2"), "secret_party");
+    c.ask(&mut r, now);
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let (one, two) = (diag.id("TSECRET1"), diag.id("TSECRET2"));
+    for line in [
+        format!("emoji-list wanted ui ws={one}"),
+        format!("emoji-list asked ui ws={one}"),
+        format!("emoji-list applied ok ws={one} names=2 pictures=1"),
+        format!("emoji-list failed api-internal_error ws={two} retry=never"),
+        format!("emoji-list skipped barred ws={two} retry=never"),
+    ] {
+        assert!(text.contains(&line), "no `{line}` in\n{text}");
+    }
+    assert!(!text.contains("SECRET") && !text.contains("secret") && !text.contains("example"), "{text}");
+}

@@ -110,6 +110,7 @@ fn main() -> ExitCode {
         workspaces,
         governor,
         errors: paths.errors_log(),
+        diag: slakio_core::diag::Diag::from_env(|k| std::env::var(k).ok(), paths.pictures_log()),
         test_addrs: test_addrs(),
         desktop: None,
         local,
@@ -135,6 +136,7 @@ fn main() -> ExitCode {
     };
     // Pictures: the environment (read once), the setting, the demo; `:images` changes the setting.
     app.images.env = slakio_tui::images::detect::Env::read(env);
+    app.images.set_diag(wiring.diag.clone());
     (app.images.setting, app.images.demo, app.images.tty) = (cfg.images.clone(), demo, io::stdout().is_terminal());
     app.images.resolve();
     app.fold_views(cfg.nav_rows == "collapsed");
@@ -285,6 +287,7 @@ struct Wiring {
     workspaces: Option<PathBuf>,
     governor: Arc<Governor>,
     errors: Option<PathBuf>,
+    diag: slakio_core::diag::Diag,
     test_addrs: Vec<(Option<String>, std::net::SocketAddr)>,
     /// What the sign-in screen's desktop scan found (no secret but the tokens; the cookie is
     /// read only when a workspace is picked).
@@ -376,6 +379,7 @@ impl Wiring {
     /// Workspace `team`'s backend, with its live updates unless they are off.
     fn serve(&self, credentials: Credentials, endpoints: Endpoints, team: &str) -> BackendHandle {
         let client = slakio_slack::Client::of_team(credentials, endpoints, Arc::clone(&self.governor), team);
+        let client = client.with_diag(self.diag.clone());
         slakio_slack::serve_with(client, self.live.then(slakio_slack::Realtime::default))
     }
 

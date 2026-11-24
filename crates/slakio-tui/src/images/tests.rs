@@ -16,7 +16,14 @@ fn on() -> Images {
 /// `job` made ready as a picture of `png` bytes, 3 × 2 cells.
 fn ready(job: &Job, png: usize) -> Prepared {
     let bytes = vec![0; png];
-    Prepared { id: job.id, cols: 3, rows: 2, bytes: png, transmit: graphics::transmit(job.id, 3, 2, &bytes) }
+    Prepared {
+        id: job.id,
+        cols: 3,
+        rows: 2,
+        bytes: png,
+        transmit: graphics::transmit(job.id, 3, 2, &bytes),
+        from: (6, 4, "png"),
+    }
 }
 
 fn key(job: &Job) -> (Source, Generation) {
@@ -179,6 +186,7 @@ fn a_photo_in_the_list_s_chip_is_a_picture_of_its_own_beside_the_slot_s() {
         rows,
         bytes: 5,
         transmit: graphics::transmit(job.id, cols, rows, &[0; 5]),
+        from: (4, 4, "png"),
     };
     images.decoded(key(&chip), Ok(made(&chip, 2, 1)));
     images.decoded(key(&slot), Ok(made(&slot, 4, 2)));
@@ -492,4 +500,73 @@ fn emoji_only_laid_out_give_the_frame_s_share_back_and_what_is_shown_keeps_it() 
     let mut got = wanted.clone();
     got.sort_by_key(|s| s.address().to_string());
     assert_eq!(got, expected, "the share holds for what is shown: {EMOJI_PER_FRAME}");
+}
+
+/// A diagnostics file of its own for test `name`, and what reads it.
+fn diag_file(name: &str) -> (Diag, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("slakio-tui-diag-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    (Diag::to(path.clone()), path)
+}
+
+#[test]
+fn with_the_diagnostics_on_each_stage_of_a_picture_has_a_line_naming_no_address() {
+    let (diag, path) = diag_file("stages");
+    let (mut images, mut requests) = (on(), Requests::default());
+    images.set_diag(diag.clone());
+    let job = fetch(&mut images, &mut requests, &thumb(1));
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    for _ in 0..3 {
+        assert!(matches!(images.look(&ws(), &thumb(1)), Look::Ready { .. }));
+    }
+    let job = fetch(&mut images, &mut requests, &thumb(2));
+    images.decoded(key(&job), Err(Refused::Unreadable));
+    assert_eq!(images.look(&ws(), &thumb(3)), Look::Pending);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().expect("asked");
+    assert!(images.failed(r.id, &FailKind::Network, Instant::now()));
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let id = diag.id(thumb(1).address());
+    for line in [
+        format!("thumb asked ui id={id} shape=preview again=false"),
+        format!("thumb decoded ok id={id} shape=preview w=6 h=4 format=png bytes=10"),
+        format!("thumb drawn ok id={id} shape=preview"),
+        format!("thumb refused decode-unreadable id={}", diag.id(thumb(2).address())),
+        format!("thumb failed network id={} shape=preview retry=60", diag.id(thumb(3).address())),
+    ] {
+        assert!(text.contains(&line), "no `{line}` in\n{text}");
+    }
+    assert_eq!(text.matches(" drawn ").count(), 1, "drawn once: {text}");
+    assert!(!text.contains("files-tmb") && !text.contains("T1-F"), "{text}");
+    // Off: the same flow writes nothing.
+    let (mut off, mut requests) = (on(), Requests::default());
+    let job = fetch(&mut off, &mut requests, &thumb(1));
+    off.decoded(key(&job), Ok(ready(&job, 10)));
+    diag.flush();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+}
+
+#[test]
+fn with_the_diagnostics_on_a_parked_picture_says_so() {
+    let (diag, path) = diag_file("parked");
+    let (mut images, mut requests) = (on(), Requests::default());
+    images.set_diag(diag.clone());
+    let held: Vec<Source> = (0..ENTRIES_MAX).map(thumb).collect();
+    for _ in 0..ENTRIES_MAX {
+        frame_of(&mut images, &mut requests, &held, false);
+    }
+    let extra = [thumb(999)];
+    frame_of(&mut images, &mut requests, &extra, true);
+    let ids = frame_of(&mut images, &mut requests, &extra, true);
+    let all: Vec<Source> = held.iter().chain(&extra).cloned().collect();
+    frame_of(&mut images, &mut requests, &all, true);
+    let job = images.answered(ids[0], vec![1]).expect("a job");
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    diag.flush();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let line =
+        format!("thumb parked room id={} shape=preview held={ENTRIES_MAX} bytes=640", diag.id(extra[0].address()));
+    assert!(text.contains(&line), "no `{line}` in\n{text}");
 }

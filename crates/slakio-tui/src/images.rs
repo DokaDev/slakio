@@ -33,10 +33,12 @@ pub mod custom;
 pub mod decode;
 pub mod detect;
 pub mod graphics;
+mod note;
 
 use crate::app::requests::Requests;
 use decode::{Refused, Shape};
 use slakio_core::backend::{Command, FailKind, Generation};
+use slakio_core::diag::{Diag, Stage};
 use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
 use std::cell::RefCell;
@@ -132,6 +134,8 @@ pub struct Prepared {
     pub rows: u16,
     pub bytes: usize,
     pub transmit: String,
+    /// What it was read from: width and height in pixels, format (the diagnostics say it).
+    pub from: (u32, u32, &'static str),
 }
 
 /// `job` decoded ([`decode::decode`], for cells of `cell` pixels) and made into the commands
@@ -140,7 +144,7 @@ pub fn prepare(job: &Job, cell: Option<(u16, u16)>) -> Result<Prepared, Refused>
     let d = decode::decode(&job.bytes, job.shape, cell)?;
     let (cols, rows) = (d.cols.min(graphics::MARKS), d.rows.min(graphics::MARKS));
     let transmit = graphics::transmit(job.id, cols, rows, &d.png);
-    Ok(Prepared { id: job.id, cols, rows, bytes: d.png.len(), transmit })
+    Ok(Prepared { id: job.id, cols, rows, bytes: d.png.len(), transmit, from: d.from })
 }
 
 /// What `:images` changed, for the app to say.
@@ -205,9 +209,17 @@ pub struct Images {
     graphics: String,
     /// The workspaces' own emoji: what each name draws (kept whether pictures are on or not).
     pub customs: custom::Customs,
+    /// The picture diagnostics (off unless asked for, [`Images::set_diag`]).
+    diag: Diag,
 }
 
 impl Images {
+    /// Write the picture diagnostics to `diag` (the emoji lists' too).
+    pub fn set_diag(&mut self, diag: Diag) {
+        self.customs.diag = diag.clone();
+        self.diag = diag;
+    }
+
     /// [`Images::on`] from what decides it ([`detect::images_on`]). Turned off, every picture
     /// leaves the terminal at once (each by its id, then all) and nothing asked is waited for.
     pub fn resolve(&mut self) {
@@ -297,7 +309,10 @@ impl Images {
         let key = (source.clone(), shape);
         self.drawn.borrow_mut().push((key.clone(), true));
         match self.entries.get(&key) {
-            Some(Entry::Ready { id, cols, rows, .. }) => Look::Ready { id: *id, cols: *cols, rows: *rows },
+            Some(Entry::Ready { id, cols, rows, .. }) => {
+                note::once(&self.diag, &key, Stage::Drawn, "ok", &[]);
+                Look::Ready { id: *id, cols: *cols, rows: *rows }
+            }
             Some(Entry::Failed { why, again }) => {
                 let why = *why;
                 if again.is_some() {
@@ -408,6 +423,7 @@ impl Images {
             let chip = key.1 == CHIP_PHOTO;
             let staying = self.held.iter().filter(|k| self.on_screen(k) && (chip || k.1 != CHIP_PHOTO)).count();
             if staying + in_flight >= ENTRIES_MAX {
+                note::once(&self.diag, &key, Stage::Skipped, "room", &[("staying", staying.to_string())]);
                 continue;
             }
             match self.entries.get(&key) {
@@ -415,6 +431,7 @@ impl Images {
                 Some(Entry::Failed { again: Some(at), .. }) if *at <= now => {}
                 Some(_) => continue,
             }
+            note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", self.entries.contains_key(&key).to_string())]);
             let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
             self.asked.insert(id, key.clone());
             self.failed.retain(|k| *k != key);
@@ -464,6 +481,7 @@ impl Images {
             k if k.retryable() || *k == FailKind::CapReached => Some(now + RETRY_AFTER),
             _ => None,
         };
+        note::line(&self.diag, &key, Stage::Failed, &note::fail_word(kind), &[("retry", note::retry(again, now))]);
         self.fail(key, why, again);
         true
     }
@@ -487,14 +505,19 @@ impl Images {
                     Refused::TooLarge => Why::TooLarge,
                     Refused::Unreadable => Why::Unreadable,
                 };
+                let result = if why == Why::TooLarge { "decode-too-large" } else { "decode-unreadable" };
+                note::line(&self.diag, &key, Stage::Refused, result, &[]);
                 return self.fail(key, why, None);
             }
         };
+        note::decoded(&self.diag, &key, &p);
         while self.held.len() >= ENTRIES_MAX || (self.bytes + p.bytes > BYTES_CAP && !self.held.is_empty()) {
             let off = self.held.iter().position(|k| !self.on_screen(k));
             let chip = || self.held.iter().position(|k| k.1 == CHIP_PHOTO);
             let Some(i) = off.or_else(|| (key.1 != CHIP_PHOTO).then(chip).flatten()) else {
                 // Never sent, so nothing to remove from the terminal.
+                let held = [("held", self.held.len().to_string()), ("bytes", self.bytes.to_string())];
+                note::line(&self.diag, &key, Stage::Parked, "room", &held);
                 self.entries.insert(key, Entry::Parked);
                 return;
             };

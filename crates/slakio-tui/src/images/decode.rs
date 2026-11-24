@@ -38,12 +38,14 @@ pub enum Shape {
     Emoji,
 }
 
-/// A picture ready for the terminal: a PNG that fills `cols` × `rows` cells.
+/// A picture ready for the terminal: a PNG that fills `cols` × `rows` cells; and what it was
+/// read from (its width and height in pixels, its format), for the diagnostics.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Decoded {
     pub png: Vec<u8>,
     pub cols: u16,
     pub rows: u16,
+    pub from: (u32, u32, &'static str),
 }
 
 /// Why a picture is not shown.
@@ -63,8 +65,8 @@ fn format(bytes: &[u8]) -> Result<ImageFormat, Refused> {
     }
 }
 
-/// `bytes` decoded within the bounds (the header read first).
-fn read(bytes: &[u8]) -> Result<DynamicImage, Refused> {
+/// `bytes` decoded within the bounds (the header read first), and its format's name.
+fn read(bytes: &[u8]) -> Result<(DynamicImage, &'static str), Refused> {
     if bytes.len() as u64 > BYTES_MAX {
         return Err(Refused::TooLarge);
     }
@@ -84,10 +86,16 @@ fn read(bytes: &[u8]) -> Result<DynamicImage, Refused> {
     // Four bytes a pixel, and as much again for the decoder's own work.
     limits.max_alloc = Some(PIXELS_MAX * 8);
     reader.limits(limits);
-    reader.decode().map_err(|e| match e {
+    let name = match format {
+        ImageFormat::Png => "png",
+        ImageFormat::Jpeg => "jpeg",
+        _ => "gif",
+    };
+    let img = reader.decode().map_err(|e| match e {
         image::ImageError::Limits(_) => Refused::TooLarge,
         _ => Refused::Unreadable,
-    })
+    })?;
+    Ok((img, name))
 }
 
 /// A cell's size: `cell` when the terminal said one that makes sense, else [`CELL_GUESS`].
@@ -98,7 +106,7 @@ fn cell_px(cell: Option<(u16, u16)>) -> (u32, u32) {
 
 /// `bytes` as a picture of `shape`, for cells of `cell` pixels (as the terminal says, if it does).
 pub fn decode(bytes: &[u8], shape: Shape, cell: Option<(u16, u16)>) -> Result<Decoded, Refused> {
-    let img = read(bytes)?;
+    let (img, format) = read(bytes)?;
     let (cw, ch) = cell_px(cell);
     let (w, h) = img.dimensions();
     let (cols, rows, fit) = match shape {
@@ -148,7 +156,7 @@ pub fn decode(bytes: &[u8], shape: Shape, cell: Option<(u16, u16)>) -> Result<De
     let mut png = Vec::new();
     canvas.write_to(&mut Cursor::new(&mut png), ImageFormat::Png).map_err(|_| Refused::Unreadable)?;
     let cells = |v: u32| u16::try_from(v).unwrap_or(1);
-    Ok(Decoded { png, cols: cells(cols), rows: cells(rows) })
+    Ok(Decoded { png, cols: cells(cols), rows: cells(rows), from: (w, h, format) })
 }
 
 #[cfg(test)]
