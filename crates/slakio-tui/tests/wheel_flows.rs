@@ -300,3 +300,30 @@ fn wheeled_back_to_the_newest_the_view_stays_there_with_the_selection_off_screen
     assert!(shows(&s.d, PaneKind::Conversation, Ts(ts)), "a live message is followed");
     assert_eq!(chosen(&s.d, PaneKind::Conversation), Some(sel), "the selection stays");
 }
+
+#[test]
+fn a_to_do_opened_in_a_wheeled_pane_brings_its_message_into_view() {
+    use slakio_tui::app::model::Row;
+    let mut d = Demo::new(120, 40);
+    d.keys("space o");
+    let rows = d.app.list_rows();
+    let at = rows
+        .iter()
+        .position(|r| matches!(r, Row::Item(i) if !d.app.model.saved(*i).thread))
+        .expect("a to-do on a conversation's message");
+    let Row::Item(i) = rows[at] else { unreachable!() };
+    let ts = d.app.model.saved(i).ts;
+    d.app.focus_list_row(at);
+    d.keys("enter");
+    d.screen();
+    assert!(shows(&d, PaneKind::Conversation, ts));
+    wheel(&mut d, PaneKind::Conversation, true, 20);
+    wheel(&mut d, PaneKind::Conversation, false, 1);
+    assert!(!shows(&d, PaneKind::Conversation, ts), "wheeled away");
+    d.keys("space o");
+    d.app.focus_list_row(at);
+    d.keys("enter");
+    d.screen();
+    assert_eq!(chosen(&d, PaneKind::Conversation), Some(ts));
+    assert!(shows(&d, PaneKind::Conversation, ts), "opened again, its message is in view");
+}

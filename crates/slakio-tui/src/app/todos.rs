@@ -249,6 +249,7 @@ impl App {
         self.open(target, focus);
         if let Some(p) = self.work.focused_mut() {
             p.selected = Some(ts);
+            p.follow();
         }
     }
 
