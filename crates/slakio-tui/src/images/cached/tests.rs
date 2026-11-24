@@ -111,7 +111,7 @@ fn a_picture_on_disk_that_does_not_decode_is_removed_and_fetched_again() {
     let diag = Diag::default();
     settle(&mut images(&dir, &diag), &mut Requests::default(), false);
     let cache = PictureCache::new(dir.clone());
-    let victim = cache.path(&photos()[3], &shape_tag(super::super::PHOTO));
+    let victim = cache.path(&photos()[3], &shape_tag(super::super::PHOTO, Some((9, 18))));
     // A header and a PNG's first bytes, then nothing a decoder reads.
     let mut bytes = std::fs::read(&victim).unwrap();
     bytes.truncate(49 + 8);
@@ -119,7 +119,10 @@ fn a_picture_on_disk_that_does_not_decode_is_removed_and_fetched_again() {
     std::fs::write(&victim, bytes).unwrap();
     let mut second = images(&dir, &diag);
     assert_eq!(settle(&mut second, &mut Requests::default(), false), 1, "only that one is fetched");
-    assert!(matches!(cache.load(&photos()[3], &shape_tag(super::super::PHOTO)), Loaded::Hit(_)), "kept again");
+    assert!(
+        matches!(cache.load(&photos()[3], &shape_tag(super::super::PHOTO, Some((9, 18)))), Loaded::Hit(_)),
+        "kept again"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -207,8 +210,31 @@ fn a_file_s_preview_is_never_kept_on_disk_nor_looked_for_there() {
     let cache = images.cache.clone().unwrap();
     let png = slakio_world::pictures::png(thumb.address(), 64, 64);
     let d = super::decode::decode(&png, job.shape, Some((9, 18))).unwrap();
-    assert!(matches!(cache.store(&thumb, &shape_tag(job.shape), &d.png), Stored::Stored(_)));
+    assert!(matches!(cache.store(&thumb, &shape_tag(job.shape, Some((9, 18))), &d.png), Stored::Stored(_)));
     let look = Job { from_cache: true, bytes: Vec::new(), ..job };
     assert_eq!(run(&look, Some((9, 18)), Some(&cache), &diag), Err(Refused::NotCached));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_picture_made_for_cells_of_another_size_is_another_picture() {
+    let dir = scratch("cell-size");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    images.look(&ws(), &photo);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    let fetched =
+        Job { from_cache: false, bytes: slakio_world::pictures::png(photo.address(), 64, 64), ..look.clone() };
+    let small = run(&fetched, Some((9, 18)), images.cache.as_ref(), &diag).unwrap();
+    assert!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).is_ok(), "kept for those cells");
+    // The terminal's font grew: what was kept is not shown at the old size.
+    assert_eq!(run(&look, Some((18, 36)), images.cache.as_ref(), &diag), Err(Refused::NotCached));
+    let large = run(&fetched, Some((18, 36)), images.cache.as_ref(), &diag).unwrap();
+    let again = run(&look, Some((18, 36)), images.cache.as_ref(), &diag).unwrap();
+    assert_eq!((again.cols, again.rows), (large.cols, large.rows), "as a fresh decode for those cells");
+    assert_eq!(again.transmit, large.transmit);
+    assert!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).unwrap().transmit == small.transmit);
     let _ = std::fs::remove_dir_all(&dir);
 }

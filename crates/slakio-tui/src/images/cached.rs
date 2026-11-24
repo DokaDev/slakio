@@ -17,12 +17,17 @@ use slakio_core::diag::{Diag, Kind, Stage};
 use slakio_core::images::Source;
 use slakio_core::picture_cache::{Loaded, PictureCache, Stored, Swept};
 
-/// The cells a picture fills, as part of its key on disk.
-pub fn shape_tag(shape: Shape) -> String {
-    match shape {
+/// The cells a picture fills and a cell's size in pixels (what it is decoded for), as part of
+/// its key on disk: a picture made for other cells is another picture.
+pub fn shape_tag(shape: Shape, cell: Option<(u16, u16)>) -> String {
+    let shape = match shape {
         Shape::Preview => "preview".to_string(),
         Shape::Emoji => "emoji".to_string(),
         Shape::Photo { cols, rows } => format!("photo-{cols}x{rows}"),
+    };
+    match cell {
+        Some((w, h)) => format!("{shape}@{w}x{h}"),
+        None => format!("{shape}@none"),
     }
 }
 
@@ -40,7 +45,7 @@ pub fn run(
         return if job.from_cache { Err(Refused::NotCached) } else { super::prepare(job, cell) };
     };
     let key = (job.source.clone(), job.shape);
-    let tag = shape_tag(job.shape);
+    let tag = shape_tag(job.shape, cell);
     if !job.from_cache {
         let d = decode::decode(&job.bytes, job.shape, cell)?;
         match cache.store(&job.source, &tag, &d.png) {
