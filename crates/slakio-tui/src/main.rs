@@ -571,8 +571,8 @@ async fn run(
                 None => break,
             },
             _ = timer => app.on_tick(Instant::now()),
-            (job, result) = decodes.next() => {
-                app.images.decoded(job, result);
+            ended = decodes.next() => {
+                app.images.decoded_all(ended);
                 true
             }
             // An answer that came later than its turn: it wakes the loop like a key.

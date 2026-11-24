@@ -101,19 +101,24 @@ impl Pictures {
         });
     }
 
-    /// The next job that ended.
-    pub(crate) async fn next(&mut self) -> Done {
-        match self.rx.recv().await {
-            Some((done, panicked)) => {
-                if panicked {
-                    let fault = Fault::other("the picture decoder panicked; the picture is not shown");
-                    ErrorLog::new(self.errors.clone()).record("picture", &fault);
-                }
-                done
-            }
-            // Never: this end holds a sender.
-            None => std::future::pending().await,
+    /// The next job that ended, and every other that ended by then (one frame for them all).
+    pub(crate) async fn next(&mut self) -> Vec<Done> {
+        // Never `None`: this end holds a sender.
+        let Some(first) = self.rx.recv().await else { return std::future::pending().await };
+        let mut ended = vec![first];
+        while let Ok(more) = self.rx.try_recv() {
+            ended.push(more);
         }
+        ended.into_iter().map(|(done, panicked)| self.panicked(done, panicked)).collect()
+    }
+
+    /// `done`, its decoder's panic (`panicked`) written to the error log.
+    fn panicked(&self, done: Done, panicked: bool) -> Done {
+        if panicked {
+            let fault = Fault::other("the picture decoder panicked; the picture is not shown");
+            ErrorLog::new(self.errors.clone()).record("picture", &fault);
+        }
+        done
     }
 }
 
@@ -193,5 +198,20 @@ mod tests {
             assert_eq!(tokio::time::timeout(Duration::from_secs(5), rx.recv()).await, Ok(Some(true)));
         }
         assert_eq!(most.load(SeqCst), cached::DISK_LOADERS, "{reads} reads, at most so many at once");
+    }
+
+    #[tokio::test]
+    async fn every_picture_ended_by_a_wake_is_taken_at_once() {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (errors, cache, diag, panic, panic_keep) = (None, None, Diag::default(), false, false);
+        let loaders = Arc::new(Semaphore::new(cached::DISK_LOADERS));
+        let mut pictures = Pictures { tx, rx, errors, cache, diag, panic, panic_keep, loaders };
+        for n in 0..5u64 {
+            let done = ((Source::Emoji(format!("e{n}")), Generation(n)), Err(Refused::NotCached));
+            pictures.tx.send((done, false)).unwrap();
+        }
+        let ended = tokio::time::timeout(Duration::from_secs(5), pictures.next()).await.expect("ended");
+        assert_eq!(ended.len(), 5, "one wake, one frame, for all five");
+        assert_eq!(ended[4].0.1, Generation(4), "in the order they ended");
     }
 }

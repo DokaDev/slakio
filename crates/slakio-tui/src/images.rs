@@ -495,6 +495,11 @@ impl Images {
         self.held.push_back(key);
     }
 
+    /// Each of `ended` ([`Images::decoded`]), in order.
+    pub fn decoded_all(&mut self, ended: Vec<((Source, Generation), Result<Prepared, Refused>)>) {
+        ended.into_iter().for_each(|(job, result)| self.decoded(job, result));
+    }
+
     /// The commands for the terminal not written yet (sending and removing pictures).
     pub fn take_graphics(&mut self) -> String {
         std::mem::take(&mut self.graphics)
