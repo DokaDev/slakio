@@ -96,6 +96,7 @@ pub(crate) fn reason(e: &SlackError) -> String {
         }
         SlackError::Network { detail } if detail.contains("cut off") => "cut-off".to_string(),
         SlackError::Network { detail } if detail.starts_with("HTTP") => "http".to_string(),
+        SlackError::Network { .. } => "network".to_string(),
         SlackError::TooLarge => "too-large".to_string(),
         SlackError::Busy => "busy".to_string(),
         _ => "other".to_string(),
