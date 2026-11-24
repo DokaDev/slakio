@@ -27,15 +27,17 @@ pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(Strin
         let after = &rest[start + 1..];
         let name = after.find(':').map(|e| &after[..e]).filter(|n| shortcode(n));
         match name.and_then(|n| drawn(app, ws, n, style)) {
-            Some((run, picture)) => {
+            Some((mut run, picture)) => {
                 if !plain.is_empty() {
                     out.push((std::mem::take(&mut plain), style));
                 }
-                out.push(run);
                 rest = &after[name.unwrap_or_default().len() + 1..];
                 if picture {
                     rest = after_picture(rest);
+                } else if let Some((toned, past)) = toned(app, ws, name.unwrap_or_default(), rest) {
+                    (run.0, rest) = (toned.to_string(), past);
                 }
+                out.push(run);
             }
             None => {
                 plain.push(':');
@@ -60,6 +62,16 @@ fn after_picture(rest: &str) -> &str {
         .and_then(|r| r.strip_prefix(':'))
         .unwrap_or(rest);
     rest.trim_start_matches(|c: char| c != '\n' && unicode_width::UnicodeWidthChar::width(c) == Some(0))
+}
+
+/// The standard emoji the alias `name` of workspace `ws` stands for, in the skin tone `rest` (the
+/// text right after it) starts with (`:skin-tone-2:` to `-6:`), and the text past the tone.
+fn toned<'a>(app: &App, ws: &WorkspaceId, name: &str, rest: &'a str) -> Option<(&'static str, &'a str)> {
+    let tone = rest.strip_prefix(":skin-tone-")?;
+    let digit = tone.chars().next().filter(|d| ('2'..='6').contains(d))?;
+    let past = tone[1..].strip_prefix(':')?;
+    let Some(Custom::Standard(standard)) = app.images.customs.get(ws, name) else { return None };
+    emoji::get(&format!("{standard}::skin-tone-{digit}")).map(|e| (e, past))
 }
 
 /// What `:name:` is drawn as in workspace `ws`, when it is one of the workspace's own emoji that

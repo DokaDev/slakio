@@ -585,3 +585,18 @@ fn prose_with_colons_stays_as_it_is_and_digits_only_ask_nothing() {
         assert!(cells(&s).is_empty(), "{text:?}: no picture");
     }
 }
+
+#[test]
+fn an_alias_of_a_standard_emoji_takes_the_skin_tone_after_it() {
+    use slakio_core::images::emoji::Custom;
+    let (mut s, _) = shown(&[("ok :yes2::skin-tone-3: done", &["yes2::skin-tone-2"])], 120, 40, true);
+    let asked = frame(&mut s);
+    let list = vec![("yes2".to_string(), Custom::Standard("+1".into()))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: list } });
+    s.pump();
+    let screen = s.d.screen();
+    assert!(!screen.contains("skin-tone") && !screen.contains("yes2"), "{screen}");
+    // The toned thumbs up (medium-light skin tone) in the text, the light one in the chip.
+    assert!(screen.contains("\u{1F44D}\u{1F3FC}"), "{screen}");
+    assert!(screen.contains("\u{1F44D}\u{1F3FB}"), "{screen}");
+}
