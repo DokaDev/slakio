@@ -175,16 +175,24 @@ struct Inner {
     path: PathBuf,
     tx: Option<SyncSender<Note>>,
     writer: Option<std::thread::JoinHandle<()>>,
+    /// Told when the writer has written everything and ends.
+    finished: Mutex<Option<mpsc::Receiver<()>>>,
     /// This run's key of [`Diag::id`].
     key: RandomState,
     once: Mutex<HashSet<u64>>,
 }
 
+/// The longest the end of a run waits for the writer to write what was handed over.
+const EXIT_WAIT: Duration = Duration::from_secs(2);
+
 impl Drop for Inner {
-    // What was handed over is written before the run ends.
+    // What was handed over is written before the run ends, unless writing hangs: then the run
+    // ends after [`EXIT_WAIT`] all the same, the writer left behind.
     fn drop(&mut self) {
         drop(self.tx.take());
-        if let Some(w) = self.writer.take() {
+        let finished = self.finished.get_mut().unwrap_or_else(PoisonError::into_inner).take();
+        let finished = finished.is_some_and(|f| f.recv_timeout(EXIT_WAIT).is_ok());
+        if let Some(w) = self.writer.take().filter(|_| finished) {
             let _ = w.join();
         }
     }
@@ -213,6 +221,7 @@ impl Diag {
     /// On, writing to `path` (made only when the first line comes).
     pub fn to(path: PathBuf) -> Self {
         let (tx, rx) = mpsc::sync_channel::<Note>(QUEUE);
+        let (done, finished) = mpsc::channel();
         let at = path.clone();
         let writer = std::thread::Builder::new().name("slakio-diag".into()).spawn(move || {
             for note in rx {
@@ -220,15 +229,23 @@ impl Diag {
                     Note::Line(line) => {
                         let _ = crate::fault::append(&at, line.as_bytes(), LOG_MAX);
                     }
-                    Note::Flush(done) => {
-                        let _ = done.send(());
+                    Note::Flush(flushed) => {
+                        let _ = flushed.send(());
                     }
                 }
             }
+            let _ = done.send(());
         });
         // No thread: no diagnostics, and nothing else changes.
         let Ok(writer) = writer else { return Self::default() };
-        let inner = Inner { path, tx: Some(tx), writer: Some(writer), key: RandomState::new(), once: Mutex::default() };
+        let inner = Inner {
+            path,
+            tx: Some(tx),
+            writer: Some(writer),
+            finished: Mutex::new(Some(finished)),
+            key: RandomState::new(),
+            once: Mutex::default(),
+        };
         Self(Some(Arc::new(inner)))
     }
 

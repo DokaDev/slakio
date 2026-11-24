@@ -195,3 +195,37 @@ fn every_governor_reason_is_a_short_word_the_log_keeps() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_end_of_a_run_waits_for_a_hung_writer_only_a_little() {
+    let (tx, _rx) = mpsc::sync_channel::<Note>(1);
+    let (done, finished) = mpsc::channel::<()>();
+    // A writer that hangs (a disk that does not answer): it says nothing for a long time.
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(20));
+        drop(done);
+    });
+    let inner = Inner {
+        path: std::env::temp_dir().join("slakio-diag-hung-never-written"),
+        tx: Some(tx),
+        writer: Some(writer),
+        finished: Mutex::new(Some(finished)),
+        key: RandomState::new(),
+        once: Mutex::default(),
+    };
+    let started = std::time::Instant::now();
+    drop(inner);
+    assert!(started.elapsed() < Duration::from_secs(10), "{:?}", started.elapsed());
+}
+
+#[test]
+fn the_end_of_a_run_writes_what_was_handed_over() {
+    let dir = std::env::temp_dir().join(format!("slakio-diag-exit-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("pictures.log");
+    let diag = Diag::to(path.clone());
+    diag.line(Kind::Avatar, Stage::Asked, "ok", &[]);
+    drop(diag);
+    assert!(std::fs::read_to_string(&path).unwrap().contains("avatar asked ok"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
