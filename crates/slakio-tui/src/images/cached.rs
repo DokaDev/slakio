@@ -80,11 +80,13 @@ pub fn run(
 }
 
 /// At the start, off the loop's thread: the folder made or found ([`PictureCache::open`]; only
-/// then are pictures kept), and swept ([`PictureCache::sweep`]).
-pub fn start(cache: &PictureCache, diag: &Diag) {
-    if cache.open().is_none() {
-        diag.line(Kind::PictureCache, Stage::CacheRefused, "folder", &[]);
-        return;
+/// then are pictures kept), handed to `made` when it was made now (to keep it out of backups),
+/// and swept ([`PictureCache::sweep`]).
+pub fn start(cache: &PictureCache, diag: &Diag, made: impl FnOnce(&std::path::Path)) {
+    match cache.open() {
+        None => return diag.line(Kind::PictureCache, Stage::CacheRefused, "folder", &[]),
+        Some(true) => made(cache.dir()),
+        Some(false) => {}
     }
     sweep(cache, diag);
 }

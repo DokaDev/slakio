@@ -58,8 +58,8 @@ impl Pictures {
         images.cache = local.pictures().filter(|_| !images.demo);
         let (cache, diag) = (images.cache.clone(), images.diag().clone());
         if let Some(c) = cache.clone().filter(|_| images.on) {
-            let d = diag.clone();
-            tokio::task::spawn_blocking(move || cached::start(&c, &d));
+            let (d, made) = (diag.clone(), local.exclude_pictures());
+            tokio::task::spawn_blocking(move || cached::start(&c, &d, made));
         }
         Self { tx, rx, errors, cache, diag, panic }
     }

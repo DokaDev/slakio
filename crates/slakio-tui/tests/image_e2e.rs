@@ -217,7 +217,14 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let m = Machine::new("kept");
     let config = std::fs::read_to_string(m.dir.join("config.toml")).unwrap();
     std::fs::write(m.dir.join("config.toml"), config.replace("cache = \"off\"", "cache = \"on\"")).unwrap();
-    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty")];
+    // A stand-in for tmutil that records what it is asked to exclude from backups.
+    let tmutil = m.dir.join("tmutil");
+    let calls = m.dir.join("tmutil.log");
+    std::fs::write(&tmutil, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\n", calls.display())).unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&tmutil, std::os::unix::fs::PermissionsExt::from_mode(0o700)).unwrap();
+    let tmutil = tmutil.display().to_string();
+    let env = [("SLAKIO_IMAGES", "on"), ("TERM", "xterm-kitty"), ("SLAKIO_TEST_TMUTIL", tmutil.as_str())];
     // A file's preview is never kept on disk: fetched each run.
     let fetches = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).collect::<Vec<_>>();
     let previews = || fetches().iter().filter(|l| l.path.starts_with("/files-tmb/")).count();
@@ -259,4 +266,8 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     run.quit();
     assert_eq!(pictures(), fetched, "nothing fetched again: every photo came from the disk");
     assert!(previews() > previewed, "the preview fetched again: never kept");
+    // Kept out of backups when it was made, once.
+    let excluded = std::fs::read_to_string(&calls).unwrap_or_default();
+    let line = format!("addexclusion\n{}\n", kept.display());
+    assert_eq!(excluded.matches(&line).count(), 1, "the pictures excluded once: {excluded}");
 }

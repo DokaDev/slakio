@@ -15,7 +15,7 @@ use slakio_core::paths::Paths;
 use slakio_core::picture_cache::PictureCache;
 use slakio_store::cache::system_clock;
 use slakio_store::layer::Waits;
-use slakio_store::{Cache, Caps, OpenError, Store, Tmutil};
+use slakio_store::{Cache, Caps, Exclude, OpenError, Store, Tmutil};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -88,6 +88,18 @@ impl Local {
     /// The pictures kept on disk between runs, beside the cache (none when it is off).
     pub(crate) fn pictures(&self) -> Option<PictureCache> {
         self.paths.pictures_cache().filter(|_| self.on).map(PictureCache::new)
+    }
+
+    /// What keeps the pictures folder out of backups once it is made (as the cache's own
+    /// directory is): when that fails, the error log says so.
+    pub(crate) fn exclude_pictures(&self) -> impl FnOnce(&std::path::Path) + Send + 'static {
+        let errors = self.paths.errors_log();
+        move |dir| {
+            if let Some(Err(why)) = exclusion().map(|t| t.exclude(dir)) {
+                let fault = Fault::other(format!("pictures: not excluded from backups: {why}"));
+                ErrorLog::new(errors).record("cache", &fault);
+            }
+        }
     }
 
     fn record(&self, fault: &Fault) {

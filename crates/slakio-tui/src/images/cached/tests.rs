@@ -28,7 +28,7 @@ fn emoji() -> Vec<String> {
 /// A run's pictures, on, keeping pictures in `dir` (opened as a run's start does).
 fn images(dir: &std::path::Path, diag: &Diag) -> Images {
     let cache = PictureCache::new(dir.to_path_buf());
-    start(&cache, diag);
+    start(&cache, diag, |_| {});
     let mut images = Images { on: true, cache: Some(cache), ..Images::default() };
     images.set_diag(diag.clone());
     images
