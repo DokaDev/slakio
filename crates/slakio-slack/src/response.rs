@@ -26,6 +26,10 @@ struct Envelope {
     error: Option<String>,
 }
 
+/// The detail of an answer that is not Slack's JSON (a network failure as the transport tells
+/// it; [`crate::emoji`] tells it apart by this, never by its words).
+pub(crate) const NOT_JSON: &str = "the answer is not Slack's JSON";
+
 /// The body of `raw` as `T`, or why there is none.
 pub fn decode<T: DeserializeOwned>(raw: &Raw) -> Result<T, SlackError> {
     if raw.status == 429 {
@@ -34,7 +38,7 @@ pub fn decode<T: DeserializeOwned>(raw: &Raw) -> Result<T, SlackError> {
     if !(200..300).contains(&raw.status) {
         return Err(SlackError::Network { detail: format!("HTTP {}", raw.status) });
     }
-    let malformed = || SlackError::Network { detail: "the answer is not Slack's JSON".to_string() };
+    let malformed = || SlackError::Network { detail: NOT_JSON.to_string() };
     let envelope: Envelope = serde_json::from_slice(&raw.body).map_err(|_| malformed())?;
     match envelope.ok {
         Some(true) => serde_json::from_slice(&raw.body).map_err(|_| malformed()),

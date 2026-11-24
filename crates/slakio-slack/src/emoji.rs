@@ -106,17 +106,22 @@ pub(crate) async fn emoji(client: &Client) -> Result<Event, SlackError> {
             crate::shape::failed(client.diag(), slakio_core::diag::Kind::EmojiList, &e, &[]);
             // An answer that is not Slack's JSON comes the same next time: told apart from the
             // network, so the UI asks again only a few times.
-            return Err(match e {
-                SlackError::Network { detail } if detail.contains("JSON") => {
-                    SlackError::Api { code: "not_slack_json".to_string() }
-                }
-                e => e,
-            });
+            return Err(not_json(e));
         }
     };
     let emoji = resolve(&listed.emoji.0);
     crate::shape::emoji_counts(client.diag(), listed.emoji.1, &listed.emoji.0, &emoji);
     Ok(Event::Emoji { emoji })
+}
+
+/// `e`, an answer that is not Slack's JSON as Slack's `not_slack_json`.
+fn not_json(e: SlackError) -> SlackError {
+    match e {
+        SlackError::Network { detail } if detail == crate::response::NOT_JSON => {
+            SlackError::Api { code: "not_slack_json".to_string() }
+        }
+        e => e,
+    }
 }
 
 #[cfg(test)]

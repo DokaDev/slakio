@@ -30,3 +30,12 @@ fn korean_names_are_kept_and_names_hiding_characters_read_past() {
     let names: Vec<&str> = listed.emoji.0.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(names, ["\u{C9DD}\u{C9DD}-\u{BCD1}\u{C544}\u{B9AC}", "\u{C9F1}\u{AD6C}_wow-2"]);
 }
+
+#[test]
+fn only_an_answer_that_is_not_slack_s_json_is_told_as_not_slack_json() {
+    let not = SlackError::Network { detail: crate::response::NOT_JSON.to_string() };
+    assert_eq!(not_json(not), SlackError::Api { code: "not_slack_json".to_string() });
+    // Another failure whose words name JSON stays what it is.
+    let other = SlackError::Network { detail: "proxy said: JSON gateway timeout".to_string() };
+    assert_eq!(not_json(other.clone()), other);
+}
