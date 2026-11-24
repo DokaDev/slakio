@@ -52,6 +52,8 @@ rustls-platform-verifier = "0.7.1"
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 # The tests' certificates for a TLS server on this machine, made when they run.
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
+# SHA-256 of the pictures kept on disk (the key of each file): the same ring the TLS uses.
+ring = { version = "0.17.14", default-features = false }
 # The macOS Keychain (the login keychain's generic passwords) behind the secret store.
 apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 keyring-core = "1"

@@ -114,7 +114,7 @@ fn a_picture_on_disk_that_does_not_decode_is_removed_and_fetched_again() {
     let victim = cache.path(&photos()[3], &shape_tag(super::super::PHOTO));
     // A header and a PNG's first bytes, then nothing a decoder reads.
     let mut bytes = std::fs::read(&victim).unwrap();
-    bytes.truncate(25 + 8);
+    bytes.truncate(49 + 8);
     bytes.extend_from_slice(&[0xee; 200]);
     std::fs::write(&victim, bytes).unwrap();
     let mut second = images(&dir, &diag);

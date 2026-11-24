@@ -23,6 +23,8 @@ toml_edit.workspace = true
 zeroize.workspace = true
 # Emoji names: a mark that joins the character before it is no letter of a shortcode.
 unicode-segmentation.workspace = true
+# The pictures kept on disk are keyed by SHA-256 (ring, already in the binary for TLS).
+ring.workspace = true
 
 # The error log opened without following a symbolic link (`O_NOFOLLOW`, Unix).
 [target.'cfg(unix)'.dependencies]

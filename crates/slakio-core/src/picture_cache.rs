@@ -3,9 +3,10 @@
 //! photo, a workspace's own emoji or a file's preview, so the next run draws it without asking
 //! the network (and without counting toward the request governor's picture share).
 //!
-//! * A file is named by [`key`] alone (16 hex digits of a hash of the kind, the address and the
-//!   cells it fills, then `.png`): never the address, a name or an id. It holds a header
-//!   ([`MAGIC`], the whole key, the time it was written, the kind) and the PNG, nothing else.
+//! * A file is named by [`key`] alone (its first 16 bytes in hex, then `.png`; the key is the
+//!   SHA-256 of the kind, the address and the cells it fills): never the address, a name or an
+//!   id. It holds a header ([`MAGIC`], all 32 bytes of the key, the time it was written, the
+//!   kind) and the PNG, nothing else. A file of an earlier format is refused and removed.
 //! * The folder is private (0700) and each file too (0600), written whole or not at all, never
 //!   through a link; a folder that is a link, or not the user's own, or one others may write in,
 //!   is neither read nor written. It is made once, when
@@ -45,28 +46,28 @@ pub const EMOJI_AGE: Duration = Duration::from_secs(30 * 24 * 3600);
 /// How long a file's preview is kept.
 pub const THUMB_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 /// The first bytes of every file (the format's version is its last digit).
-pub const MAGIC: &[u8; 8] = b"slkpic1\n";
-/// The header: [`MAGIC`], the key and the time written (little-endian `u64`s), the kind.
-const HEADER: usize = 25;
+pub const MAGIC: &[u8; 8] = b"slkpic2\n";
+/// The header: [`MAGIC`], the key (32 bytes), the time written (a little-endian `u64`), the
+/// kind.
+const HEADER: usize = 49;
 const PNG: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 /// How far after now a file's time may be (a clock put back a little) before it is refused.
 const SKEW: Duration = Duration::from_secs(24 * 3600);
 /// A write's temporary file still there after this long was left by a run that ended.
 const TMP_AGE: Duration = Duration::from_secs(3600);
 
-/// FNV-1a, 64 bits: a hash that is the same on every machine, Rust version and run (the
-/// standard library's is not promised to be). Not a secret and not collision-proof: two
-/// pictures of one kind whose keys collide share one file (the later write replaces the
-/// earlier), which shows one where the other belongs; the folder is the user's own.
-pub fn fnv1a(parts: &[&[u8]]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+/// SHA-256 of `parts`, each after its length (a little-endian `u64`), so no two lists of parts
+/// hash the same bytes: the same on every machine, Rust version and run, and two pictures never
+/// share a file.
+pub fn sha256(parts: &[&[u8]]) -> [u8; 32] {
+    let mut ctx = ring::digest::Context::new(&ring::digest::SHA256);
     for part in parts {
-        for b in part.iter().chain(&[0xff]) {
-            h ^= u64::from(*b);
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
-        }
+        ctx.update(&(part.len() as u64).to_le_bytes());
+        ctx.update(part);
     }
-    h
+    let mut key = [0; 32];
+    key.copy_from_slice(ctx.finish().as_ref());
+    key
 }
 
 /// The kind as one byte of the header.
@@ -84,20 +85,21 @@ fn age_of(byte: u8) -> Option<Duration> {
 }
 
 /// The key of the picture of `source` that fills the cells `shape` names.
-pub fn key(source: &Source, shape: &str) -> u64 {
-    fnv1a(&[b"slakio-picture", &[kind_byte(source)], source.address().as_bytes(), shape.as_bytes()])
+pub fn key(source: &Source, shape: &str) -> [u8; 32] {
+    sha256(&[b"slakio-picture", &[kind_byte(source)], source.address().as_bytes(), shape.as_bytes()])
 }
 
-/// The file's name: the key in hex, then `.png`.
+/// The file's name: the key's first 16 bytes in hex, then `.png`.
 pub fn file_name(source: &Source, shape: &str) -> String {
-    format!("{:016x}.png", key(source, shape))
+    let hex: String = key(source, shape)[..16].iter().map(|b| format!("{b:02x}")).collect();
+    format!("{hex}.png")
 }
 
 /// `name` is one [`file_name`] makes.
 fn is_name(name: &str) -> bool {
-    name.len() == 20
+    name.len() == 36
         && name.ends_with(".png")
-        && name.bytes().take(16).all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && name.bytes().take(32).all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// What time it is (tests set it).
@@ -294,7 +296,7 @@ impl PictureCache {
         let secs = now.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
         let mut bytes = Vec::with_capacity(HEADER + png.len());
         bytes.extend_from_slice(MAGIC);
-        bytes.extend_from_slice(&key(source, shape).to_le_bytes());
+        bytes.extend_from_slice(&key(source, shape));
         bytes.extend_from_slice(&secs.to_le_bytes());
         bytes.push(kind_byte(source));
         bytes.extend_from_slice(png);
@@ -374,8 +376,7 @@ impl PictureCache {
 /// the file is refused.
 fn parse(bytes: &[u8], source: &Source, shape: &str, now: SystemTime) -> Result<Option<Vec<u8>>, &'static str> {
     let (age, written) = header(bytes).ok_or("header")?;
-    let hash = u64::from_le_bytes(bytes[8..16].try_into().map_err(|_| "header")?);
-    if hash != key(source, shape) || bytes[24] != kind_byte(source) {
+    if bytes[8..40] != key(source, shape) || bytes[48] != kind_byte(source) {
         return Err("key");
     }
     if written > now + SKEW {
@@ -397,8 +398,8 @@ fn header(bytes: &[u8]) -> Option<(Duration, SystemTime)> {
     if bytes.len() < HEADER || &bytes[..8] != MAGIC {
         return None;
     }
-    let secs = u64::from_le_bytes(bytes[16..24].try_into().ok()?);
-    Some((age_of(bytes[24])?, UNIX_EPOCH.checked_add(Duration::from_secs(secs))?))
+    let secs = u64::from_le_bytes(bytes[40..48].try_into().ok()?);
+    Some((age_of(bytes[48])?, UNIX_EPOCH.checked_add(Duration::from_secs(secs))?))
 }
 
 /// The file at `path` is too old at `now`, or its header is not one this writes.

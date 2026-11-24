@@ -251,7 +251,7 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
         assert_eq!(std::fs::metadata(&kept).unwrap().permissions().mode() & 0o777, 0o700);
         for f in std::fs::read_dir(&kept).unwrap().flatten() {
             let name = f.file_name().to_string_lossy().into_owned();
-            assert!(name.len() == 20 && name.ends_with(".png"), "{name}");
+            assert!(name.len() == 36 && name.ends_with(".png"), "{name}");
             assert_eq!(f.metadata().unwrap().permissions().mode() & 0o777, 0o600, "{name}");
         }
     }

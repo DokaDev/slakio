@@ -49,14 +49,13 @@ fn a_picture_kept_is_read_back_and_a_miss_is_a_miss() {
 
 #[test]
 fn the_key_is_stable_and_no_file_name_tells_an_address() {
-    // FNV-1a's published test value: the hash never changes with the Rust version.
-    assert_eq!(fnv1a(&[]), 0xcbf2_9ce4_8422_2325);
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in b"a" {
-        h ^= u64::from(*b);
-        h = h.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    assert_eq!(h, 0xaf63_dc4c_8601_ec8c);
+    // SHA-256's published value of no bytes, and one name worked out apart from slakio: the
+    // key never changes with the Rust version or the machine.
+    let hex = |b: &[u8]| b.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    assert_eq!(hex(&sha256(&[])), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    let photo = Source::Avatar(AVATAR.into());
+    assert_eq!(file_name(&photo, "photo-4x2"), "82fe2dccd2a9beb20a9424ea852c904e.png");
+    assert_eq!(hex(&key(&photo, "photo-4x2")), "82fe2dccd2a9beb20a9424ea852c904eeb0b2fbe97dd3e93f3ccf2e5bd7921af");
     let (c, _) = cache("names");
     for s in [Source::Avatar(AVATAR.into()), Source::Emoji(EMOJI.into()), Source::Thumb(THUMB.into())] {
         assert!(matches!(c.store(&s, "preview", &png(64)), Stored::Stored(_)));
@@ -288,5 +287,34 @@ fn a_folder_others_may_write_in_is_neither_read_nor_written() {
     assert_eq!(c.sweep(), None);
     fs::set_permissions(c.dir(), fs::Permissions::from_mode(0o700)).unwrap();
     assert!(matches!(c.load(&photo, "x"), Loaded::Hit(b) if b == png(64)), "the file left as it was");
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn a_file_of_the_first_format_is_refused_and_removed() {
+    let (c, _) = cache("v1");
+    let photo = Source::Avatar(AVATAR.into());
+    // The first format: its magic, an FNV key of 8 bytes, the time, the kind, the PNG.
+    let mut v1 = b"slkpic1\n".to_vec();
+    v1.extend_from_slice(&0x0123_4567_89ab_cdef_u64.to_le_bytes());
+    v1.extend_from_slice(&START.to_le_bytes());
+    v1.push(1);
+    v1.extend_from_slice(&png(64));
+    // Under this format's name: refused on read, also when all but its magic reads as this
+    // format.
+    fs::write(c.path(&photo, "x"), &v1).unwrap();
+    assert_eq!(c.load(&photo, "x"), Loaded::Refused("header"));
+    assert!(!c.path(&photo, "x").exists(), "removed");
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)));
+    let mut old_magic = fs::read(c.path(&photo, "x")).unwrap();
+    old_magic[..8].copy_from_slice(b"slkpic1\n");
+    fs::write(c.path(&photo, "x"), &old_magic).unwrap();
+    assert_eq!(c.load(&photo, "x"), Loaded::Refused("header"));
+    assert!(!c.path(&photo, "x").exists(), "removed");
+    // Under the first format's name (16 hex digits): the sweep removes it.
+    fs::write(c.dir().join("0123456789abcdef.png"), &v1).unwrap();
+    assert!(matches!(c.store(&photo, "x", &png(64)), Stored::Stored(_)));
+    assert_eq!(c.sweep().unwrap(), Swept { removed: 1, kept: 1, bytes: (HEADER + 64) as u64 });
+    assert!(!c.dir().join("0123456789abcdef.png").exists());
     let _ = fs::remove_dir_all(c.dir());
 }
