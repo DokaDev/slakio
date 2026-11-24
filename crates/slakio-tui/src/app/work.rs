@@ -458,7 +458,8 @@ impl Work {
     pub fn scroll_in(&mut self, id: Option<PaneId>, rows: isize) {
         if let Some(p) = id.and_then(|id| self.panes.get_mut(&id)) {
             let tl = self.timelines.get(&p.target).unwrap_or(&EMPTY);
-            let past = rows > 0 && !p.is_thread() && tl.cut && p.free.get().is_none() && p.bottom.get().is_none();
+            let past =
+                rows > 0 && !p.is_thread() && tl.cut && p.free.get().unwrap_or(0) == 0 && p.bottom.get().is_none();
             p.scroll(rows);
             if past {
                 let target = p.target.clone();

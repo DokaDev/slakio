@@ -255,3 +255,48 @@ fn a_live_message_does_not_move_a_view_the_wheel_moved() {
     s.d.screen();
     assert!(shows(&s.d, PaneKind::Conversation, Ts(ts)), "at the bottom, new messages stay in view");
 }
+
+/// `#big-history`'s workspace and conversation, and a live message in it at `ts`.
+fn post(s: &mut Scripted, ts: u64) {
+    let c = s.d.app.model.conversations().iter().find(|c| c.name == "big-history").unwrap().clone();
+    let me = s.d.app.model.me(&c.workspace).unwrap().clone();
+    let message = Message {
+        ts: Ts(ts),
+        user: me,
+        text: Remote::new("fresh from the wire"),
+        thread: None,
+        reactions: Vec::new(),
+        edited: false,
+        files: Vec::new(),
+    };
+    let live = Live::Message {
+        workspace: c.workspace,
+        conversation: c.id,
+        thread: None,
+        broadcast: false,
+        changed: false,
+        mention: false,
+        message,
+        users: Vec::new(),
+    };
+    s.b.push(Envelope { generation: Generation::PUSHED, event: Event::Live(Box::new(live)) });
+    s.pump();
+}
+
+#[test]
+fn wheeled_back_to_the_newest_the_view_stays_there_with_the_selection_off_screen() {
+    let mut s = big();
+    s.keys("k k");
+    let sel = chosen(&s.d, PaneKind::Conversation).expect("a selection");
+    wheel(&mut s.d, PaneKind::Conversation, true, 30);
+    assert!(!shows(&s.d, PaneKind::Conversation, sel));
+    wheel(&mut s.d, PaneKind::Conversation, false, 200);
+    let newest = |s: &Scripted| s.d.pane(PaneKind::Conversation).unwrap().messages().last().unwrap().ts;
+    s.d.screen();
+    assert!(shows(&s.d, PaneKind::Conversation, newest(&s)), "drawn again, still at the newest");
+    let ts = newest(&s).0 + 1;
+    post(&mut s, ts);
+    s.d.screen();
+    assert!(shows(&s.d, PaneKind::Conversation, Ts(ts)), "a live message is followed");
+    assert_eq!(chosen(&s.d, PaneKind::Conversation), Some(sel), "the selection stays");
+}

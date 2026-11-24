@@ -92,7 +92,9 @@ impl Work {
     /// there), whatever comes in below it; until a pane is drawn, its bottom is pinned to the
     /// newest message shown. What is newer than that newest one counts as new below the view.
     fn pin(&self, targets: &[Target]) {
-        let chose = |p: &&Pane| p.selected.is_some() || p.free.get().is_some();
+        // A view the wheel took to the newest follows the newest.
+        let following = |p: &Pane| p.free.get() == Some(0) && p.bottom.get().is_none();
+        let chose = |p: &&Pane| (p.selected.is_some() || p.free.get().is_some()) && !following(p);
         for pane in self.panes.values().filter(|p| targets.contains(&p.target)).filter(chose) {
             let newest = self.timelines.get(&pane.target).and_then(|tl| tl.items.last()).map(|m| m.ts);
             if pane.bottom.get().is_none() {

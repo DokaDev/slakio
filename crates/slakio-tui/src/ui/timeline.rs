@@ -121,7 +121,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
         let by = pane.wheel.replace(0);
         let moved = wheel::place((bottom, was), by, n, h, &mut |i| height(i, &mut laid));
         (bottom, cut) = moved.unwrap_or((n - 1, 0));
-        pane.free.set(moved.map(|(_, c)| c));
+        // At the newest it follows the newest, the selection still off screen until a key.
+        pane.free.set(moved.map(|(_, c)| c).or(pane.selected.map(|_| 0)));
     } else if let (Some((_, below)), Some(sel)) = (held, selected.map(|s| s.min(n - 1))) {
         let (mut total, mut j) = (0, sel);
         while total < below && j + 1 < n {
