@@ -459,7 +459,12 @@ the other workspaces' parts are left as they are.
   in place of one of its files is refused. On macOS it is excluded from Time Machine backups
   (`tmutil addexclusion`, which marks the directory itself); if that fails, slakio says so once
   and tries again on the next start.
-- A second slakio while one runs reads the cache but does not write it, and says so. A cache that
+- The pictures kept between runs (profile photos and emoji, never a file's preview) are beside
+  it, in `pictures` in the same cache directory ([Pictures](#pictures)): readable by you only,
+  excluded from Time Machine on macOS when the folder is made, at most 64 MiB, and removed by
+  `slakio logout` too.
+- A second slakio while one runs reads the cache but does not write it, and says so (the
+  pictures kept are the exception: each slakio keeps the pictures it makes). A cache that
   cannot be read (damaged, or written by a newer slakio) is started again from nothing, with one
   line in the status line (shown after any other notice, so each is seen). `slakio logout`
   (of the last workspace, or `--all`) removes it, also when the keychain could not be changed,
