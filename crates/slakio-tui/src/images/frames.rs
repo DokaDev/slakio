@@ -4,7 +4,8 @@
 //! ([`super::animate`]); nothing is fetched for it.
 //!
 //! Bounded: at most [`FRAMES_MAX`] frames, and their pixels as drawn (four bytes each) at most
-//! [`FRAME_BYTES_MAX`] in all; a picture past either, or one whose frames stop reading part way,
+//! [`FRAME_BYTES_MAX`] in all, their pixels as they come at most [`SOURCE_PIXELS_MAX`] in all
+//! (checked before a frame is decoded); a picture past any, or one whose frames stop reading part way,
 //! stays still on its first frame (the diagnostics' `decoded` line says why). A frame is shown
 //! at least [`DELAY_MIN`] (a GIF that says 0 or 10 ms is shown at ten frames a second, as
 //! browsers do).
@@ -20,6 +21,9 @@ use std::time::Duration;
 pub const FRAMES_MAX: usize = 64;
 /// The most bytes of a picture's frames as drawn (width × height × 4 each, all frames).
 pub const FRAME_BYTES_MAX: u64 = 8 * 1024 * 1024;
+/// The most pixels of a picture's frames as they come (width × height each, all frames): what
+/// decoding them costs, whatever size they are drawn at.
+pub const SOURCE_PIXELS_MAX: u64 = 8 * slakio_core::images::PIXELS_MAX;
 /// The shortest time a frame is shown: at most ten frames a second.
 pub const DELAY_MIN: Duration = Duration::from_millis(100);
 
@@ -71,26 +75,36 @@ pub(super) fn read(bytes: &[u8], l: &Layout) -> Moving {
             if d.set_limits(limits()).is_err() {
                 return Moving::still(0, "unreadable");
             }
-            d.into_frames()
+            (d.dimensions(), d.into_frames())
         }
         Ok(ImageFormat::Png) => match PngDecoder::with_limits(Cursor::new(bytes), limits()) {
-            Ok(d) if d.is_apng().unwrap_or(false) => match d.apng() {
-                Ok(a) => a.into_frames(),
-                Err(_) => return Moving::still(0, "unreadable"),
-            },
+            Ok(d) if d.is_apng().unwrap_or(false) => {
+                let size = d.dimensions();
+                match d.apng() {
+                    Ok(a) => (size, a.into_frames()),
+                    Err(_) => return Moving::still(0, "unreadable"),
+                }
+            }
             _ => return Moving::still(1, "single"),
         },
         _ => return Moving::still(1, "format"),
     };
-    collect(frames, l)
+    let ((w, h), frames) = frames;
+    collect(frames, u64::from(w) * u64::from(h), l)
 }
 
-/// `frames` made as `l` says, while within the bounds.
-fn collect(frames: Frames<'_>, l: &Layout) -> Moving {
+/// `frames`, each `source` pixels as they come, made as `l` says, while within the bounds: a
+/// frame that would take them past [`SOURCE_PIXELS_MAX`] is not decoded.
+fn collect(frames: Frames<'_>, source: u64, l: &Layout) -> Moving {
     let each = u64::from(l.canvas.0) * u64::from(l.canvas.1) * 4;
     let mut raw = Vec::new();
     let mut delays = Vec::new();
-    for (seen, frame) in (1..).zip(frames) {
+    let mut frames = frames.into_iter();
+    for seen in 1.. {
+        if seen as u64 * source > SOURCE_PIXELS_MAX {
+            return Moving::still(seen - 1, "pixels");
+        }
+        let Some(frame) = frames.next() else { break };
         let Ok(frame) = frame else { return Moving::still(seen, "unreadable") };
         if seen > FRAMES_MAX {
             return Moving::still(seen, "frames");

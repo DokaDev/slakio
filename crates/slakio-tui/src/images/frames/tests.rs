@@ -94,3 +94,14 @@ fn kept_on_disk_as_an_animated_png_it_moves_again_the_same() {
 fn kept_still(d: &crate::images::decode::Decoded) -> Vec<u8> {
     kept(&d.png, &d.moving)
 }
+
+#[test]
+fn frames_past_the_source_pixel_budget_are_not_decoded() {
+    // Nine frames of 2048 × 2048 drawn as a small emoji: little drawn, much decoded.
+    let d = decode(&gif(2048, 2048, 9, 100), Shape::Emoji, CELL).unwrap();
+    assert!(!d.moving.moves());
+    assert_eq!(d.moving.why, "pixels");
+    let each = 2048 * 2048;
+    assert!(d.moving.seen as u64 * each <= SOURCE_PIXELS_MAX, "no frame past the budget is read: {}", d.moving.seen);
+    assert!(!d.png.is_empty(), "its first frame is shown");
+}
