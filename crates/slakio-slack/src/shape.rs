@@ -354,7 +354,7 @@ pub(crate) async fn sections(client: &Client) {
         let n = page.to_string();
         let params: Vec<(&str, &str)> = cursor.as_deref().map(|c| ("cursor", c)).into_iter().collect();
         diag.line(Kind::Sections, Stage::Asked, "ok", &[("page", &n), ("cursor", yn(cursor.is_some()))]);
-        let call = Call::form(Method::UsersChannelSectionsList, &params);
+        let call = Call::form(Method::UsersChannelSectionsList, &params).probe();
         let v = match client.call::<Value>(&call, Priority::Background).await {
             Ok(v) => v,
             Err(e) => return failed(diag, Kind::Sections, &e, &[("page", &n)]),

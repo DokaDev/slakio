@@ -92,8 +92,9 @@ impl Client {
         match &answer {
             Err(SlackError::RateLimited { retry_after }) => self.governor.pause(call.method, *retry_after),
             // The diagnostics' sidebar probe only reads a shape: its refusal is a line of the log
-            // (`sections failed signed-out`), never the end of the sign-in.
-            Err(SlackError::Auth { .. }) if call.method != Method::UsersChannelSectionsList => self.sign_out(),
+            // (`sections failed signed-out`), never the end of the sign-in. Told by the call's
+            // own flag, never by its method.
+            Err(SlackError::Auth { .. }) if !call.probe => self.sign_out(),
             _ => {}
         }
         answer
