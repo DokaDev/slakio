@@ -14,7 +14,9 @@
 # measured about +0.29 MiB on aarch64 macOS, CI's x86_64 Linux build 8.24 MiB before it.
 # Raised from 9.0 for theme files and the settings screen: theme files brought the `toml` parser
 # and serde's derived readers into the binary (CI's x86_64 Linux build 8.97 MiB after them).
-binary_mib_max = 9.5
+# Raised from 9.5 for the pictures kept on disk between runs (CI's x86_64 Linux build 9.46 MiB
+# before them).
+binary_mib_max = 10.0
 
 [idle]
 # The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
