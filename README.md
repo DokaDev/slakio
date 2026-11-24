@@ -129,8 +129,9 @@ images, and settings. This README only lists what works; it will grow with each 
     rows; older messages load a page at a time as you go up, paced so reading back never
     runs into Slack's limits (a page on its way, one that failed with `r` to retry, and the
     start of a conversation each show a row); `j` / `k` select messages, `g g` / `G` jump to
-    the oldest loaded (asking for one more page) / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` and the mouse
-    wheel too), `Enter` opens the selected message's thread in a panel on the right (another
+    the oldest loaded (asking for one more page) / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` too; the
+    mouse wheel scrolls the view three rows a notch and leaves the selection where it is,
+    until a key moves it back into view; up at the top it loads older messages too), `Enter` opens the selected message's thread in a panel on the right (another
     thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
     the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between the
     conversations a pane showed;
