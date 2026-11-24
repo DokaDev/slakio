@@ -4,8 +4,9 @@
 //! the loop's thread.
 //!
 //! With the local cache on (not in the demo), the pictures made are kept on disk and looked for
-//! there first ([`slakio_tui::images::cached`]); the folder is swept once at the start, on a
-//! blocking task too.
+//! there first ([`slakio_tui::images::cached`]); the folder is made (when pictures are on at
+//! the start: only then are they kept in this run) and swept once at the start, on a blocking
+//! task too.
 //!
 //! A panic in the decoder is caught there ([`slakio_tui::terminal::catching`]: the panic hook
 //! leaves the terminal as it is): the picture is not shown, and the error log says so in one
@@ -56,9 +57,9 @@ impl Pictures {
         let panic = cfg!(debug_assertions) && std::env::var_os("SLAKIO_DEBUG_DECODE_PANIC").is_some_and(|v| v == "1");
         images.cache = local.pictures().filter(|_| !images.demo);
         let (cache, diag) = (images.cache.clone(), images.diag().clone());
-        if let Some(c) = cache.clone() {
+        if let Some(c) = cache.clone().filter(|_| images.on) {
             let d = diag.clone();
-            tokio::task::spawn_blocking(move || cached::sweep(&c, &d));
+            tokio::task::spawn_blocking(move || cached::start(&c, &d));
         }
         Self { tx, rx, errors, cache, diag, panic }
     }

@@ -25,9 +25,11 @@ fn emoji() -> Vec<String> {
     (0..40).map(|n| format!("https://{}/T1/party{n}/0a1b2c.png", EMOJI_HOSTS[0])).collect()
 }
 
-/// A run's pictures, on, keeping pictures in `dir`.
+/// A run's pictures, on, keeping pictures in `dir` (opened as a run's start does).
 fn images(dir: &std::path::Path, diag: &Diag) -> Images {
-    let mut images = Images { on: true, cache: Some(PictureCache::new(dir.to_path_buf())), ..Images::default() };
+    let cache = PictureCache::new(dir.to_path_buf());
+    start(&cache, diag);
+    let mut images = Images { on: true, cache: Some(cache), ..Images::default() };
     images.set_diag(diag.clone());
     images
 }
@@ -137,7 +139,8 @@ fn a_picture_removed_from_the_terminal_comes_back_from_the_disk() {
 #[test]
 fn the_loop_only_hands_looks_over_never_reading_the_disk_itself() {
     let dir = scratch("off-thread");
-    let mut images = images(&dir, &Diag::default());
+    let cache = Some(PictureCache::new(dir.clone()));
+    let mut images = Images { on: true, cache, ..Images::default() };
     let mut requests = Requests::default();
     for p in photos() {
         images.look(&ws(), &p);
@@ -199,9 +202,9 @@ fn a_file_s_preview_is_never_kept_on_disk_nor_looked_for_there() {
     let job = images.answered(r.id, png).expect("a job");
     let result = run(&job, Some((9, 18)), images.cache.as_ref(), &diag);
     assert!(result.is_ok(), "shown all the same");
-    assert!(!dir.exists(), "nothing written: {:?}", std::fs::read_dir(&dir).map(|d| d.count()));
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "nothing written");
     // A preview someone else left there is never read either.
-    let cache = PictureCache::new(dir.clone());
+    let cache = images.cache.clone().unwrap();
     let png = slakio_world::pictures::png(thumb.address(), 64, 64);
     let d = super::decode::decode(&png, job.shape, Some((9, 18))).unwrap();
     assert!(matches!(cache.store(&thumb, &shape_tag(job.shape), &d.png), Stored::Stored(_)));

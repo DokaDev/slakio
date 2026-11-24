@@ -27,9 +27,12 @@ fn clock(secs: u64) -> (Clock, Arc<AtomicU64>) {
 const DAY: u64 = 24 * 3600;
 const START: u64 = 1_800_000_000;
 
+/// A cache opened as a run's start opens it.
 fn cache(name: &str) -> (PictureCache, Arc<AtomicU64>) {
     let (now, at) = clock(START);
-    (PictureCache::new(scratch(name)).with_clock(now), at)
+    let c = PictureCache::new(scratch(name)).with_clock(now);
+    assert_eq!(c.open(), Some(true), "made now");
+    (c, at)
 }
 
 #[test]
@@ -124,6 +127,7 @@ fn a_file_written_in_the_future_is_refused() {
 fn the_sweep_keeps_the_folder_within_its_room_least_recently_used_first() {
     let (now, at) = clock(START);
     let c = PictureCache::new(scratch("sweep")).with_clock(now).with_budget(10_000);
+    c.open().unwrap();
     let sources: Vec<Source> = (0..8).map(|n| Source::Emoji(format!("{EMOJI}?n={n}"))).collect();
     for (n, s) in sources.iter().enumerate() {
         at.store(START + n as u64 * 10, Ordering::Relaxed);
@@ -233,6 +237,7 @@ fn a_folder_that_is_a_link_is_neither_read_nor_written() {
     let link = scratch("linked-folder");
     std::os::unix::fs::symlink(&real, &link).unwrap();
     let c = PictureCache::new(link.clone()).with_clock(now);
+    assert_eq!(c.open(), None);
     let photo = Source::Avatar(AVATAR.into());
     assert_eq!(c.store(&photo, "x", &png(64)), Stored::Refused("folder"));
     assert_eq!(fs::read_dir(&real).unwrap().count(), 0);
@@ -250,4 +255,22 @@ fn clear_removes_everything() {
     c.clear().unwrap();
     assert!(!c.dir().exists());
     c.clear().unwrap();
+}
+
+#[test]
+fn the_folder_is_made_once_at_the_start_and_never_again_by_a_write() {
+    let (now, _) = clock(START);
+    let dir = scratch("made-once");
+    let c = PictureCache::new(dir.clone()).with_clock(now);
+    let photo = Source::Avatar(AVATAR.into());
+    assert_eq!(c.store(&photo, "x", &png(64)), Stored::Refused("folder"), "not opened: nothing written");
+    assert!(!dir.exists());
+    assert_eq!(c.open(), Some(true));
+    assert_eq!(c.open(), Some(false), "there already");
+    assert!(matches!(c.clone().store(&photo, "x", &png(64)), Stored::Stored(_)));
+    // `slakio logout` removes the folder while this runs: it stays removed.
+    PictureCache::new(dir.clone()).clear().unwrap();
+    assert_eq!(c.store(&photo, "x", &png(64)), Stored::Refused("folder"));
+    assert!(!dir.exists(), "not made again");
+    assert_eq!(c.load(&photo, "x"), Loaded::Miss);
 }

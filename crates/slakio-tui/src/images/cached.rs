@@ -79,7 +79,17 @@ pub fn run(
     }
 }
 
-/// The sweep at the start ([`PictureCache::sweep`]), off the loop's thread.
+/// At the start, off the loop's thread: the folder made or found ([`PictureCache::open`]; only
+/// then are pictures kept), and swept ([`PictureCache::sweep`]).
+pub fn start(cache: &PictureCache, diag: &Diag) {
+    if cache.open().is_none() {
+        diag.line(Kind::PictureCache, Stage::CacheRefused, "folder", &[]);
+        return;
+    }
+    sweep(cache, diag);
+}
+
+/// The sweep ([`PictureCache::sweep`]), off the loop's thread.
 pub fn sweep(cache: &PictureCache, diag: &Diag) {
     if let Some(s) = cache.sweep() {
         swept_line(diag, s);

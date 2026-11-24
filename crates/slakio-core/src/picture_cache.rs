@@ -7,7 +7,9 @@
 //!   cells it fills, then `.png`): never the address, a name or an id. It holds a header
 //!   ([`MAGIC`], the whole key, the time it was written, the kind) and the PNG, nothing else.
 //! * The folder is private (0700) and each file too (0600), written whole or not at all, never
-//!   through a link; a folder that is a link is neither read nor written.
+//!   through a link; a folder that is a link is neither read nor written. It is made once, when
+//!   a run starts ([`PictureCache::open`]), never by a write: one removed while slakio runs
+//!   (`slakio logout`) stays removed, and nothing more is written.
 //! * A file is read only when it is a plain file (not a link, opened without following one) of
 //!   at most [`FILE_MAX`] bytes, with the header of the key asked for, written no later than a day
 //!   from now and a PNG after it; anything else is a miss and the file is removed. What is read
@@ -25,7 +27,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, TryLockError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -139,6 +141,8 @@ pub struct PictureCache {
     /// The bytes in the folder, as the last sweep found and writes since added.
     total: Arc<AtomicU64>,
     sweeping: Arc<Mutex<()>>,
+    /// The folder was made or found at the start ([`PictureCache::open`]): writes may follow.
+    opened: Arc<AtomicBool>,
 }
 
 impl fmt::Debug for PictureCache {
@@ -175,10 +179,28 @@ fn touch(path: &Path, at: SystemTime) {
 }
 
 impl PictureCache {
-    /// The cache in `dir` (made when the first picture is written), [`BUDGET`] bytes, the
-    /// system's clock.
+    /// The cache in `dir` ([`PictureCache::open`] makes it), [`BUDGET`] bytes, the system's
+    /// clock.
     pub fn new(dir: PathBuf) -> Self {
-        Self { dir, budget: BUDGET, now: Arc::new(SystemTime::now), total: Arc::default(), sweeping: Arc::default() }
+        let (total, sweeping, opened) = (Arc::default(), Arc::default(), Arc::default());
+        Self { dir, budget: BUDGET, now: Arc::new(SystemTime::now), total, sweeping, opened }
+    }
+
+    /// Make the folder (private) or find it, at the start of a run: only then are pictures
+    /// written, and never again is it made. `Some(true)` when it was made now, `None` when it
+    /// cannot be used (not a folder, a link, not made).
+    pub fn open(&self) -> Option<bool> {
+        let fresh = match fs::symlink_metadata(&self.dir) {
+            Ok(m) if !m.is_dir() => return None,
+            Ok(_) => false,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => true,
+            Err(_) => return None,
+        };
+        if crate::fsutil::private_dir(&self.dir).is_err() || !self.dir_ok() {
+            return None;
+        }
+        self.opened.store(true, Ordering::Relaxed);
+        Some(fresh)
     }
 
     /// The same, holding at most `budget` bytes.
@@ -254,8 +276,8 @@ impl PictureCache {
         }
     }
 
-    /// Keep `png`, the picture of `source` as `shape`. A write that takes the folder over its
-    /// room sweeps it.
+    /// Keep `png`, the picture of `source` as `shape`, in the folder opened at the start (one
+    /// gone since is not made again). A write that takes the folder over its room sweeps it.
     pub fn store(&self, source: &Source, shape: &str, png: &[u8]) -> Stored {
         if (HEADER + png.len()) as u64 > FILE_MAX {
             return Stored::Refused("too-large");
@@ -263,12 +285,7 @@ impl PictureCache {
         if !png.starts_with(&PNG) {
             return Stored::Refused("not-png");
         }
-        match fs::symlink_metadata(&self.dir) {
-            Ok(m) if !m.is_dir() => return Stored::Refused("folder"),
-            Err(e) if e.kind() != io::ErrorKind::NotFound => return Stored::Refused("folder"),
-            _ => {}
-        }
-        if crate::fsutil::private_dir(&self.dir).is_err() || !self.dir_ok() {
+        if !self.opened.load(Ordering::Relaxed) || !self.dir_ok() {
             return Stored::Refused("folder");
         }
         let now = (self.now)();
