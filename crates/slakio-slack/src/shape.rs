@@ -188,12 +188,15 @@ fn boot_shape(diag: &Diag, v: &Value) {
     image_tally(diag, Kind::SelfPhoto, profile.into_iter());
 }
 
-/// The preferences whose names speak of the sidebar's order (`sort`, `sidebar`, `section`,
-/// `order`, `dm`): each name, and its value when enum-like or a yes/no (else its kind).
+/// The preferences whose names speak of the sidebar's order: a name that starts with `sidebar`,
+/// `sort`, `section`, `channel_sort`, `channel_section` or `dm_`, or ends with `_sort` or
+/// `_order` (anchored: `admin_dm_policy` is none of them). Each name is told, and its value when
+/// enum-like or a yes/no (else its kind).
 fn sidebar_prefs(diag: &Diag, prefs: Option<&Value>) {
-    const WORDS: [&str; 6] = ["sort", "sidebar", "channel_sort", "dm", "section", "order"];
-    let named =
-        prefs.and_then(Value::as_object).into_iter().flatten().filter(|(k, _)| WORDS.iter().any(|w| k.contains(w)));
+    const STARTS: [&str; 6] = ["sidebar", "sort", "section", "channel_sort", "channel_section", "dm_"];
+    const ENDS: [&str; 2] = ["_sort", "_order"];
+    let wanted = |k: &str| STARTS.iter().any(|w| k.starts_with(w)) || ENDS.iter().any(|w| k.ends_with(w));
+    let named = prefs.and_then(Value::as_object).into_iter().flatten().filter(|(k, _)| wanted(k));
     for (k, v) in named.take(KEYS_MAX) {
         let value = v.as_bool().map_or_else(|| enum_like(v), |b| b.to_string());
         diag.line(Kind::BootShape, Stage::Field, "pref", &[("name", key(k)), ("value", &value)]);

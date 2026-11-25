@@ -198,7 +198,8 @@ fn the_sidebar_preferences_and_the_counts_entries_tell_names_only() {
     let (d, path) = log();
     let boot = json!({"ok": true, "prefs": {
         "channel_sort": "alphabetical", "sidebar_behavior": "Secret Free Text", "dm_sort_order": true,
-        "theme": "dark", "muted_channels": "C0SECRET"}});
+        "theme": "dark", "muted_channels": "C0SECRET", "admin_dm_policy": "x", "channel_list_order": "y",
+        "is_sidebar_x": 1}});
     boot_shape(&d, &boot);
     let counts = json!({"ok": true, "channels": [{"id": "C0SECRET", "latest": "1767603600.000100", "has_unreads": true}],
         "ims": [{"id": "D0SECRET", "last_read": "1767603600.000100"}], "mpims": []});
@@ -212,6 +213,10 @@ fn the_sidebar_preferences_and_the_counts_entries_tell_names_only() {
     assert!(t.contains("boot-shape field pref name=sidebar_behavior value=text"), "{t}");
     assert!(t.contains("boot-shape field pref name=dm_sort_order value=true"), "{t}");
     assert!(!t.contains("name=theme") && !t.contains("name=muted_channels"), "{t}");
+    assert!(t.contains("boot-shape field pref name=channel_list_order"), "an anchored end: {t}");
+    for unanchored in ["admin_dm_policy", "is_sidebar_x"] {
+        assert!(!t.contains(unanchored), "a word inside a name is not the sidebar's: {t}");
+    }
     assert!(t.contains("counts-shape field channels_key name=latest entries=1"), "{t}");
     assert!(t.contains("counts-shape field ims_key name=last_read entries=1"), "{t}");
 }
