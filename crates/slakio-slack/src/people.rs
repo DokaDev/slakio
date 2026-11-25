@@ -34,6 +34,8 @@ pub(crate) struct People {
     unnamed: Mutex<HashSet<String>>,
     /// Ids lookups left out or listed as pending or failed, and how many times.
     omitted: Mutex<HashMap<String, u8>>,
+    /// Ids a lookup's answer had, and whether a photo was taken of them (for the diagnostics).
+    answers: Mutex<HashMap<String, bool>>,
     team: Mutex<Option<String>>,
 }
 
@@ -84,6 +86,12 @@ impl People {
         if self.unnamed.lock().unwrap_or_else(PoisonError::into_inner).contains(id) { "unnamed" } else { "unknown" }
     }
 
+    /// Whether a lookup's answer had person `id` (and a photo of them was taken), since this was
+    /// last asked: what it said is forgotten.
+    pub(crate) fn answer(&self, id: &str) -> Option<bool> {
+        self.answers.lock().unwrap_or_else(PoisonError::into_inner).remove(id)
+    }
+
     /// The people of `ids` (in no order), those not known yet looked up first: in batches of
     /// [`LOOKUP_BATCH`], each id once. Those Slack does not name are left out.
     pub(crate) async fn names(&self, client: &Client, ids: &[String], priority: Priority) -> Vec<User> {
@@ -130,10 +138,12 @@ impl People {
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
         let mut omitted = self.omitted.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut answers = self.answers.lock().unwrap_or_else(PoisonError::into_inner);
         let asked: HashSet<&str> = batch.iter().map(|id| id.as_str()).collect();
         let mut answered = HashSet::new();
         for p in found.results.unwrap_or_default().into_iter().filter(|p| asked.contains(p.id.as_str())) {
             answered.insert(p.id.clone());
+            answers.insert(p.id.clone(), p.profile.as_ref().and_then(wire::Profile::avatar).is_some());
             match user(&p, team) {
                 Some(u) => keep(&mut known, &p.id, u),
                 None if !known.contains_key(&p.id) => {

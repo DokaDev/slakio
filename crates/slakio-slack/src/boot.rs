@@ -55,6 +55,7 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     if !bundled {
         // A page may have named them already without a photo: asked all the same.
         people.forget_unpictured(&self_.id);
+        let _ = people.answer(&self_.id);
         asked.push(self_.id.clone());
         let standing = people.standing(&self_.id);
         let lookup = [("before", before), ("now", standing)];
@@ -63,7 +64,7 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     let mut known = people.names(client, &asked, Priority::Background).await;
     if client.diag().on() {
         if !bundled {
-            crate::shape::own_lookup(client.diag(), people.standing(&self_.id));
+            crate::shape::own_lookup(client.diag(), people.standing(&self_.id), people.answer(&self_.id));
         }
         let photo = own_photo(self_, &known);
         let source = match (bundled, photo.is_some(), before) {

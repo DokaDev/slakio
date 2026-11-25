@@ -109,6 +109,59 @@ fn the_user_s_own_lookup_says_what_it_gave_and_the_answer_s_counts() {
 }
 
 #[test]
+fn a_lookup_answer_tells_its_entries_names_photo_hosts_and_what_it_decoded() {
+    rt().block_on(async {
+        let mut r = Run::new("lookup-shape", None).await;
+        let me = World::demo().snapshot().workspaces[0].me.as_str().to_string();
+        let original = "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/1234_SECRETFILE_original.jpg";
+        let answer = json!({"ok": true, "results": [{"id": me, "name": "secretme", "updated": 1, "profile": {
+            "real_name": "Secret Me", "image_original": original, "avatar_hash": "SECRETHASH", "is_custom_image": true}}]});
+        r.fake.fail_next("users/info", Fault::Answer(answer));
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        let text = r.text();
+        for secret in ["SECRET", "secretme", "slack-files2", "1234_"] {
+            assert!(!text.contains(secret), "{secret} in {text}");
+        }
+        has(&text, "avatar counted lookup results=1 ");
+        for name in ["id", "name", "profile", "updated"] {
+            has(&text, &format!("avatar field result_key name={name} entries=1"));
+        }
+        has(&text, "avatar field profile_key name=image_original entries=1");
+        has(&text, "avatar field profile_key name=avatar_hash entries=1");
+        has(&text, "avatar counted image name=image_original entries=1");
+        has(&text, "avatar counted image_host name=image_original host=s3-us-west-2.amazonaws.com urls=1");
+        has(&text, "avatar counted marks avatar_hash=1 is_custom_image=1 custom_true=1 of=1");
+        has(&text, "avatar counted decoded from=lookup results=1 pictured=0");
+        has(&text, "avatar skipped no-photo from=lookup no_profile=0 no_photo=1 of=1");
+        has(&text, "self-photo lookup result standing=unpictured in_results=yes photo=none");
+    });
+}
+
+#[test]
+fn the_user_s_own_lookup_tells_the_answer_not_what_a_page_gave_before() {
+    rt().block_on(async {
+        let mut r = Run::new("lookup-real", None).await;
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        let (me, team) = (b.workspaces[0].me.as_str().to_string(), b.workspaces[0].id.as_str().to_string());
+        let photo = format!("https://{}/avatars/me_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+        let view = json!({
+            "ok": true,
+            "history": {"messages": [{"type": "message", "user": me, "text": "mine", "ts": "1767603600.000100"}], "has_more": false},
+            "users": [{"id": me, "team_id": team, "profile": {"display_name": "Me", "image_72": photo}}],
+        });
+        r.fake.fail_next("conversations.view", Fault::Answer(view));
+        assert!(matches!(r.ask(Command::History { target: general(), before: None, limit: 20 }).await, Event::History(_)));
+        let before = r.text().matches("self-photo lookup result").count();
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        let text = r.text();
+        let second: Vec<&str> = text.lines().filter(|l| l.contains("self-photo lookup result")).skip(before).collect();
+        // Known with a photo from the page: not asked, so not in the answer.
+        assert_eq!(second.len(), 1, "{text}");
+        assert!(second[0].ends_with("standing=pictured in_results=no photo=none"), "{text}");
+    });
+}
+
+#[test]
 fn the_user_s_own_record_in_a_view_is_told_once() {
     rt().block_on(async {
         let mut r = Run::new("seen", None).await;

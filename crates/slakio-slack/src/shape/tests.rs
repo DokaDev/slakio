@@ -106,3 +106,63 @@ fn a_section_s_sort_fields_and_a_profile_s_pictures_are_told_at_most_forty_times
     assert!(text.lines().filter(|l| l.contains("sections field sort")).all(|l| l.contains(" page=1 ")), "{text}");
     assert_eq!(text.lines().filter(|l| l.contains("self-photo field image")).count(), KEYS_MAX);
 }
+
+#[test]
+fn the_start_bundle_s_own_profile_tells_its_field_names_and_photo_hosts_never_values() {
+    let (d, path) = log();
+    let original = "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/1234_SECRETFILE_original.jpg";
+    let boot = json!({
+        "ok": true,
+        "self": {"id": "U0SECRET", "profile": {
+            "image_original": original, "avatar_hash": "SECRETHASH", "is_custom_image": true,
+            "real_name": "Secret Person", "status_text": "Secret Status"}},
+    });
+    boot_shape(&d, &boot);
+    let t = text(&d, &path);
+    for secret in ["SECRET", "Secret", "slack-files2", "2026-01-05", "1234_"] {
+        assert!(!t.contains(secret), "{secret} in {t}");
+    }
+    for name in ["avatar_hash", "image_original", "is_custom_image", "real_name", "status_text"] {
+        assert!(t.contains(&format!("self-photo field profile_key name={name} entries=1")), "{name}: {t}");
+    }
+    assert!(t.contains("self-photo counted image name=image_original entries=1"), "{t}");
+    assert!(
+        t.contains("self-photo counted image_host name=image_original host=s3-us-west-2.amazonaws.com urls=1"),
+        "{t}"
+    );
+    assert!(t.contains("self-photo counted marks avatar_hash=1 is_custom_image=1 custom_true=1 of=1"), "{t}");
+}
+
+#[test]
+fn a_profile_s_image_fields_are_counted_even_past_the_cap_of_names() {
+    let (d, path) = log();
+    let mut profile = serde_json::Map::new();
+    // Sorted before `image_original`: the names told are cut before it.
+    for i in 0..KEYS_MAX {
+        profile.insert(format!("a_{i:02}"), json!(1));
+    }
+    profile.insert("image_original".into(), json!("https://s3-eu-west-1.amazonaws.com/x/y_original.png"));
+    lookup_shape(&d, &json!({"ok": true, "results": [{"id": "U1", "profile": profile}]}));
+    let t = text(&d, &path);
+    assert!(!t.contains("profile_key name=image_original"), "the names are capped: {t}");
+    assert_eq!(t.matches("avatar field profile_key").count(), KEYS_MAX, "{t}");
+    assert!(t.contains("avatar counted image name=image_original entries=1"), "{t}");
+    assert!(t.contains("avatar counted image_host name=image_original host=s3-eu-west-1.amazonaws.com urls=1"), "{t}");
+    assert!(t.contains("avatar counted marks avatar_hash=0 is_custom_image=0 custom_true=0 of=1"), "{t}");
+}
+
+#[test]
+fn entries_without_a_photo_are_tallied_once_not_skipped_silently() {
+    let (d, path) = log();
+    let persons: Vec<wire::Person> = serde_json::from_value(json!([
+        {"id": "U1", "profile": {"real_name": "A", "avatar_hash": "h"}},
+        {"id": "U2"},
+        {"id": "U3", "profile": {"real_name": "C"}},
+    ]))
+    .unwrap();
+    photos(&d, &persons, "lookup");
+    photos(&d, &persons, "lookup");
+    let t = text(&d, &path);
+    assert_eq!(t.matches("avatar skipped no-photo from=lookup no_profile=1 no_photo=2 of=3").count(), 1, "{t}");
+    assert_eq!(t.matches("avatar counted decoded from=lookup results=3 pictured=0").count(), 2, "{t}");
+}

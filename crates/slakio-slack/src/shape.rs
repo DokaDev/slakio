@@ -184,6 +184,47 @@ fn boot_shape(diag: &Diag, v: &Value) {
     for k in images.take(KEYS_MAX) {
         diag.line(Kind::SelfPhoto, Stage::Field, "image", &[("name", key(k))]);
     }
+    key_lines(diag, Kind::SelfPhoto, "profile_key", profile.into_iter(), "");
+    image_tally(diag, Kind::SelfPhoto, profile.into_iter());
+}
+
+/// The host of a photo address as a line may tell it: an avatar host, or Amazon's (Slack's own
+/// uploads), else `other` (a host of a workspace's own is never told).
+fn photo_host(url: &str) -> String {
+    let h = host(url);
+    let amazon = h.strip_suffix(".amazonaws.com").is_some_and(|s| !s.is_empty() && !s.contains('.'));
+    if amazon || slakio_core::images::AVATAR_HOSTS.contains(&h.as_str()) { h } else { "other".to_string() }
+}
+
+/// What the `image_*` fields of `profiles` hold, told apart from their other names (sorted, those
+/// may be cut at [`KEYS_MAX`]): how many have each, and by host ([`photo_host`], never a path)
+/// how many of each are addresses; and how many carry `avatar_hash` and `is_custom_image` (and how many say `true`).
+fn image_tally<'a>(diag: &Diag, kind: Kind, profiles: impl Iterator<Item = &'a Value>) {
+    let (mut names, mut hosts) = (BTreeMap::<&str, usize>::new(), BTreeMap::<(&str, String), usize>::new());
+    let (mut n, mut hash, mut custom, mut custom_true) = (0usize, 0usize, 0usize, 0usize);
+    for o in profiles.take(ENTRIES_MAX).filter_map(Value::as_object) {
+        n += 1;
+        hash += usize::from(o.contains_key("avatar_hash"));
+        custom += usize::from(o.contains_key("is_custom_image"));
+        custom_true += usize::from(o.get("is_custom_image") == Some(&Value::Bool(true)));
+        for (k, v) in o.iter().filter(|(k, _)| k.starts_with("image_")).take(KEYS_MAX) {
+            *names.entry(key(k)).or_default() += 1;
+            let Some(url) = v.as_str() else { continue };
+            let h = photo_host(url);
+            let h = if hosts.len() >= 8 && !hosts.contains_key(&(key(k), h.clone())) { "more".to_string() } else { h };
+            *hosts.entry((key(k), h)).or_default() += 1;
+        }
+    }
+    for (name, count) in names.into_iter().take(KEYS_MAX) {
+        diag.line(kind, Stage::Counted, "image", &[("name", name), ("entries", &count.to_string())]);
+    }
+    for ((name, h), count) in hosts {
+        diag.line(kind, Stage::Counted, "image_host", &[("name", name), ("host", &h), ("urls", &count.to_string())]);
+    }
+    let marks = [hash, custom, custom_true, n].map(|c| c.to_string());
+    let pairs =
+        [("avatar_hash", &*marks[0]), ("is_custom_image", &*marks[1]), ("custom_true", &*marks[2]), ("of", &*marks[3])];
+    diag.line(kind, Stage::Counted, "marks", &pairs);
 }
 
 /// The photo addresses `persons` (from a view's `users`, or a lookup: `from`) carry: each one
@@ -192,10 +233,18 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
     if !diag.on() {
         return;
     }
+    let (mut no_profile, mut no_photo, mut pictured) = (0usize, 0usize, 0usize);
     for p in persons.iter().take(ENTRIES_MAX) {
-        let Some(profile) = &p.profile else { continue };
+        let Some(profile) = &p.profile else {
+            no_profile += 1;
+            continue;
+        };
+        pictured += usize::from(profile.avatar().is_some());
         let fields = [("image_72", &profile.image_72), ("image_48", &profile.image_48)];
-        let Some((field, url)) = fields.iter().find_map(|(f, u)| u.as_deref().map(|u| (*f, u))) else { continue };
+        let Some((field, url)) = fields.iter().find_map(|(f, u)| u.as_deref().map(|u| (*f, u))) else {
+            no_photo += 1;
+            continue;
+        };
         let source = Source::Avatar(url.to_string());
         let id = diag.id(url);
         let pairs = [("id", id.as_str()), ("host", &host(url)), ("field", field), ("from", from)];
@@ -213,6 +262,14 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
                 }
             }
         }
+    }
+    let counts = [persons.len(), pictured, no_profile, no_photo].map(|c| c.to_string());
+    let decoded = [("from", from), ("results", &*counts[0]), ("pictured", &*counts[1])];
+    diag.line(Kind::Avatar, Stage::Counted, "decoded", &decoded);
+    // Those without a photo: once a run for each tally (a skip is no longer silent).
+    if no_profile + no_photo > 0 && diag.first(Kind::Avatar, Stage::Skipped, &format!("{from} {}", counts.join(" "))) {
+        let pairs = [("from", from), ("no_profile", &*counts[2]), ("no_photo", &*counts[3]), ("of", &*counts[0])];
+        diag.line(Kind::Avatar, Stage::Skipped, "no-photo", &pairs);
     }
 }
 
@@ -261,17 +318,17 @@ pub(crate) fn own_profile(diag: &Diag, me: &wire::Me) {
 }
 
 /// What the lookup gave of the user's own record: where they stand after it ([`People::standing`]
-/// words), whether the answer named them and whether a photo of them is known now.
+/// words), whether the answer itself had them (`answer`: with a photo taken or not) and whether
+/// it gave a photo of them.
 ///
 /// [`People::standing`]: crate::people::People::standing
-pub(crate) fn own_lookup(diag: &Diag, standing: &str) {
-    let named = matches!(standing, "pictured" | "unpictured");
-    let photo = if standing == "pictured" { "ok" } else { "none" };
+pub(crate) fn own_lookup(diag: &Diag, standing: &str, answer: Option<bool>) {
+    let photo = if answer == Some(true) { "ok" } else { "none" };
     diag.line(
         Kind::SelfPhoto,
         Stage::Lookup,
         "result",
-        &[("standing", standing), ("in_results", yn(named)), ("photo", photo)],
+        &[("standing", standing), ("in_results", yn(answer.is_some())), ("photo", photo)],
     );
 }
 
@@ -289,6 +346,10 @@ fn lookup_shape(diag: &Diag, v: &Value) {
     let (results, pending, failed) = (count("results"), count("pending_ids"), count("failed_ids"));
     let pairs = [("results", results.as_str()), ("pending_ids", pending.as_str()), ("failed_ids", failed.as_str())];
     diag.line(Kind::Avatar, Stage::Counted, "lookup", &pairs);
+    let entries = || o.get("results").and_then(Value::as_array).into_iter().flatten();
+    key_lines(diag, Kind::Avatar, "result_key", entries(), "");
+    key_lines(diag, Kind::Avatar, "profile_key", entries().filter_map(|e| e.get("profile")), "");
+    image_tally(diag, Kind::Avatar, entries().filter_map(|e| e.get("profile")));
 }
 
 /// Where the user's own photo came from: the start bundle's `profile`, a page read before the
