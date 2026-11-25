@@ -1,7 +1,7 @@
 use super::*;
 use crate::images::decode::{Shape, decode};
 use image::codecs::gif::{GifEncoder, Repeat};
-use image::{Delay, Frame as GifFrame, Rgba};
+use image::{Delay, Frame as GifFrame, Rgba, RgbaImage};
 
 /// A GIF `w` × `h` of `n` frames (each a colour of its own), each shown `ms` milliseconds.
 fn gif(w: u32, h: u32, n: usize, ms: u32) -> Vec<u8> {
@@ -75,24 +75,29 @@ fn a_preview_a_still_gif_and_a_png_never_move() {
     assert_eq!((d.moving.moves(), d.moving.why), (false, "single"));
 }
 
-#[test]
-fn kept_on_disk_as_an_animated_png_it_moves_again_the_same() {
-    let d = decode(&gif(40, 40, 4, 150), PHOTO, CELL).unwrap();
-    let kept = kept(&d.png, &d.moving);
-    assert!(kept.starts_with(&[0x89, b'P', b'N', b'G']), "a PNG, as the cache keeps");
-    assert!(kept.len() < 1024 * 1024);
-    let again = decode(&kept, PHOTO, CELL).unwrap();
-    assert_eq!(again.moving.frames.len(), 4);
-    assert!(again.moving.frames.iter().all(|f| f.delay == Duration::from_millis(150)));
-    assert_eq!(again.moving.raw, d.moving.raw, "the same frames");
-    assert_eq!((again.cols, again.rows), (d.cols, d.rows));
-    // A still picture is kept as its one PNG.
-    let still = decode(&gif(40, 40, 1, 150), PHOTO, CELL).unwrap();
-    assert_eq!(kept_still(&still), still.png);
+/// `gif`'s frames as one animated PNG (looping), each shown `ms` milliseconds.
+fn apng(gif: &[u8], ms: u16) -> Vec<u8> {
+    let frames: Vec<RgbaImage> =
+        GifDecoder::new(std::io::Cursor::new(gif)).unwrap().into_frames().map(|f| f.unwrap().into_buffer()).collect();
+    let mut out = Vec::new();
+    let mut enc = png::Encoder::new(&mut out, frames[0].width(), frames[0].height());
+    enc.set_color(png::ColorType::Rgba);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_animated(u32::try_from(frames.len()).unwrap(), 0).unwrap();
+    let mut w = enc.write_header().unwrap();
+    for frame in &frames {
+        w.set_frame_delay(ms, 1000).unwrap();
+        w.write_image_data(frame.as_raw()).unwrap();
+    }
+    w.finish().unwrap();
+    out
 }
 
-fn kept_still(d: &crate::images::decode::Decoded) -> Vec<u8> {
-    kept(&d.png, &d.moving)
+#[test]
+fn an_animated_png_moves_as_a_gif_does() {
+    let d = decode(&apng(&gif(40, 40, 4, 150), 150), PHOTO, CELL).unwrap();
+    assert_eq!(d.moving.frames.len(), 4);
+    assert!(d.moving.frames.iter().all(|f| f.delay == Duration::from_millis(150)));
 }
 
 #[test]
@@ -124,7 +129,7 @@ fn a_frame_past_the_most_is_never_decoded() {
 fn frames_are_counted_from_the_blocks() {
     assert_eq!(count::gif(&gif(8, 8, 5, 100)), Some(5));
     assert_eq!(count::gif(&gif(8, 8, 5, 100)[..40]), None, "cut short: not counted");
+    assert_eq!(count::apng(&apng(&gif(16, 16, 3, 100), 100)), Some(3));
     let d = decode(&gif(16, 16, 3, 100), Shape::Emoji, CELL).unwrap();
-    assert_eq!(count::apng(&apng(&d.moving).unwrap()), Some(3));
     assert_eq!(count::apng(&d.png), None, "one picture");
 }

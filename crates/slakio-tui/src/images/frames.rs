@@ -1,5 +1,4 @@
-//! A picture that moves: the frames of a GIF emoji or photo (or of one kept on disk as an
-//! animated PNG, [`apng`]), each made as the cells show it ([`super::decode::render`]) and written
+//! A picture that moves: the frames of a GIF emoji or photo (or of an animated PNG), each made as the cells show it ([`super::decode::render`]) and written
 //! as a PNG, off the loop's thread like the rest of a decode. The loop only sends the frame due
 //! ([`super::animate`]); nothing is fetched for it.
 //!
@@ -13,7 +12,7 @@
 use super::decode::{Layout, limits, png_of, render};
 use image::codecs::gif::GifDecoder;
 use image::codecs::png::PngDecoder;
-use image::{AnimationDecoder, Frames, ImageDecoder, ImageFormat, RgbaImage};
+use image::{AnimationDecoder, Frames, ImageDecoder, ImageFormat};
 use std::io::Cursor;
 use std::time::Duration;
 
@@ -38,8 +37,6 @@ pub struct Frame {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Moving {
     pub frames: Vec<Frame>,
-    /// The frames as drawn (RGBA), for the copy kept on disk ([`apng`]).
-    pub raw: Vec<RgbaImage>,
     pub seen: usize,
     pub why: &'static str,
 }
@@ -47,7 +44,7 @@ pub struct Moving {
 impl Moving {
     /// A picture that stays still, after `seen` frames, for `why`.
     pub fn still(seen: usize, why: &'static str) -> Self {
-        Self { frames: Vec::new(), raw: Vec::new(), seen, why }
+        Self { frames: Vec::new(), seen, why }
     }
 
     /// It moves.
@@ -135,32 +132,7 @@ fn collect(frames: Frames<'_>, source: u64, l: &Layout) -> Moving {
             Err(_) => return Moving::still(raw.len(), "unreadable"),
         }
     }
-    Moving { seen: raw.len(), frames: out, raw, why: "" }
-}
-
-/// `m`'s frames as one animated PNG (looping), as it is kept on disk; `None` when it does not
-/// move.
-pub fn apng(m: &Moving) -> Option<Vec<u8>> {
-    let first = m.raw.first().filter(|_| m.moves())?;
-    let mut out = Vec::new();
-    let mut enc = png::Encoder::new(&mut out, first.width(), first.height());
-    enc.set_color(png::ColorType::Rgba);
-    enc.set_depth(png::BitDepth::Eight);
-    enc.set_animated(u32::try_from(m.raw.len()).ok()?, 0).ok()?;
-    let mut w = enc.write_header().ok()?;
-    for (canvas, frame) in m.raw.iter().zip(&m.frames) {
-        let ms = u16::try_from(frame.delay.as_millis()).unwrap_or(u16::MAX);
-        w.set_frame_delay(ms, 1000).ok()?;
-        w.write_image_data(canvas.as_raw()).ok()?;
-    }
-    w.finish().ok()?;
-    Some(out)
-}
-
-/// What is kept on disk of a picture decoded as `png` that moves as `m`: all its frames, or its
-/// one picture.
-pub fn kept(png: &[u8], m: &Moving) -> Vec<u8> {
-    apng(m).unwrap_or_else(|| png.to_vec())
+    Moving { seen: raw.len(), frames: out, why: "" }
 }
 
 mod count;

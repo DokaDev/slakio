@@ -8,7 +8,8 @@
 //! nor in their [`super::IN_FLIGHT_MAX`]. Found, it is decoded within the same bounds as a
 //! fetched picture (what is on disk is not trusted: one that does not decode is removed); not
 //! found, the next frame that still wants it asks the backend ([`Images::ask`]), and the
-//! picture made from the answer is kept for the next time.
+//! answer is kept for the next time as it came, once per address ([`KEPT_AS`]): a photo kept
+//! for a DM row's chip is read for the picture slot too, and for cells of any size.
 //! A picture parked or removed from the terminal comes back from there, not from the network.
 //! Nothing here reads or writes the disk on the loop's thread.
 
@@ -24,19 +25,8 @@ pub const LOOKUPS_MAX: usize = super::ENTRIES_MAX;
 /// The most looks in the cache the binary reads and decodes at once.
 pub const DISK_LOADERS: usize = 4;
 
-/// The cells a picture fills and a cell's size in pixels (what it is decoded for), as part of
-/// its key on disk: a picture made for other cells is another picture.
-pub fn shape_tag(shape: Shape, cell: Option<(u16, u16)>) -> String {
-    let shape = match shape {
-        Shape::Preview => "preview".to_string(),
-        Shape::Emoji => "emoji".to_string(),
-        Shape::Photo { cols, rows } => format!("photo-{cols}x{rows}"),
-    };
-    match cell {
-        Some((w, h)) => format!("{shape}@{w}x{h}"),
-        None => format!("{shape}@none"),
-    }
-}
+/// The tag of every picture's key on disk: it is kept as fetched, whatever cells it fills.
+pub const KEPT_AS: &str = "source";
 
 /// `job` made ready, for cells of `cell` pixels, as the binary runs it (a blocking task): with
 /// a cache, a look there ([`Refused::NotCached`] when nothing there can be shown), or the bytes
@@ -78,23 +68,22 @@ pub fn run_then_keep(
     };
     send(Ok(super::made(job, &d)));
     let key = (job.source.clone(), job.shape);
-    // A picture that moves is kept with all its frames (an animated PNG), decoded again within
-    // the same bounds when read.
-    let png = super::frames::kept(&d.png, &d.moving);
-    match cache.store_as_of(job.epoch, &job.source, &shape_tag(job.shape, cell), &png) {
+    // Kept as it came (with all its frames, when it moves), decoded again within the same bounds
+    // when read, for whatever cells want it then.
+    match cache.store_as_of(job.epoch, &job.source, KEPT_AS, &job.bytes) {
         Stored::Stored(swept) => {
-            note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", png.len().to_string())]);
+            note::line(diag, &key, Stage::CacheStored, "ok", &[("bytes", job.bytes.len().to_string())]);
             swept.into_iter().for_each(|s| swept_line(diag, s));
         }
         Stored::Refused(why) => note::line(diag, &key, Stage::CacheRefused, why, &[]),
     }
 }
 
-/// Making `job` ready for cells of `cell` pixels panicked: a picture read from `cache` that set
+/// Making `job` ready panicked: a picture read from `cache` that set
 /// it off is removed, so the next run does not read it again.
-pub fn panicked(job: &Job, cell: Option<(u16, u16)>, cache: Option<&PictureCache>) {
+pub fn panicked(job: &Job, cache: Option<&PictureCache>) {
     if let Some(cache) = cache.filter(|_| job.from_cache && kept(&job.source)) {
-        cache.forget(&job.source, &shape_tag(job.shape, cell));
+        cache.forget(&job.source, KEPT_AS);
     }
 }
 
@@ -102,15 +91,14 @@ pub fn panicked(job: &Job, cell: Option<(u16, u16)>, cache: Option<&PictureCache
 /// [`Refused::NotCached`] when nothing there can be shown (one that does not decode is removed).
 fn load(job: &Job, cell: Option<(u16, u16)>, cache: &PictureCache, diag: &Diag) -> Result<Prepared, Refused> {
     let key = (job.source.clone(), job.shape);
-    let tag = shape_tag(job.shape, cell);
-    match cache.load(&job.source, &tag) {
-        Loaded::Hit(png) => match decode::decode(&png, job.shape, cell) {
+    match cache.load(&job.source, KEPT_AS) {
+        Loaded::Hit(picture) => match decode::decode(&picture, job.shape, cell) {
             Ok(d) => {
                 note::line(diag, &key, Stage::CacheHit, "ok", &[]);
                 Ok(super::made(job, &d))
             }
             Err(_) => {
-                cache.forget(&job.source, &tag);
+                cache.forget(&job.source, KEPT_AS);
                 note::line(diag, &key, Stage::CacheRefused, "decode", &[]);
                 Err(Refused::NotCached)
             }

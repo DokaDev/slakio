@@ -1,12 +1,14 @@
 //! The pictures kept on disk between runs (`<cache>/pictures`,
-//! [`crate::paths::Paths::pictures_cache`]): the small PNG made for the terminal from a profile
-//! photo, a workspace's own emoji or a file's preview, so the next run draws it without asking
-//! the network (and without counting toward the request governor's picture share).
+//! [`crate::paths::Paths::pictures_cache`]): a profile photo, a workspace's own emoji or a
+//! file's preview as it was fetched (a PNG, JPEG or GIF), once per address whatever cells it is
+//! drawn in, so the next run draws it, in any of them, without asking the network (and without
+//! counting toward the request governor's picture share).
 //!
 //! * A file is named by [`key`] alone (its first 16 bytes in hex, then `.png`; the key is the
-//!   SHA-256 of the kind, the address and the cells it fills): never the address, a name or an
+//!   SHA-256 of the kind, the address and a tag the UI gives): never the address, a name or an
 //!   id. It holds a header ([`MAGIC`], all 32 bytes of the key, the time it was written, the
-//!   kind) and the PNG, nothing else. A file of an earlier format is refused and removed.
+//!   kind) and the picture, nothing else. A file of an earlier format (the second kept a PNG
+//!   per address and cells) is refused and removed, on a read and by the sweep.
 //! * The folder is private (0700) and each file too (0600), written whole or not at all, never
 //!   through a link; a folder that is a link, or not the user's own, or one others may write in,
 //!   is neither read nor written. It is made once, when
@@ -14,8 +16,9 @@
 //!   (`slakio logout`) stays removed, and nothing more is written.
 //! * A file is read only when it is a plain file (not a link, opened without following one) of
 //!   at most [`FILE_MAX`] bytes, with the header of the key asked for, written no later than a day
-//!   from now and a PNG after it; anything else is a miss and the file is removed. What is read
-//!   is untrusted all the same: the UI decodes it within the bounds of a fetched picture.
+//!   from now and a PNG, JPEG or GIF after it (told by its first bytes); anything else is a miss
+//!   and the file is removed. What is read is untrusted all the same: the UI decodes it within
+//!   the bounds of a fetched picture.
 //! * A file is too old after [`AVATAR_AGE`] (photos), [`EMOJI_AGE`] (emoji, whose addresses
 //!   change with the picture) or [`THUMB_AGE`] (previews): a miss, and removed.
 //! * At most [`BUDGET`] bytes in all: [`PictureCache::sweep`] (at the start, and whenever a write
@@ -39,7 +42,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub const DIR: &str = "pictures";
 /// The most bytes the folder holds.
 pub const BUDGET: u64 = 64 * 1024 * 1024;
-/// The most bytes one file holds (header and PNG); a larger picture is not kept.
+/// The most bytes one file holds (header and picture); a larger picture is not kept.
 pub const FILE_MAX: u64 = 1024 * 1024;
 /// How long a profile photo is kept.
 pub const AVATAR_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
@@ -48,11 +51,16 @@ pub const EMOJI_AGE: Duration = Duration::from_secs(30 * 24 * 3600);
 /// How long a file's preview is kept.
 pub const THUMB_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 /// The first bytes of every file (the format's version is its last digit).
-pub const MAGIC: &[u8; 8] = b"slkpic2\n";
+pub const MAGIC: &[u8; 8] = b"slkpic3\n";
 /// The header: [`MAGIC`], the key (32 bytes), the time written (a little-endian `u64`), the
 /// kind.
 const HEADER: usize = 49;
 const PNG: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+
+/// `bytes` start as a PNG, a JPEG or a GIF does (what is kept; the UI decodes it all the same).
+fn is_picture(bytes: &[u8]) -> bool {
+    bytes.starts_with(&PNG) || bytes.starts_with(&[0xff, 0xd8, 0xff]) || bytes.starts_with(b"GIF8")
+}
 /// How far after now a file's time may be (a clock put back a little) before it is refused.
 const SKEW: Duration = Duration::from_secs(24 * 3600);
 /// A write's temporary file still there after this long was left by a run that ended.
@@ -86,7 +94,7 @@ fn age_of(byte: u8) -> Option<Duration> {
     [THUMB_AGE, AVATAR_AGE, EMOJI_AGE].get(usize::from(byte)).copied()
 }
 
-/// The key of the picture of `source` that fills the cells `shape` names.
+/// The key of the picture of `source` kept as `shape` (a tag the UI gives).
 pub fn key(source: &Source, shape: &str) -> [u8; 32] {
     sha256(&[b"slakio-picture", &[kind_byte(source)], source.address().as_bytes(), shape.as_bytes()])
 }
@@ -110,7 +118,7 @@ pub type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 /// What reading a picture gave.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Loaded {
-    /// The PNG kept for it.
+    /// The picture kept for it.
     Hit(Vec<u8>),
     /// Not kept.
     Miss,
@@ -257,7 +265,7 @@ impl PictureCache {
         crate::fsutil::is_own_dir(&self.dir)
     }
 
-    /// The PNG kept for `source` as `shape`, when there is one that may be read; a file that is
+    /// The picture kept for `source` as `shape`, when there is one that may be read; a file that is
     /// too old or refused is removed. A hit counts as a use (its time is set to now).
     pub fn load(&self, source: &Source, shape: &str) -> Loaded {
         if !self.dir_ok() {
@@ -310,8 +318,9 @@ impl PictureCache {
         self.epoch.load(Ordering::SeqCst)
     }
 
-    /// Keep `png`, the picture of `source` as `shape`, in the folder opened at the start or found
-    /// since ([`PictureCache::open_existing`]; one gone since is not made again). A write that takes the folder over its room sweeps it.
+    /// Keep `png`, the picture of `source` as `shape` (a PNG, JPEG or GIF), in the folder opened
+    /// at the start or found since ([`PictureCache::open_existing`]; one gone since is not made
+    /// again). A write that takes the folder over its room sweeps it.
     pub fn store(&self, source: &Source, shape: &str, png: &[u8]) -> Stored {
         self.store_as_of(self.epoch(), source, shape, png)
     }
@@ -330,8 +339,8 @@ impl PictureCache {
         if (HEADER + png.len()) as u64 > FILE_MAX {
             return Stored::Refused("too-large");
         }
-        if !png.starts_with(&PNG) {
-            return Stored::Refused("not-png");
+        if !is_picture(png) {
+            return Stored::Refused("not-picture");
         }
         if !self.open_existing() || !self.dir_ok() {
             return Stored::Refused("folder");
@@ -437,7 +446,7 @@ impl PictureCache {
     }
 }
 
-/// The PNG of a file's `bytes` for `source` as `shape` (`None`: too old at `now`), or why
+/// The picture of a file's `bytes` for `source` as `shape` (`None`: too old at `now`), or why
 /// the file is refused.
 fn parse(bytes: &[u8], source: &Source, shape: &str, now: SystemTime) -> Result<Option<Vec<u8>>, &'static str> {
     let (age, written) = header(bytes).ok_or("header")?;
@@ -450,11 +459,11 @@ fn parse(bytes: &[u8], source: &Source, shape: &str, now: SystemTime) -> Result<
     if now.duration_since(written).unwrap_or_default() > age {
         return Ok(None);
     }
-    let png = &bytes[HEADER..];
-    if !png.starts_with(&PNG) {
-        return Err("not-png");
+    let picture = &bytes[HEADER..];
+    if !is_picture(picture) {
+        return Err("not-picture");
     }
-    Ok(Some(png.to_vec()))
+    Ok(Some(picture.to_vec()))
 }
 
 /// How long the file whose first bytes are `bytes` is kept and when it was written, when its

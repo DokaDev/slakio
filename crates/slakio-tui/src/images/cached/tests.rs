@@ -113,7 +113,7 @@ fn a_picture_on_disk_that_does_not_decode_is_removed_and_fetched_again() {
     let diag = Diag::default();
     settle(&mut images(&dir, &diag), &mut Requests::default(), false);
     let cache = PictureCache::new(dir.clone());
-    let victim = cache.path(&photos()[3], &shape_tag(super::super::PHOTO, Some((9, 18))));
+    let victim = cache.path(&photos()[3], KEPT_AS);
     // A header and a PNG's first bytes, then nothing a decoder reads.
     let mut bytes = std::fs::read(&victim).unwrap();
     bytes.truncate(49 + 8);
@@ -121,10 +121,7 @@ fn a_picture_on_disk_that_does_not_decode_is_removed_and_fetched_again() {
     std::fs::write(&victim, bytes).unwrap();
     let mut second = images(&dir, &diag);
     assert_eq!(settle(&mut second, &mut Requests::default(), false), 1, "only that one is fetched");
-    assert!(
-        matches!(cache.load(&photos()[3], &shape_tag(super::super::PHOTO, Some((9, 18)))), Loaded::Hit(_)),
-        "kept again"
-    );
+    assert!(matches!(cache.load(&photos()[3], KEPT_AS), Loaded::Hit(_)), "kept again");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -211,33 +208,67 @@ fn a_file_s_preview_is_never_kept_on_disk_nor_looked_for_there() {
     // A preview someone else left there is never read either.
     let cache = images.cache.clone().unwrap();
     let png = slakio_world::pictures::png(thumb.address(), 64, 64);
-    let d = super::decode::decode(&png, job.shape, Some((9, 18))).unwrap();
-    assert!(matches!(cache.store(&thumb, &shape_tag(job.shape, Some((9, 18))), &d.png), Stored::Stored(_)));
+    assert!(matches!(cache.store(&thumb, KEPT_AS, &png), Stored::Stored(_)));
     let look = Job { from_cache: true, bytes: Vec::new(), ..job };
     assert_eq!(run(&look, Some((9, 18)), Some(&cache), &diag), Err(Refused::NotCached));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn a_picture_made_for_cells_of_another_size_is_another_picture() {
+fn a_photo_kept_is_read_for_cells_of_any_size_and_either_place() {
     let dir = scratch("cell-size");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    // Fetched for a DM row's chip.
+    images.look_as(&ws(), &photo, CHIP_PHOTO);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    let fetched =
+        Job { from_cache: false, bytes: slakio_world::pictures::png(photo.address(), 64, 64), ..look.clone() };
+    let chip = run(&fetched, Some((9, 18)), images.cache.as_ref(), &diag).unwrap();
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "kept once, by its address");
+    assert_eq!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).unwrap().transmit, chip.transmit);
+    // The picture slot's, and the terminal's font grown: each read from what was kept, as a fresh
+    // decode of the fetched bytes for those cells.
+    for (shape, cell) in [(PHOTO, Some((9, 18))), (PHOTO, Some((18, 36))), (CHIP_PHOTO, Some((18, 36)))] {
+        let slot = Job { shape, ..look.clone() };
+        let kept = run(&slot, cell, images.cache.as_ref(), &diag).unwrap();
+        let fresh = crate::images::prepare(&Job { shape, ..fetched.clone() }, cell).unwrap();
+        assert_eq!(
+            (kept.cols, kept.rows, kept.transmit),
+            (fresh.cols, fresh.rows, fresh.transmit),
+            "{shape:?} {cell:?}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_moving_photo_kept_moves_again_the_same() {
+    let dir = scratch("moving");
     let diag = Diag::default();
     let mut images = images(&dir, &diag);
     let photo = photos()[0].clone();
     images.look(&ws(), &photo);
     images.ask(&mut Requests::default(), Instant::now());
     let look = images.take_lookups().pop().expect("looked for first");
-    let fetched =
-        Job { from_cache: false, bytes: slakio_world::pictures::png(photo.address(), 64, 64), ..look.clone() };
-    let small = run(&fetched, Some((9, 18)), images.cache.as_ref(), &diag).unwrap();
-    assert!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).is_ok(), "kept for those cells");
-    // The terminal's font grew: what was kept is not shown at the old size.
-    assert_eq!(run(&look, Some((18, 36)), images.cache.as_ref(), &diag), Err(Refused::NotCached));
-    let large = run(&fetched, Some((18, 36)), images.cache.as_ref(), &diag).unwrap();
-    let again = run(&look, Some((18, 36)), images.cache.as_ref(), &diag).unwrap();
-    assert_eq!((again.cols, again.rows), (large.cols, large.rows), "as a fresh decode for those cells");
-    assert_eq!(again.transmit, large.transmit);
-    assert!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag).unwrap().transmit == small.transmit);
+    let mut gif = Vec::new();
+    {
+        use image::codecs::gif::{GifEncoder, Repeat};
+        let mut enc = GifEncoder::new(&mut gif);
+        enc.set_repeat(Repeat::Infinite).unwrap();
+        for shade in [0u8, 120, 240] {
+            let img = image::RgbaImage::from_pixel(40, 40, image::Rgba([shade, 255 - shade, 128, 255]));
+            let delay = image::Delay::from_numer_denom_ms(150, 1);
+            enc.encode_frame(image::Frame::from_parts(img, 0, 0, delay)).unwrap();
+        }
+    }
+    let fetched = Job { from_cache: false, bytes: gif, ..look.clone() };
+    let shown = run(&fetched, Some((9, 18)), images.cache.as_ref(), &diag).unwrap();
+    assert!(shown.moving.frames.len() > 1, "it moves");
+    let again = run(&look, Some((9, 18)), images.cache.as_ref(), &diag).unwrap();
+    assert_eq!(again.moving, shown.moving, "the same frames, the same delays");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -299,7 +330,7 @@ fn kept_photos(dir: &std::path::Path, sources: &[Source]) {
     cache.open().unwrap();
     for s in sources {
         let png = slakio_world::pictures::png(s.address(), 64, 64);
-        assert!(matches!(cache.store(s, &shape_tag(PHOTO, Some((9, 18))), &png), Stored::Stored(_)));
+        assert!(matches!(cache.store(s, KEPT_AS, &png), Stored::Stored(_)));
     }
 }
 

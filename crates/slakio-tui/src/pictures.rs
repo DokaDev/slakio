@@ -95,7 +95,7 @@ impl Pictures {
                 let fault = Fault::other("keeping a picture on disk panicked; it is shown, not kept");
                 ErrorLog::new(errors).record("picture", &fault);
             } else if made.is_err() {
-                cached::panicked(&job, cell, cache.as_ref());
+                cached::panicked(&job, cache.as_ref());
                 let _ = tx.send((((job.source, job.request), Err(Refused::Unreadable)), true));
             }
         });

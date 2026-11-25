@@ -173,7 +173,7 @@ fn a_file_too_large_corrupted_or_of_another_key_is_refused_and_removed() {
     let photo = Source::Avatar(AVATAR.into());
     let other = Source::Avatar(format!("{AVATAR}?other"));
     assert_eq!(c.store(&photo, "x", &png(FILE_MAX as usize)), Stored::Refused("too-large"));
-    assert_eq!(c.store(&photo, "x", b"GIF89a not a png"), Stored::Refused("not-png"));
+    assert_eq!(c.store(&photo, "x", b"<html>not a picture"), Stored::Refused("not-picture"));
     c.store(&photo, "x", &png(64));
     let path = c.path(&photo, "x");
     for (bytes, why) in [
@@ -182,10 +182,10 @@ fn a_file_too_large_corrupted_or_of_another_key_is_refused_and_removed() {
             {
                 let mut b = fs::read(&path).unwrap();
                 b.truncate(HEADER);
-                b.extend_from_slice(b"no png here");
+                b.extend_from_slice(b"no picture here");
                 b
             },
-            "not-png",
+            "not-picture",
         ),
         (vec![0; FILE_MAX as usize + 1], "too-large"),
     ] {
@@ -422,4 +422,34 @@ fn a_folder_there_already_is_used_by_a_run_that_did_not_open_it_and_one_missing_
     assert!(!c.open_existing());
     assert_eq!(c.store(&photo, "x", &png(64)), Stored::Refused("folder"));
     assert!(!dir.exists());
+}
+
+#[test]
+fn a_photo_is_kept_as_it_came_whatever_its_format() {
+    let (c, _) = cache("formats");
+    for (n, picture) in [png(64), b"\xff\xd8\xff\xe0 a jpeg".to_vec(), b"GIF89a a gif".to_vec()].iter().enumerate() {
+        let photo = Source::Avatar(format!("{AVATAR}?{n}"));
+        assert!(matches!(c.store(&photo, "source", picture), Stored::Stored(_)), "{n}");
+        assert_eq!(c.load(&photo, "source"), Loaded::Hit(picture.clone()), "{n}: read back as it came");
+    }
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn a_file_of_the_second_format_is_refused_on_a_read_and_removed_by_the_sweep() {
+    let (c, _) = cache("v2");
+    let photo = Source::Avatar(AVATAR.into());
+    // The second format: the same header under its own magic, a PNG made for some cells.
+    assert!(matches!(c.store(&photo, "photo-4x2@9x18", &png(64)), Stored::Stored(_)));
+    let mut v2 = fs::read(c.path(&photo, "photo-4x2@9x18")).unwrap();
+    v2[..8].copy_from_slice(b"slkpic2\n");
+    fs::write(c.path(&photo, "photo-4x2@9x18"), &v2).unwrap();
+    assert_eq!(c.load(&photo, "photo-4x2@9x18"), Loaded::Refused("header"));
+    assert!(!c.path(&photo, "photo-4x2@9x18").exists(), "removed");
+    // Left by an earlier run under a name no one asks for again: the sweep removes it.
+    fs::write(c.path(&photo, "chip-2x1@9x18"), &v2).unwrap();
+    assert!(matches!(c.store(&photo, "source", &png(64)), Stored::Stored(_)));
+    assert_eq!(c.sweep().unwrap(), Swept { removed: 1, kept: 1, bytes: (HEADER + 64) as u64 });
+    assert!(!c.path(&photo, "chip-2x1@9x18").exists());
+    let _ = fs::remove_dir_all(c.dir());
 }
