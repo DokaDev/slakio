@@ -53,19 +53,54 @@ impl Machine {
     }
 
     fn start(&self) -> Option<Run> {
+        self.start_with((120, 14), "on")
+    }
+
+    /// [`Machine::start`] in a terminal of `size`, pictures `images`.
+    fn start_with(&self, size: (u16, u16), images: &str) -> Option<Run> {
         let ws = &self.world.snapshot().workspaces[0];
         let creds = format!("{}|{TOKEN}|{COOKIE}", ws.id);
         let addr = self.fake.addr().to_string();
         let env = [
             ("SLAKIO_TEST_CREDENTIALS", creds.as_str()),
             ("SLAKIO_TEST_SLACK_ADDR", addr.as_str()),
-            ("SLAKIO_IMAGES", "on"),
+            ("SLAKIO_IMAGES", images),
             ("TERM", "xterm-kitty"),
         ];
-        Run::spawn(&self.dir, &self.dir.join("config.toml"), &self.dir.join("typescript"), &env, (120, 14))
+        Run::spawn(&self.dir, &self.dir.join("config.toml"), &self.dir.join("typescript"), &env, size)
     }
 
-    /// Each 1:1 DM of the first workspace whose peer has a photo: its name and the photo's path.
+    /// The photo paths of [`Machine::dm_photos`] in the order Home lists their rows, top down
+    /// (the order their photos are asked for ahead): read from a run of its own, its list on its
+    /// last row in a terminal tall enough for every DM row above it, pictures off (nothing
+    /// fetched). `None` when `script` cannot start.
+    fn home_order(name: &str) -> Option<Vec<String>> {
+        let m = Machine::new(name);
+        let dms = m.dm_photos();
+        let mut run = m.start_with((120, 90), "off")?;
+        run.wait_for("the list", |t| t.contains("# backend"));
+        run.type_bytes(b"G");
+        // A row's text without its blanks (a wide letter is followed by one on this screen); a
+        // DM's row is its name and at most a count after it (a group DM's goes on with a comma).
+        let rows = |t: &str| -> Vec<String> {
+            t.lines().map(|l| l.split('\u{2502}').nth(1).unwrap_or("").split_whitespace().collect()).collect()
+        };
+        let at = |rows: &[String], name: &str| {
+            let name: String = name.split_whitespace().collect();
+            rows.iter().position(|r| {
+                r.split_once(name.as_str()).is_some_and(|(_, rest)| rest.chars().all(|c| c.is_ascii_digit()))
+            })
+        };
+        run.wait_for("every DM row", |t| dms.iter().all(|(n, _)| at(&rows(t), n).is_some()));
+        let rows = rows(&run.output());
+        run.quit();
+        let mut order: Vec<(usize, String)> = dms.into_iter().map(|(n, p)| (at(&rows, &n).unwrap(), p)).collect();
+        order.sort();
+        Some(order.into_iter().map(|(_, p)| p).collect())
+    }
+
+    /// Each 1:1 DM of the first workspace whose peer has a photo: its name (as shown) and the
+    /// photo's path.
     fn dm_photos(&self) -> Vec<(String, String)> {
         let s = self.world.snapshot();
         let ws = &s.workspaces[0].id;
@@ -75,7 +110,7 @@ impl Machine {
                 let u = s.users.iter().find(|u| u.id == *user && u.workspace == *ws)?;
                 let path =
                     u.avatar.as_ref()?.strip_prefix("https://")?.split_once('/').map(|(_, p)| format!("/{p}"))?;
-                Some((c.name.unsanitized().to_string(), path))
+                Some((c.name.line().as_str().to_string(), path))
             })
             .collect()
     }
@@ -140,10 +175,13 @@ fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
     let m = Machine::new("not-custom");
     let dms = m.dm_photos();
     assert!(dms.len() >= 2, "some DM peers with a photo");
-    // The DMs' people as the edge cache answers: each with a photo address, all but the first
-    // marked as having no photo of their own (Slack's default only). The first, with a photo of
-    // their own, is the control: it shows photos are fetched ahead at all.
-    let control = dms[0].1.clone();
+    // The DMs' people as the edge cache answers: each with a photo address, all but one marked
+    // as having no photo of their own (Slack's default only). That one, with a photo of their
+    // own, is the control: it shows photos are fetched ahead at all. It is the row Home lists
+    // last, so its photo is asked for ahead after any other's (one at a time, in the rows'
+    // order): once it is fetched, none of the others is still to come.
+    let Some(order) = Machine::home_order("not-custom-order") else { return };
+    let control = order.last().expect("a DM row with a photo").clone();
     let s = m.world.snapshot();
     let ws = &s.workspaces[0].id;
     let results: Vec<serde_json::Value> = (s.conversations.iter().filter(|c| c.workspace == *ws))
@@ -163,8 +201,6 @@ fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
     run.wait_for("the list", |t| t.contains("# backend"));
     wait_until("the DMs' people looked up", || m.fake.methods().iter().any(|x| x == "users/info"));
     wait_until("the control's photo fetched ahead", || m.photo_fetches().contains_key(&control));
-    // The others would have been asked with it, ahead in the same queue; a moment more for any late.
-    std::thread::sleep(Duration::from_secs(1));
     let per = m.photo_fetches();
     run.quit();
     let fetched: Vec<&String> =
