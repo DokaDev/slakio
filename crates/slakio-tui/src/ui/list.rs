@@ -285,12 +285,21 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                     (x, x + 2)
                 }
             };
-            let tag = match (c.external, icons) {
+            let mut tag = match (c.external, icons) {
                 (false, _) => String::new(),
                 (true, false) => format!(" {}", app.i18n.label(Label::ListExternal)),
                 // The glyph and the blank of its slot.
                 (true, true) => format!(" {ICON_EXTERNAL} "),
             };
+            // A bot's photo is whatever picture it chose (a person's, even): its row says it is
+            // an app wherever the photo shows.
+            let bot = match &c.kind {
+                ConversationKind::Dm { user } => app.model.user(&c.workspace, user).is_some_and(|u| u.bot),
+                _ => false,
+            };
+            if bot && is_photo {
+                tag.push_str(&format!(" {}", app.i18n.label(Label::MessageApp)));
+            }
             let tag_w = width(&tag) as u16;
             // One blank cell at least between the name and what is right of it.
             let gap = if pill > 0 { pill + 2 } else { 1 };

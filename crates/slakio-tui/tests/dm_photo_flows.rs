@@ -797,3 +797,54 @@ fn a_photo_replaced_or_gone_leaves_the_terminal() {
     frame(&mut s);
     assert!(cells(&s).iter().all(|c| c.2 != now && c.2 != old), "neither picture drawn:\n{}", s.d.screen());
 }
+
+/// A bot's photo is whatever picture it chose (a person's, even): its DM row says it is an app
+/// wherever the photo shows; a person's row does not.
+#[test]
+fn a_bot_s_dm_row_with_its_photo_says_it_is_an_app() {
+    let mut s = dms(120, 40, true);
+    let photos = expected(&s);
+    let (bot_at, person_at) = (photos[0].clone(), photos[1].clone());
+    let bot = peer_at(&s, &bot_at);
+    profile_changed(&mut s, User { bot: true, ..bot });
+    fill(&mut s);
+    let row = |s: &Scripted, p: &Photo| rest_of_row(s, p.x + 2, p.y).trim_end().to_string();
+    assert!(cells(&s).contains(&(bot_at.x, bot_at.y, id_of(&s, &bot_at.address))), "the bot's photo drawn");
+    let named = |s: &Scripted, p: &Photo| {
+        let name = peer_at(s, p).display_name.line().as_str().to_string();
+        row(s, p).contains(&format!("{name} app "))
+    };
+    assert!(named(&s, &bot_at), "{:?}", row(&s, &bot_at));
+    assert!(!named(&s, &person_at) && !row(&s, &person_at).contains(" app "), "{:?}", row(&s, &person_at));
+}
+
+/// In the timeline, a bot's photo stands beside its name and the `app` mark.
+#[test]
+fn a_bot_s_photo_in_the_timeline_stands_beside_the_app_mark() {
+    let (mut s, peers) = crowded(100, 90, 3);
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let bot = s.d.app.model.user(&ws, &peers[0]).cloned().unwrap();
+    profile_changed(&mut s, User { bot: true, ..bot.clone() });
+    for _ in 0..20 {
+        let now = frame(&mut s);
+        if now.is_empty() {
+            break;
+        }
+        for (id, _) in now {
+            deliver(&mut s, id);
+        }
+    }
+    let id = match s.d.app.images.look(&ws, &Source::Avatar(bot.avatar.clone().unwrap())) {
+        Look::Ready { id, .. } => id,
+        other => panic!("{other:?}"),
+    };
+    let buf = s.d.buffer();
+    let name = bot.display_name.line().as_str().to_string();
+    let header = (0..buf.area.height).find_map(|y| {
+        let line: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol().to_string()).collect();
+        let photo = (0..buf.area.width).any(|x| is_placeholder(buf[(x, y)].symbol()) && id_in(buf[(x, y)].fg) == id);
+        (photo && line.contains(&name)).then_some(line)
+    });
+    let header = header.unwrap_or_else(|| panic!("the bot's photo and name on one row:\n{}", s.d.screen()));
+    assert!(header.contains(&format!("{name} app")), "{header}");
+}
