@@ -139,9 +139,11 @@ fn dm_rows_out_of_view_get_their_photos_ahead() {
 fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
     let m = Machine::new("not-custom");
     let dms = m.dm_photos();
-    assert!(!dms.is_empty(), "some DM peers with a photo");
-    // The DMs' people as the edge cache answers: each with a photo address, all marked as
-    // having no photo of their own (Slack's default only).
+    assert!(dms.len() >= 2, "some DM peers with a photo");
+    // The DMs' people as the edge cache answers: each with a photo address, all but the first
+    // marked as having no photo of their own (Slack's default only). The first, with a photo of
+    // their own, is the control: it shows photos are fetched ahead at all.
+    let control = dms[0].1.clone();
     let s = m.world.snapshot();
     let ws = &s.workspaces[0].id;
     let results: Vec<serde_json::Value> = (s.conversations.iter().filter(|c| c.workspace == *ws))
@@ -150,8 +152,9 @@ fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
             _ => None,
         })
         .map(|u| {
+            let own = u.avatar.as_ref().is_some_and(|a| a.ends_with(&control));
             serde_json::json!({"id": u.id.as_str(), "team_id": ws.as_str(), "name": u.name.unsanitized(),
-                "profile": {"real_name": u.display_name.unsanitized(), "image_72": u.avatar, "is_custom_image": false}})
+                "profile": {"real_name": u.display_name.unsanitized(), "image_72": u.avatar, "is_custom_image": own}})
         })
         .collect();
     m.fake.fail_next("users/info", slakio_fake::Fault::Answer(serde_json::json!({"ok": true, "results": results})));
@@ -159,9 +162,12 @@ fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
     wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
     run.wait_for("the list", |t| t.contains("# backend"));
     wait_until("the DMs' people looked up", || m.fake.methods().iter().any(|x| x == "users/info"));
-    std::thread::sleep(Duration::from_secs(6));
+    wait_until("the control's photo fetched ahead", || m.photo_fetches().contains_key(&control));
+    // The others would have been asked with it, ahead in the same queue; a moment more for any late.
+    std::thread::sleep(Duration::from_secs(1));
     let per = m.photo_fetches();
     run.quit();
-    let fetched: Vec<&String> = per.keys().filter(|p| dms.iter().any(|(_, path)| path == *p)).collect();
-    assert!(fetched.is_empty(), "no photo of a DM peer is fetched: {fetched:?}");
+    let fetched: Vec<&String> =
+        per.keys().filter(|p| **p != control && dms.iter().any(|(_, path)| path == *p)).collect();
+    assert!(fetched.is_empty(), "no photo of a DM peer without one of their own is fetched: {fetched:?}");
 }
