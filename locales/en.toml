@@ -367,6 +367,7 @@
 "help.keys" = "↑↓ move · Enter run · / search · Esc close"
 "help.search" = "Type / to search"
 "help.none" = "No key matches “{query}”"
+"help.marks" = "{app} app or bot · {ext} another organization"
 "dialog.quit_title" = "Quit slakio?"
 "dialog.quit_text" = "A message you wrote has not been sent; quitting loses it."
 "dialog.quit_confirm_text" = "No message is waiting to be sent."

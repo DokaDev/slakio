@@ -1,9 +1,10 @@
-//! The keyboard help over the dimmed screen: a search line, then every context's keys (the one
-//! the keyboard was in open first), each row the action's label and its keys on the right.
+//! The keyboard help over the dimmed screen: a search line (on its right what the marks after a
+//! sender's name mean), then every context's keys (the one the keyboard was in open first), each
+//! row the action's label and its keys on the right.
 //!
 //! ```text
 //! ╭ Keys — List panel ─────────────────────────────────────────╮
-//! │ / Type / to search                                          │
+//! │ / Type / to search    ▣ app or bot · ⇄ another organization │
 //! │─────────────────────────────────────────────────────────────│
 //! │ ▾ List panel                                                │
 //! │   Next row                                         j / Down │
@@ -49,7 +50,16 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     } else {
         Line::from(vec![Span::styled(" / ", t.key()), Span::styled(h.filter.clone(), t.text())])
     };
+    // The marks a sender's name may be followed by, on the right where they fit.
+    let (app_mark, ext_mark) = (super::timeline::message::APP_MARK, super::timeline::message::EXT_MARK);
+    let marks = app.i18n.msg(&Msg::HelpMarks { app: app_mark.to_string(), ext: ext_mark.to_string() }).to_string();
+    let marks_w = width(&marks) as u16;
+    let search_w = search.width();
     f.render_widget(Paragraph::new(search), Rect { height: 1, ..inner });
+    if search_w + width(&marks) + 3 <= iw {
+        let x = inner.right() - marks_w - 1;
+        f.render_widget(Paragraph::new(marks).style(t.faint()), Rect { x, y: inner.y, width: marks_w, height: 1 });
+    }
     if h.typing {
         let x = inner.x + 3 + width(&h.filter) as u16;
         f.set_cursor_position(Position { x: x.min(inner.right().saturating_sub(1)), y: inner.y });

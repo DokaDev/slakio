@@ -218,44 +218,94 @@ fn thread_cut_at(w: u16, h: u16) {
     assert!(bot < notice, "the notice after the last reply (the bot's): {screen}");
 }
 
-/// In the compact column a long name is cut to leave its tags room: a bot of another organization
-/// keeps both, `app` (its name may pass for a person's) and `ext` (the mark to trust less); the
-/// tags are faint and italic, a style no name is drawn in (also without color).
-#[test]
-fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
+/// The sender's row of the last message of `deploys` in compact (terminal `w` cells wide), its
+/// sender `name`, a bot (`bot`) and of another organization (`ext`) as asked.
+fn compact_sender(theme: slakio_tui::theme::Theme, w: u16, name: &str, bot: bool, ext: bool) -> (String, Scripted) {
     use slakio_core::model::{Org, User, UserId};
     use slakio_core::sanitize::Remote;
+    let mut s = Scripted::booted(true, None);
+    s.d.app.theme = theme;
+    s.d.app.settings.compact = true;
+    s.d.app.resize(w, 40);
+    s.d.list_cursor_on("deploys");
+    s.keys("enter");
+    let i = s.b.held.len() - 1;
+    let mut e = s.b.reply(i);
+    let Event::History(page) = &mut e.event else { panic!("{e:?}") };
+    let last = page.messages.last_mut().unwrap();
+    last.user = UserId::new(if bot { "BREL" } else { "UPEER" });
+    last.text = Remote::new("Shipped".to_string());
+    page.users.push(User {
+        id: last.user.clone(),
+        workspace: page.target.workspace().clone(),
+        name: Remote::new(name.to_string()),
+        display_name: Remote::new(name.to_string()),
+        org: if ext { Org::External(Remote::new("TPARTNER".to_string())) } else { Org::Own },
+        bot,
+        presence: Presence::Unknown,
+        avatar: None,
+        no_photo: false,
+    });
+    s.b.push(e);
+    s.pump();
+    let screen = s.d.screen();
+    let line = screen.lines().find(|l| l.contains("Shipped")).unwrap_or_else(|| panic!("{screen}")).to_string();
+    (line, s)
+}
+
+/// In the compact column (14 cells, however wide the pane: 90 is the narrowest terminal that
+/// leaves the pane its columns) a name is cut to leave its tags room
+/// down to six cells; below that the words become marks (`▣` app, `⇄` ext), then only `▣` stays
+/// (a bot's name may pass for a person's). The tags are faint and italic, a style no name is
+/// drawn in (also without color).
+#[test]
+fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
+    let long = "Partner Release Notifier Bot";
+    let cases = [
+        ("Bo", true, false, "Bo app        Shipped"),
+        ("Bo", false, true, "Bo ext        Shipped"),
+        ("Bo", true, true, "Bo app ext    Shipped"),
+        ("Hanbit", true, true, "Hanbit ▣ ⇄    Shipped"),
+        (long, true, false, "Partner… app  Shipped"),
+        (long, false, true, "Partner… ext  Shipped"),
+        (long, true, true, "Partner… ▣ ⇄  Shipped"),
+    ];
     for theme in [slakio_tui::theme::Theme::terminal(), slakio_tui::theme::Theme::no_color()] {
-        let mut s = Scripted::booted(true, None);
-        s.d.app.theme = theme;
-        s.d.app.settings.compact = true;
-        s.d.list_cursor_on("deploys");
-        s.keys("enter");
-        let i = s.b.held.len() - 1;
-        let mut e = s.b.reply(i);
-        let Event::History(page) = &mut e.event else { panic!("{e:?}") };
-        let last = page.messages.last_mut().unwrap();
-        last.user = UserId::new("BREL~1");
-        page.users.push(User {
-            id: last.user.clone(),
-            workspace: page.target.workspace().clone(),
-            name: Remote::new("Partner Release Notifier Bot".to_string()),
-            display_name: Remote::new("Partner Release Notifier Bot".to_string()),
-            org: Org::External(Remote::new("TPARTNER".to_string())),
-            bot: true,
-            presence: Presence::Unknown,
-            avatar: None,
-            no_photo: false,
-        });
-        s.b.push(e);
-        s.pump();
+        for ((name, bot, ext, want), w) in cases.into_iter().flat_map(|c| [(c, 120), (c, 90)]) {
+            let (line, s) = compact_sender(theme.clone(), w, name, bot, ext);
+            assert!(line.contains(want), "{w} {name} {bot} {ext}: want {want:?} in {line:?}");
+            let screen = s.d.screen();
+            let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
+            let x = line[..line.find(want).unwrap()].chars().count() + want.find(' ').unwrap() + 1;
+            let style = s.d.buffer()[(x as u16, y as u16)].style();
+            assert!(style.add_modifier.contains(ratatui::style::Modifier::ITALIC), "{line}");
+            assert!(!style.add_modifier.contains(ratatui::style::Modifier::BOLD), "{line}");
+        }
+    }
+}
+
+/// A stacked sender's row (a pane narrower than its columns) keeps the name six cells the same
+/// way, at the narrowest terminal (50: an 18-cell pane) and where the pane starts stacking.
+#[test]
+fn stacked_tags_leave_the_name_six_cells() {
+    let long = "Partner Release Notifier Bot";
+    let cases = [
+        (50, "Bo", true, false, "B  Bo ▣ · "),
+        (50, "Bo", false, true, "B  Bo ⇄ · "),
+        (50, "Bo", true, true, "B  Bo ▣ · "),
+        (50, "Hanbit", true, true, "H  Hanb… · "),
+        (50, long, true, true, "PB Part… · "),
+        (56, "Bo", true, true, "B  Bo app ext · "),
+        (56, "Hanbit", true, true, "H  Hanbit ▣ ⇄ · "),
+        (56, long, true, false, "PB Partne… app · "),
+        (56, long, false, true, "PB Partne… ext · "),
+        (56, long, true, true, "PB Partne… ▣ ⇄ · "),
+    ];
+    for (w, name, bot, ext, want) in cases {
+        let (_, s) = compact_sender(slakio_tui::theme::Theme::terminal(), w, name, bot, ext);
         let screen = s.d.screen();
-        let line = screen.lines().find(|l| l.contains("… app ext")).unwrap_or_else(|| panic!("both marks:\n{screen}"));
-        assert!(line.contains("Part… app ext"), "the name cut, its start kept: {line}");
-        let (y, row) = screen.lines().enumerate().find(|(_, l)| l.contains("… app ext")).unwrap();
-        let x = row[..row.find("… app ext").unwrap()].chars().count() + 2;
-        let style = s.d.buffer()[(x as u16, y as u16)].style();
-        assert!(style.add_modifier.contains(ratatui::style::Modifier::ITALIC), "{row}");
-        assert!(!style.add_modifier.contains(ratatui::style::Modifier::BOLD), "{row}");
+        let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
+        let header = screen.lines().nth(y - 1).unwrap();
+        assert!(header.contains(&format!("││ {want}")), "{w} {name} {bot} {ext}: want {want:?} in {header:?}");
     }
 }

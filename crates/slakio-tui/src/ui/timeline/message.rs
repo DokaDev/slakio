@@ -43,6 +43,13 @@ use slakio_core::model::{Org, WorkspaceId};
 
 /// The sender's column, at most (compact).
 const AUTHOR_WIDTH: usize = 14;
+/// A name keeps at least this many cells (all of it when shorter) before its tags do: they go
+/// to their marks first, then to the more important one, then out ([`tags`]).
+const NAME_FLOOR: usize = 6;
+/// The mark of `app` where its word leaves the name too little room (the help tells it).
+pub const APP_MARK: &str = "\u{25A3}";
+/// The mark of `ext` where its word leaves the name too little room (the help tells it).
+pub const EXT_MARK: &str = "\u{21C4}";
 /// The time column (`10:02` and a space before it, compact).
 const TIME_WIDTH: usize = 6;
 /// Rows of text a message shows at most; the rest is marked, not drawn.
@@ -245,7 +252,7 @@ fn comfortable(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, select
     };
     let author_style = if m.own { t.own_author() } else { t.author() };
     let time_text = time::hm(m.ts, &app.zone);
-    let tag = tags(app, pane, m);
+    let tag = tags(app, pane, m, usize::MAX);
     let name = clip(m.author.as_str(), text_w.saturating_sub(width(&time_text) + 2 + width(&tag)).max(1));
     let mut header = picture(0);
     header.push(Span::styled(name, author_style));
@@ -312,7 +319,7 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
             spans.extend([chip, Span::raw(" ")]);
             room -= chip_column;
         }
-        let tag = tags(app, pane, m);
+        let tag = tags(app, pane, m, room);
         spans.extend([
             Span::styled(clip(m.author.as_str(), room.saturating_sub(width(&tag))), author_style),
             Span::styled(tag, tag_style(app)),
@@ -330,11 +337,8 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
                 spans.extend([chip, Span::raw(" ")]);
                 name_w -= chip_w;
             }
-            // The tags after the name, the name cut to leave them room: neither goes while
-            // they fit (a bot's name and photo may pass for a person's; another organization is
-            // what to trust less).
-            let tag = tags(app, pane, m);
-            let tag = if width(&tag) + 2 <= name_w { tag } else { String::new() };
+            // The tags after the name, the name cut to leave them room down to its floor.
+            let tag = tags(app, pane, m, name_w - 1);
             let name = clip(m.author.as_str(), (name_w - 1).saturating_sub(width(&tag)).max(1));
             let pad = " ".repeat(name_w.saturating_sub(width(&name) + width(&tag)));
             if tag.is_empty() {
@@ -356,21 +360,39 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
     out
 }
 
-/// What follows the sender's name: ` app` for a bot or an app (GUI Slack's APP badge: its name
-/// is whatever it chose to post as; a bot's per-name author id is one even when its person is
-/// no longer kept), ` ext` for a sender of another organization (a Slack Connect peer); empty
-/// for a person of the workspace's own. Both for a bot of another organization.
-fn tags(app: &App, pane: &Pane, m: &Shown) -> String {
+/// What follows the sender's name, sharing `room` cells with it: ` app` for a bot or an app
+/// (GUI Slack's APP badge: its name is whatever it chose to post as; a bot's per-name author id
+/// is one even when its person is no longer kept), ` ext` for a sender of another organization
+/// (a Slack Connect peer); empty for a person of the workspace's own. Both for a bot of another
+/// organization.
+fn tags(app: &App, pane: &Pane, m: &Shown, room: usize) -> String {
     let user = app.model.user(pane.target.workspace(), &m.user);
+    let bot = user.is_some_and(|u| u.bot) || m.user.as_str().contains('~');
     let ext = user.is_some_and(|u| matches!(u.org, Org::External(_)));
-    let mut out = String::new();
-    if user.is_some_and(|u| u.bot) || m.user.as_str().contains('~') {
-        out.push_str(&format!(" {}", app.i18n.label(Label::MessageApp)));
-    }
-    if ext {
-        out.push_str(&format!(" {}", app.i18n.label(Label::ListExternal)));
-    }
-    out
+    let words = (app.i18n.label(Label::MessageApp), app.i18n.label(Label::ListExternal));
+    fit_tags(m.author.as_str(), bot, ext, (&words.0, &words.1), room)
+}
+
+/// The tags of a sender named `name` in `room` cells shared with the name, which keeps
+/// [`NAME_FLOOR`] cells: the `words` while they leave it that, else the marks, else only the
+/// more important one, `app` (a bot's name and photo may pass for a person's), else none.
+fn fit_tags(name: &str, bot: bool, ext: bool, words: (&str, &str), room: usize) -> String {
+    let both = |app: &str, ext_: &str| {
+        let mut out = String::new();
+        if bot {
+            out.push_str(&format!(" {app}"));
+        }
+        if ext {
+            out.push_str(&format!(" {ext_}"));
+        }
+        out
+    };
+    let one = if bot { format!(" {APP_MARK}") } else { both("", EXT_MARK) };
+    let floor = width(name).min(NAME_FLOOR);
+    [both(words.0, words.1), both(APP_MARK, EXT_MARK), one]
+        .into_iter()
+        .find(|tag| room.saturating_sub(width(tag)) >= floor && width(tag) < room)
+        .unwrap_or_default()
 }
 
 /// The tags' style: faint and italic, which no sender's name is drawn in (a name is bold), so a
@@ -497,8 +519,29 @@ fn no_replies(app: &App, w: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::notice;
+    use super::{APP_MARK, EXT_MARK, NAME_FLOOR, fit_tags, notice};
+    use crate::text::width;
     use ratatui::style::Style;
+
+    #[test]
+    fn a_name_keeps_its_floor_while_a_tag_shows_and_app_goes_last() {
+        for name in ["B", "Bo", "Hanbit", "Partner Release Notifier Bot"] {
+            for (bot, ext) in [(true, false), (false, true), (true, true)] {
+                for room in 0..30 {
+                    let tag = fit_tags(name, bot, ext, ("app", "ext"), room);
+                    if tag.is_empty() {
+                        continue;
+                    }
+                    let left = room - width(&tag);
+                    assert!(left >= width(name).min(NAME_FLOOR) && left >= 1, "{name} {bot} {ext} {room}: {tag:?}");
+                    assert_eq!(tag.contains("app") || tag.contains(APP_MARK), bot, "{name} {room}: {tag:?}");
+                    if ext && !(tag.contains("ext") || tag.contains(EXT_MARK)) {
+                        assert_eq!(tag, format!(" {APP_MARK}"), "only ext goes: {name} {room}");
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_notice_keeps_every_word_however_narrow_the_pane() {
