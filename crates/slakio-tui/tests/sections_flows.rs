@@ -13,7 +13,7 @@ use ratatui::crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifi
 use scripted::Scripted;
 use slakio_core::backend::{Command, Envelope, Event, Found, Generation, Hit, Live};
 use slakio_core::model::{
-    Conversation, ConversationId, Message, Section, SectionId, SectionKind, Sort, Target, Ts, UserId,
+    Conversation, ConversationId, ConversationKind, Message, Section, SectionId, SectionKind, Sort, Target, Ts, UserId,
 };
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::model::{Row, SignedIn};
@@ -149,6 +149,53 @@ fn sections_that_come_late_after_a_click_on_the_cursor_s_row_leave_it_there() {
     let (live, _) = late_mine(&s);
     push(&mut s, live);
     assert_eq!(under_cursor(&s), clicked, "the cursor stays on the conversation clicked");
+}
+
+/// Rows that moved around the cursor the boot put at the top (a newer message reorders the DMs
+/// listed first) are no move of the user's: sections that come later still put it at the top.
+#[test]
+fn sections_that_come_late_after_a_reorder_before_the_cursor_moved_put_it_at_the_top() {
+    let mut snap = World::demo().snapshot().clone();
+    let ws = snap.workspaces[0].id.clone();
+    let dms = (snap.sections.iter()).position(|x| x.workspace == ws && x.kind == SectionKind::DirectMessages).unwrap();
+    let mut dms = snap.sections.remove(dms);
+    dms.sort = Some(Sort::Recent);
+    snap.sections.insert(0, dms);
+    let mut s = Scripted::booted(true, Some(snap));
+    s.d.app.resize(120, 12);
+    s.pump();
+    let at = first(&s);
+    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (at, 0), "the boot put it at the top");
+    let Row::Conversation(next) = s.d.app.list_rows()[at + 1] else { panic!("a second DM") };
+    let next = s.d.app.model.conversation(next).clone();
+    let ConversationKind::Dm { user } = next.kind.clone() else { panic!("a DM: {next:?}") };
+    let message = Message {
+        ts: Ts(1_900_000_000_000_000),
+        user,
+        text: Remote::new("newest"),
+        thread: None,
+        reactions: Vec::new(),
+        edited: false,
+        files: Vec::new(),
+    };
+    let (workspace, conversation) = (ws.clone(), next.id.clone());
+    let live = Live::Message {
+        workspace,
+        conversation,
+        thread: None,
+        broadcast: false,
+        changed: false,
+        mention: false,
+        message,
+        users: Vec::new(),
+    };
+    push(&mut s, live);
+    assert_eq!(s.d.app.list_cursor(), at + 1, "the DM the cursor is on went down a row");
+    let (live, last) = late_mine(&s);
+    push(&mut s, live);
+    let top = first(&s);
+    assert!(matches!(s.d.app.list_rows()[top], Row::Conversation(i) if s.d.app.model.conversation(i).id == last));
+    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (top, 0), "the cursor and the view at the top");
 }
 
 #[test]

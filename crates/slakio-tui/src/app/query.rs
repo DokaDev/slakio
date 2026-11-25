@@ -276,6 +276,7 @@ impl App {
     pub fn move_list_cursor_to(&mut self, row: usize) {
         let last = self.list_rows().len().saturating_sub(1);
         self.shell.list_cursor = row.min(last);
+        self.shell.moved();
     }
 
     /// Test driver: the list panel gets the keyboard, its cursor on row `row`.
@@ -290,5 +291,6 @@ impl App {
     pub fn show_unfolded(&mut self, view: View) {
         self.shell.view = view;
         self.shell.collapsed.clear();
+        self.shell.moved();
     }
 }

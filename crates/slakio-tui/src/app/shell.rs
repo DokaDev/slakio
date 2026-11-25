@@ -113,9 +113,9 @@ pub struct Shell {
     pub list_hidden: bool,
     /// The list cursor goes to the first conversation once the rows are known.
     pending_home: bool,
-    /// Where the boot put the list cursor (the view, the cursor, the first row on screen), until
-    /// the user moves it.
-    boot_home: Option<(View, usize, usize)>,
+    /// The list cursor and the view are where the boot put them: the user has not moved them
+    /// since (rows that moved around them do not count).
+    boot_home: bool,
 }
 
 impl Default for Shell {
@@ -136,7 +136,7 @@ impl Default for Shell {
             todo: TodoView::default(),
             list_hidden: false,
             pending_home: true,
-            boot_home: None,
+            boot_home: false,
         }
     }
 }
@@ -184,7 +184,7 @@ impl Shell {
         here: &mut Region,
     ) -> Option<Open> {
         let mut open = None;
-        self.boot_home = None;
+        self.boot_home = false;
         let list = self.rows(model);
         let page = list_height.max(1) as isize;
         match action {
@@ -492,20 +492,18 @@ impl Shell {
         }
         self.list_cursor = self.list_cursor.min(self.rows(model).len().saturating_sub(1));
         self.scroll(list_height);
-        if home {
-            self.boot_home = Some((self.view, self.list_cursor, self.list_top));
-        }
+        self.boot_home |= home;
     }
 
     /// The list cursor is still where the boot put it: the user has not moved it since.
     pub fn untouched(&self) -> bool {
-        self.boot_home == Some((self.view, self.list_cursor, self.list_top))
+        self.boot_home
     }
 
     /// The user moved the list cursor or the view (a click, the wheel, a jump, another view):
     /// sections that come later leave it where it is.
     pub fn moved(&mut self) {
-        self.boot_home = None;
+        self.boot_home = false;
     }
 
     /// Put the list cursor and the view at the top again, as the boot did (sections that came
@@ -513,7 +511,7 @@ impl Shell {
     pub fn rehome(&mut self, model: &Model, list_height: usize) {
         self.home_cursor(model);
         self.scroll(list_height);
-        self.boot_home = Some((self.view, self.list_cursor, self.list_top));
+        self.boot_home = true;
     }
 
     /// The view shown: index into [`View::ALL`].
