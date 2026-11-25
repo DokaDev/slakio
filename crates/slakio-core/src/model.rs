@@ -122,10 +122,14 @@ pub enum SectionKind {
     Favorites,
     /// A section the user made.
     Custom,
+    /// Conversations shared with another organization (Slack Connect) not in a section above.
+    External,
     /// Channels not in another section.
     Channels,
     /// DMs and group DMs not in another section.
     DirectMessages,
+    /// DMs with apps (bots) not in another section.
+    Apps,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -18,12 +18,13 @@ use crate::governor::Priority;
 use crate::method::Method;
 use crate::people::People;
 use crate::request::Call;
+use crate::sidebar::Facts;
 use crate::wire;
 use slakio_core::backend::{Event, Snapshot};
 use slakio_core::diag::{Kind, Stage};
 use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, Org, Presence, Section, SectionId, SectionKind, Ts, User, UserId,
-    Workspace, WorkspaceColor, WorkspaceId,
+    Conversation, ConversationId, ConversationKind, Org, Presence, Ts, User, UserId, Workspace, WorkspaceColor,
+    WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
@@ -45,6 +46,8 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     people.set_team(&team.id);
     *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
     let counts = counts(client).await;
+    // The sidebar's sections: unknown when they cannot be read (the two default ones then).
+    let sidebar = crate::sidebar::Sidebar::new(&team.id, crate::sections::fetch(client).await, client.diag());
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
     // The user too, when the start bundle has no photo of them.
@@ -82,7 +85,7 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
             u.presence = if on { Presence::Dnd } else { Presence::Unknown };
         }
     }
-    Ok(Event::Booted(Box::new(snapshot(boot, counts, known, now))))
+    Ok(Event::Booted(Box::new(snapshot(boot, counts, known, now, sidebar))))
 }
 
 /// The unread counts (`client.counts`, in the background share); `None` when they could not be
@@ -128,32 +131,31 @@ pub(crate) fn unread_counts(counts: wire::Counts) -> HashMap<String, (u32, u32)>
 }
 
 /// The snapshot of `boot` (with a team and a user), its counts `counts` (`None`: unknown), the
-/// people `known`, at `now` (seconds).
-fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>, now: u64) -> Snapshot {
+/// people `known`, at `now` (seconds), its conversations placed in the sections of `sidebar`.
+fn snapshot(
+    boot: wire::UserBoot,
+    counts: Option<wire::Counts>,
+    known: Vec<User>,
+    now: u64,
+    sidebar: crate::sidebar::Sidebar,
+) -> Snapshot {
     let (Some(team), Some(me)) = (boot.team, boot.me) else { return Snapshot::default() };
     let ws = WorkspaceId::new(&team.id);
     let counts_failed = counts.is_none();
     let unread = counts.map(unread_counts).unwrap_or_default();
     let muted: HashSet<String> = boot.prefs.as_ref().map(wire::Prefs::muted).unwrap_or_default();
-    let section = |id: &str, name: &str, kind| Section {
-        id: SectionId::new(format!("{}:{id}", team.id)),
-        workspace: ws.clone(),
-        name: Remote::new(name),
-        kind,
-    };
-    let sections = vec![
-        section("channels", "Channels", SectionKind::Channels),
-        section("dms", "Direct messages", SectionKind::DirectMessages),
-    ];
-    let conversation = |id: String, name: String, kind: ConversationKind, external: bool, section: &Section| {
+    let starred: HashSet<String> = boot.starred.unwrap_or_default().into_iter().collect();
+    let conversation = |id: String, name: String, kind: ConversationKind, external: bool| {
         let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
+        let facts = Facts { dm: !matches!(kind, ConversationKind::Channel { .. }), starred: starred.contains(&id) };
+        let section = sidebar.place(&id, facts);
         Conversation {
             muted: muted.contains(&id),
             id: ConversationId::new(id),
             workspace: ws.clone(),
             kind,
             name: Remote::new(name),
-            section: section.id.clone(),
+            section,
             external,
             unread,
             mentions,
@@ -167,7 +169,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
         .map(|c| {
             let name = c.name.unwrap_or_else(|| c.id.clone());
             let kind = ConversationKind::Channel { private: c.is_private == Some(true) };
-            conversation(c.id, name, kind, c.is_ext_shared == Some(true), &sections[0])
+            conversation(c.id, name, kind, c.is_ext_shared == Some(true))
         })
         .collect();
     conversations.extend(boot.ims.unwrap_or_default().into_iter().filter_map(|im| {
@@ -175,7 +177,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
         let peer = known.iter().find(|u| u.id.as_str() == user);
         let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
         let external = peer.is_some_and(|u| matches!(u.org, Org::External(_)));
-        Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external, &sections[1]))
+        Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external))
     }));
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
     let avatar = own_photo(&me, &known);
@@ -202,7 +204,7 @@ fn snapshot(boot: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
         .collect(),
-        sections,
+        sections: sidebar.sections,
         conversations,
         // Saved items are not read in this version: unknown, not none.
         saved: None,

@@ -104,8 +104,6 @@ pub(crate) struct Session {
     pub(crate) booted: tokio::sync::Notify,
     /// The conversations the UI read this session: the live updates name new authors only there.
     pub(crate) opened: std::sync::Mutex<std::collections::HashSet<ConversationId>>,
-    /// The sidebar's shape was described (picture diagnostics on, [`crate::sections::probe`]).
-    probed: AtomicBool,
 }
 
 pub use crate::people::LOOKUP_BATCH;
@@ -253,15 +251,10 @@ fn spawn_boot(
 ) {
     tasks.spawn(async move {
         let booted = boot(&client, &ctx.me, &ctx.people).await;
-        let probe = booted.is_ok() && client.diag().on() && !ctx.probed.swap(true, Ordering::SeqCst);
         if booted.is_ok() {
             ctx.booted.notify_one();
         }
         answer(&tx, id, booted).await;
-        // Diagnostics only, after the answer: once per workspace, nothing of it kept.
-        if probe {
-            crate::sections::probe(&client).await;
-        }
     });
 }
 

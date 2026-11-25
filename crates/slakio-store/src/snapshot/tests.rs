@@ -159,3 +159,26 @@ fn a_photo_kept_on_another_host_is_none_when_read() {
     let u = back.users.iter().find(|u| u.id == s.users[0].id).unwrap();
     assert_eq!(u.avatar, None);
 }
+
+#[test]
+fn every_section_kind_comes_back_and_an_older_version_does_not_read_them() {
+    let mut store = writer("snap-kinds");
+    let mut s = World::new(5).snapshot().clone();
+    let kinds = [
+        SectionKind::Favorites,
+        SectionKind::Custom,
+        SectionKind::External,
+        SectionKind::Channels,
+        SectionKind::DirectMessages,
+        SectionKind::Apps,
+    ];
+    for (section, kind) in s.sections.iter_mut().zip(kinds.iter().cycle()) {
+        section.kind = *kind;
+    }
+    assert!(s.sections.len() >= kinds.len(), "every kind is kept");
+    store.put_snapshot(&s).unwrap();
+    assert_parts(&store, &s, "kinds");
+    // A cache that may hold the newer kinds is a newer version's to the one before them.
+    let before = &crate::schema::MIGRATIONS[..4];
+    assert_eq!(crate::schema::migrate(&mut store.conn, before).unwrap(), crate::schema::Schema::Newer(5));
+}

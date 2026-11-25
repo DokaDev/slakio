@@ -28,6 +28,8 @@ fn sections(world: &World, team: usize) -> Option<Vec<Value>> {
             SectionKind::Custom => ("standard", section.name.unsanitized().to_string()),
             SectionKind::Channels => ("channels", section.name.unsanitized().to_string()),
             SectionKind::DirectMessages => ("direct_messages", section.name.unsanitized().to_string()),
+            SectionKind::External => ("slack_connect", section.name.unsanitized().to_string()),
+            SectionKind::Apps => ("recent_apps", section.name.unsanitized().to_string()),
         };
         let ids: Vec<&str> = if section.kind == SectionKind::Custom {
             s.conversations.iter().filter(|c| c.section == section.id).map(|c| c.id.as_str()).collect()

@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 
 /// A list whose unreadable entries are left out; `None` when the field is missing or not a list.
-fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Option<Vec<T>>, D::Error> {
+pub(crate) fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Option<Vec<T>>, D::Error> {
     let value = Option::<serde_json::Value>::deserialize(d)?;
     Ok(match value {
         Some(serde_json::Value::Array(items)) => {
@@ -18,7 +18,7 @@ fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Optio
 }
 
 /// A value that cannot be read is `None`, not a failure of the whole answer.
-fn loose<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Option<T>, D::Error> {
+pub(crate) fn loose<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Option<T>, D::Error> {
     let value = Option::<serde_json::Value>::deserialize(d)?;
     Ok(value.and_then(|v| serde_json::from_value(v).ok()))
 }
@@ -38,6 +38,9 @@ pub struct UserBoot {
     /// The user's own do-not-disturb times.
     #[serde(default, deserialize_with = "loose")]
     pub dnd: Option<Dnd>,
+    /// The ids of the conversations the user starred.
+    #[serde(default, deserialize_with = "lenient")]
+    pub starred: Option<Vec<String>>,
 }
 
 /// The user's preferences, of which the client reads the conversations muted.

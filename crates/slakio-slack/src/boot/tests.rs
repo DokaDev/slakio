@@ -1,7 +1,15 @@
 use super::*;
+use crate::sidebar::Sidebar;
 use serde_json::json;
+use slakio_core::diag::Diag;
+use slakio_core::model::SectionKind;
 
 const NOW: u64 = 1_767_600_000;
+
+/// The snapshot with no sections listed (the two default ones).
+fn snapshot(b: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>, now: u64) -> Snapshot {
+    super::snapshot(b, counts, known, now, Sidebar::new("T1", None, &Diag::default()))
+}
 
 fn boot(prefs: serde_json::Value, dnd: serde_json::Value) -> wire::UserBoot {
     serde_json::from_value(json!({
@@ -159,4 +167,40 @@ fn the_user_s_own_photo_looked_up_or_learned_is_kept_not_dropped() {
     let own = format!("https://{}/2020-01-01/0_72.png", slakio_core::images::AVATAR_HOSTS[0]);
     let s = snapshot(me_with(json!({"image_48": own})), None, known, NOW);
     assert_eq!(s.users[0].avatar.as_deref(), Some(own.as_str()));
+}
+
+#[test]
+fn conversations_go_to_the_sections_slack_lists_a_section_of_the_user_s_own_first() {
+    let listed: Vec<crate::sidebar::ChannelSection> = serde_json::from_value(json!([
+        {"channel_section_id": "L2", "type": "channels", "name": "", "next_channel_section_id": "L3"},
+        {"channel_section_id": "L1", "type": "standard", "name": "Mine", "next_channel_section_id": "L2",
+         "channel_ids_page": {"channel_ids": ["C2", "D1"], "count": 2}},
+        {"channel_section_id": "L3", "type": "direct_messages", "name": "DMs", "next_channel_section_id": null},
+    ]))
+    .unwrap();
+    let sidebar = Sidebar::new("T1", Some(listed), &Diag::default());
+    let s = super::snapshot(boot(json!({}), json!(null)), None, Vec::new(), NOW, sidebar);
+    let names: Vec<&str> = s.sections.iter().map(|x| x.name.unsanitized()).collect();
+    assert_eq!(names, ["Mine", "Channels", "DMs"], "in the chain's order, Slack's names else English ones");
+    let section = |id| find(&s, id).section.as_str().to_string();
+    assert_eq!(section("C2"), "T1:L1");
+    assert!(s.sections.iter().all(|x| x.kind != SectionKind::Favorites), "no Starred listed");
+    assert_eq!(section("D1"), "T1:L1", "a DM in a section of the user's own");
+    assert_eq!(section("C1"), "T1:channels");
+}
+
+#[test]
+fn the_conversations_slack_lists_as_starred_go_to_starred() {
+    let mut b = boot(json!({}), json!(null));
+    b.starred = Some(vec!["C1".to_string(), "D1".to_string(), "C9".to_string()]);
+    let listed: Vec<crate::sidebar::ChannelSection> = serde_json::from_value(json!([
+        {"channel_section_id": "LS", "type": "stars", "next_channel_section_id": "LH"},
+        {"channel_section_id": "LH", "type": "channels", "next_channel_section_id": null},
+    ]))
+    .unwrap();
+    let s = super::snapshot(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
+    assert_eq!(s.sections[0].name.unsanitized(), "Starred");
+    assert_eq!(find(&s, "C1").section.as_str(), "T1:stars");
+    assert_eq!(find(&s, "D1").section.as_str(), "T1:stars");
+    assert_eq!(find(&s, "C2").section.as_str(), "T1:channels");
 }

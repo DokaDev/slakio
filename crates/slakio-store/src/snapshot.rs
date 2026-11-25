@@ -46,6 +46,8 @@ fn section_code(k: SectionKind) -> i64 {
         SectionKind::Custom => 1,
         SectionKind::Channels => 2,
         SectionKind::DirectMessages => 3,
+        SectionKind::External => 4,
+        SectionKind::Apps => 5,
     }
 }
 
@@ -55,6 +57,8 @@ fn section_kind(n: i64) -> rusqlite::Result<SectionKind> {
         1 => SectionKind::Custom,
         2 => SectionKind::Channels,
         3 => SectionKind::DirectMessages,
+        4 => SectionKind::External,
+        5 => SectionKind::Apps,
         _ => return Err(damaged("section kind")),
     })
 }

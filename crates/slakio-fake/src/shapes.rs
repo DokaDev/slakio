@@ -3,7 +3,7 @@
 
 use crate::Logged;
 use serde_json::{Value, json};
-use slakio_core::model::{ConversationId, ConversationKind, Message, Org, Presence, Ts};
+use slakio_core::model::{ConversationId, ConversationKind, Message, Org, Presence, SectionKind, Ts};
 use slakio_world::World;
 
 /// The answer to `request`.
@@ -104,6 +104,11 @@ fn user_boot(world: &World, team: usize) -> Value {
             }
         }
     }
+    // The conversations of the world's Favorites, starred.
+    let favorites: Vec<&slakio_core::model::SectionId> =
+        s.sections.iter().filter(|x| x.workspace == ws.id && x.kind == SectionKind::Favorites).map(|x| &x.id).collect();
+    let starred: Vec<&str> =
+        s.conversations.iter().filter(|c| favorites.contains(&&c.section)).map(|c| c.id.as_str()).collect();
     // Muted conversations as Slack spells them now (notification prefs as JSON in a string),
     // and every other one in the older comma-separated spelling too.
     let muted: Vec<&str> =
@@ -124,7 +129,7 @@ fn user_boot(world: &World, team: usize) -> Value {
         "ok": true,
         "self": {"id": ws.me.as_str(), "name": me.map(|u| u.name.unsanitized()), "team_id": ws.id.as_str(), "profile": own},
         "team": {"id": ws.id.as_str(), "name": ws.name.unsanitized(), "domain": "fake"},
-        "starred": channels.iter().take(1).map(|c| c["id"].clone()).collect::<Vec<_>>(),
+        "starred": starred,
         "channels": channels,
         "ims": ims,
         "is_open": [],

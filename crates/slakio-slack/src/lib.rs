@@ -58,6 +58,7 @@ pub mod response;
 pub mod search;
 pub(crate) mod sections;
 pub(crate) mod shape;
+pub(crate) mod sidebar;
 pub(crate) mod threads;
 pub mod wire;
 

@@ -1,8 +1,8 @@
-//! The picture diagnostics against the fake Slack: off by default (no file, no sidebar probe);
+//! The picture diagnostics against the fake Slack: off by default (no file);
 //! on, a line for each stage of a photo, a copy, an emoji, the emoji list, the user's own photo,
 //! the start bundle's shape and the sidebar's sections, and none of the fixture's tokens,
-//! addresses, paths, names, ids or text in the file. The sidebar probe is read-only, counted by
-//! the governor, and stops after its page cap.
+//! addresses, paths, names, ids or text in the file. The sidebar's sections are read at each
+//! boot, read-only, counted by the governor, and stop after their page cap.
 
 use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Envelope, Event, Generation, Request};
@@ -146,7 +146,7 @@ fn gravatar() -> String {
 }
 
 #[test]
-fn off_by_default_no_file_and_no_sidebar_probe() {
+fn off_by_default_no_file_and_the_sections_read_for_the_sidebar_only() {
     rt().block_on(async {
         let path = scratch("off");
         let diag = Diag::from_env(|_| None, Some(path.clone()));
@@ -157,7 +157,7 @@ fn off_by_default_no_file_and_no_sidebar_probe() {
         assert!(matches!(r.ask(Command::Emoji).await, Event::Emoji { .. }));
         tokio::time::sleep(Duration::from_millis(300)).await;
         diag.flush();
-        assert_eq!(r.calls(SECTIONS), 0, "no probe");
+        assert_eq!(r.calls(SECTIONS), 1, "read once, for the sidebar");
         assert!(!path.parent().unwrap().exists(), "no file, no folder");
     });
 }
@@ -209,7 +209,7 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
             &format!("self-photo source profile host={} id=", AVATAR_HOSTS[0]),
             "self-photo parsed profile present=yes",
             "self-photo counted image_host name=image_original host=s3-us-west-2.amazonaws.com urls=1",
-            "boot-shape field present name=starred type=array count=1",
+            "boot-shape field present name=starred type=array count=2",
             "boot-shape field ims_key name=is_open",
             "sections asked ok page=1 cursor=no",
             "sections counted page page=1 count=6 cursor=yes next_cursor=no cursor_same=-",
@@ -264,10 +264,10 @@ fn the_sidebar_probe_is_counted_and_stops_at_its_page_cap() {
         assert_eq!(r.governor.sent() as usize, api, "every request counted, the probe's too");
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("sections counted page-cap pages=5"), "{text}");
-        // Booted again: the probe is not run twice.
+        // Booted again: the sections are read again, for the sidebar (the three pages left
+        // queued, then the fake's own answer, which closes the chain).
         assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        assert_eq!(r.calls(SECTIONS), 5);
+        assert_eq!(r.calls(SECTIONS), 9);
     });
 }
 

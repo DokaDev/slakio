@@ -85,6 +85,11 @@ pub const MIGRATIONS: &[&str] = &[
     // the files' order) and people's profile photos ('' for none); kept before: none.
     "ALTER TABLE messages ADD COLUMN thumbs TEXT NOT NULL DEFAULT '';
      ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';",
+    // 5: two more section kinds, 4 (shared with another organization) and 5 (apps). Nothing
+    // changes in the tables: the new number only keeps an older version, which would take a
+    // kind it does not know for damage, from reading a cache that may hold them (it sets its
+    // cache up again instead).
+    "DELETE FROM meta WHERE 0;",
 ];
 
 /// Where a database stands against `migrations`.
