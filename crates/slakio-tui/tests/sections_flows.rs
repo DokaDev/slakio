@@ -207,34 +207,41 @@ fn a_link_to_a_closed_dm_opens_it() {
     assert!(s.d.app.pane_showing(&want).is_some(), "the closed DM opens: {:?}", s.b.held);
 }
 
+/// A message coming live into a closed DM opens it again, as in Slack's sidebar: one by the
+/// other person, and one the user sent from another client too.
 #[test]
 fn a_message_in_a_closed_dm_opens_it_again() {
-    let (mut s, dm) = with_a_closed_dm();
-    s.d.app.show_unfolded(View::Home);
-    let me = s.d.app.model.me(&dm.workspace).unwrap().clone();
-    let other =
-        (World::demo().snapshot().users.iter()).find(|u| u.workspace == dm.workspace && u.id != me).unwrap().id.clone();
-    let message = Message {
-        ts: Ts(1_767_603_600_000_100),
-        user: other,
-        text: Remote::new("back"),
-        thread: None,
-        reactions: Vec::new(),
-        edited: false,
-        files: Vec::new(),
-    };
-    let live = Live::Message {
-        workspace: dm.workspace.clone(),
-        conversation: dm.id.clone(),
-        thread: None,
-        broadcast: false,
-        changed: false,
-        mention: false,
-        message,
-        users: Vec::new(),
-    };
-    push(&mut s, live);
-    assert!(lists(&s, &dm.id), "open again, in Direct messages");
+    for own in [false, true] {
+        let (mut s, dm) = with_a_closed_dm();
+        s.d.app.show_unfolded(View::Home);
+        let me = s.d.app.model.me(&dm.workspace).unwrap().clone();
+        let other = (World::demo().snapshot().users.iter())
+            .find(|u| u.workspace == dm.workspace && u.id != me)
+            .unwrap()
+            .id
+            .clone();
+        let message = Message {
+            ts: Ts(1_767_603_600_000_100),
+            user: if own { me } else { other },
+            text: Remote::new("back"),
+            thread: None,
+            reactions: Vec::new(),
+            edited: false,
+            files: Vec::new(),
+        };
+        let live = Live::Message {
+            workspace: dm.workspace.clone(),
+            conversation: dm.id.clone(),
+            thread: None,
+            broadcast: false,
+            changed: false,
+            mention: false,
+            message,
+            users: Vec::new(),
+        };
+        push(&mut s, live);
+        assert!(lists(&s, &dm.id), "open again, in Direct messages (the user's own: {own})");
+    }
 }
 
 #[test]

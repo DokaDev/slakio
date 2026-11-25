@@ -372,12 +372,14 @@ impl Model {
 
     /// The user's own message came live into conversation `id` of `ws` (sent from another
     /// client), posted at `at`: it counts for nothing, yet it is the conversation's newest now
-    /// (what orders it by recency), as in Slack's app. `true` when listed.
+    /// (what orders it by recency), and a closed DM is open again, as in Slack's app. `true` when
+    /// listed.
     pub fn touch(&mut self, ws: &WorkspaceId, id: &ConversationId, at: Ts) -> bool {
         let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
             return false;
         };
         c.latest = c.latest.max(Some(at));
+        c.closed = false;
         true
     }
 
