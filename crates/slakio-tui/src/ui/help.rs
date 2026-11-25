@@ -41,19 +41,19 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let title = app.i18n.msg(&Msg::HelpTitle { context }).to_string();
     let inner = modal(f, app, rect, &title, &app.i18n.label(Label::HelpKeys));
     let iw = usize::from(inner.width);
-    // The search line, then a divider.
-    let search = if h.filter.is_empty() && !h.typing {
-        Line::from(vec![
-            Span::styled(" / ", t.key()),
-            Span::styled(app.i18n.label(Label::HelpSearch).to_string(), t.muted()),
-        ])
-    } else {
-        Line::from(vec![Span::styled(" / ", t.key()), Span::styled(h.filter.clone(), t.text())])
-    };
     // The marks a sender's name may be followed by, on the right where they fit.
     let (app_mark, ext_mark) = (super::timeline::message::APP_MARK, super::timeline::message::EXT_MARK);
     let marks = app.i18n.msg(&Msg::HelpMarks { app: app_mark.to_string(), ext: ext_mark.to_string() }).to_string();
     let marks_w = width(&marks) as u16;
+    // The search line, then a divider. Its placeholder gives way to the marks where both do not
+    // fit (a narrow screen, where the marks show).
+    let hint = app.i18n.label(Label::HelpSearch).to_string();
+    let search = if h.filter.is_empty() && !h.typing {
+        let hint = if 3 + width(&hint) + width(&marks) + 3 <= iw { hint } else { String::new() };
+        Line::from(vec![Span::styled(" / ", t.key()), Span::styled(hint, t.muted())])
+    } else {
+        Line::from(vec![Span::styled(" / ", t.key()), Span::styled(h.filter.clone(), t.text())])
+    };
     let search_w = search.width();
     f.render_widget(Paragraph::new(search), Rect { height: 1, ..inner });
     if search_w + width(&marks) + 3 <= iw {

@@ -385,6 +385,19 @@ fn question_mark_f1_and_space_question_mark_open_the_help_where_the_keyboard_is(
     assert_eq!(d.app.mode(), Mode::Insert, "back to typing");
 }
 
+/// At 50 columns the marks' legend shows before anything is typed: the search line's
+/// placeholder gives way to it (the narrow panes are where the marks show).
+#[test]
+fn the_help_tells_the_marks_at_50_columns_in_both_languages() {
+    use slakio_tui::ui::timeline::message::{APP_MARK, EXT_MARK};
+    for lang in [Lang::En, Lang::Ko] {
+        let mut d = Demo::with(50, 24, lang, Settings::default());
+        d.keys("?");
+        let s = d.screen();
+        assert!(s.contains(APP_MARK) && s.contains(EXT_MARK), "{lang:?}\n{s}");
+    }
+}
+
 #[test]
 fn the_help_moves_searches_and_runs_the_key_under_the_cursor() {
     let mut d = Demo::new(80, 24);
