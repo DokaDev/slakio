@@ -33,8 +33,10 @@
 //! The defaults are far above what the client needs (its start is three requests, opening a
 //! conversation one): they are ceilings that stop a bug from flooding Slack, not a pace.
 
+mod cdn;
 mod clock;
 
+pub use cdn::{CDN_RUN_REACHED, CdnLimits, CdnSlot, HOST_PAUSE, HOST_PAUSE_MAX};
 pub use clock::{Clock, FakeClock, SystemClock};
 
 use crate::error::SlackError;
@@ -160,6 +162,8 @@ struct Counts {
     total: u32,
     /// The per-process cap was reached: nothing more is sent.
     tripped: bool,
+    /// What the picture hosts were asked ([`cdn`]).
+    cdn: cdn::CdnCounts,
 }
 
 /// The process's rails. One is shared by every workspace's transport.
@@ -176,6 +180,9 @@ pub struct Governor {
     /// Each workspace's lane while a client uses it, and its background work of the last hour
     /// for as long as the process runs ([`Governor::lane_of`]).
     lanes: Mutex<HashMap<String, (std::sync::Weak<Lane>, Background)>>,
+    /// The picture hosts' budget and their asks' places ([`cdn`]).
+    cdn_limits: CdnLimits,
+    cdn_slots: Arc<Semaphore>,
 }
 
 /// When each background request of a lane in the last hour was let through, oldest first, and
@@ -247,16 +254,7 @@ impl Drop for Waiting<'_> {
 impl Governor {
     /// `network`: whether the network may be used at all.
     pub fn new(limits: Limits, clock: Box<dyn Clock>, network: bool) -> Arc<Self> {
-        Arc::new(Self {
-            limits,
-            clock,
-            counts: Mutex::new(Counts::default()),
-            network: watch::Sender::new(network),
-            locked: !network,
-            slots: Arc::new(Semaphore::new(limits.in_flight)),
-            waiting: AtomicUsize::new(0),
-            lanes: Mutex::default(),
-        })
+        Self::with_cdn(limits, CdnLimits::default(), clock, network)
     }
 
     /// The kill switch: nothing more is sent, and what is in flight stops ([`Governor::stopped`]).
@@ -464,8 +462,6 @@ impl Governor {
         while c.pictures.front().is_some_and(|(at, _)| now.saturating_sub(*at) >= HOUR) {
             c.pictures.pop_front();
         }
-        // Of each picture share, the part the list's pictures may use: about two thirds, one left.
-        let list_part = |n: u32| (n - n / 3).min(n.saturating_sub(1));
         let (minute, hour) = (self.limits.picture_per_minute, self.limits.picture_per_hour);
         if picture.is_some() && over_share(c.pictures.iter().map(|p| p.0), now, minute, hour) {
             return Err(SlackError::CapReached { why: "the pictures' share is reached" });
@@ -552,6 +548,11 @@ impl Governor {
     pub fn sent(&self) -> u32 {
         self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).total
     }
+}
+
+/// Of a share of `n`, the part the list's pictures may use: about two thirds, one left.
+fn list_part(n: u32) -> u32 {
+    (n - n / 3).min(n.saturating_sub(1))
 }
 
 /// Whether `times` (when each was let through in the last hour, oldest first) hold `minute` in
