@@ -845,6 +845,24 @@ fn a_bot_s_dm_row_with_its_photo_says_it_is_an_app() {
     assert!(!named(&s, &person_at) && !row(&s, &person_at).contains(" app "), "{:?}", row(&s, &person_at));
 }
 
+/// Pictures off, a bot's DM row keeps its initials and still says it is an app.
+#[test]
+fn a_bot_s_dm_row_without_its_photo_says_it_is_an_app_too() {
+    let mut s = dms(120, 40, false);
+    let m = &s.d.app.model;
+    let peer = (0..m.conversations().len())
+        .find_map(|i| match &m.conversation(i).kind {
+            ConversationKind::Dm { user } => m.user(&m.conversation(i).workspace, user).filter(|u| !u.bot).cloned(),
+            _ => None,
+        })
+        .expect("a person's DM");
+    s.d.app.model.add_users(&peer.workspace.clone(), &[User { bot: true, ..peer.clone() }]);
+    let name = peer.display_name.line().as_str().to_string();
+    let screen = s.d.screen();
+    let row = screen.lines().find(|l| l.contains(&name)).unwrap_or_else(|| panic!("the bot's row:\n{screen}"));
+    assert!(row.contains(&format!("{name} app ")), "{row:?}");
+}
+
 /// In the timeline, a bot's photo stands beside its name and the `app` mark.
 #[test]
 fn a_bot_s_photo_in_the_timeline_stands_beside_the_app_mark() {
