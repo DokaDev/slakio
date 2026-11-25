@@ -585,3 +585,14 @@ fn the_list_s_photos_keep_to_two_thirds_of_the_process_s_minute_and_every_hour()
     assert_eq!(g.list_picture_if(&b, true), part);
     assert_eq!((0..400).filter(|_| g.picture(&b).is_ok()).count(), 500 - 350 - 100, "the process's hour");
 }
+
+#[test]
+fn with_a_share_of_two_pictures_or_fewer_the_timeline_still_keeps_one() {
+    for (share, list) in [(1, 0), (2, 1), (3, 2)] {
+        let limits = Limits { lane_picture_per_minute: share, picture_per_minute: share, ..hours_only() };
+        let (g, _) = governor(limits, true);
+        let a = g.lane();
+        assert_eq!((0..5).filter(|_| g.list_picture_if(&a, true).is_ok()).count(), list, "the list of {share}");
+        assert_eq!((0..5).filter(|_| g.picture(&a).is_ok()).count(), share as usize - list, "the timeline of {share}");
+    }
+}

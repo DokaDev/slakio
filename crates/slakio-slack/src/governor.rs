@@ -498,8 +498,8 @@ impl Governor {
         while c.pictures.front().is_some_and(|(at, _)| now.saturating_sub(*at) >= HOUR) {
             c.pictures.pop_front();
         }
-        // Of each picture share, the part the list's pictures may use: about two thirds.
-        let list_part = |n: u32| n - n / 3;
+        // Of each picture share, the part the list's pictures may use: about two thirds, one left.
+        let list_part = |n: u32| (n - n / 3).min(n.saturating_sub(1));
         let (minute, hour) = (self.limits.picture_per_minute, self.limits.picture_per_hour);
         if picture.is_some() && over_share(c.pictures.iter().map(|p| p.0), now, minute, hour) {
             return Err(SlackError::CapReached { why: "the pictures' share is reached" });
