@@ -16,7 +16,8 @@ use ratatui::style::Color;
 use scripted::Scripted;
 use slakio_core::backend::{Command, Envelope, Event, Generation, Live};
 use slakio_core::images::{AVATAR_HOSTS, Source};
-use slakio_core::model::{ConversationKind, User};
+use slakio_core::model::{ConversationKind, Org, Presence, User};
+use slakio_core::sanitize::Remote;
 use slakio_tui::app::Effect;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
@@ -771,6 +772,32 @@ fn a_photo_changed_live_is_asked_for_and_a_photo_gone_brings_the_initials_back()
     assert!(s.d.app.model.user(&stranger.workspace, &stranger.id).is_none());
 }
 
+/// A profile changed live tells the names and the photo only: whether the person is around (do
+/// not disturb, here), a bot, or of another organization stays as known, whatever the change's
+/// record says of them.
+#[test]
+fn a_profile_changed_live_keeps_presence_bot_and_organization() {
+    let mut s = dms(120, 40, true);
+    let p = expected(&s)[0].clone();
+    let peer = peer_at(&s, &p);
+    let ws = peer.workspace.clone();
+    let known = User { presence: Presence::Dnd, bot: true, org: Org::External(Remote::new("T-OTHER")), ..peer };
+    s.d.app.model.add_users(&ws, std::slice::from_ref(&known));
+    let new = format!("https://{}/avatars/{}/{}-new-72.png", AVATAR_HOSTS[0], ws, known.id);
+    let change = User {
+        display_name: Remote::new("Renamed Peer"),
+        avatar: Some(new.clone()),
+        presence: Presence::Unknown,
+        bot: false,
+        org: Org::Own,
+        ..known.clone()
+    };
+    profile_changed(&mut s, change);
+    let now = s.d.app.model.user(&ws, &known.id).cloned().expect("still known");
+    assert_eq!((now.display_name.line().as_str(), now.avatar.as_deref()), ("Renamed Peer", Some(new.as_str())));
+    assert_eq!((now.presence, now.bot, &now.org), (known.presence, known.bot, &known.org));
+}
+
 /// A photo replaced, or gone because Slack said there is none of their own, leaves the terminal:
 /// its picture is deleted by its id (in every shape held), so nothing of it stays.
 #[test]
@@ -806,7 +833,7 @@ fn a_bot_s_dm_row_with_its_photo_says_it_is_an_app() {
     let photos = expected(&s);
     let (bot_at, person_at) = (photos[0].clone(), photos[1].clone());
     let bot = peer_at(&s, &bot_at);
-    profile_changed(&mut s, User { bot: true, ..bot });
+    s.d.app.model.add_users(&bot.workspace.clone(), &[User { bot: true, ..bot }]);
     fill(&mut s);
     let row = |s: &Scripted, p: &Photo| rest_of_row(s, p.x + 2, p.y).trim_end().to_string();
     assert!(cells(&s).contains(&(bot_at.x, bot_at.y, id_of(&s, &bot_at.address))), "the bot's photo drawn");
@@ -824,7 +851,7 @@ fn a_bot_s_photo_in_the_timeline_stands_beside_the_app_mark() {
     let (mut s, peers) = crowded(100, 90, 3);
     let ws = s.d.app.model.workspaces()[0].id.clone();
     let bot = s.d.app.model.user(&ws, &peers[0]).cloned().unwrap();
-    profile_changed(&mut s, User { bot: true, ..bot.clone() });
+    s.d.app.model.add_users(&ws, &[User { bot: true, ..bot.clone() }]);
     for _ in 0..20 {
         let now = frame(&mut s);
         if now.is_empty() {

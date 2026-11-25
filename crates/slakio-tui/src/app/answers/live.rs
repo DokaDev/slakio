@@ -10,7 +10,7 @@ use super::super::status::Level;
 use super::super::work::live::Place;
 use slakio_core::backend::{Connection, Live};
 use slakio_core::i18n::{Label, Msg};
-use slakio_core::model::{Workspace, WorkspaceId};
+use slakio_core::model::{User, Workspace, WorkspaceId};
 use std::time::Instant;
 
 impl App {
@@ -55,10 +55,17 @@ impl App {
                 self.model.mark(&workspace, &conversation, unread, mentions)
             }
             Live::Counts { workspace, counts } => self.model.recount(&workspace, &counts),
-            // Only people shown already: a workspace's every profile change comes this way.
+            // Only people shown already: a workspace's every profile change comes this way. It
+            // tells their names and photo; whether they are around, a bot or of another
+            // organization stays as known (a change does not say it).
             Live::People { workspace, users } => {
-                let known: Vec<_> =
-                    users.into_iter().filter(|u| self.model.user(&workspace, &u.id).is_some()).collect();
+                let known: Vec<_> = (users.into_iter())
+                    .filter_map(|u| {
+                        let old = self.model.user(&workspace, &u.id)?;
+                        let User { id, workspace: ws, name, display_name, avatar, no_photo, .. } = u;
+                        Some(User { id, workspace: ws, name, display_name, avatar, no_photo, ..old.clone() })
+                    })
+                    .collect();
                 self.model.add_users(&workspace, &known);
                 !known.is_empty()
             }
