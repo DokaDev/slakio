@@ -208,7 +208,11 @@ impl Model {
     /// of the model is replaced, the other workspaces' stay as they are. What the answer says
     /// of another workspace is not taken. Its place and color stay those it was listed with.
     pub fn merge(&mut self, ws: &WorkspaceId, snapshot: &Snapshot, cached: bool) {
-        let new = snapshot.only(ws);
+        let mut new = snapshot.only(ws);
+        if snapshot.sections_unknown {
+            // Slack's sections could not be read (yet): those shown before stay.
+            new.keep_sections(ws, &self.snapshot);
+        }
         let s = &mut self.snapshot;
         let at = s.workspaces.iter().position(|w| &w.id == ws);
         match (at, new.workspaces.into_iter().next()) {

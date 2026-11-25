@@ -1,5 +1,6 @@
 //! A workspace's sidebar sections in a snapshot: Slack's, when they come after its boot
-//! ([`super::Live::Sections`]).
+//! ([`super::Live::Sections`]), and those known before, when a boot could not read them
+//! ([`Snapshot::sections_unknown`]).
 
 use super::Snapshot;
 use crate::model::{ConversationId, Section, SectionId, WorkspaceId};
@@ -23,5 +24,23 @@ impl Snapshot {
         self.sections.retain(|x| &x.workspace != ws);
         let at = at.min(self.sections.len());
         self.sections.splice(at..at, sections);
+    }
+
+    /// Workspace `ws`'s sections of `before` kept in place of this snapshot's (which does not
+    /// know Slack's): this snapshot's own sections `before` does not have are added after them,
+    /// and each conversation `before` lists stays in its section. Nothing changes when `before`
+    /// has no section of `ws`.
+    pub fn keep_sections(&mut self, ws: &WorkspaceId, before: &Snapshot) {
+        let mut kept: Vec<Section> = before.sections.iter().filter(|x| &x.workspace == ws).cloned().collect();
+        if kept.is_empty() {
+            return;
+        }
+        let known: HashSet<SectionId> = kept.iter().map(|x| x.id.clone()).collect();
+        kept.extend(self.sections.iter().filter(|x| &x.workspace == ws && !known.contains(&x.id)).cloned());
+        let places: Vec<(ConversationId, SectionId)> = (before.conversations.iter())
+            .filter(|c| &c.workspace == ws)
+            .map(|c| (c.id.clone(), c.section.clone()))
+            .collect();
+        self.resection(ws, kept, &places);
     }
 }

@@ -577,3 +577,50 @@ async fn a_page_read_around_a_message_is_never_given_first_nor_kept_as_the_newes
     assert_eq!(p.messages, newest, "still the newest page the first run kept");
     r.no_faults();
 }
+
+#[tokio::test]
+async fn sections_a_boot_does_not_know_stay_and_slack_s_that_follow_are_kept() {
+    use slakio_core::backend::Live;
+    use slakio_core::model::{SectionId, SectionKind};
+    let (dir, w) = (scratch("sections"), world());
+    first_run(&dir, &w).await;
+    let kept = snapshot(&w);
+    let ws = kept.workspaces[0].id.clone();
+    // A boot that could not read Slack's sections: its default ones only.
+    let mut unknown = kept.clone();
+    unknown.sections.retain(|x| matches!(x.kind, SectionKind::Channels | SectionKind::DirectMessages));
+    let channels = unknown.sections.iter().find(|x| x.kind == SectionKind::Channels).unwrap().id.clone();
+    let dms = unknown.sections.iter().find(|x| x.kind == SectionKind::DirectMessages).unwrap().id.clone();
+    for c in &mut unknown.conversations {
+        c.section = if c.is_dm() { dms.clone() } else { channels.clone() };
+    }
+    unknown.sections_unknown = true;
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, Command::Boot);
+    let req = r.backend_next().await;
+    assert!(matches!(r.ui_next().await.event, Event::CachedBoot(_)));
+    r.answer(req.id, Event::Booted(Box::new(unknown.clone()))).await;
+    assert!(matches!(r.ui_next().await.event, Event::Booted(_)));
+    r.settled().await;
+    let back = r.cache.snapshot(vec![ws.clone()]).await.unwrap();
+    assert_eq!(back.sections, kept.sections, "the sections kept before stay");
+    assert!(back.conversations.iter().zip(&kept.conversations).all(|(a, b)| a.section == b.section));
+    // Slack's sections follow: kept in the boot's snapshot.
+    let sections = unknown.sections.clone();
+    let places: Vec<(slakio_core::model::ConversationId, SectionId)> =
+        unknown.conversations.iter().map(|c| (c.id.clone(), c.section.clone())).collect();
+    let live = Live::Sections { workspace: ws.clone(), sections: sections.clone(), places };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(live.clone()))).await;
+    assert_eq!(r.ui_next().await.event, Event::Live(Box::new(live)), "it goes on to the UI");
+    r.settled().await;
+    r.no_faults();
+    let back = r.cache.snapshot(vec![ws.clone()]).await.unwrap();
+    assert_eq!(back.sections, sections);
+    assert!(back.conversations.iter().zip(&unknown.conversations).all(|(a, b)| a.section == b.section));
+    // Another workspace's sections are not kept in this one's.
+    let other = Live::Sections { workspace: WorkspaceId::new("TOTHER"), sections: Vec::new(), places: Vec::new() };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(other))).await;
+    r.ui_next().await;
+    r.settled().await;
+    assert_eq!(r.cache.snapshot(vec![ws]).await.unwrap().sections, sections);
+}

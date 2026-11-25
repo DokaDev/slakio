@@ -210,3 +210,39 @@ fn every_section_kind_comes_back_and_an_older_version_does_not_read_them() {
     let before = &crate::schema::MIGRATIONS[..4];
     assert_eq!(crate::schema::migrate(&mut store.conn, before).unwrap(), crate::schema::Schema::Newer(5));
 }
+
+#[test]
+fn sections_slack_could_not_tell_keep_those_kept_before() {
+    let mut store = writer("snap-sections");
+    let s = World::new(5).snapshot().clone();
+    let ws = s.workspaces[0].id.clone();
+    let s = s.only(&ws);
+    assert!(s.sections.iter().any(|x| x.kind == SectionKind::Custom), "the world has a section of the user's own");
+    store.put_snapshot(&s).unwrap();
+    // The next boot could not read Slack's sections: its default ones.
+    let mut next = s.clone();
+    let of = |id: &str, kind| Section {
+        id: SectionId::new(format!("{ws}:{id}")),
+        workspace: ws.clone(),
+        name: Remote::new(""),
+        kind,
+    };
+    next.sections = vec![of("channels", SectionKind::Channels), of("dms", SectionKind::DirectMessages)];
+    for c in &mut next.conversations {
+        c.section = SectionId::new(format!("{ws}:{}", if c.is_dm() { "dms" } else { "channels" }));
+    }
+    next.sections_unknown = true;
+    store.put_snapshot(&next).unwrap();
+    let back = store.snapshot(std::slice::from_ref(&ws)).unwrap().unwrap();
+    assert_eq!(back.sections[..s.sections.len()], s.sections[..], "the sections kept before, in their order");
+    for c in &s.conversations {
+        let now = back.conversations.iter().find(|x| x.id == c.id).unwrap();
+        assert_eq!(now.section, c.section, "{} stays in its section", c.id);
+    }
+    assert!(!back.sections_unknown, "the sections kept are known ones");
+    // A boot that read them replaces them.
+    next.sections_unknown = false;
+    store.put_snapshot(&next).unwrap();
+    let back = store.snapshot(std::slice::from_ref(&ws)).unwrap().unwrap();
+    assert_eq!(back.sections, next.sections);
+}

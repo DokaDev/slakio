@@ -83,3 +83,26 @@ fn a_snapshot_cut_to_one_workspace_keeps_its_part_only() {
     assert_eq!((only.saved, only.taken), (None, crate::model::Ts(7)), "unknown stays unknown");
     assert_eq!(s.only(&WorkspaceId::new("T9")).workspaces, vec![]);
 }
+
+#[test]
+fn a_workspace_s_new_sections_take_the_place_of_its_own_among_the_others() {
+    use crate::model::{Section, SectionId, SectionKind};
+    let section = |ws: &str, id: &str| Section {
+        id: SectionId::new(format!("{ws}:{id}")),
+        workspace: WorkspaceId::new(ws),
+        name: crate::sanitize::Remote::new(""),
+        kind: SectionKind::Channels,
+    };
+    let mut s = Snapshot {
+        sections: vec![section("T1", "a"), section("T2", "b"), section("T2", "c"), section("T3", "d")],
+        ..Snapshot::default()
+    };
+    let t2 = WorkspaceId::new("T2");
+    // A section of another workspace among the new ones is not taken.
+    s.resection(&t2, vec![section("T2", "x"), section("T9", "y")], &[]);
+    let ids: Vec<&str> = s.sections.iter().map(|x| x.id.as_str()).collect();
+    assert_eq!(ids, ["T1:a", "T2:x", "T3:d"]);
+    // Kept from a snapshot without the workspace's sections: nothing changes.
+    s.keep_sections(&t2, &Snapshot::default());
+    assert_eq!(s.sections.len(), 3);
+}

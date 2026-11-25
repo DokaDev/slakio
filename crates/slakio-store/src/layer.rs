@@ -11,6 +11,8 @@
 //!   (`CachedHistory`); every page the backend answers for one is kept.
 //! - A conversation read again after live updates were lost (`Catchup`): its answer is kept like a
 //!   newest page, and nothing of the cache's comes first.
+//! - Slack's sidebar sections that follow a boot answer (`Live::Sections`) are kept in its
+//!   snapshot; a boot answer that does not know them keeps the sections kept before.
 //! - Everything else goes through untouched, both ways: the UI's request still gets exactly one
 //!   answer of the backend's (a cached one is extra and ends nothing).
 //!
@@ -90,6 +92,8 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
     let cache = &front.cache;
     let mut asked: HashMap<Generation, Asked> = HashMap::new();
     let (mut pages, mut booted) = (0u32, false);
+    // The workspace's last boot answer as kept: Slack's sections that follow it are kept in it.
+    let mut last: Option<slakio_core::backend::Snapshot> = None;
     loop {
         tokio::select! {
             request = end.rx.recv() => {
@@ -112,7 +116,9 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                 match (asked.remove(&envelope.generation), &envelope.event) {
                     (Some(Asked::Boot), Event::Booted(s)) => {
                         // Of this workspace only: an answer never writes another's part.
-                        cache.put_snapshot(s.only(&front.workspace));
+                        let mine = s.only(&front.workspace);
+                        cache.put_snapshot(mine.clone());
+                        last = Some(mine);
                         if !booted {
                             booted = true;
                             cache.prune();
@@ -124,6 +130,16 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                         pages += 1;
                         if pages % PRUNE_EVERY == 0 {
                             cache.prune();
+                        }
+                    }
+                    (_, Event::Live(live)) => {
+                        if let (slakio_core::backend::Live::Sections { workspace, sections, places }, Some(s)) =
+                            (&**live, last.as_mut())
+                            && *workspace == front.workspace
+                        {
+                            s.resection(workspace, sections.clone(), places);
+                            s.sections_unknown = false;
+                            cache.put_snapshot(s.clone());
                         }
                     }
                     _ => {}

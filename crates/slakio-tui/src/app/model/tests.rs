@@ -507,3 +507,58 @@ fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
     m.merge(&a, &with(&other), false);
     assert_eq!(m.take_gone_photos(), [icon], "a workspace's boot");
 }
+
+/// Workspace `a`'s part as a boot that could not read Slack's sections answers it: its default
+/// sections (a Channels and a Direct messages of its own ids), every conversation in one.
+fn sections_unknown(a: &WorkspaceId, part: &Snapshot) -> Snapshot {
+    let mut s = part.clone();
+    let of = |id: &str, kind| slakio_core::model::Section {
+        id: SectionId::new(format!("{a}:{id}")),
+        workspace: a.clone(),
+        name: "".into(),
+        kind,
+    };
+    s.sections = vec![of("channels", SectionKind::Channels), of("dms", SectionKind::DirectMessages)];
+    for c in &mut s.conversations {
+        c.section = SectionId::new(format!("{a}:{}", if c.is_dm() { "dms" } else { "channels" }));
+    }
+    s.sections_unknown = true;
+    s
+}
+
+#[test]
+fn a_boot_that_does_not_know_slack_s_sections_keeps_those_shown_before() {
+    let (a, part_a) = part(0);
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &part_a, true);
+    let before: Vec<(SectionId, SectionKind)> = (0..m.snapshot.sections.len())
+        .map(|i| m.section(i))
+        .filter(|x| x.workspace == a)
+        .map(|x| (x.id.clone(), x.kind))
+        .collect();
+    assert!(before.iter().any(|(_, k)| *k == SectionKind::Custom), "the cache had a section of the user's own");
+    let mut next = sections_unknown(&a, &part_a);
+    // A conversation the cache did not know goes to its default section.
+    let mut new = next.conversations[0].clone();
+    new.id = slakio_core::model::ConversationId::new("CNEW");
+    new.section = SectionId::new(format!("{a}:channels"));
+    next.conversations.push(new);
+    m.merge(&a, &next, false);
+    let after: Vec<(SectionId, SectionKind)> =
+        m.snapshot.sections.iter().filter(|x| x.workspace == a).map(|x| (x.id.clone(), x.kind)).collect();
+    assert_eq!(after[..before.len()], before[..], "the sections shown before, in their order");
+    assert_eq!(after.len(), before.len() + 2, "the default sections it did not have, after them");
+    for c in part_a.conversations.iter() {
+        let now = m.conversations().iter().find(|x| x.id == c.id).unwrap();
+        assert_eq!(now.section, c.section, "{} stays in its section", c.id);
+    }
+    let added = m.conversations().iter().find(|x| x.id.as_str() == "CNEW").unwrap();
+    assert_eq!(added.section.as_str(), format!("{a}:channels"));
+    // A boot that knows them replaces them.
+    let mut known = sections_unknown(&a, &part_a);
+    known.sections_unknown = false;
+    m.merge(&a, &known, false);
+    let kinds: Vec<SectionKind> = m.snapshot.sections.iter().filter(|x| x.workspace == a).map(|x| x.kind).collect();
+    assert_eq!(kinds, [SectionKind::Channels, SectionKind::DirectMessages]);
+}

@@ -215,6 +215,13 @@ fn saved(r: &Row<'_>) -> rusqlite::Result<SavedItem> {
 /// are not touched. `ord` is its place in `s`.
 fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> rusqlite::Result<()> {
     let id = ws.as_str();
+    let mut s = s.only(ws);
+    if s.sections_unknown
+        && let Some(before) = read(tx, ws)?
+    {
+        // Slack's sections could not be read: those kept from before stay.
+        s.keep_sections(ws, &before);
+    }
     // Counts Slack could not tell are unknown, not zero: those kept from before stay.
     let kept: std::collections::HashMap<String, (u32, u32)> = if s.counts_failed {
         tx.prepare("SELECT id, unread, mentions FROM conversations WHERE workspace = ?1")?
@@ -228,7 +235,6 @@ fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> ru
     }
     tx.execute("DELETE FROM workspaces WHERE id = ?1", [id])?;
     tx.execute("UPDATE users SET ord = NULL WHERE workspace = ?1", [id])?;
-    let s = s.only(ws);
     for w in &s.workspaces {
         tx.execute(
             "INSERT INTO workspaces (id, ord, name, color, me) VALUES (?1, ?2, ?3, ?4, ?5)",
