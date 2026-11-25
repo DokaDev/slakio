@@ -1,7 +1,8 @@
 //! A workspace's live updates: one socket to Slack's realtime host, opened once the workspace has
 //! booted, which only receives — new, changed and deleted messages, conversations read elsewhere,
-//! people's profiles changed — and pushes them to the UI as [`Event::Live`]. The client sends nothing over it but what its
-//! protocol needs (a pong for each ping, a close); no message, typing or read mark ever goes out.
+//! people's profiles changed — and pushes them to the UI as [`Event::Live`]. The client sends
+//! nothing over it but what its protocol needs (a pong for each ping, a close); no message,
+//! typing or read mark ever goes out.
 //!
 //! The socket replays nothing it missed, so when it opens after it was said to be lost (or not
 //! connected yet) the UI is told to read its open conversations again (`Connected { catch_up:
