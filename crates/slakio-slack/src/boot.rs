@@ -11,7 +11,8 @@
 //! being for the user. A conversation the user muted keeps its counts here: the UI shows a muted
 //! channel's mentions only, a muted DM's nothing. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
 //! within the organization is not), and a DM or group DM Slack marks so or with a person of
-//! another team. Group DMs show when open in the sidebar (`is_open`).
+//! another team. Group DMs show when open in the sidebar (`is_open`); their names never hold the
+//! user's own handle.
 
 use crate::client::Client;
 use crate::error::SlackError;
@@ -227,6 +228,8 @@ fn listed(
 ) -> Vec<(String, String, ConversationKind, Facts)> {
     let peer_of = |id: &str| known.iter().find(|u| u.id.as_str() == id);
     let outside = |id: &str| peer_of(id).is_some_and(|u| matches!(u.org, Org::External(_)));
+    // The user's own handle: the start bundle's, else the one looked up.
+    let own = me.name.as_deref().or_else(|| peer_of(&me.id).map(|u| u.name.unsanitized()));
     let mut out = Vec::new();
     for c in channels.into_iter().filter(|c| c.is_archived != Some(true)) {
         let star = c.is_starred == Some(true) || starred.contains(&c.id);
@@ -240,8 +243,19 @@ fn listed(
         if !shown_group(&c, open) {
             continue;
         }
-        let users: Vec<UserId> = c.members.iter().flatten().filter(|m| **m != me.id).map(UserId::new).collect();
-        let name = group_name(&users, known, c.name.as_deref(), me.name.as_deref()).unwrap_or_else(|| c.id.clone());
+        // Its people: its members but the user; without members, the people known by the
+        // handles of its name (the user's left out).
+        let users: Vec<UserId> = match &c.members {
+            Some(members) => members.iter().filter(|m| **m != me.id).map(UserId::new).collect(),
+            None => handles(c.name.as_deref(), own)
+                .iter()
+                .filter_map(|h| known.iter().find(|k| k.name.unsanitized() == *h && k.id.as_str() != me.id))
+                .map(|k| k.id.clone())
+                .collect(),
+        };
+        // Named by its people only when Slack listed them all.
+        let named: &[UserId] = if c.members.is_some() { &users } else { &[] };
+        let name = group_name(named, known, c.name.as_deref(), own).unwrap_or_else(|| c.id.clone());
         let external = c.is_ext_shared == Some(true) || users.iter().any(|u| outside(u.as_str()));
         let facts = Facts { dm: true, starred: star, external, app: false };
         out.push((c.id, name, ConversationKind::GroupDm { users }, facts));
@@ -275,13 +289,19 @@ fn group_name(users: &[UserId], known: &[User], handle: Option<&str>, own: Optio
     if let Some(names) = names.filter(|n| !n.is_empty()) {
         return Some(names.join(", "));
     }
-    let inner = handle?.strip_prefix("mpdm-")?;
+    let handles = handles(handle, own);
+    (!handles.is_empty()).then(|| handles.join(", "))
+}
+
+/// The handles in Slack's group DM name `mpdm-one--two--three-1`, the user's (`own`) left out;
+/// none in a name of another shape.
+fn handles<'a>(handle: Option<&'a str>, own: Option<&str>) -> Vec<&'a str> {
+    let Some(inner) = handle.and_then(|h| h.strip_prefix("mpdm-")) else { return Vec::new() };
     let inner = inner
         .rsplit_once('-')
         .filter(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
         .map_or(inner, |(h, _)| h);
-    let handles: Vec<&str> = inner.split("--").filter(|h| !h.is_empty() && Some(*h) != own).collect();
-    (!handles.is_empty()).then(|| handles.join(", "))
+    inner.split("--").filter(|h| !h.is_empty() && Some(*h) != own).collect()
 }
 
 /// The user's own photo: the start bundle's, else the one looked up or learned of them

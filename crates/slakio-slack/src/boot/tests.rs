@@ -315,3 +315,21 @@ fn a_group_dm_is_named_by_its_people_when_all_are_known() {
     assert_eq!(group_name(&users, &[], Some("odd"), None), None);
     assert_eq!(group_name(&[], &[], Some("mpdm-me-1"), Some("me")), None);
 }
+
+#[test]
+fn a_group_dm_s_name_never_holds_the_user_s_own_handle() {
+    // The start bundle without the user's handle: the one looked up of them is left out.
+    let mut b = placed();
+    b.me = serde_json::from_value(json!({"id": "U0"})).unwrap();
+    let known = vec![known_person("U0", "Me", false), known_person("U1", "Ann", false)];
+    let s = snapshot(b, None, known.clone(), NOW);
+    assert_eq!(find(&s, "G1").name.unsanitized(), "ann, bob", "Bob is not known: the handles, the user's left out");
+    // A group DM without members: its people are those known by the handles, the user left out.
+    let mut b = placed();
+    b.me = serde_json::from_value(json!({"id": "U0"})).unwrap();
+    b.channels = serde_json::from_value(json!([{"id": "G1", "name": "mpdm-me--ann--bob-1", "is_mpim": true}])).unwrap();
+    let s = snapshot(b, None, known, NOW);
+    let group = find(&s, "G1");
+    assert_eq!(group.kind, ConversationKind::GroupDm { users: vec![UserId::new("U1")] });
+    assert_eq!(group.name.unsanitized(), "ann, bob");
+}
