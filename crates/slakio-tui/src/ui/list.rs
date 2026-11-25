@@ -163,6 +163,25 @@ fn right(f: &mut Frame, row: Rect, text: &str, style: Style) -> u16 {
     w
 }
 
+/// The name a section header shows: its own (a section of the user's own keeps the user's), else
+/// its kind's in the UI's language (Slack's built-in sections come without one).
+fn section_name(app: &App, s: &slakio_core::model::Section) -> String {
+    use slakio_core::model::SectionKind;
+    let own = s.name.line();
+    if !own.as_str().trim().is_empty() {
+        return own.into_string();
+    }
+    let label = match s.kind {
+        SectionKind::Favorites => Label::SectionStarred,
+        SectionKind::Custom => Label::SectionCustom,
+        SectionKind::External => Label::SectionExternal,
+        SectionKind::Channels => Label::SectionChannels,
+        SectionKind::DirectMessages => Label::SectionDms,
+        SectionKind::Apps => Label::SectionApps,
+    };
+    app.i18n.label(label).to_string()
+}
+
 /// Draw `row` in `area`; where its presence mark is (the column), and whose, when it has one
 /// that is not faint.
 #[expect(clippy::too_many_lines, reason = "one arm per row kind; to be split")]
@@ -198,7 +217,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             };
             put(f, area, 1, 1, vec![Span::styled(if folded { "▸" } else { "▾" }, t.faint())]);
             let room = area.width.saturating_sub(3 + used + 2);
-            let name = clip(s.name.line().as_str(), usize::from(room));
+            let name = clip(&section_name(app, s), usize::from(room));
             put(f, area, 3, room, vec![Span::styled(name, t.section())]);
             None
         }

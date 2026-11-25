@@ -67,12 +67,12 @@ fn slack_s_types_map_to_kinds_and_the_others_are_not_shown() {
     assert_eq!(
         kinds(&s),
         [
-            (SectionKind::Favorites, "T1:stars", "Starred"),
+            (SectionKind::Favorites, "T1:stars", ""),
             (SectionKind::Custom, "T1:custom:LC", "Team"),
-            (SectionKind::External, "T1:external", "Slack Connect"),
-            (SectionKind::Channels, "T1:channels", "Rooms"),
-            (SectionKind::DirectMessages, "T1:dms", "Direct messages"),
-            (SectionKind::Apps, "T1:apps", "Apps"),
+            (SectionKind::External, "T1:external", ""),
+            (SectionKind::Channels, "T1:channels", ""),
+            (SectionKind::DirectMessages, "T1:dms", ""),
+            (SectionKind::Apps, "T1:apps", ""),
         ]
     );
 }
@@ -82,10 +82,7 @@ fn no_list_or_one_without_channels_keeps_the_two_default_sections() {
     let fallback = Sidebar::new("T1", None, &Diag::default());
     assert_eq!(
         kinds(&fallback),
-        [
-            (SectionKind::Channels, "T1:channels", "Channels"),
-            (SectionKind::DirectMessages, "T1:dms", "Direct messages")
-        ]
+        [(SectionKind::Channels, "T1:channels", ""), (SectionKind::DirectMessages, "T1:dms", "")]
     );
     assert_eq!(fallback.place("C1", Facts::default()).as_str(), "T1:channels");
     assert_eq!(fallback.place("D1", Facts { dm: true, ..Facts::default() }).as_str(), "T1:dms");

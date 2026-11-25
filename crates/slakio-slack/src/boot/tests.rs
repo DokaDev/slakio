@@ -210,7 +210,9 @@ fn conversations_go_to_the_sections_slack_lists_a_section_of_the_user_s_own_firs
     let sidebar = Sidebar::new("T1", Some(listed), &Diag::default());
     let s = with_sidebar(boot(json!({}), json!(null)), None, Vec::new(), NOW, sidebar);
     let names: Vec<&str> = s.sections.iter().map(|x| x.name.unsanitized()).collect();
-    assert_eq!(names, ["Mine", "Channels", "DMs"], "in the chain's order, Slack's names else English ones");
+    assert_eq!(names, ["Mine", "", ""], "in the chain's order; the built-in ones are named by the UI");
+    let kinds: Vec<SectionKind> = s.sections.iter().map(|x| x.kind).collect();
+    assert_eq!(kinds, [SectionKind::Custom, SectionKind::Channels, SectionKind::DirectMessages]);
     let section = |id| find(&s, id).section.as_str().to_string();
     assert_eq!(section("C2"), "T1:custom:L1");
     assert!(s.sections.iter().all(|x| x.kind != SectionKind::Favorites), "no Starred listed");
@@ -228,7 +230,7 @@ fn the_conversations_slack_lists_as_starred_go_to_starred() {
     ]))
     .unwrap();
     let s = with_sidebar(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
-    assert_eq!(s.sections[0].name.unsanitized(), "Starred");
+    assert_eq!((s.sections[0].kind, s.sections[0].name.unsanitized()), (SectionKind::Favorites, ""), "named by the UI");
     assert_eq!(find(&s, "C1").section.as_str(), "T1:stars");
     assert_eq!(find(&s, "D1").section.as_str(), "T1:stars");
     assert_eq!(find(&s, "C2").section.as_str(), "T1:channels");

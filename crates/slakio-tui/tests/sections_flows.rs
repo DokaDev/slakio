@@ -231,3 +231,69 @@ fn a_message_in_a_closed_dm_opens_it_again() {
     push(&mut s, live);
     assert!(lists(&s, &dm.id), "open again, in Direct messages");
 }
+
+#[test]
+fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_the_user_s_own_keeps_its_name() {
+    use slakio_core::i18n::{I18n, Label, Lang};
+    for lang in [Lang::En, Lang::Ko] {
+        let i18n = I18n::new(lang);
+        let label = |l: Label| i18n.label(l).to_string();
+        let names = [
+            label(Label::SectionStarred),
+            "Mine".to_string(),
+            label(Label::SectionExternal),
+            label(Label::SectionChannels),
+            label(Label::SectionDms),
+            label(Label::SectionApps),
+        ];
+        if lang == Lang::En {
+            assert_eq!(names[0], "Starred", "the English names are these");
+            assert_eq!(names[2..], ["External connections", "Channels", "Direct messages", "Apps"]);
+        } else {
+            assert!(names.iter().all(|n| !n.is_ascii() || n == "Mine"), "the Korean names are the locale's");
+        }
+        let mut snapshot = World::demo().snapshot().clone();
+        let ws = snapshot.workspaces[0].id.clone();
+        let kinds = [
+            SectionKind::Favorites,
+            SectionKind::Custom,
+            SectionKind::External,
+            SectionKind::Channels,
+            SectionKind::DirectMessages,
+            SectionKind::Apps,
+        ];
+        let sections: Vec<Section> = (kinds.iter().enumerate())
+            .map(|(i, kind)| Section {
+                id: SectionId::new(format!("{ws}:s{i}")),
+                workspace: ws.clone(),
+                name: if *kind == SectionKind::Custom { "Mine".into() } else { "".into() },
+                kind: *kind,
+            })
+            .collect();
+        // One conversation in each (the others of the workspace left out), so every header
+        // shows on the screen.
+        let mut ids = sections.iter().map(|x| x.id.clone());
+        snapshot.conversations.retain_mut(|c| {
+            if c.workspace != ws {
+                return true;
+            }
+            ids.next().map(|id| c.section = id).is_some()
+        });
+        snapshot.sections.retain(|x| x.workspace != ws);
+        snapshot.sections.splice(0..0, sections);
+        let mut s = Scripted::connected(true);
+        s.d.app.i18n = I18n::new(lang);
+        s.d.app.resize(120, 80);
+        s.b.snapshot = Some(snapshot);
+        s.pump();
+        s.b.answer(0);
+        s.pump();
+        s.d.app.show_unfolded(View::Home);
+        // A wide character is drawn with a blank after it, and a long name is clipped.
+        let screen = s.d.screen().replace(' ', "");
+        for name in &names {
+            let start: String = name.replace(' ', "").chars().take(8).collect();
+            assert!(screen.contains(&start), "{lang:?}: {name} in {screen}");
+        }
+    }
+}

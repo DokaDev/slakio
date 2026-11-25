@@ -3,8 +3,8 @@
 //! `standard` (a section the user made, with the conversations of its first page of ids),
 //! `slack_connect` (External connections), `channels`, `direct_messages` and `recent_apps`
 //! (Apps). The other types (`temporary_channels`, `salesforce_records`, `agents`, any unknown)
-//! are not shown. A section without a name of Slack's gets its English one; Channels and Direct
-//! messages are always there (appended when Slack listed none), so every conversation has a
+//! are not shown. A built-in section has no name here (the UI names it, in its language); a
+//! section the user made keeps theirs. Channels and Direct messages are always there (appended when Slack listed none), so every conversation has a
 //! place; with no list at all the sidebar is those two alone.
 //!
 //! A conversation goes to the first of: a section the user made that lists it, Starred (when
@@ -72,15 +72,15 @@ pub(crate) fn order(list: Vec<ChannelSection>) -> Vec<ChannelSection> {
     chain.into_iter().filter_map(|i| slots[i].take()).collect()
 }
 
-/// The core's kind of a Slack section type, and its English name; `None`: not shown.
-fn kind(t: &str) -> Option<(SectionKind, &'static str)> {
+/// The core's kind of a Slack section type; `None`: not shown.
+fn kind(t: &str) -> Option<SectionKind> {
     Some(match t {
-        "stars" => (SectionKind::Favorites, "Starred"),
-        "standard" => (SectionKind::Custom, "Section"),
-        "slack_connect" => (SectionKind::External, "External connections"),
-        "channels" => (SectionKind::Channels, "Channels"),
-        "direct_messages" => (SectionKind::DirectMessages, "Direct messages"),
-        "recent_apps" => (SectionKind::Apps, "Apps"),
+        "stars" => SectionKind::Favorites,
+        "standard" => SectionKind::Custom,
+        "slack_connect" => SectionKind::External,
+        "channels" => SectionKind::Channels,
+        "direct_messages" => SectionKind::DirectMessages,
+        "recent_apps" => SectionKind::Apps,
         _ => return None,
     })
 }
@@ -148,8 +148,13 @@ impl Sidebar {
         };
         let (mut sections, mut custom) = (Vec::new(), HashMap::new());
         for (n, s) in order(listed.unwrap_or_default()).into_iter().enumerate() {
-            let Some((kind, english)) = s.kind.as_deref().and_then(kind) else { continue };
-            let name = s.name.as_deref().map(str::trim).filter(|t| !t.is_empty()).unwrap_or(english);
+            let Some(kind) = s.kind.as_deref().and_then(kind) else { continue };
+            // The user's own name of a section they made; a built-in one is named by the UI, in
+            // its language (Slack's name of it is in the language of Slack's client).
+            let name = match kind {
+                SectionKind::Custom => s.name.as_deref().map_or("", str::trim),
+                _ => "",
+            };
             let id = match kind {
                 // Slack's id, apart from the built-in ones' (`custom:`), and only of a plain
                 // shape: else the section is not shown and its conversations stay in their
@@ -185,11 +190,9 @@ impl Sidebar {
             }
             sections.push(made);
         }
-        for (kind, id, name) in
-            [(SectionKind::Channels, "channels", "Channels"), (SectionKind::DirectMessages, "dms", "Direct messages")]
-        {
+        for (kind, id) in [(SectionKind::Channels, "channels"), (SectionKind::DirectMessages, "dms")] {
             if !sections.iter().any(|s| s.kind == kind) {
-                sections.push(section(id.to_string(), name, kind));
+                sections.push(section(id.to_string(), "", kind));
             }
         }
         // Both are there (appended above when Slack listed none).
