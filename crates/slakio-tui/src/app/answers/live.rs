@@ -36,10 +36,12 @@ impl App {
                 let at = Place { workspace: &workspace, conversation: &conversation, thread, broadcast };
                 let mut drawn = self.work.on_live_message(at, changed, &message, &self.model);
                 // A reply counts in the conversation only when shown there too; the user's own
-                // messages (sent from another client) are read.
+                // messages (sent from another client) are read, yet make it the newest.
                 let counts = !changed && (thread.is_none() || broadcast);
                 if counts && self.model.me(&workspace) != Some(&message.user) {
                     drawn |= self.model.bump(&workspace, &conversation, mention, message.ts);
+                } else if counts {
+                    drawn |= self.model.touch(&workspace, &conversation, message.ts);
                 }
                 // A new mention is listed in Activity (a reply too), and Activity read again.
                 if mention && !changed && self.model.me(&workspace) != Some(&message.user) {

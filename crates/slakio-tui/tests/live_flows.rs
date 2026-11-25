@@ -641,3 +641,27 @@ fn a_held_view_says_how_many_came_below_it_until_the_newest_is_reached() {
     push(&mut s, at.post(ts, &at.other, "followed"));
     assert!(!s.d.screen().contains("↓") && s.d.screen().contains("followed"), "{}", s.d.screen());
 }
+
+/// The user's own message (sent from another client) counts for nothing, yet makes its
+/// conversation the newest, as in Slack's app: recent order moves it up.
+#[test]
+fn the_user_s_own_message_makes_its_conversation_the_newest_and_counts_nothing() {
+    let (mut s, at) = opened("general", 120, 40);
+    let model = &s.d.app.model;
+    let dm = model.conversations().iter().find(|c| c.workspace == at.ws && c.is_dm() && !c.muted).unwrap().clone();
+    let newest = model.conversations().iter().filter_map(|c| c.latest).max().map_or(1, |t| t.0 + 1);
+    let live = Live::Message {
+        workspace: at.ws.clone(),
+        conversation: dm.id.clone(),
+        thread: None,
+        broadcast: false,
+        changed: false,
+        mention: false,
+        message: message(newest, &at.me, "sent elsewhere"),
+        users: Vec::new(),
+    };
+    push(&mut s, live);
+    let after = s.d.app.model.conversations().iter().find(|c| c.id == dm.id).unwrap().clone();
+    assert_eq!(after.latest, Some(Ts(newest)), "the newest now");
+    assert_eq!((after.unread, after.mentions), (dm.unread, dm.mentions), "counted for nothing");
+}
