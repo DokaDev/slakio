@@ -526,3 +526,13 @@ fn photos_are_wanted_ahead_only_with_pictures_photos_a_cache_and_not_in_the_demo
     assert!(!Images { on: true, ..Images::default() }.wants_ahead(true), "no cache on disk");
     assert!(!Images { on: true, demo: true, cache: on.cache.clone(), ..Images::default() }.wants_ahead(true), "demo");
 }
+
+#[test]
+fn the_photos_done_ahead_are_kept_within_a_bound() {
+    let mut t = T::new("done-bound");
+    for n in 0..3 * crate::images::FAILED_MAX {
+        t.images.done_ahead((dm(n), CHIP_PHOTO));
+        assert!(t.images.ahead.done.len() <= crate::images::FAILED_MAX, "{} kept", t.images.ahead.done.len());
+    }
+    assert!(t.images.ahead.done.contains(&(dm(3 * crate::images::FAILED_MAX - 1), CHIP_PHOTO)), "the latest kept");
+}

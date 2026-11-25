@@ -87,6 +87,16 @@ impl Images {
         self.on && photos && !self.demo && self.cache.is_some()
     }
 
+    /// `key` was asked for ahead this run: not again. At most [`super::FAILED_MAX`] are kept
+    /// (all are forgotten past that, the way the misses on disk are; a photo forgotten is
+    /// looked for on disk first again).
+    fn done_ahead(&mut self, key: Key) {
+        if self.ahead.done.len() >= super::FAILED_MAX {
+            self.ahead.done.clear();
+        }
+        self.ahead.done.insert(key);
+    }
+
     /// The photos waiting to be asked for ahead.
     pub fn ahead_waiting(&self) -> usize {
         self.ahead.queue.len()
@@ -192,7 +202,7 @@ impl Images {
             self.asked.insert(id, key.clone());
             self.entries.insert(key.clone(), Entry::Asked(id));
             self.ahead.sent.push_back(now);
-            self.ahead.done.insert(key.clone());
+            self.done_ahead(key.clone());
             self.ahead.flying.insert(key);
             return true;
         }
@@ -208,7 +218,7 @@ impl Images {
     /// terminal (its row is not on screen and it does not fit beside what is held and what is on
     /// its way, removing nothing).
     pub(super) fn let_go_ahead(&mut self, key: &Key, bytes: usize) -> bool {
-        self.ahead.done.insert(key.clone());
+        self.done_ahead(key.clone());
         if self.seen_now(key) {
             return false;
         }
