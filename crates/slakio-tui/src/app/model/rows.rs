@@ -1,5 +1,5 @@
 //! The list panel's rows of a view: a section's conversations in the order it takes
-//! ([`Sorting`]), the DMs view's as Direct messages take theirs.
+//! ([`Sorting`]), the DMs view's in the order `dm_sort` gives.
 
 use super::super::shell::View;
 use super::super::todos::{Group, TodoView};
@@ -105,7 +105,8 @@ impl Model {
                 rows
             }
             View::Todos => self.todo_rows(ws, groups, opts),
-            // In the order Direct messages take theirs.
+            // In the order `dm_sort` gives, when Direct messages are ordered at all; a choice of
+            // `:sort-section` for Direct messages orders that section alone, not this view.
             View::Dms => {
                 let dms =
                     self.snapshot.sections.iter().find(|s| &s.workspace == ws && s.kind == SectionKind::DirectMessages);
