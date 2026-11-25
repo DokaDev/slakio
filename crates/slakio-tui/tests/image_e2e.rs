@@ -264,6 +264,16 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
     // Everything fetched is kept before the run ends.
     wait_until("each picture kept", || files() > 0 && files() == pictures());
+    // Until nothing more is fetched (the DM rows' photos come four at a time, a slow machine
+    // takes a while between them): two seconds with every picture fetched kept and no new one.
+    let settled = std::cell::Cell::new((usize::MAX, Instant::now()));
+    wait_until("the pictures settled", || {
+        let now = (pictures(), files());
+        if now.0 != now.1 || now.0 != settled.get().0 {
+            settled.set((now.0, Instant::now()));
+        }
+        settled.get().1.elapsed() >= Duration::from_secs(2)
+    });
     std::thread::sleep(Duration::from_millis(800));
     assert_eq!(files(), pictures());
     run.quit();
