@@ -110,6 +110,8 @@ pub struct Model {
     pub net: Net,
     /// Activity: the notices loaded so far.
     pub notices: activity::Notices,
+    /// Photos no one may show any more, for the terminal to drop ([`Model::take_gone_photos`]).
+    gone_photos: Vec<String>,
 }
 
 /// Whether anything may be sent.
@@ -142,6 +144,7 @@ impl Model {
             live: HashMap::new(),
             net: Net::default(),
             notices: activity::Notices::default(),
+            gone_photos: Vec::new(),
         };
         m.index_users();
         m
@@ -220,10 +223,13 @@ impl Model {
             .filter_map(|u| Some((u.id.clone(), u.avatar.clone()?)))
             .collect();
         s.users.retain(|u| &u.workspace != ws);
+        let gone = &mut self.gone_photos;
         s.users.extend(new.users.into_iter().map(|mut u| {
+            let old = photos.get(&u.id);
             if u.avatar.is_none() && !u.no_photo {
-                u.avatar = photos.get(&u.id).cloned();
+                u.avatar = old.cloned();
             }
+            gone.extend(old.filter(|o| u.avatar.as_ref() != Some(*o)).cloned());
             u
         }));
         s.sections.retain(|x| &x.workspace != ws);
@@ -398,7 +404,8 @@ impl Model {
                     // A record without a photo does not say the photo is gone; one that says
                     // they have no photo of their own does.
                     let old = self.snapshot.users[i].avatar.take();
-                    let avatar = u.avatar.clone().or(old.filter(|_| !u.no_photo));
+                    let avatar = u.avatar.clone().or_else(|| old.clone().filter(|_| !u.no_photo));
+                    self.photo_changed(old, avatar.as_ref());
                     self.snapshot.users[i] = User { avatar, ..u.clone() };
                 }
                 None => {
@@ -552,6 +559,7 @@ impl Model {
 
 pub mod activity;
 mod forget;
+mod photos;
 mod saved;
 #[cfg(test)]
 mod tests;

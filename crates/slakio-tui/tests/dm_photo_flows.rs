@@ -20,7 +20,7 @@ use slakio_core::model::{ConversationKind, User};
 use slakio_tui::app::Effect;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
-use slakio_tui::images::graphics::{color, is_placeholder};
+use slakio_tui::images::graphics::{color, delete, is_placeholder};
 use slakio_tui::images::{CHIP_PHOTO, IN_FLIGHT_MAX, Look, prepare};
 use slakio_tui::screen;
 use std::collections::BTreeSet;
@@ -769,4 +769,31 @@ fn a_photo_changed_live_is_asked_for_and_a_photo_gone_brings_the_initials_back()
     let stranger = User { id: slakio_core::model::UserId::new("U-STRANGER"), ..peer };
     profile_changed(&mut s, stranger.clone());
     assert!(s.d.app.model.user(&stranger.workspace, &stranger.id).is_none());
+}
+
+/// A photo replaced, or gone because Slack said there is none of their own, leaves the terminal:
+/// its picture is deleted by its id (in every shape held), so nothing of it stays.
+#[test]
+fn a_photo_replaced_or_gone_leaves_the_terminal() {
+    let mut s = dms(120, 40, true);
+    fill(&mut s);
+    let p = expected(&s)[0].clone();
+    let old = id_of(&s, &p.address);
+    let _ = s.d.app.images.take_graphics();
+    let peer = peer_at(&s, &p);
+    let new = format!("https://{}/avatars/{}/{}-new-72.png", AVATAR_HOSTS[0], peer.workspace, peer.id);
+    profile_changed(&mut s, User { avatar: Some(new.clone()), ..peer.clone() });
+    assert!(s.d.app.images.take_graphics().contains(&delete(old)), "the old picture deleted");
+    let asked = frame(&mut s);
+    let (id, _) = asked.into_iter().find(|(_, a)| *a == Source::Avatar(new.clone())).unwrap();
+    deliver(&mut s, id);
+    let now = id_of(&s, &new);
+    let _ = s.d.app.images.take_graphics();
+    // A record that says nothing of a photo keeps it: nothing deleted.
+    profile_changed(&mut s, User { avatar: None, ..peer.clone() });
+    assert!(!s.d.app.images.take_graphics().contains(&delete(now)), "not said: kept");
+    profile_changed(&mut s, User { avatar: None, no_photo: true, ..peer });
+    assert!(s.d.app.images.take_graphics().contains(&delete(now)), "no photo of their own: deleted");
+    frame(&mut s);
+    assert!(cells(&s).iter().all(|c| c.2 != now && c.2 != old), "neither picture drawn:\n{}", s.d.screen());
 }

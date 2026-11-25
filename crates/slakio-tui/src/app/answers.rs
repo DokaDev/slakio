@@ -231,6 +231,10 @@ impl App {
                 false
             }
         };
+        // A photo no one shows any more leaves the terminal (no picture of it stays held).
+        for gone in self.model.take_gone_photos() {
+            self.images.forget_photo(&gone);
+        }
         // A link's message, selected as its page came, is marked from now.
         self.landed(now);
         // A workspace booted while Activity shows is read.
@@ -248,7 +252,7 @@ impl App {
         let (anchor, net) = (self.shell.anchor(&self.model), self.model.net);
         let notices = std::mem::take(&mut self.model.notices);
         match self.boots[b].workspace.clone() {
-            None if !cached => self.model = Model::new(self.model.with_photos(snapshot.clone())),
+            None if !cached => self.model = self.model.renewed(snapshot.clone()),
             None if !self.model.is_loaded() || self.model.is_cached() => self.model = Model::cached(snapshot.clone()),
             Some(ws) if !cached || !self.model.is_fresh(&ws) => self.model.merge(&ws, snapshot, cached),
             _ => {

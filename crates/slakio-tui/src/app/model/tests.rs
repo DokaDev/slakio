@@ -458,3 +458,52 @@ fn empty_starred_external_and_apps_sections_are_not_shown_the_others_are() {
     );
     assert!(!rows.windows(2).any(|w| w[0] == Row::Spacer && w[1] == Row::Spacer), "no blank row doubled");
 }
+
+/// A photo replaced is noted as gone once, unless someone still shows it (a bot's names share
+/// its picture); a whole new boot notes those it shows for no one.
+#[test]
+fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
+    let mut m = model();
+    let w = ws(&m, 0);
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let icon = format!("https://{host}/bot_72.png");
+    let bot = |i: usize, avatar: &str| User {
+        id: UserId::new(format!("BHOOK~{i:016x}")),
+        workspace: w.clone(),
+        name: Remote::new(format!("name {i}")),
+        display_name: Remote::new(format!("name {i}")),
+        org: Org::Own,
+        bot: true,
+        presence: slakio_core::model::Presence::Unknown,
+        avatar: Some(avatar.to_string()),
+        no_photo: false,
+    };
+    m.add_users(&w, &[bot(1, &icon), bot(2, &icon)]);
+    let _ = m.take_gone_photos();
+    let other = format!("https://{host}/bot2_72.png");
+    m.add_users(&w, &[bot(1, &other)]);
+    assert!(m.take_gone_photos().is_empty(), "the other name still shows it");
+    m.add_users(&w, &[bot(2, &other), bot(2, &other)]);
+    assert_eq!(m.take_gone_photos(), [icon.clone()], "once, now that no one shows it");
+    let next = m.renewed(m.snapshot.clone());
+    let mut fewer = m.snapshot.clone();
+    fewer.users.retain(|u| u.avatar.as_ref() != Some(&other));
+    let mut next2 = next.renewed(fewer);
+    assert_eq!(next2.take_gone_photos(), [other.clone()], "a whole new boot that shows it for no one");
+    // A workspace's boot that gives its user a new photo.
+    let (a, part_a) = part(0);
+    let me = part_a.workspaces[0].me.clone();
+    let with = |photo: &str| {
+        let mut s = part_a.clone();
+        for u in s.users.iter_mut().filter(|u| u.id == me) {
+            u.avatar = Some(photo.to_string());
+        }
+        s
+    };
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &with(&icon), false);
+    let _ = m.take_gone_photos();
+    m.merge(&a, &with(&other), false);
+    assert_eq!(m.take_gone_photos(), [icon], "a workspace's boot");
+}

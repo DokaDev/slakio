@@ -312,6 +312,12 @@ impl Images {
         self.forget_ahead();
     }
 
+    /// Photo `address` is no one's any more: it leaves the terminal (in each of its shapes), and
+    /// is not waited for if asked for.
+    pub fn forget_photo(&mut self, address: &str) {
+        self.forget_where(|k| matches!(&k.0, Source::Avatar(a) if a == address));
+    }
+
     /// Workspace `ws` is signed in to as someone else: its own emoji go, the list and the
     /// pictures it named (held ones leave the terminal); both are read again when next wanted.
     pub fn forget_customs(&mut self, ws: &WorkspaceId) {
