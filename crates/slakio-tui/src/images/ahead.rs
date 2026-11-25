@@ -123,7 +123,7 @@ impl Images {
     }
 
     /// Photo `key`, asked for ahead, failed for `kind`: for a while only (busy, offline, the
-    /// budget, a 429, the network), it may be asked ahead again once its wait is over; one that
+    /// budget, a 429, the network, bytes that stopped coming), it may be asked ahead again once its wait is over; one that
     /// cannot be shown (gone, not a picture, too large, refused) never is this run.
     pub(super) fn failed_ahead(&mut self, key: &Key, kind: &FailKind) {
         let passing = matches!(
@@ -133,6 +133,7 @@ impl Images {
                 | FailKind::CapReached
                 | FailKind::RateLimited { .. }
                 | FailKind::Network
+                | FailKind::Stalled
         );
         if passing {
             self.ahead.done.remove(key);

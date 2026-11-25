@@ -345,6 +345,7 @@ fn a_photo_ahead_that_failed_for_a_while_is_asked_again_once_its_wait_is_over() 
         FailKind::Offline,
         FailKind::CapReached,
         FailKind::RateLimited { retry_after: None },
+        FailKind::Stalled,
     ];
     for kind in passing {
         let again = after_failing(&kind);
