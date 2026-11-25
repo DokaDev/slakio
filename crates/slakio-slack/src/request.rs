@@ -208,9 +208,9 @@ pub struct Call {
     pub method: Method,
     form: Vec<(String, String)>,
     json: Map<String, Value>,
-    /// The diagnostics' read of an answer's shape ([`Call::probe`]): Slack refusing it never
-    /// ends the sign-in.
-    pub(crate) probe: bool,
+    /// A read the workspace does without ([`Call::no_sign_out`]): Slack refusing it never ends
+    /// the sign-in.
+    pub(crate) no_sign_out: bool,
 }
 
 impl Call {
@@ -220,21 +220,21 @@ impl Call {
             method,
             form: params.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect(),
             json: Map::new(),
-            probe: false,
+            no_sign_out: false,
         }
     }
 
     /// An edge cache call with a JSON body.
     pub fn json(method: Method, body: Map<String, Value>) -> Self {
-        Self { method, form: Vec::new(), json: body, probe: false }
+        Self { method, form: Vec::new(), json: body, no_sign_out: false }
     }
 
-    /// The same call, as the diagnostics' probe of an answer's shape: a refusal of it is a line
-    /// of their log, never the end of the sign-in (any other call refused ends it, whatever its
-    /// method).
+    /// The same call, as a read the workspace does without (the sidebar's sections): a refusal
+    /// of it is a line of the diagnostics, never the end of the sign-in (any other call refused
+    /// ends it, whatever its method).
     #[must_use]
-    pub fn probe(mut self) -> Self {
-        self.probe = true;
+    pub fn no_sign_out(mut self) -> Self {
+        self.no_sign_out = true;
         self
     }
 }

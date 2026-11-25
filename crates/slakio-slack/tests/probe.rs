@@ -1,6 +1,6 @@
-//! Only the diagnostics' probe of an answer's shape is exempt from the sign-out a refused call
-//! means: a call of the same method without the flag, or any call after the probe's refusal,
-//! still signs the workspace out.
+//! Only a read the workspace does without (`Call::no_sign_out`) is exempt from the sign-out a
+//! refused call means: a call of the same method without the flag, or any call after that
+//! read's refusal, still signs the workspace out.
 
 use slakio_core::secret::Credentials;
 use slakio_fake::{FakeSlack, Fault};
@@ -33,24 +33,24 @@ async fn signed_out(fake: &FakeSlack, client: &Client) -> bool {
 }
 
 #[test]
-fn the_method_of_the_probe_without_its_flag_still_signs_out() {
+fn the_method_of_a_no_sign_out_read_without_its_flag_still_signs_out() {
     rt().block_on(async {
         let (fake, client) = client().await;
         fake.fail_next(SECTIONS, Fault::Api("invalid_auth".to_string()));
         let call = Call::form(Method::UsersChannelSectionsList, &[]);
         assert!(client.call::<serde_json::Value>(&call, Priority::Background).await.is_err());
-        assert!(signed_out(&fake, &client).await, "a refusal of the same method is no probe's");
+        assert!(signed_out(&fake, &client).await, "a refusal of the same method without the flag signs out");
     });
 }
 
 #[test]
-fn after_the_probe_s_refusal_a_refused_call_still_signs_out() {
+fn after_a_no_sign_out_read_s_refusal_a_refused_call_still_signs_out() {
     rt().block_on(async {
         let (fake, client) = client().await;
         fake.fail_next(SECTIONS, Fault::Api("invalid_auth".to_string()));
-        let probe = Call::form(Method::UsersChannelSectionsList, &[]).probe();
-        assert!(client.call::<serde_json::Value>(&probe, Priority::Background).await.is_err());
-        assert!(!signed_out(&fake, &client).await, "the probe's refusal keeps the sign-in");
+        let read = Call::form(Method::UsersChannelSectionsList, &[]).no_sign_out();
+        assert!(client.call::<serde_json::Value>(&read, Priority::Background).await.is_err());
+        assert!(!signed_out(&fake, &client).await, "the flagged read's refusal keeps the sign-in");
         fake.fail_next("client.counts", Fault::Api("invalid_auth".to_string()));
         assert!(
             client.call::<serde_json::Value>(&Call::form(Method::ClientCounts, &[]), Priority::User).await.is_err()

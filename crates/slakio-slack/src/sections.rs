@@ -82,7 +82,7 @@ pub(crate) async fn fetch(client: &Client) -> Option<Vec<ChannelSection>> {
         let params: Vec<(&str, &str)> = cursor.as_deref().map(|c| ("cursor", c)).into_iter().collect();
         let asked = if cursor.is_some() { "yes" } else { "no" };
         diag.line(Kind::Sections, Stage::Asked, "ok", &[("page", &n), ("cursor", asked)]);
-        let call = Call::form(Method::UsersChannelSectionsList, &params).probe();
+        let call = Call::form(Method::UsersChannelSectionsList, &params).no_sign_out();
         let v = match client.call::<Value>(&call, Priority::Background).await {
             Ok(v) => v,
             Err(e) => {
