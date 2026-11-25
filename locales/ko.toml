@@ -340,7 +340,7 @@
 "help.keys" = "↑↓ 이동 · Enter 실행 · / 찾기 · Esc 닫기"
 "help.search" = "/를 눌러 찾기"
 "help.none" = "“{query}” 에 맞는 키가 없습니다"
-"help.marks" = "{app} 앱·봇 · {ext} 다른 조직"
+"help.marks" = "{app} 앱 또는 봇 · {ext} 다른 조직"
 "dialog.quit_title" = "slakio를 종료할까요?"
 "dialog.quit_text" = "보내지 않은 메시지가 있습니다. 종료하면 사라집니다."
 "dialog.quit_confirm_text" = "보내지 않은 메시지는 없습니다."
