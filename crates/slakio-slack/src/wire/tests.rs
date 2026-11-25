@@ -63,7 +63,7 @@ fn a_photo_is_picked_from_the_best_field_slack_gave() {
 }
 
 #[test]
-fn every_field_passes_the_host_check_and_an_original_as_it_is_comes_last() {
+fn every_field_passes_the_host_check_and_an_original_is_taken_only_as_its_sized_copy() {
     let avatars = slakio_core::images::AVATAR_HOSTS[0];
     // A field on another host is passed over for the next.
     let p = profile(serde_json::json!({
@@ -73,12 +73,17 @@ fn every_field_passes_the_host_check_and_an_original_as_it_is_comes_last() {
         "image_32": format!("https://{avatars}/2026-01-05/a_32.png"),
     }));
     assert_eq!(p.photo(), Some(("image_32", format!("https://{avatars}/2026-01-05/a_32.png"))));
-    // An original that is not of the dated form, on an avatar host: taken as it is, last.
+    // An original that is not of the dated form, even on an avatar host: never taken as it is
+    // (as uploaded it may be larger than slakio fetches); a sized copy is.
     let odd = format!("https://{avatars}/odd/a_original.png");
     let p = profile(serde_json::json!({"image_original": odd}));
-    assert_eq!(p.photo(), Some(("image_original", odd.clone())));
+    assert_eq!(p.photo(), None);
     let p = profile(serde_json::json!({"image_original": odd, "image_24": format!("https://{avatars}/a_24.png")}));
-    assert_eq!(p.photo().map(|(f, _)| f), Some("image_24"), "a sized copy before the original as it is");
+    assert_eq!(p.photo().map(|(f, _)| f), Some("image_24"));
+    // Each field says how it is taken: the original only as its sized copy.
+    let taken: Vec<(&str, Taken)> = p.candidates().into_iter().map(|(f, _, t)| (f, t)).collect();
+    assert_eq!(taken.iter().filter(|(f, _)| *f == "image_original").count(), 1);
+    assert!(taken.iter().all(|(f, t)| (*t == Taken::Sized) == (*f == "image_original")), "{taken:?}");
     // An original anywhere else is no photo.
     let p = profile(serde_json::json!({"image_original": "https://evil.example/2026-01-05/a_original.png"}));
     assert_eq!(p.photo(), None);

@@ -209,6 +209,15 @@ pub struct Person {
     pub profile: Option<Profile>,
 }
 
+/// How a photo field's address is taken ([`Profile::candidates`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Taken {
+    /// As given, on an avatar host ([`slakio_core::images::avatar_address`]).
+    AsGiven,
+    /// As its 72-pixel copy on the avatar host ([`slakio_core::images::avatar_sized`]).
+    Sized,
+}
+
 /// A person's profile: each field that cannot be read is none, not the whole profile.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 pub struct Profile {
@@ -240,26 +249,25 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// The photo fields, best first: 72 and 48 pixels, the larger ones, the original (as its
-    /// 72-pixel copy, [`slakio_core::images::avatar_sized`]), the largest, the smaller ones, and
-    /// last the original as it is.
-    pub fn candidates(&self) -> [(&'static str, Option<&str>); 9] {
+    /// The photo fields, best first, each with how its address is taken: 72 and 48 pixels, the
+    /// larger ones, the original (only as its 72-pixel copy, [`slakio_core::images::avatar_sized`]:
+    /// as uploaded it may be larger than slakio fetches), the largest, the smaller ones.
+    pub fn candidates(&self) -> [(&'static str, Option<&str>, Taken); 8] {
         [
-            ("image_72", self.image_72.as_deref()),
-            ("image_48", self.image_48.as_deref()),
-            ("image_192", self.image_192.as_deref()),
-            ("image_512", self.image_512.as_deref()),
-            ("image_original", self.image_original.as_deref()),
-            ("image_1024", self.image_1024.as_deref()),
-            ("image_32", self.image_32.as_deref()),
-            ("image_24", self.image_24.as_deref()),
-            ("image_original", self.image_original.as_deref()),
+            ("image_72", self.image_72.as_deref(), Taken::AsGiven),
+            ("image_48", self.image_48.as_deref(), Taken::AsGiven),
+            ("image_192", self.image_192.as_deref(), Taken::AsGiven),
+            ("image_512", self.image_512.as_deref(), Taken::AsGiven),
+            ("image_original", self.image_original.as_deref(), Taken::Sized),
+            ("image_1024", self.image_1024.as_deref(), Taken::AsGiven),
+            ("image_32", self.image_32.as_deref(), Taken::AsGiven),
+            ("image_24", self.image_24.as_deref(), Taken::AsGiven),
         ]
     }
 
     /// The first photo field Slack gave, and its address as given.
     pub fn given(&self) -> Option<(&'static str, &str)> {
-        self.candidates().into_iter().find_map(|(f, u)| u.map(|u| (f, u)))
+        self.candidates().into_iter().find_map(|(f, u, _)| u.map(|u| (f, u)))
     }
 
     /// The profile photo and the field it came from: the first of [`Profile::candidates`] on an
@@ -269,10 +277,12 @@ impl Profile {
         if self.not_custom() {
             return None;
         }
-        self.candidates().into_iter().enumerate().find_map(|(i, (field, url))| {
+        self.candidates().into_iter().find_map(|(field, url, taken)| {
             let url = url?;
-            let kept =
-                if i == 4 { slakio_core::images::avatar_sized(url) } else { slakio_core::images::avatar_address(url) };
+            let kept = match taken {
+                Taken::AsGiven => slakio_core::images::avatar_address(url),
+                Taken::Sized => slakio_core::images::avatar_sized(url),
+            };
             kept.map(|k| (field, k))
         })
     }
