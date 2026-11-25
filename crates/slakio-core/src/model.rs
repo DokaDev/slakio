@@ -112,6 +112,10 @@ pub struct User {
     /// Their profile photo: an `https` address on a host of [`crate::images::AVATAR_HOSTS`]
     /// ([`crate::images::avatar_address`]); `None` when Slack gave none there.
     pub avatar: Option<String>,
+    /// Slack said they have no photo of their own (only its default; `avatar` is then `None`):
+    /// a photo known of them before is gone. `false` with no `avatar`: not said, so a photo known
+    /// before stays.
+    pub no_photo: bool,
 }
 
 /// What a sidebar section holds, which decides where new conversations land and how the

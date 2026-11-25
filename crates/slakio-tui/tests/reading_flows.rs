@@ -201,6 +201,7 @@ fn thread_cut_at(w: u16, h: u16) {
         bot: true,
         presence: Presence::Unknown,
         avatar: None,
+        no_photo: false,
     });
     s.b.push(e);
     s.pump();
@@ -244,6 +245,7 @@ fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
             bot: true,
             presence: Presence::Unknown,
             avatar: None,
+            no_photo: false,
         });
         s.b.push(e);
         s.pump();

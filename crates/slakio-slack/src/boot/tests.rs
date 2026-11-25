@@ -88,6 +88,7 @@ fn only_a_channel_shared_with_another_organization_is_slack_connect() {
         bot: false,
         presence: Presence::Unknown,
         avatar: None,
+        no_photo: false,
     };
     let s = snapshot(boot(json!({}), json!(null)), None, vec![peer], NOW);
     assert!(find(&s, "D1").external);
@@ -123,6 +124,7 @@ fn person(id: &str, avatar: Option<&str>) -> User {
         bot: false,
         presence: Presence::Unknown,
         avatar: avatar.map(str::to_string),
+        no_photo: false,
     }
 }
 
@@ -151,6 +153,20 @@ fn the_user_s_own_photo_comes_from_the_start_bundle_s_original_as_its_72_pixel_c
     // No photo of their own: none.
     let s = snapshot(me_with(json!({"image_original": original, "is_custom_image": false})), None, Vec::new(), NOW);
     assert_eq!(s.users[0].avatar, None);
+}
+
+/// The user's own record says whether Slack said they have no photo of their own (so a photo
+/// shown before goes): in the start bundle or as looked up; not said, it does not.
+#[test]
+fn the_user_s_own_record_says_when_slack_said_no_photo_of_their_own() {
+    let not_custom = json!({"image_72": "https://evil.example/0.png", "is_custom_image": false});
+    let s = snapshot(me_with(not_custom), None, Vec::new(), NOW);
+    assert!(s.users[0].no_photo && s.users[0].avatar.is_none(), "the start bundle says so");
+    let looked_up = User { no_photo: true, ..person("U0", None) };
+    let s = snapshot(me_with(json!({})), None, vec![looked_up], NOW);
+    assert!(s.users[0].no_photo, "the lookup says so");
+    let s = snapshot(me_with(json!({})), None, vec![person("U0", None)], NOW);
+    assert!(!s.users[0].no_photo, "not said");
 }
 
 #[test]
@@ -215,6 +231,7 @@ fn known_person(id: &str, shown: &str, bot: bool) -> User {
         bot,
         presence: Presence::Unknown,
         avatar: None,
+        no_photo: false,
     }
 }
 

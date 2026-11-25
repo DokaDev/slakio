@@ -266,7 +266,7 @@ impl Profile {
     /// avatar host ([`slakio_core::images::avatar_address`]); none when the person has no photo
     /// of their own (`is_custom_image` false).
     pub fn photo(&self) -> Option<(&'static str, String)> {
-        if self.is_custom_image == Some(false) {
+        if self.not_custom() {
             return None;
         }
         self.candidates().into_iter().enumerate().find_map(|(i, (field, url))| {
@@ -280,6 +280,12 @@ impl Profile {
     /// The profile photo ([`Profile::photo`]).
     pub fn avatar(&self) -> Option<String> {
         self.photo().map(|(_, a)| a)
+    }
+
+    /// Slack says the person has no photo of their own (`is_custom_image` false): a photo known
+    /// of them before is gone. Not said (no such field) is not the same.
+    pub fn not_custom(&self) -> bool {
+        self.is_custom_image == Some(false)
     }
 }
 

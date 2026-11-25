@@ -107,6 +107,7 @@ fn a_person_listed_by_two_workspaces_is_kept_as_each_one_sees_them() {
         bot: false,
         presence: slakio_core::model::Presence::Unknown,
         avatar: None,
+        no_photo: false,
     };
     let mut m = Model::default();
     m.add_users(&a, &[peer(&a, Org::Own)]);
@@ -324,6 +325,7 @@ fn a_bot_s_names_kept_as_people_are_capped() {
         bot: true,
         presence: slakio_core::model::Presence::Unknown,
         avatar: None,
+        no_photo: false,
     };
     for i in 0..1000 {
         m.add_users(&w, &[bot(i)]);
@@ -348,6 +350,7 @@ fn a_known_photo_is_never_replaced_by_no_photo_but_a_new_photo_replaces_it() {
         bot: false,
         presence: slakio_core::model::Presence::Unknown,
         avatar: avatar.map(str::to_string),
+        no_photo: false,
     };
     let host = slakio_core::images::AVATAR_HOSTS[0];
     let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
@@ -388,6 +391,37 @@ fn a_boot_answer_without_a_photo_keeps_the_photo_shown() {
     }
     m.merge(&a, &without, false);
     assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(other.as_str()), "a real new photo replaces it");
+}
+
+/// A record that says the person has no photo of their own drops the photo known, as a page
+/// brings it, as a workspace's boot does and as a whole new boot does.
+#[test]
+fn a_record_saying_no_photo_of_their_own_drops_the_photo_shown() {
+    let (a, part_a) = part(0);
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let photo = format!("https://{host}/me_72.png");
+    let me = part_a.workspaces[0].me.clone();
+    let with = |avatar: Option<&String>, no_photo: bool| {
+        let mut s = part_a.clone();
+        for u in s.users.iter_mut().filter(|u| u.id == me) {
+            (u.avatar, u.no_photo) = (avatar.cloned(), no_photo);
+        }
+        s
+    };
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &with(Some(&photo), false), false);
+    let gone = User { avatar: None, no_photo: true, ..m.user(&a, &me).unwrap().clone() };
+    m.add_users(&a, &[gone]);
+    assert_eq!(m.user(&a, &me).unwrap().avatar, None, "a page's record");
+    m.merge(&a, &with(Some(&photo), false), false);
+    m.merge(&a, &with(None, true), false);
+    assert_eq!(m.user(&a, &me).unwrap().avatar, None, "a workspace's boot");
+    m.merge(&a, &with(Some(&photo), false), false);
+    let next = m.with_photos(with(None, true));
+    assert_eq!(next.users.iter().find(|u| u.id == me).unwrap().avatar, None, "a whole new boot");
+    let next = m.with_photos(with(None, false));
+    assert_eq!(next.users.iter().find(|u| u.id == me).unwrap().avatar.as_ref(), Some(&photo), "not said: kept");
 }
 
 #[test]

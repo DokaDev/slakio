@@ -179,6 +179,9 @@ fn snapshot(
         listed.into_iter().map(|(id, name, kind, facts)| conversation(id, name, kind, facts)).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
     let avatar = own_photo(&me, &known);
+    // Slack said the user has no photo of their own: in the start bundle, or the lookup.
+    let not_custom = me.profile.as_ref().is_some_and(wire::Profile::not_custom)
+        || known.iter().any(|u| u.id.as_str() == me.id && u.no_photo);
     let presence = match boot.dnd.as_ref().and_then(|d| d.active(now)) {
         Some(true) => Presence::Dnd,
         _ => Presence::Unknown,
@@ -198,6 +201,7 @@ fn snapshot(
             org: Org::Own,
             bot: false,
             presence,
+            no_photo: avatar.is_none() && not_custom,
             avatar,
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))

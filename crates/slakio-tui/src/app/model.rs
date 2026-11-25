@@ -190,11 +190,12 @@ impl Model {
         self.index_users();
     }
 
-    /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of.
+    /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of
+    /// (unless it says they have no photo of their own).
     pub fn with_photos(&self, mut snapshot: Snapshot) -> Snapshot {
         let photos: HashMap<(&WorkspaceId, &UserId), &String> =
             (self.snapshot.users.iter()).filter_map(|u| Some(((&u.workspace, &u.id), u.avatar.as_ref()?))).collect();
-        for u in snapshot.users.iter_mut().filter(|u| u.avatar.is_none()) {
+        for u in snapshot.users.iter_mut().filter(|u| u.avatar.is_none() && !u.no_photo) {
             u.avatar = photos.get(&(&u.workspace, &u.id)).map(|a| (*a).clone());
         }
         snapshot
@@ -212,14 +213,15 @@ impl Model {
             (None, Some(w)) => s.workspaces.push(w),
             (_, None) => {}
         }
-        // A photo shown before stays when the answer has none of that person.
+        // A photo shown before stays when the answer has none of that person (and does not say
+        // they have no photo of their own).
         let photos: HashMap<UserId, String> = (s.users.iter())
             .filter(|u| &u.workspace == ws)
             .filter_map(|u| Some((u.id.clone(), u.avatar.clone()?)))
             .collect();
         s.users.retain(|u| &u.workspace != ws);
         s.users.extend(new.users.into_iter().map(|mut u| {
-            if u.avatar.is_none() {
+            if u.avatar.is_none() && !u.no_photo {
                 u.avatar = photos.get(&u.id).cloned();
             }
             u
@@ -386,14 +388,17 @@ impl Model {
 
     /// People the backend learned of after the start (a page's authors, of workspace `ws`): each
     /// is added, or replaces what was known of them in `ws` (a photo known stays when the new
-    /// record has none); one of another workspace is left out.
+    /// record has none, unless it says they have no photo of their own); one of another
+    /// workspace is left out.
     pub fn add_users(&mut self, ws: &WorkspaceId, users: &[User]) {
         for u in users.iter().filter(|u| &u.workspace == ws) {
             let key = (u.workspace.clone(), u.id.clone());
             match self.users.get(&key) {
                 Some(&i) => {
-                    // A record without a photo does not say the photo is gone.
-                    let avatar = u.avatar.clone().or_else(|| self.snapshot.users[i].avatar.take());
+                    // A record without a photo does not say the photo is gone; one that says
+                    // they have no photo of their own does.
+                    let old = self.snapshot.users[i].avatar.take();
+                    let avatar = u.avatar.clone().or(old.filter(|_| !u.no_photo));
                     self.snapshot.users[i] = User { avatar, ..u.clone() };
                 }
                 None => {

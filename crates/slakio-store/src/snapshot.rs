@@ -80,7 +80,8 @@ fn state(n: i64) -> rusqlite::Result<SavedState> {
     })
 }
 
-/// A person, as a page or the snapshot brings them; `ord` is their place in the snapshot.
+/// A person, as a page or the snapshot brings them; `ord` is their place in the snapshot. A photo
+/// kept before stays when `u` has none, unless `u` says it is gone ([`User::no_photo`]).
 pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> rusqlite::Result<()> {
     let org = match &u.org {
         Org::Own => None,
@@ -91,7 +92,7 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
         "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence, avatar)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT (workspace, id) DO UPDATE SET ord = COALESCE(?3, ord), name = ?4, display_name = ?5,
-             org = ?6, bot = ?7, presence = ?8, avatar = ?9",
+             org = ?6, bot = ?7, presence = ?8, avatar = CASE WHEN ?9 = '' AND NOT ?10 THEN avatar ELSE ?9 END",
         params![
             u.workspace.as_str(),
             u.id.as_str(),
@@ -101,7 +102,8 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
             org,
             u.bot,
             presence_code(u.presence),
-            u.avatar.as_deref().unwrap_or_default()
+            u.avatar.as_deref().unwrap_or_default(),
+            u.no_photo
         ],
     )?;
     Ok(())
@@ -121,6 +123,7 @@ pub(crate) fn user(r: &Row<'_>) -> rusqlite::Result<User> {
         presence: presence(r.get("presence")?)?,
         // Kept as it came; checked again, as a backend's would be.
         avatar: slakio_core::images::avatar_address(&r.get::<_, String>("avatar")?),
+        no_photo: false,
     })
 }
 

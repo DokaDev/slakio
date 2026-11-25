@@ -90,6 +90,24 @@ fn a_record_without_a_photo_keeps_the_photo_known_and_a_new_photo_replaces_it() 
 }
 
 #[test]
+fn a_record_saying_no_photo_of_their_own_drops_the_photo_known() {
+    let people = People::default();
+    people.set_team("T1");
+    let one = format!("https://{}/one_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+    people.learn(&[person("U1", Some(&one))]);
+    // Slack's default avatar only, as a later lookup says it: the photo known before is gone.
+    let default = serde_json::from_value(json!({"id": "U1", "team_id": "T1",
+        "profile": {"display_name": "Minsu", "image_72": one, "is_custom_image": false}}))
+    .unwrap();
+    people.learn(&[default]);
+    assert_eq!(photo_of(&people, "U1"), None, "no photo of their own: the old one is gone");
+    assert!(people.known.lock().unwrap()["U1"].no_photo);
+    // A later record that says nothing of a photo leaves none: nothing comes back.
+    people.learn(&[person("U1", None)]);
+    assert_eq!(photo_of(&people, "U1"), None);
+}
+
+#[test]
 fn only_a_person_known_without_a_photo_is_forgotten_to_be_asked_again() {
     let people = People::default();
     people.set_team("T1");

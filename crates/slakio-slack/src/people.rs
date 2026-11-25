@@ -162,10 +162,11 @@ impl People {
     }
 }
 
-/// Keep `u`, replacing what was known of them; a photo known before stays when `u` has none
-/// (a record without a photo does not say the photo is gone).
+/// Keep `u`, replacing what was known of them: a new photo replaces the old one, and one Slack
+/// says they no longer have ([`User::no_photo`]) is gone; a photo known before stays when `u`
+/// says nothing of it (a record without a photo does not say the photo is gone).
 fn keep(known: &mut HashMap<String, User>, id: &str, mut u: User) {
-    if u.avatar.is_none() {
+    if u.avatar.is_none() && !u.no_photo {
         u.avatar = known.get(id).and_then(|old| old.avatar.clone());
     }
     known.insert(id.to_string(), u);
@@ -188,6 +189,7 @@ fn user(p: &wire::Person, team: &str) -> Option<User> {
         bot: p.is_bot == Some(true),
         presence: Presence::Unknown,
         avatar: p.profile.as_ref().and_then(wire::Profile::avatar),
+        no_photo: p.profile.as_ref().is_some_and(wire::Profile::not_custom),
     })
 }
 

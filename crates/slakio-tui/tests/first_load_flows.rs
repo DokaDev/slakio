@@ -59,6 +59,7 @@ fn busy() -> (Scripted, WorkspaceId, Vec<Request>) {
             bot: false,
             presence: Presence::Unknown,
             avatar: Some(photo(&ws, i)),
+            no_photo: false,
         })
         .collect();
     page.messages = (0..PEOPLE)

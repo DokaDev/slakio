@@ -160,6 +160,34 @@ fn a_photo_kept_on_another_host_is_none_when_read() {
     assert_eq!(u.avatar, None);
 }
 
+/// A later record without a photo keeps the photo kept (it says nothing of it); one that says
+/// the person has no photo of their own drops it; a new photo replaces it.
+#[test]
+fn a_photo_kept_goes_only_when_a_record_says_there_is_none_of_their_own() {
+    let world = World::new(5);
+    let mut store = writer("snap-no-photo");
+    let s = world.snapshot();
+    let i = s.users.iter().position(|u| u.avatar.is_some()).expect("the world has photos");
+    store.put_snapshot(s).unwrap();
+    let t = target(&world, "general");
+    let kept = |store: &Store| {
+        let back = store.snapshot(&ids(s)).unwrap().unwrap();
+        back.users.into_iter().find(|u| u.id == s.users[i].id).unwrap().avatar
+    };
+    let put = |store: &mut Store, avatar: Option<String>, no_photo: bool| {
+        let mut p = page(&world, &t, None, 5);
+        p.users = vec![User { avatar, no_photo, ..s.users[i].clone() }];
+        store.put_page(&p, None, 100).unwrap();
+    };
+    put(&mut store, None, false);
+    assert_eq!(kept(&store), s.users[i].avatar, "a record without a photo keeps it");
+    let other = s.users[i].avatar.as_ref().unwrap().replace("_72", "_48");
+    put(&mut store, Some(other.clone()), false);
+    assert_eq!(kept(&store), Some(other), "a new photo replaces it");
+    put(&mut store, None, true);
+    assert_eq!(kept(&store), None, "no photo of their own: gone");
+}
+
 #[test]
 fn every_section_kind_comes_back_and_an_older_version_does_not_read_them() {
     let mut store = writer("snap-kinds");
