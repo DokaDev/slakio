@@ -218,13 +218,14 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
 
 #[test]
 fn photos_ahead_leave_most_of_the_picture_share_even_when_each_is_redirected() {
-    let limits = slakio_slack::governor::Limits::default();
-    // Every hop counts: a photo and each redirect it may follow.
-    let hops = slakio_slack::picture::AVATAR_REDIRECTS + 1;
+    // The backend's budget, as its own tests pin it (the UI does not name the Slack adapter): a
+    // workspace's picture share is 30 a minute and 350 an hour, and a photo follows at most two
+    // redirects, every hop counted.
+    let (share_minute, share_hour, hops) = (30, 350, 3);
     let (minute, hour) = (AHEAD_PER_MINUTE * hops, AHEAD_PER_HOUR * hops);
     // At most two fifths of a workspace's picture share, so what is on screen keeps the rest.
-    assert!(minute * 5 <= limits.lane_picture_per_minute as usize * 2, "{minute} hops a minute");
-    assert!(hour * 5 <= limits.lane_picture_per_hour as usize * 2, "{hour} hops an hour");
+    assert!(minute * 5 <= share_minute * 2, "{minute} hops a minute");
+    assert!(hour * 5 <= share_hour * 2, "{hour} hops an hour");
 }
 
 #[test]
