@@ -261,10 +261,11 @@ fn spawn_boot(
             ctx.booted.notify_one();
         }
         answer(&tx, id, booted).await;
-        let Some(listed) = pending else { return };
+        let Some(crate::boot::Pending { boot: number, listed }) = pending else { return };
         let listed = listed.await.ok().flatten();
+        // Let go when a newer boot placed the sidebar meanwhile.
         let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
-        if let Some(update) = placing.update(listed, client.diag()) {
+        if let Some(update) = (placing.boot == number).then(|| placing.update(listed, client.diag())).flatten() {
             let _ = crate::live::push(&tx, update).await;
         }
     });

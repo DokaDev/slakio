@@ -30,6 +30,7 @@ use slakio_core::model::{
 };
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 /// The user's own id once the workspace has booted (whose reactions are "mine").
@@ -43,8 +44,15 @@ pub const DND_BATCH: usize = 80;
 pub const SECTIONS_GRACE: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// The sidebar's sections still being read when the boot answered: the update to push once
-/// they come ([`crate::sidebar::Placing::update`]).
-pub(crate) type Pending = tokio::task::JoinHandle<Option<Vec<crate::sidebar::ChannelSection>>>;
+/// they come ([`crate::sidebar::Placing::update`]), unless a newer boot placed the sidebar
+/// meanwhile (`boot`: which boot read them, as [`crate::sidebar::Placing::boot`] tells it).
+pub(crate) struct Pending {
+    pub(crate) boot: u64,
+    pub(crate) listed: tokio::task::JoinHandle<Option<Vec<crate::sidebar::ChannelSection>>>,
+}
+
+/// The boots so far, each told apart by its number.
+static BOOTS: AtomicU64 = AtomicU64::new(0);
 
 /// The answer to a boot of `client`'s workspace, and the sidebar's sections when they are still
 /// being read (`session`: the user's id, the people, and what places each conversation are
@@ -64,7 +72,7 @@ pub(crate) async fn boot(
     let counts = counts(client).await;
     // The sidebar's sections, read alongside the rest: the answer never waits for them longer
     // than [`SECTIONS_GRACE`].
-    let mut sections: Pending = {
+    let mut sections = {
         let client = std::sync::Arc::clone(client);
         tokio::spawn(async move { crate::sections::fetch(&client).await })
     };
@@ -119,13 +127,17 @@ pub(crate) async fn boot(
         Ok(listed) => (listed.ok().flatten(), None),
         Err(_) => (None, Some(sections)),
     };
+    // This boot's number: sections read late follow only while the sidebar is still its.
+    let number = BOOTS.fetch_add(1, Ordering::Relaxed) + 1;
+    let pending = pending.map(|listed| Pending { boot: number, listed });
     let unknown = listed.is_none();
     let sidebar = crate::sidebar::Sidebar::new(&team.id, listed, client.diag());
     let team_id = team.id.clone();
     let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
     snapshot.sections = sidebar.sections;
     snapshot.sections_unknown = unknown;
-    *session.placing.lock().unwrap_or_else(PoisonError::into_inner) = crate::sidebar::Placing { team: team_id, facts };
+    *session.placing.lock().unwrap_or_else(PoisonError::into_inner) =
+        crate::sidebar::Placing { team: team_id, facts, boot: number };
     Ok((Event::Booted(Box::new(snapshot)), pending))
 }
 

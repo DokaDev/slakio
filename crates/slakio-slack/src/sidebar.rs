@@ -129,11 +129,13 @@ pub(crate) struct Facts {
     pub(crate) app: bool,
 }
 
-/// What places a booted workspace's conversations: its team, and what places each one (by id).
+/// What places a booted workspace's conversations: its team, what places each one (by id), and
+/// the number of the boot that read them ([`crate::boot::Pending`]).
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Placing {
     pub(crate) team: String,
     pub(crate) facts: Vec<(String, Facts)>,
+    pub(crate) boot: u64,
 }
 
 impl Placing {

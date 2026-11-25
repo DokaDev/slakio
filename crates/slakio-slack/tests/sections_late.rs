@@ -82,3 +82,31 @@ fn sections_slack_refuses_are_unknown_and_no_update_follows() {
         assert!(next(&mut handle, Duration::from_millis(300)).await.is_none(), "nothing follows");
     });
 }
+
+/// A boot whose sections come late, booted again meanwhile: what the older boot reads comes
+/// after the newer placed the sidebar, so it is let go (the newer's sections, refused here, stay
+/// unknown and nothing follows).
+#[test]
+fn sections_an_older_boot_reads_late_are_let_go_after_a_newer_boot() {
+    rt().block_on(async {
+        let fake = FakeSlack::start(World::new(7)).await.unwrap();
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        let late = Duration::from_secs(5);
+        fake.fail_next(SECTIONS, Fault::Late(late));
+        fake.fail_next(SECTIONS, Fault::Status { status: 500, retry_after: None });
+        let mut handle = slakio_slack::serve(client);
+        let asked = Instant::now();
+        for id in [1, 2] {
+            handle.send(Request { id: Generation(id), workspace: None, command: Command::Boot }).unwrap();
+            let booted = next(&mut handle, Duration::from_secs(20)).await.expect("the boot answer");
+            assert_eq!(booted.generation, Generation(id));
+            let Event::Booted(s) = booted.event else { panic!("{booted:?}") };
+            assert!(s.sections_unknown, "boot {id}: the sections are not known yet");
+        }
+        // Past the older boot's late answer, and then some: nothing came.
+        let wait = (late + Duration::from_secs(3)).saturating_sub(asked.elapsed());
+        assert!(next(&mut handle, wait).await.is_none(), "the older boot's sections are let go");
+        assert_eq!(fake.methods().iter().filter(|m| *m == SECTIONS).count(), 2, "both boots asked");
+    });
+}
