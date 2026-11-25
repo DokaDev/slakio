@@ -2,13 +2,16 @@
 //! ([`Images::answered`], [`Images::failed`]).
 
 use super::cached::LOOKUPS_MAX;
-use super::{CHIP_PHOTO, Entry, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why, note};
+use super::{
+    CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why,
+    note,
+};
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::diag::Stage;
 use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
-use slakio_core::picture_cache::PictureCache;
+use slakio_core::picture_cache::{FILE_MAX, PictureCache};
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -151,11 +154,16 @@ impl Images {
         if self.entries.get(&key) != Some(&Entry::Asked(id)) {
             return None;
         }
+        // Within [`FETCHED_MAX`] photos and [`FETCHED_BYTES_MAX`] bytes, none larger than the
+        // cache on disk keeps.
         if matches!(key.0, Source::Avatar(_)) {
             self.fetched.retain(|f| f.0 != key.0);
-            self.fetched.push_back((key.0.clone(), bytes.clone()));
-            if self.fetched.len() > FETCHED_MAX {
-                self.fetched.pop_front();
+            if bytes.len() as u64 <= FILE_MAX {
+                self.fetched.push_back((key.0.clone(), bytes.clone()));
+            }
+            let mut total: usize = self.fetched.iter().map(|f| f.1.len()).sum();
+            while self.fetched.len() > FETCHED_MAX || total > FETCHED_BYTES_MAX {
+                total -= self.fetched.pop_front().map_or(0, |f| f.1.len());
             }
         }
         self.entries.insert(key.clone(), Entry::Decoding(id));

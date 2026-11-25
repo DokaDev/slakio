@@ -674,3 +674,26 @@ fn the_bytes_of_the_last_photos_fetched_are_kept_and_forgotten_with_them() {
     images.decoded(key(&job), Ok(ready(&job, 5)));
     assert!(images.fetched.is_empty());
 }
+
+#[test]
+fn the_photos_bytes_kept_for_their_other_place_stay_within_a_few_mebibytes() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = |n: usize| Source::Avatar(format!("https://{}/{n}.png", slakio_core::images::AVATAR_HOSTS[0]));
+    let mib = 1024 * 1024;
+    let mut answer = |images: &mut Images, n: usize, len: usize| {
+        images.look(&ws(), &photo(n));
+        images.ask(&mut requests, Instant::now());
+        let r = requests.take().pop().expect("asked");
+        let job = images.answered(r.id, vec![0; len]).expect("a job");
+        images.decoded(key(&job), Ok(ready(&job, 5)));
+    };
+    for n in 0..=FETCHED_BYTES_MAX / mib {
+        answer(&mut images, n, mib);
+    }
+    assert_eq!(images.fetched.iter().map(|f| f.1.len()).sum::<usize>(), FETCHED_BYTES_MAX, "the oldest went");
+    assert!(images.fetched.iter().all(|f| f.0 != photo(0)));
+    // One larger than the cache on disk keeps is not kept here either.
+    answer(&mut images, 100, slakio_core::picture_cache::FILE_MAX as usize + 1);
+    assert!(images.fetched.iter().all(|f| f.0 != photo(100)));
+    assert_eq!(images.fetched.len(), FETCHED_BYTES_MAX / mib);
+}

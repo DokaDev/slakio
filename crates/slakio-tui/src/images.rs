@@ -72,6 +72,8 @@ pub const RETRY_AFTER: Duration = Duration::from_secs(60);
 pub const RETRY_SOON: Duration = Duration::from_secs(2);
 /// The most photos whose fetched bytes are kept, for their other place ([`Images::ask`]).
 pub const FETCHED_MAX: usize = 64;
+/// The most bytes of those photos kept ([`FETCHED_MAX`]): the oldest go first.
+pub const FETCHED_BYTES_MAX: usize = 8 * 1024 * 1024;
 /// The most pictures that failed whose reason is kept (the oldest is forgotten, and asked for
 /// again when it is drawn again).
 pub const FAILED_MAX: usize = 1024;
