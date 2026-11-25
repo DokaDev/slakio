@@ -22,7 +22,7 @@ use crate::method::Method;
 use crate::request::Call;
 use crate::sidebar::Facts;
 use crate::wire;
-use slakio_core::backend::{Event, Snapshot};
+use slakio_core::backend::{Envelope, Event, Generation, Snapshot};
 use slakio_core::diag::{Kind, Stage};
 use slakio_core::model::{
     Conversation, ConversationId, ConversationKind, Org, Presence, Ts, User, UserId, Workspace, WorkspaceColor,
@@ -53,6 +53,33 @@ pub(crate) struct Pending {
 
 /// The boots so far, each told apart by its number.
 static BOOTS: AtomicU64 = AtomicU64::new(0);
+
+/// Start the workspace on a task of its own; a boot that succeeds is told to the live updates.
+/// The sidebar's sections, when they came after the answer, follow it as an update.
+pub(crate) fn spawn(
+    tasks: &mut tokio::task::JoinSet<()>,
+    client: std::sync::Arc<Client>,
+    ctx: std::sync::Arc<crate::adapter::Session>,
+    (tx, id): (tokio::sync::mpsc::Sender<Envelope>, Generation),
+) {
+    tasks.spawn(async move {
+        let (booted, pending) = match boot(&client, &ctx).await {
+            Ok((event, pending)) => (Ok(event), pending),
+            Err(e) => (Err(e), None),
+        };
+        if booted.is_ok() {
+            ctx.booted.notify_one();
+        }
+        crate::adapter::answer(&tx, id, booted).await;
+        let Some(Pending { boot: number, listed }) = pending else { return };
+        let listed = listed.await.ok().flatten();
+        // Let go when a newer boot placed the sidebar meanwhile.
+        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        if let Some(update) = (placing.boot == number).then(|| placing.update(listed, client.diag())).flatten() {
+            let _ = crate::live::push(&tx, update).await;
+        }
+    });
+}
 
 /// The answer to a boot of `client`'s workspace, and the sidebar's sections when they are still
 /// being read (`session`: the user's id, the people, and what places each conversation are

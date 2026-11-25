@@ -23,7 +23,7 @@
 //! kept for the session ([`crate::threads`]): its newest page is the end of what was read, its
 //! older pages come from what is kept, without a request.
 
-use crate::boot::{Me, boot};
+use crate::boot::Me;
 use crate::client::Client;
 use crate::error::SlackError;
 use crate::governor::Priority;
@@ -180,7 +180,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         opened(&session, &command);
         let dated = matches!(command, Command::Dated { .. });
         match command {
-            Command::Boot => spawn_boot(&mut tasks, client, ctx, (tx, id)),
+            Command::Boot => crate::boot::spawn(&mut tasks, client, ctx, (tx, id)),
             Command::Catchup { target, limit } => {
                 let work =
                     async move { catch_up(&client, &ctx, target, limit).await.map(|p| Event::History(Box::new(p))) };
@@ -242,33 +242,6 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
         searching = searching.filter(|f| !f.task.is_finished());
         noticing = noticing.filter(|f| !f.task.is_finished());
     }
-}
-
-/// Start the workspace on a task of its own; a boot that succeeds is told to the live updates.
-/// The sidebar's sections, when they came after the answer, follow it as an update.
-fn spawn_boot(
-    tasks: &mut JoinSet<()>,
-    client: Arc<Client>,
-    ctx: Arc<Session>,
-    (tx, id): (mpsc::Sender<Envelope>, Generation),
-) {
-    tasks.spawn(async move {
-        let (booted, pending) = match boot(&client, &ctx).await {
-            Ok((event, pending)) => (Ok(event), pending),
-            Err(e) => (Err(e), None),
-        };
-        if booted.is_ok() {
-            ctx.booted.notify_one();
-        }
-        answer(&tx, id, booted).await;
-        let Some(crate::boot::Pending { boot: number, listed }) = pending else { return };
-        let listed = listed.await.ok().flatten();
-        // Let go when a newer boot placed the sidebar meanwhile.
-        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
-        if let Some(update) = (placing.boot == number).then(|| placing.update(listed, client.diag())).flatten() {
-            let _ = crate::live::push(&tx, update).await;
-        }
-    });
 }
 
 /// Read the picture at `source` (at most `max` bytes, and never more than
@@ -388,7 +361,7 @@ async fn listed(client: Arc<Client>, ctx: Arc<Session>, command: Command) -> Res
 }
 
 /// Send the answer to request `id`.
-async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Event, SlackError>) {
+pub(crate) async fn answer(tx: &mpsc::Sender<Envelope>, id: Generation, result: Result<Event, SlackError>) {
     let envelope = match result {
         Ok(event) => Envelope { generation: id, event },
         Err(e) => Envelope::failed(id, e.kind(), e.detail()),
