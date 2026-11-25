@@ -64,7 +64,7 @@ impl Images {
     /// when pictures and `photos` are on, with a cache on disk and not in the demo; else none is.
     pub fn offer_ahead(&mut self, photos: bool, dms: impl IntoIterator<Item = (WorkspaceId, Source)>) {
         self.ahead.queue.clear();
-        if !(self.on && photos && !self.demo && self.cache.is_some()) {
+        if !self.wants_ahead(photos) {
             return;
         }
         let mut queued = HashSet::new();
@@ -78,6 +78,12 @@ impl Images {
             }
             self.ahead.queue.push_back((ws, key));
         }
+    }
+
+    /// Photos are asked for ahead at all: pictures and `photos` on, a cache on disk, not the demo
+    /// (cheap: whoever offers them need not list the DM rows otherwise).
+    pub fn wants_ahead(&self, photos: bool) -> bool {
+        self.on && photos && !self.demo && self.cache.is_some()
     }
 
     /// The photos waiting to be asked for ahead.

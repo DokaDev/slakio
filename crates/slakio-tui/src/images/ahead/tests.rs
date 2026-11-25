@@ -498,3 +498,14 @@ fn nothing_is_fetched_ahead_with_pictures_or_photos_off() {
     }
     assert_eq!(t.images.held().0, 0);
 }
+
+#[test]
+fn photos_are_wanted_ahead_only_with_pictures_photos_a_cache_and_not_in_the_demo() {
+    let t = T::new("wants");
+    let on = Images { on: true, cache: t.images.cache.clone(), ..Images::default() };
+    assert!(on.wants_ahead(true));
+    assert!(!on.wants_ahead(false), "photos or avatars off");
+    assert!(!Images { on: false, cache: on.cache.clone(), ..Images::default() }.wants_ahead(true), "pictures off");
+    assert!(!Images { on: true, ..Images::default() }.wants_ahead(true), "no cache on disk");
+    assert!(!Images { on: true, demo: true, cache: on.cache.clone(), ..Images::default() }.wants_ahead(true), "demo");
+}

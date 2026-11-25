@@ -107,7 +107,7 @@ impl App {
         let covers = |l: &Layer| matches!(l, Layer::Dialog | Layer::Settings | Layer::Help | Layer::Files);
         self.images.cover(self.layers(None).iter().any(covers));
         let photos = self.settings.photos && self.settings.avatars;
-        let dms = if photos { self.dm_photos() } else { Vec::new() };
+        let dms = if self.images.wants_ahead(photos) { self.dm_photos() } else { Vec::new() };
         self.images.offer_ahead(photos, dms);
         let asked = self.images.ask(&mut self.work.requests, now) | lists;
         // Looks in the cache on disk run off the loop's thread, as decodes do.
