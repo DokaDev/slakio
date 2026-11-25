@@ -511,6 +511,29 @@ fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
     assert_eq!(m.take_gone_photos(), [icon], "a workspace's boot");
 }
 
+/// A workspace's boot that leaves out a person shown before (and no one else shows their photo):
+/// the photo is noted as gone, so the terminal does not hold it until it is evicted.
+#[test]
+fn a_workspace_s_boot_without_a_person_notes_their_photo_as_gone() {
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (a, part_a) = part(0);
+    let me = part_a.workspaces[0].me.clone();
+    let peer = part_a.users.iter().find(|u| u.id != me && u.workspace == a).expect("a peer").id.clone();
+    let photo = format!("https://{host}/peer_72.png");
+    let mut with = part_a.clone();
+    for u in with.users.iter_mut().filter(|u| u.id == peer) {
+        u.avatar = Some(photo.clone());
+    }
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &with, false);
+    let _ = m.take_gone_photos();
+    let mut without = part_a.clone();
+    without.users.retain(|u| u.id != peer);
+    m.merge(&a, &without, false);
+    assert_eq!(m.take_gone_photos(), [photo], "left out of the answer: gone");
+}
+
 /// Workspace `a`'s part as a boot that could not read Slack's sections answers it: its default
 /// sections (a Channels and a Direct messages of its own ids), every conversation in one.
 fn sections_unknown(a: &WorkspaceId, part: &Snapshot) -> Snapshot {

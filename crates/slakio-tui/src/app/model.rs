@@ -226,6 +226,10 @@ impl Model {
             .filter_map(|u| Some((u.id.clone(), u.avatar.clone()?)))
             .collect();
         s.users.retain(|u| &u.workspace != ws);
+        // One the answer leaves out is no longer shown: their photo is gone.
+        let answered: HashSet<&UserId> = new.users.iter().map(|u| &u.id).collect();
+        let left_out = photos.iter().filter(|(id, _)| !answered.contains(id)).map(|(_, a)| a.clone());
+        self.gone_photos.extend(left_out);
         let gone = &mut self.gone_photos;
         s.users.extend(new.users.into_iter().map(|mut u| {
             let old = photos.get(&u.id);
