@@ -108,8 +108,10 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
 }
 
-/// A picture deleted by its id.
-const DELETED: &[u8] = b"\x1b_Ga=d,d=I,i=";
+/// The command that deletes picture `id` (by its id).
+fn deleted(id: u32) -> Vec<u8> {
+    format!("\x1b_Ga=d,d=I,i={id},").into_bytes()
+}
 
 #[test]
 fn a_photo_changed_live_is_fetched_anew_and_the_old_picture_leaves_the_terminal() {
@@ -121,9 +123,13 @@ fn a_photo_changed_live_is_fetched_anew_and_the_old_picture_leaves_the_terminal(
     run.type_bytes(b" d");
     run.wait_for("a DM row", |t| dms.iter().any(|d| t.contains(d.0.as_str())));
     let screen = run.output();
-    let (_, who, shown, old) = dms.iter().find(|d| screen.contains(d.0.as_str())).expect("a DM row on screen").clone();
+    let (name, who, shown, old) =
+        dms.iter().find(|d| screen.contains(d.0.as_str())).expect("a DM row on screen").clone();
+    let row = screen.lines().position(|l| l.contains(name.as_str())).unwrap();
     wait_until("the peer's photo fetched", || m.fetched(&old));
-    wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T"));
+    // The picture the peer's row shows: its id, which a delete must name.
+    wait_until("the peer's photo drawn", || run.pictures_on_row(row).len() == 1);
+    let old_id = run.pictures_on_row(row)[0];
     std::thread::sleep(Duration::from_millis(500));
     let (mark, api) = (m.written().len(), m.api_calls());
     let ws = m.world.snapshot().workspaces[0].id.to_string();
@@ -134,13 +140,15 @@ fn a_photo_changed_live_is_fetched_anew_and_the_old_picture_leaves_the_terminal(
         "user": profile(json!({"display_name": shown, "image_original": original, "is_custom_image": true}))}));
     let new = format!("/2026-01-05/{file}_72.png");
     wait_until("the new photo fetched", || m.fetched(&new));
-    wait_until("the old picture deleted", || contains(&m.written()[mark..], DELETED));
+    wait_until("the old picture deleted", || contains(&m.written()[mark..], &deleted(old_id)));
+    wait_until("the new photo drawn", || run.pictures_on_row(row).iter().any(|id| *id != old_id));
+    let new_id = run.pictures_on_row(row).into_iter().find(|id| *id != old_id).unwrap();
     std::thread::sleep(Duration::from_millis(500));
     let mark = m.written().len();
     let fetches = m.fake.log().iter().filter(|l| l.method() == PICTURES).count();
     m.fake.push(&json!({"type": "user_profile_changed",
         "user": profile(json!({"display_name": shown, "image_original": original, "is_custom_image": false}))}));
-    wait_until("the new picture deleted", || contains(&m.written()[mark..], DELETED));
+    wait_until("the new picture deleted", || contains(&m.written()[mark..], &deleted(new_id)));
     std::thread::sleep(Duration::from_millis(500));
     let after = m.fake.log().iter().filter(|l| l.method() == PICTURES).count();
     run.quit();

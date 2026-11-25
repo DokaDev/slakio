@@ -102,6 +102,17 @@ impl Run {
         screen(&typescript, usize::from(rows), usize::from(cols))
     }
 
+    /// The ids of the pictures whose placeholders row `row` (from 0) of the screen shows now, left
+    /// to right, each once (a placeholder's foreground color is its picture's id).
+    pub fn pictures_on_row(&self, row: usize) -> Vec<u32> {
+        let (cols, rows) = self.size;
+        let typescript = std::fs::read(&self.out).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+        let grid = cells(&typescript, usize::from(rows), usize::from(cols));
+        let mut ids: Vec<u32> = grid.get(row).into_iter().flatten().filter_map(|(_, id)| *id).collect();
+        ids.dedup();
+        ids
+    }
+
     pub fn wait_for(&self, what: &str, done: impl Fn(&str) -> bool) {
         let deadline = Instant::now() + Duration::from_secs(30);
         while !done(&self.output()) {
@@ -131,12 +142,24 @@ impl Run {
     }
 }
 
-/// The screen as the terminal shows it after `t`: a small emulator of what the binary writes
-/// (cursor moves, clears, text; styles and modes ignored). Ratatui writes only the cells that
+/// The screen as the terminal shows it after `t` ([`cells`]). Ratatui writes only the cells that
 /// changed, so a text is looked for on the screen, never in the stream.
 fn screen(t: &str, rows: usize, cols: usize) -> String {
-    let mut grid = vec![vec![' '; cols]; rows];
+    let grid = cells(t, rows, cols);
+    grid.into_iter().map(|row| row.into_iter().map(|(ch, _)| ch).collect::<String>()).collect::<Vec<_>>().join("\n")
+}
+
+/// The picture placeholder (kitty's Unicode placeholders).
+const PLACEHOLDER: char = '\u{10EEEE}';
+
+/// Each cell of the screen after `t`, with the id of the picture a placeholder there shows: a
+/// small emulator of what the binary writes (cursor moves, clears, text and the foreground
+/// color of a placeholder, its picture's id; other styles and modes ignored).
+fn cells(t: &str, rows: usize, cols: usize) -> Vec<Vec<(char, Option<u32>)>> {
+    let mut grid = vec![vec![(' ', None); cols]; rows];
     let (mut r, mut c) = (0usize, 0usize);
+    // The foreground color as an id, when it is a 24-bit one.
+    let mut fg: Option<u32> = None;
     let mut chars = t.chars().peekable();
     while let Some(ch) = chars.next() {
         match ch {
@@ -157,8 +180,9 @@ fn screen(t: &str, rows: usize, cols: usize) -> String {
                             r = nums.first().copied().unwrap_or(1).saturating_sub(1).min(rows - 1);
                             c = nums.get(1).copied().unwrap_or(1).saturating_sub(1).min(cols - 1);
                         }
-                        'J' if params == "2" => grid = vec![vec![' '; cols]; rows],
-                        'h' if params == "?1049" => grid = vec![vec![' '; cols]; rows],
+                        'J' if params == "2" => grid = vec![vec![(' ', None); cols]; rows],
+                        'h' if params == "?1049" => grid = vec![vec![(' ', None); cols]; rows],
+                        'm' => fg = sgr(&params, fg),
                         _ => {}
                     }
                 }
@@ -189,16 +213,43 @@ fn screen(t: &str, rows: usize, cols: usize) -> String {
                     continue;
                 }
                 if c < cols {
-                    grid[r][c] = ch;
+                    grid[r][c] = (ch, fg.filter(|_| ch == PLACEHOLDER));
                     if w == 2 && c + 1 < cols {
-                        grid[r][c + 1] = ' ';
+                        grid[r][c + 1] = (' ', None);
                     }
                 }
                 c += w;
             }
         }
     }
-    grid.into_iter().map(|row| row.into_iter().collect::<String>()).collect::<Vec<_>>().join("\n")
+    grid
+}
+
+/// The foreground color as an id after the style change `params` (`ESC [ params m`), from `fg`:
+/// a 24-bit one is an id; a reset or another kind of color is none.
+fn sgr(params: &str, mut fg: Option<u32>) -> Option<u32> {
+    let p: Vec<&str> = params.split(';').collect();
+    let mut i = 0;
+    while i < p.len() {
+        let n = |k: usize| p.get(i + k).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        match (p[i], p.get(i + 1).copied()) {
+            ("" | "0" | "39", _) => fg = None,
+            ("38", Some("2")) => {
+                fg = Some((n(2) << 16) | (n(3) << 8) | n(4));
+                i += 4;
+            }
+            ("38", Some("5")) => {
+                fg = None;
+                i += 2;
+            }
+            ("48", Some("2")) => i += 4,
+            ("48", Some("5")) => i += 2,
+            (v, _) if v.len() == 2 && (v.starts_with('3') || v.starts_with('9')) => fg = None,
+            _ => {}
+        }
+        i += 1;
+    }
+    fg
 }
 
 /// Start the binary in a pseudo terminal of `size`, recording what it draws in `out`.
