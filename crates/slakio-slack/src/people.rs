@@ -60,12 +60,14 @@ impl People {
 
     /// Person `p` as the live updates say their profile is now: kept, when they are known (a new
     /// photo replaces the old one, one they no longer have is gone, as [`keep`] says), and
-    /// returned for the UI; `None` when Slack gave no name to show.
+    /// returned for the UI; `None` when Slack gave no name to show. A change tells the names and
+    /// the photo: whether one known is a bot or of another organization stays as known.
     pub(crate) fn changed(&self, p: &wire::Person) -> Option<User> {
         let team = self.team()?;
-        let u = user(p, &team)?;
+        let mut u = user(p, &team)?;
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
-        if known.contains_key(&p.id) {
+        if let Some(old) = known.get(&p.id) {
+            u = User { bot: old.bot, org: old.org.clone(), presence: old.presence, ..u };
             keep(&mut known, &p.id, u.clone());
         }
         Some(u)

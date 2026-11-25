@@ -123,6 +123,24 @@ fn a_profile_change_is_kept_for_a_person_known_and_given_back_for_anyone() {
 }
 
 #[test]
+fn a_profile_change_keeps_whether_one_known_is_a_bot_and_of_another_organization() {
+    let people = People::default();
+    people.set_team("T1");
+    let bot = serde_json::from_value(json!({"id": "B1", "team_id": "T2", "is_bot": true,
+        "profile": {"display_name": "Deploys"}}))
+    .unwrap();
+    people.learn(&[bot]);
+    // The change's record says neither: not a bot, nor of another organization, as it reads.
+    let u = people.changed(&person("B1", None)).unwrap();
+    assert_eq!(u.display_name, "Minsu");
+    let kept = people.known.lock().unwrap()["B1"].clone();
+    for u in [u, kept] {
+        assert!(u.bot);
+        assert_eq!(u.org, Org::External(Remote::new("T2")));
+    }
+}
+
+#[test]
 fn only_a_person_known_without_a_photo_is_forgotten_to_be_asked_again() {
     let people = People::default();
     people.set_team("T1");
