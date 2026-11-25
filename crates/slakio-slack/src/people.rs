@@ -34,8 +34,6 @@ pub(crate) struct People {
     unnamed: Mutex<HashSet<String>>,
     /// Ids lookups left out or listed as pending or failed, and how many times.
     omitted: Mutex<HashMap<String, u8>>,
-    /// Ids a lookup's answer had, and whether a photo was taken of them (for the diagnostics).
-    answers: Mutex<HashMap<String, bool>>,
     team: Mutex<Option<String>>,
 }
 
@@ -99,16 +97,23 @@ impl People {
         if self.unnamed.lock().unwrap_or_else(PoisonError::into_inner).contains(id) { "unnamed" } else { "unknown" }
     }
 
-    /// Whether a lookup's answer had person `id` (and a photo of them was taken), since this was
-    /// last asked: what it said is forgotten.
-    pub(crate) fn answer(&self, id: &str) -> Option<bool> {
-        self.answers.lock().unwrap_or_else(PoisonError::into_inner).remove(id)
-    }
-
     /// The people of `ids` (in no order), those not known yet looked up first: in batches of
     /// [`LOOKUP_BATCH`], each id once. Those Slack does not name are left out.
     pub(crate) async fn names(&self, client: &Client, ids: &[String], priority: Priority) -> Vec<User> {
-        let Some(team) = self.team() else { return Vec::new() };
+        self.lookup(client, ids, priority, None).await.0
+    }
+
+    /// [`People::names`], and whether this lookup's own answer had person `watched` (and a photo
+    /// of them was taken; for the diagnostics): `None` when it did not ask for them or they were
+    /// not in its answer. Nothing of it is kept, so no other lookup can say it.
+    pub(crate) async fn lookup(
+        &self,
+        client: &Client,
+        ids: &[String],
+        priority: Priority,
+        watched: Option<&str>,
+    ) -> (Vec<User>, Option<bool>) {
+        let Some(team) = self.team() else { return (Vec::new(), None) };
         let mut wanted: Vec<&String> = ids.iter().collect();
         wanted.sort_unstable();
         wanted.dedup();
@@ -117,6 +122,7 @@ impl People {
             let unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
             wanted.iter().copied().filter(|id| !known.contains_key(*id) && !unnamed.contains(*id)).collect()
         };
+        let mut answer = None;
         for batch in missing.chunks(LOOKUP_BATCH) {
             let updated: Map<String, Value> = batch.iter().map(|id| ((*id).clone(), json!(0))).collect();
             // No `include_profile_only_if_stale`: with it the edge cache may judge its record not
@@ -138,25 +144,28 @@ impl People {
                 }
             };
             crate::shape::photos(client.diag(), found.results.as_deref().unwrap_or_default(), "lookup");
-            self.take(&team, batch, found);
+            answer = answer.or(self.take(&team, batch, found, watched));
         }
         let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
-        wanted.iter().filter_map(|id| known.get(*id).cloned()).collect()
+        (wanted.iter().filter_map(|id| known.get(*id).cloned()).collect(), answer)
     }
 
     /// What one lookup of `batch` found (only the ids it asked for): the people named kept; an
     /// id answered without a name not asked again, unless a name of it is known; one left out,
-    /// pending or failed asked again later, at most [`OMITTED_MAX`] lookups.
-    fn take(&self, team: &str, batch: &[&String], found: wire::EdgeUsers) {
+    /// pending or failed asked again later, at most [`OMITTED_MAX`] lookups. Whether it had
+    /// person `watched` (with a photo taken or not).
+    fn take(&self, team: &str, batch: &[&String], found: wire::EdgeUsers, watched: Option<&str>) -> Option<bool> {
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         let mut unnamed = self.unnamed.lock().unwrap_or_else(PoisonError::into_inner);
         let mut omitted = self.omitted.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut answers = self.answers.lock().unwrap_or_else(PoisonError::into_inner);
         let asked: HashSet<&str> = batch.iter().map(|id| id.as_str()).collect();
         let mut answered = HashSet::new();
+        let mut answer = None;
         for p in found.results.unwrap_or_default().into_iter().filter(|p| asked.contains(p.id.as_str())) {
             answered.insert(p.id.clone());
-            answers.insert(p.id.clone(), p.profile.as_ref().and_then(wire::Profile::avatar).is_some());
+            if watched == Some(p.id.as_str()) {
+                answer = Some(p.profile.as_ref().and_then(wire::Profile::avatar).is_some());
+            }
             match user(&p, team) {
                 Some(u) => keep(&mut known, &p.id, u),
                 None if !known.contains_key(&p.id) => {
@@ -172,6 +181,7 @@ impl People {
                 unnamed.insert((*id).clone());
             }
         }
+        answer
     }
 }
 

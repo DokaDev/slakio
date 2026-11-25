@@ -215,3 +215,46 @@ fn the_sidebar_preferences_and_the_counts_entries_tell_names_only() {
     assert!(t.contains("counts-shape field channels_key name=latest entries=1"), "{t}");
     assert!(t.contains("counts-shape field ims_key name=last_read entries=1"), "{t}");
 }
+
+#[test]
+fn a_photo_host_is_told_only_when_it_is_an_avatar_host_or_amazon_s_storage_of_a_region() {
+    let at = |host: &str| format!("https://{host}/slack-files2/avatars/2026-01-05/a_original.png");
+    for host in ["s3-us-west-2.amazonaws.com", "s3-eu-central-1.amazonaws.com", AVATAR_HOSTS_0] {
+        assert_eq!(photo_host(&at(host)), host);
+    }
+    for host in [
+        "workspace-secret.amazonaws.com",
+        "s3-.amazonaws.com",
+        "s3-us_west.amazonaws.com",
+        "a.s3-us-west-2.amazonaws.com",
+        "acme.example.com",
+    ] {
+        assert_eq!(photo_host(&at(host)), "other", "{host}");
+    }
+}
+
+const AVATAR_HOSTS_0: &str = slakio_core::images::AVATAR_HOSTS[0];
+
+#[test]
+fn the_user_s_own_record_in_a_view_says_when_it_has_no_photo_of_their_own() {
+    let (d, path) = log();
+    let persons: Vec<wire::Person> = serde_json::from_value(json!([
+        {"id": "U0", "profile": {"real_name": "Me", "image_72": format!("https://{AVATAR_HOSTS_0}/2026-01-05/a_72.png"),
+            "is_custom_image": false}},
+    ]))
+    .unwrap();
+    own_seen(&d, &persons, Some(&slakio_core::model::UserId::new("U0")));
+    let t = text(&d, &path);
+    assert!(t.contains("self-photo seen ok from=view photo=not_custom"), "{t}");
+}
+
+#[test]
+fn a_start_bundle_without_the_user_s_profile_says_it_was_not_read() {
+    for me in [json!({"id": "U0"}), json!({"id": "U0", "profile": "odd"})] {
+        let (d, path) = log();
+        own_profile(&d, &serde_json::from_value(me.clone()).unwrap());
+        let t = text(&d, &path);
+        assert!(t.contains("self-photo parsed bundle read=no"), "{me}: {t}");
+        assert!(!t.contains("U0"), "{t}");
+    }
+}

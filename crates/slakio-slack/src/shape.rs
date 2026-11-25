@@ -200,11 +200,14 @@ fn sidebar_prefs(diag: &Diag, prefs: Option<&Value>) {
     }
 }
 
-/// The host of a photo address as a line may tell it: an avatar host, or Amazon's (Slack's own
-/// uploads), else `other` (a host of a workspace's own is never told).
+/// The host of a photo address as a line may tell it: an avatar host, or Amazon's storage of a
+/// region (`s3-<region>.amazonaws.com`, Slack's own uploads), else `other` (a host of a
+/// workspace's own, or any other name under Amazon's, is never told).
 fn photo_host(url: &str) -> String {
     let h = host(url);
-    let amazon = h.strip_suffix(".amazonaws.com").is_some_and(|s| !s.is_empty() && !s.contains('.'));
+    let region = h.strip_prefix("s3-").and_then(|s| s.strip_suffix(".amazonaws.com"));
+    let plain = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-';
+    let amazon = region.is_some_and(|r| !r.is_empty() && r.bytes().all(plain));
     if amazon || slakio_core::images::AVATAR_HOSTS.contains(&h.as_str()) { h } else { "other".to_string() }
 }
 
@@ -291,7 +294,8 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
 }
 
 /// The user's own record (`me`) among a view's `persons`: once a run, whether it had a photo
-/// slakio takes (`yes`), one it refuses (`refused`) or none (`no`).
+/// slakio takes (`yes`), none of their own (`not_custom`), one it refuses (`refused`) or none
+/// (`no`).
 pub(crate) fn own_seen(diag: &Diag, persons: &[wire::Person], me: Option<&slakio_core::model::UserId>) {
     if !diag.on() {
         return;
@@ -303,6 +307,7 @@ pub(crate) fn own_seen(diag: &Diag, persons: &[wire::Person], me: Option<&slakio
     let raw = p.profile.as_ref().is_some_and(|f| f.given().is_some());
     let photo = match (p.profile.as_ref().and_then(wire::Profile::avatar), raw) {
         (Some(_), _) => "yes",
+        (None, _) if p.profile.as_ref().is_some_and(wire::Profile::not_custom) => "not_custom",
         (None, true) => "refused",
         (None, false) => "no",
     };

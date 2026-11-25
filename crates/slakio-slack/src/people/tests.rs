@@ -233,10 +233,53 @@ fn only_the_ids_asked_for_are_taken_and_a_named_one_never_becomes_unnamed() {
         "results": [named("UASKED"), {"id": "UASKED"}, named("UOTHER")],
     }))
     .unwrap();
-    people.take("T1", &[&asked], found);
+    assert_eq!(people.take("T1", &[&asked], found, None), None);
     assert_eq!(people.standing("UASKED"), "unpictured");
     assert!(!people.unnamed.lock().unwrap().contains("UASKED"), "its nameless duplicate is not unnamed");
     assert_eq!(people.standing("UOTHER"), "unknown", "not asked for: not taken");
+}
+
+/// Whether a lookup's answer had the person watched is that lookup's own (nothing is kept for
+/// anyone else): a person not asked, or not watched, says nothing.
+#[test]
+fn a_lookup_tells_only_of_the_person_it_watches_and_keeps_nothing_of_it() {
+    let people = People::default();
+    people.set_team("T1");
+    let (one, two) = ("UONE".to_string(), "UTWO".to_string());
+    let photo = format!("https://{}/one_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+    let found = || -> wire::EdgeUsers {
+        serde_json::from_value(json!({"ok": true, "results": [
+            {"id": "UONE", "team_id": "T1", "profile": {"display_name": "One", "image_72": photo}},
+            {"id": "UTWO", "team_id": "T1", "profile": {"display_name": "Two"}},
+        ]}))
+        .unwrap()
+    };
+    assert_eq!(people.take("T1", &[&one, &two], found(), Some("UONE")), Some(true));
+    assert_eq!(people.take("T1", &[&one, &two], found(), Some("UTWO")), Some(false));
+    assert_eq!(people.take("T1", &[&one], found(), Some("UTWO")), None, "not asked for");
+    assert_eq!(people.take("T1", &[&one, &two], found(), None), None);
+}
+
+#[test]
+fn an_earlier_lookup_of_the_person_watched_says_nothing_of_a_later_one() {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    rt.block_on(async {
+        let fake = FakeSlack::start(World::new(7)).await.unwrap();
+        let world = World::new(7);
+        let team = world.snapshot().workspaces[0].id.as_str().to_string();
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        client.set_team(&team);
+        let people = People::default();
+        people.set_team(&team);
+        let id = world.snapshot().users[1].id.as_str().to_string();
+        let ids = [id.clone()];
+        // Another lookup had them; the later one, which watches them, finds them known and asks
+        // nothing: it says nothing of them.
+        let _ = people.names(&client, &ids, Priority::User).await;
+        let (named, answer) = people.lookup(&client, &ids, Priority::User, Some(&id)).await;
+        assert_eq!((named.len(), answer), (1, None));
+    });
 }
 
 /// The JSON body of each edge lookup `fake` was sent.
