@@ -144,7 +144,7 @@ impl Run {
 
 /// The screen as the terminal shows it after `t` ([`cells`]). Ratatui writes only the cells that
 /// changed, so a text is looked for on the screen, never in the stream.
-fn screen(t: &str, rows: usize, cols: usize) -> String {
+pub fn screen(t: &str, rows: usize, cols: usize) -> String {
     let grid = cells(t, rows, cols);
     grid.into_iter().map(|row| row.into_iter().map(|(ch, _)| ch).collect::<String>()).collect::<Vec<_>>().join("\n")
 }
@@ -155,7 +155,7 @@ const PLACEHOLDER: char = '\u{10EEEE}';
 /// Each cell of the screen after `t`, with the id of the picture a placeholder there shows: a
 /// small emulator of what the binary writes (cursor moves, clears, text and the foreground
 /// color of a placeholder, its picture's id; other styles and modes ignored).
-fn cells(t: &str, rows: usize, cols: usize) -> Vec<Vec<(char, Option<u32>)>> {
+pub fn cells(t: &str, rows: usize, cols: usize) -> Vec<Vec<(char, Option<u32>)>> {
     let mut grid = vec![vec![(' ', None); cols]; rows];
     let (mut r, mut c) = (0usize, 0usize);
     // The foreground color as an id, when it is a 24-bit one.
@@ -227,7 +227,7 @@ fn cells(t: &str, rows: usize, cols: usize) -> Vec<Vec<(char, Option<u32>)>> {
 
 /// The foreground color as an id after the style change `params` (`ESC [ params m`), from `fg`:
 /// a 24-bit one is an id; a reset or another kind of color is none.
-fn sgr(params: &str, mut fg: Option<u32>) -> Option<u32> {
+pub fn sgr(params: &str, mut fg: Option<u32>) -> Option<u32> {
     let p: Vec<&str> = params.split(';').collect();
     let mut i = 0;
     while i < p.len() {
