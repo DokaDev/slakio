@@ -7,6 +7,13 @@ use super::{Model, Row};
 use slakio_core::model::{Conversation, Section, SectionId, SectionKind, Sort, WorkspaceId};
 use std::collections::{HashMap, HashSet};
 
+/// Section `s` lists `c`: it is in `s`, and, as in Slack's desktop app, a closed DM is listed only
+/// in a section of the user's own and Starred.
+pub(super) fn lists(s: &Section, c: &Conversation) -> bool {
+    let keeps_closed = matches!(s.kind, SectionKind::Favorites | SectionKind::Custom);
+    c.workspace == s.workspace && c.section == s.id && (keeps_closed || !c.closed)
+}
+
 /// How the list orders the conversations of a section that is ordered ([`Section::sort`]; one
 /// that is not keeps the order listed).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,10 +77,7 @@ impl Model {
             View::Home => {
                 let mut rows = vec![];
                 for (si, s) in self.snapshot.sections.iter().enumerate().filter(|(_, s)| &s.workspace == ws) {
-                    // As Slack's desktop app: a closed DM is listed only in a section of the
-                    // user's own and Starred.
-                    let keeps_closed = matches!(s.kind, SectionKind::Favorites | SectionKind::Custom);
-                    let shown = convs.clone().filter(|(_, c)| c.section == s.id && (keeps_closed || !c.closed));
+                    let shown = convs.clone().filter(|(_, c)| lists(s, c));
                     let shown = ordered(shown.collect(), sorting.of(s));
                     // Starred, External connections and Apps show only when they list a
                     // conversation; the others always do.

@@ -689,3 +689,27 @@ fn a_message_makes_its_conversation_the_newest() {
     assert!(m.bump(&ws, &alpha, false, slakio_core::model::Ts(1)));
     assert_eq!(m.conversations().iter().find(|c| c.id == alpha).unwrap().latest, Some(slakio_core::model::Ts(5)));
 }
+
+/// A folded section counts only the conversations it lists: a closed DM, not listed in Direct
+/// messages, adds nothing to its header; in a section of the user's own it is listed and counts.
+#[test]
+fn a_folded_section_counts_no_closed_dm_it_does_not_list() {
+    let mut s = World::demo().snapshot().clone();
+    let ws = s.workspaces[0].id.clone();
+    let at = |s: &Snapshot, kind| s.sections.iter().position(|x| x.workspace == ws && x.kind == kind).unwrap();
+    let (dms, mine) = (at(&s, SectionKind::DirectMessages), at(&s, SectionKind::Custom));
+    let (dms_id, mine_id) = (s.sections[dms].id.clone(), s.sections[mine].id.clone());
+    let dm = s.conversations.iter().position(|c| c.workspace == ws && c.section == dms_id && c.is_dm()).unwrap();
+    let c = &mut s.conversations[dm];
+    (c.unread, c.mentions, c.muted, c.closed) = (3, 2, false, false);
+    let open = Model::new(s.clone());
+    let (unread, mentions) = open.section_counts(dms);
+    assert!(unread >= 1 && mentions >= 2, "the open DM counts");
+    s.conversations[dm].closed = true;
+    let closed = Model::new(s.clone());
+    assert_eq!(closed.section_counts(dms), (unread - 1, mentions - 2), "the closed DM is not counted");
+    let mine_before = closed.section_counts(mine);
+    s.conversations[dm].section = mine_id;
+    let moved = Model::new(s);
+    assert_eq!(moved.section_counts(mine), (mine_before.0 + 1, mine_before.1 + 2), "listed in one's own");
+}

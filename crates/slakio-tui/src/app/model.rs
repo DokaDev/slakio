@@ -492,11 +492,11 @@ impl Model {
         self.snapshot.taken
     }
 
-    /// Of the conversations of section `i`: how many have unread messages (not muted ones), and
-    /// the mentions they hold (what a folded header shows).
+    /// Of the conversations section `i` lists: how many have unread messages (not muted ones),
+    /// and the mentions they hold (what a folded header shows).
     pub fn section_counts(&self, i: usize) -> (u32, u32) {
         let s = &self.snapshot.sections[i];
-        let convs = self.snapshot.conversations.iter().filter(|c| c.workspace == s.workspace && c.section == s.id);
+        let convs = self.snapshot.conversations.iter().filter(|c| rows::lists(s, c));
         convs.fold((0, 0), |(u, m), c| (u + u32::from(c.badges().0 > 0), m + c.badges().1))
     }
 
