@@ -8,11 +8,12 @@ use slakio_core::model::{
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
 
-/// A bot that posted: the name it posted as, and its team when Slack gave one.
+/// A bot that posted: the name it posted as, its team and its picture when Slack gave them.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Bot {
     pub name: String,
     pub team: Option<String>,
+    pub icon: Option<String>,
 }
 
 /// The bots that posted in a page, by the author id their messages carry: one for each bot and
@@ -38,7 +39,12 @@ pub(crate) fn read(raw: Vec<wire::Message>, me: Option<&UserId>) -> (Vec<Message
                 if let (None, Some(id), Some(name)) = (&m.user, &m.bot_id, &m.username) {
                     let author = bot_author(id, name);
                     let team = m.bot_profile.as_ref().and_then(|b| b.team_id.clone()).or_else(|| m.team.clone());
-                    bots.insert(author.clone(), Bot { name: name.clone(), team });
+                    // The message's own picture first, else the bot's; one known stays.
+                    let icons = [m.icons.as_ref(), m.bot_profile.as_ref().and_then(|b| b.icons.as_ref())];
+                    let icon = icons.into_iter().flatten().find_map(wire::Icons::photo);
+                    let bot = bots.entry(author.clone()).or_default();
+                    (bot.name, bot.team) = (name.clone(), team);
+                    bot.icon = icon.or(bot.icon.take());
                     m.user = Some(author);
                 }
                 // When it was edited last: 0 never, 1 at a time Slack did not give.
@@ -76,7 +82,7 @@ pub(crate) fn bot(ws: &str, id: String, b: Bot) -> User {
         org,
         bot: true,
         presence: Presence::Unknown,
-        avatar: None,
+        avatar: b.icon,
     }
 }
 

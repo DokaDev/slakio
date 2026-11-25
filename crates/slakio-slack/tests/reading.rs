@@ -542,3 +542,44 @@ fn a_bot_s_name_is_each_message_s_and_another_organization_s_bot_is_marked() {
         assert!(p.messages.iter().all(|m| !m.user.as_str().contains(' ')), "no name in an id");
     });
 }
+
+/// A bot's picture: the message's own `icons` first, else its `bot_profile`'s, best size first,
+/// only from an avatar host; nothing is asked to find one.
+#[test]
+fn a_bot_s_picture_comes_from_its_icons_through_the_photo_checks() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let target = r.target("alerts");
+        let host = slakio_core::images::AVATAR_HOSTS[0];
+        let icon = |name: &str| format!("https://{host}/2026-01-05/{name}.png");
+        let answer = json!({"ok": true, "history": {"has_more": false, "messages": [
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000500", "bot_id": "BPROF", "username": "Profiled",
+             "text": "a", "bot_profile": {"id": "BPROF", "icons": {
+                "image_36": icon("p36"), "image_48": icon("p48"), "image_72": "https://evil.example/p72.png", "image_132": icon("p132")}}},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000400", "bot_id": "BOWN", "username": "Own",
+             "text": "b", "icons": {"image_64": icon("m64"), "emoji": ":robot_face:"},
+             "bot_profile": {"id": "BOWN", "icons": {"image_72": icon("b72")}}},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000300", "bot_id": "BBIG", "username": "Big",
+             "text": "c", "bot_profile": {"id": "BBIG", "icons": {"image_36": icon("g36"), "image_230": icon("g230")}}},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000200", "bot_id": "BEVIL", "username": "Evil",
+             "text": "d", "bot_profile": {"id": "BEVIL", "icons": {"image_72": "http://evil.example/x.png", "image_48": 48}}},
+            {"type": "message", "subtype": "bot_message", "ts": "1700000000.000100", "bot_id": "BNONE", "username": "None",
+             "text": "e"},
+        ]}, "users": []});
+        r.fake.fail_next("conversations.view", Fault::Answer(answer));
+        let p = r.page(&target, None).await;
+        let picture = |name: &str| {
+            let u = p.users.iter().find(|u| u.bot && u.display_name.unsanitized() == name).expect(name);
+            u.avatar.clone()
+        };
+        assert_eq!(picture("Profiled"), Some(icon("p48")), "72 refused, 48 next");
+        assert_eq!(picture("Own"), Some(icon("m64")), "the message's own picture first");
+        assert_eq!(picture("Big"), Some(icon("g230")), "a larger one before a smaller one");
+        assert_eq!(picture("Evil"), None);
+        assert_eq!(picture("None"), None);
+        let asked: Vec<String> = r.fake.log().into_iter().map(|l| l.method().to_string()).collect();
+        assert!(!asked.iter().any(|m| m == "bots.info" || m == "users.info"), "{asked:?}");
+        assert!(!r.fake.log().into_iter().any(|l| l.method() == "users/info" && l.body.contains("BPROF")));
+    });
+}
