@@ -119,6 +119,7 @@ impl App {
         }
         self.set_focus(Focus::List);
         self.shell.list_cursor = row;
+        self.shell.moved();
         match rows[row] {
             Row::Filter if x >= self.filter_row().sort_x => self.todo(ShellAction::TodoSort, now),
             Row::Filter => self.todo(ShellAction::TodoFilter, now),

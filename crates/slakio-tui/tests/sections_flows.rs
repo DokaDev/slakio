@@ -9,7 +9,7 @@ mod demo;
 #[path = "support/scripted.rs"]
 mod scripted;
 
-use ratatui::crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use scripted::Scripted;
 use slakio_core::backend::{Command, Envelope, Event, Found, Generation, Hit, Live};
 use slakio_core::model::{
@@ -84,17 +84,15 @@ fn sections_that_come_later_replace_the_workspace_s_and_the_cursor_stays_on_its_
     assert_eq!(under_cursor(&s).as_deref(), Some(dm.as_str()), "the cursor stays on its conversation");
 }
 
-/// Sections that come late on a first boot, before the user moved the list's cursor: the cursor
-/// and the view go to the top, not after the row the boot's defaults put first.
-#[test]
-fn sections_that_come_late_before_the_cursor_moved_put_it_at_the_top() {
-    let mut s = Scripted::booted(true, None);
-    s.d.app.resize(120, 12);
-    s.pump();
-    let first = |s: &Scripted| (s.d.app.list_rows().iter()).position(|r| matches!(r, Row::Conversation(_))).unwrap();
-    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (first(&s), 0), "the boot put it at the top");
+/// The first conversation row of the list.
+fn first(s: &Scripted) -> usize {
+    (s.d.app.list_rows().iter()).position(|r| matches!(r, Row::Conversation(_))).unwrap()
+}
+
+/// Sections of the first workspace as they come late: a section of the user's own, above the
+/// others, holds the last channel listed (its id is returned too).
+fn late_mine(s: &Scripted) -> (Live, ConversationId) {
     let ws = s.d.app.model.workspaces()[0].id.clone();
-    // A section of the user's own, above the others, holds the last channel listed.
     let mine = Section {
         id: SectionId::new("custom:S1"),
         workspace: ws.clone(),
@@ -116,10 +114,41 @@ fn sections_that_come_late_before_the_cursor_moved_put_it_at_the_top() {
         .filter(|c| c.workspace == ws)
         .map(|c| (c.id.clone(), if c.id == last { mine.id.clone() } else { c.section.clone() }))
         .collect();
-    push(&mut s, Live::Sections { workspace: ws, sections, places });
+    (Live::Sections { workspace: ws, sections, places }, last)
+}
+
+/// Sections that come late on a first boot, before the user moved the list's cursor: the cursor
+/// and the view go to the top, not after the row the boot's defaults put first.
+#[test]
+fn sections_that_come_late_before_the_cursor_moved_put_it_at_the_top() {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.resize(120, 12);
+    s.pump();
+    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (first(&s), 0), "the boot put it at the top");
+    let (live, last) = late_mine(&s);
+    push(&mut s, live);
     let top = first(&s);
     assert!(matches!(s.d.app.list_rows()[top], Row::Conversation(i) if s.d.app.model.conversation(i).id == last));
     assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (top, 0), "the cursor and the view at the top");
+}
+
+/// A click on the row the boot put the cursor on moves it as a key does: sections that come
+/// later leave the cursor on that conversation.
+#[test]
+fn sections_that_come_late_after_a_click_on_the_cursor_s_row_leave_it_there() {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.resize(120, 12);
+    s.pump();
+    s.d.screen();
+    let at = first(&s);
+    assert_eq!(s.d.app.list_cursor(), at);
+    let clicked = under_cursor(&s);
+    let (list, rows) = (s.d.app.areas().list.unwrap(), s.d.app.list_parts().unwrap().rows);
+    s.d.mouse(MouseEventKind::Down(MouseButton::Left), list.x + 3, rows.y + (at - s.d.app.list_top()) as u16);
+    s.pump();
+    let (live, _) = late_mine(&s);
+    push(&mut s, live);
+    assert_eq!(under_cursor(&s), clicked, "the cursor stays on the conversation clicked");
 }
 
 #[test]

@@ -355,6 +355,7 @@ impl Shell {
             self.list_cursor = at;
             self.scroll(list_height);
         }
+        self.moved();
     }
 
     /// Scroll the list by `by` rows (the mouse wheel); the cursor stays on its row, on screen or
@@ -362,6 +363,7 @@ impl Shell {
     pub fn scroll_by(&mut self, model: &Model, by: isize, list_height: usize) {
         let rows = self.rows(model).len();
         let max_top = rows.saturating_sub(list_height.max(1));
+        self.moved();
         self.list_top = self.list_top.saturating_add_signed(by).min(max_top);
         // Activity's list starts on a notice's first row.
         if self.view == View::Activity {
@@ -375,6 +377,7 @@ impl Shell {
         self.nav_cursor = self.view_index();
         self.home_cursor(model);
         self.list_hidden = false;
+        self.moved();
     }
 
     /// Show workspace `ws` (index into the model's workspaces), from its Home.
@@ -385,6 +388,7 @@ impl Shell {
         self.nav_cursor = 0;
         self.home_cursor(model);
         self.list_hidden = false;
+        self.moved();
     }
 
     /// The conversation under the cursor (to open), or fold or unfold its section.
@@ -496,6 +500,12 @@ impl Shell {
     /// The list cursor is still where the boot put it: the user has not moved it since.
     pub fn untouched(&self) -> bool {
         self.boot_home == Some((self.view, self.list_cursor, self.list_top))
+    }
+
+    /// The user moved the list cursor or the view (a click, the wheel, a jump, another view):
+    /// sections that come later leave it where it is.
+    pub fn moved(&mut self) {
+        self.boot_home = None;
     }
 
     /// Put the list cursor and the view at the top again, as the boot did (sections that came
