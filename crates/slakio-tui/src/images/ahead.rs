@@ -7,8 +7,10 @@
 //!   backend lets through before it answers busy);
 //! - each request goes through the same request budget as any picture (the governor's share
 //!   for pictures), and at most [`AHEAD_PER_MINUTE`] a minute and [`AHEAD_PER_HOUR`] an hour of
-//!   them are asked ahead, so most of that share stays with what is on screen and the rest of
-//!   the budget with everything else;
+//!   them are asked ahead. The governor counts every hop of a photo (up to three, with its
+//!   redirects): at worst 12 of a workspace's 30 pictures a minute (120 of 350 an hour) go
+//!   ahead, so what is on screen keeps at least 18, and the rest of the budget stays with
+//!   everything else;
 //! - an answer that the backend is busy or offline, or that the budget is spent, for any
 //!   picture, stops it for [`RETRY_AFTER`]; one that Slack asks to slow down (429), for as long
 //!   as it says and at least that; a pause only ever lasts longer;
@@ -32,10 +34,11 @@ use std::time::{Duration, Instant};
 
 /// The most photos asked for ahead (or looked for on disk) at once.
 pub const AHEAD_MAX: usize = 1;
-/// The most photos asked of the network ahead in any minute.
-pub const AHEAD_PER_MINUTE: usize = 6;
+/// The most photos asked of the network ahead in any minute (each up to three of the
+/// governor's picture counts, with its redirects).
+pub const AHEAD_PER_MINUTE: usize = 4;
 /// The most photos asked of the network ahead in any hour.
-pub const AHEAD_PER_HOUR: usize = 60;
+pub const AHEAD_PER_HOUR: usize = 40;
 /// The most photos waiting to be asked for ahead.
 pub const AHEAD_QUEUE_MAX: usize = 128;
 

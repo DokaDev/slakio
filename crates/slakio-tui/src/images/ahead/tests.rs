@@ -204,9 +204,27 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
     }
     let first_hour: usize = minutes[..60].iter().sum();
     assert_eq!(first_hour, AHEAD_PER_HOUR, "the hour's share, and no more: {minutes:?}");
-    assert_eq!(minutes[..10], [AHEAD_PER_MINUTE; 10], "the minute's share each minute until the hour's is spent");
-    assert!(minutes[10..60].iter().all(|m| *m == 0), "then none until the hour has passed");
+    // The minutes that spend the hour's share, a full minute's share each.
+    let full = AHEAD_PER_HOUR / AHEAD_PER_MINUTE;
+    assert!(full < 60 && AHEAD_PER_HOUR.is_multiple_of(AHEAD_PER_MINUTE));
+    assert_eq!(
+        minutes[..full],
+        vec![AHEAD_PER_MINUTE; full],
+        "the minute's share each minute until the hour's is spent"
+    );
+    assert!(minutes[full..60].iter().all(|m| *m == 0), "then none until the hour has passed");
     assert!(minutes[60..].iter().sum::<usize>() > 0, "and again after it");
+}
+
+#[test]
+fn photos_ahead_leave_most_of_the_picture_share_even_when_each_is_redirected() {
+    let limits = slakio_slack::governor::Limits::default();
+    // Every hop counts: a photo and each redirect it may follow.
+    let hops = slakio_slack::picture::AVATAR_REDIRECTS + 1;
+    let (minute, hour) = (AHEAD_PER_MINUTE * hops, AHEAD_PER_HOUR * hops);
+    // At most two fifths of a workspace's picture share, so what is on screen keeps the rest.
+    assert!(minute * 5 <= limits.lane_picture_per_minute as usize * 2, "{minute} hops a minute");
+    assert!(hour * 5 <= limits.lane_picture_per_hour as usize * 2, "{hour} hops an hour");
 }
 
 #[test]
