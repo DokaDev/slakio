@@ -32,6 +32,8 @@ const QUICK: Realtime = Realtime {
     wake_check: Duration::from_secs(5),
     wake_gap: Duration::from_secs(10),
     wall: SystemTime::now,
+    resection_wait: Duration::from_millis(200),
+    resection_gap: Duration::from_millis(1500),
 };
 
 /// How far the tests' wall clock is ahead of the real one: moved on, it is as if the machine
@@ -856,5 +858,47 @@ fn a_profile_change_pushes_the_person_with_their_photo_now_and_asks_nothing() {
         let Live::People { users, .. } = r.live().await else { panic!("a person") };
         assert_eq!((users[0].avatar.as_deref(), users[0].no_photo), (None, true), "no photo of their own");
         assert_eq!(r.fake.log().len(), asked, "nothing asked of Slack");
+    });
+}
+
+/// Slack saying the sidebar's sections changed reads them again a moment later, once for every
+/// such event meanwhile, and never sooner than the gap after the read before; anything else
+/// reads nothing. The sections pushed place every conversation of the boot.
+#[test]
+fn sections_changed_live_are_read_again_after_a_pause_at_most_once_a_gap() {
+    const SECTIONS: &str = "users.channelSections.list";
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let before = r.calls(SECTIONS);
+        let asked = Instant::now();
+        for kind in [
+            "channel_section_upserted",
+            "channel_sections_channels_upserted",
+            "channel_section_deleted",
+            "channel_sections_channels_removed",
+        ] {
+            r.fake.push(&json!({"type": kind, "channel_section_id": "L0SECRET", "channel_ids": ["C0SECRET"]}));
+        }
+        let Live::Sections { workspace, sections, places } = r.live().await else { panic!("the sections") };
+        assert!(asked.elapsed() >= QUICK.resection_wait, "after the pause");
+        assert_eq!(r.calls(SECTIONS) - before, 1, "one read for the four events");
+        assert_eq!(workspace, r.ws().id);
+        assert!(!sections.is_empty() && !places.is_empty());
+        assert!(places.iter().all(|(_, at)| sections.iter().any(|s| &s.id == at)));
+        // Another right away: not read again before the gap is over, then once.
+        let first = Instant::now();
+        r.fake.push(&json!({"type": "channel_section_upserted"}));
+        r.quiet(Duration::from_millis(700)).await;
+        assert_eq!(r.calls(SECTIONS) - before, 1, "not within the gap");
+        assert!(matches!(r.live().await, Live::Sections { .. }));
+        assert!(first.elapsed() >= QUICK.resection_gap - Duration::from_millis(400), "{:?}", first.elapsed());
+        assert_eq!(r.calls(SECTIONS) - before, 2);
+        // Other events read nothing.
+        r.fake.push(&json!({"type": "channel_section_upserted_not"}));
+        r.fake.push(&json!({"type": "presence_change", "user": "U1", "presence": "away"}));
+        r.quiet(Duration::from_millis(QUICK.resection_gap.as_millis() as u64 + 300)).await;
+        assert_eq!(r.calls(SECTIONS) - before, 2);
     });
 }

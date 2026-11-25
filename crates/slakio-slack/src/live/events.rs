@@ -1,12 +1,14 @@
 //! What the live updates' socket says, read tolerantly: the frames the client acts on — `hello`,
 //! `goodbye`, a message posted, changed or deleted, a conversation read elsewhere, a person's
 //! profile changed (`user_change`, `user_profile_changed`: the record they carry, nothing asked)
-//! — and nothing else (presence, typing, reactions and the rest are left unread for now). A frame that cannot
+//! — and that the sidebar's sections changed (`channel_section_*`, `channel_sections_channels_*`:
+//! only the event's type) — and nothing else (presence, typing, reactions and the rest are left unread for now). A frame that cannot
 //! be read, or that lacks what it needs (a channel, a timestamp, the counts), is left out:
 //! unknown is not zero.
 //!
 //! Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the event names, which
-//! message subtypes are a new message, an edit or a deletion, and the `*_marked` fields.
+//! message subtypes are a new message, an edit or a deletion, the `*_marked` fields, and the
+//! sidebar sections' event names.
 
 use crate::messages::{Bots, read};
 use crate::wire;
@@ -42,6 +44,9 @@ pub(crate) enum Frame {
     },
     /// A person's record, as it is after their profile changed.
     Person(wire::Person),
+    /// The user's sidebar sections changed (one added, changed or removed, or conversations
+    /// moved between them): what changed is not read, the sections are read again.
+    Sections,
     /// Anything else.
     Other,
 }
@@ -56,6 +61,12 @@ pub(crate) fn frame(text: &str, me: Option<&UserId>) -> Frame {
         Some("message") => message(&v, me).unwrap_or(Frame::Other),
         Some("channel_marked" | "im_marked" | "group_marked" | "mpim_marked") => marked(&v).unwrap_or(Frame::Other),
         Some("user_change" | "user_profile_changed") => person(&v).unwrap_or(Frame::Other),
+        Some(
+            "channel_section_upserted"
+            | "channel_section_deleted"
+            | "channel_sections_channels_upserted"
+            | "channel_sections_channels_removed",
+        ) => Frame::Sections,
         _ => Frame::Other,
     }
 }

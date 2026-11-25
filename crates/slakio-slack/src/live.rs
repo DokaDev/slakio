@@ -13,7 +13,8 @@
 //! open while the machine slept (a laptop's lid closed: the wall clock ran ahead of the monotonic
 //! one, [`Realtime::slept`]), at once, and it opens again without a pause. After a socket was
 //! lost, Slack's unread counts are read again too (one `client.counts`), since what came
-//! meanwhile in conversations not open is counted nowhere else. Every
+//! meanwhile in conversations not open is counted nowhere else. When Slack says the sidebar's
+//! sections changed, they are read again a moment later, at most once every half minute. Every
 //! opening passes the governor: with the network off nothing opens, and switching it off ends the
 //! socket (switched on again, it opens again and asks to catch up); an opening counts against the request cap, and on the workspace's own part of the
 //! background share (while that has no room, the UI is told so: `Held`, not just lost). A workspace's socket is its own: one that fails holds no other back.
@@ -58,6 +59,11 @@ pub struct Realtime {
     pub wake_gap: Duration,
     /// The wall clock (the tests' moves when they say).
     pub wall: fn() -> SystemTime,
+    /// How long after Slack says the sidebar's sections changed they are read again (what else
+    /// it says meanwhile waits with it).
+    pub resection_wait: Duration,
+    /// The least time between two such reads of a workspace's sections.
+    pub resection_gap: Duration,
 }
 
 impl Default for Realtime {
@@ -70,6 +76,8 @@ impl Default for Realtime {
             wake_check: Duration::from_secs(5),
             wake_gap: Duration::from_secs(10),
             wall: SystemTime::now,
+            resection_wait: Duration::from_secs(2),
+            resection_gap: Duration::from_secs(30),
         }
     }
 }
@@ -154,6 +162,8 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     // the socket (and answering its pings) never waits for a lookup.
     let (out, rx) = mpsc::channel::<Out>(OUTBOX);
     tokio::spawn(outbox(Arc::clone(&client), Arc::clone(&ctx), rx, tx));
+    let resections = Arc::new(tokio::sync::Notify::new());
+    tokio::spawn(resection(Arc::clone(&client), Arc::clone(&ctx), Arc::clone(&resections), out.clone(), settings));
     let mut jitter = RandomIds::default();
     // What the UI was last told while not connected: lost, or held by the budget; and whether
     // the network was switched off since the last hello.
@@ -163,7 +173,7 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     loop {
         // What was missed while it was said to be lost (or not connected yet), or while the
         // network was off, is read again.
-        let ended = connection(&client, &ctx, &ws, &out, settings, told.is_some() || off).await;
+        let ended = connection(&client, (&ctx, &resections), &ws, &out, settings, told.is_some() || off).await;
         let (hello, wait, held, woke) = match ended {
             End::Stop => return,
             End::SignedOut => {
@@ -232,6 +242,35 @@ async fn recount(client: Arc<Client>, ws: WorkspaceId, out: mpsc::Sender<Out>) {
         .collect();
     counts.sort_unstable_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     let _ = out.send((Live::Counts { workspace: ws, counts }, None)).await;
+}
+
+/// The sidebar's sections read again each time `wake` is told they changed: after
+/// [`Realtime::resection_wait`] (what is told meanwhile is taken with it), never sooner than
+/// [`Realtime::resection_gap`] after the read before; pushed on `out` placed as at the boot.
+/// Sections that cannot be read push nothing (the sidebar stays as it is).
+async fn resection(
+    client: Arc<Client>,
+    ctx: Arc<Session>,
+    wake: Arc<tokio::sync::Notify>,
+    out: mpsc::Sender<Out>,
+    settings: Realtime,
+) {
+    loop {
+        tokio::select! {
+            () = wake.notified() => {}
+            () = out.closed() => return,
+        }
+        tokio::time::sleep(settings.resection_wait).await;
+        let started = tokio::time::Instant::now();
+        let listed = crate::sections::fetch(&client).await;
+        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        if let Some(live) = placing.update(listed, client.diag())
+            && out.send((live, None)).await.is_err()
+        {
+            return;
+        }
+        tokio::time::sleep_until(started + settings.resection_gap).await;
+    }
 }
 
 /// Push `live` to the UI; `Err` when it is gone.
@@ -310,7 +349,7 @@ async fn close_after_wake(client: &Client, socket: &mut Socket<crate::http::Upgr
 /// before it opened should be read again.
 async fn connection(
     client: &Arc<Client>,
-    ctx: &Session,
+    (ctx, resections): (&Session, &tokio::sync::Notify),
     ws: &WorkspaceId,
     out: &mpsc::Sender<Out>,
     settings: Realtime,
@@ -382,6 +421,11 @@ async fn connection(
                 Some(u) => Live::People { workspace: ws.clone(), users: vec![u] },
                 None => continue,
             },
+            // Read again a while later, once for all that comes meanwhile.
+            Frame::Sections => {
+                resections.notify_one();
+                continue;
+            }
             Frame::Hello | Frame::Other => continue,
         };
         if out.send((live, who)).await.is_err() {
