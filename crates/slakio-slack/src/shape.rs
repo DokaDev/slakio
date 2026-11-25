@@ -1,24 +1,17 @@
 //! The Slack side of the picture diagnostics ([`slakio_core::diag`], off unless asked for): what
 //! a workspace's `emoji.list` answered, where the user's own photo came from, which photo
 //! addresses Slack's answers carried, and the shape (field names, counts and enum-like values,
-//! never names, ids, text or addresses) of `client.userBoot` and `users.channelSections.list`.
-//! Nothing here changes what the backend does or answers: the sections are read only to be
-//! described, once a workspace has booted, and only while the diagnostics are on.
+//! never names, ids, text or addresses) of `client.userBoot`, `client.counts` and
+//! `users.channelSections.list`. Nothing here changes what the backend does or answers.
 
-use crate::client::Client;
 use crate::error::SlackError;
-use crate::governor::Priority;
 use crate::method::Method;
-use crate::request::Call;
 use crate::response::Raw;
 use crate::wire;
 use serde_json::Value;
 use slakio_core::diag::{Diag, Kind, Stage, host, refusal, slug};
 use slakio_core::images::Source;
 use std::collections::BTreeMap;
-
-/// The most pages of `users.channelSections.list` the probe reads.
-pub const SECTION_PAGES: usize = 5;
 
 /// The most entries of one list described (sections of a page, DMs of the start bundle).
 const ENTRIES_MAX: usize = 200;
@@ -156,6 +149,12 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw) {
             Ok(v) => boot_shape(diag, &v),
             Err(_) => diag.line(Kind::BootShape, Stage::Failed, "parse", &[]),
         },
+        Method::ClientCounts => {
+            let v: Value = serde_json::from_slice(&raw.body).unwrap_or_default();
+            for (list, label) in [("channels", "channels_key"), ("mpims", "mpims_key"), ("ims", "ims_key")] {
+                key_lines(diag, Kind::Counts, label, v.get(list).and_then(Value::as_array).into_iter().flatten(), "");
+            }
+        }
         _ => {}
     }
 }
@@ -177,6 +176,7 @@ fn boot_shape(diag: &Diag, v: &Value) {
     for (list, label) in [("ims", "ims_key"), ("channel_sections", "section_key")] {
         key_lines(diag, Kind::BootShape, label, v.get(list).and_then(Value::as_array).into_iter().flatten(), "");
     }
+    sidebar_prefs(diag, v.get("prefs"));
     let profile = v.get("self").and_then(|s| s.get("profile"));
     diag.line(Kind::SelfPhoto, Stage::Parsed, "profile", &[("present", yn(profile.is_some_and(Value::is_object)))]);
     let images =
@@ -186,6 +186,18 @@ fn boot_shape(diag: &Diag, v: &Value) {
     }
     key_lines(diag, Kind::SelfPhoto, "profile_key", profile.into_iter(), "");
     image_tally(diag, Kind::SelfPhoto, profile.into_iter());
+}
+
+/// The preferences whose names speak of the sidebar's order (`sort`, `sidebar`, `section`,
+/// `order`, `dm`): each name, and its value when enum-like or a yes/no (else its kind).
+fn sidebar_prefs(diag: &Diag, prefs: Option<&Value>) {
+    const WORDS: [&str; 6] = ["sort", "sidebar", "channel_sort", "dm", "section", "order"];
+    let named =
+        prefs.and_then(Value::as_object).into_iter().flatten().filter(|(k, _)| WORDS.iter().any(|w| k.contains(w)));
+    for (k, v) in named.take(KEYS_MAX) {
+        let value = v.as_bool().map_or_else(|| enum_like(v), |b| b.to_string());
+        diag.line(Kind::BootShape, Stage::Field, "pref", &[("name", key(k)), ("value", &value)]);
+    }
 }
 
 /// The host of a photo address as a line may tell it: an avatar host, or Amazon's (Slack's own
@@ -411,48 +423,29 @@ pub(crate) fn emoji_counts(
     );
 }
 
-/// Once a workspace has booted, with the diagnostics on: the shape of its sidebar's sections
-/// (`users.channelSections.list`, read-only, in the background share), a page at a time, at most
-/// [`SECTION_PAGES`] pages. Nothing read is kept.
-pub(crate) async fn sections(client: &Client) {
-    let diag = client.diag();
-    if !diag.on() {
-        return;
-    }
-    let mut cursor: Option<String> = None;
-    for page in 1..=SECTION_PAGES {
-        let n = page.to_string();
-        let params: Vec<(&str, &str)> = cursor.as_deref().map(|c| ("cursor", c)).into_iter().collect();
-        diag.line(Kind::Sections, Stage::Asked, "ok", &[("page", &n), ("cursor", yn(cursor.is_some()))]);
-        let call = Call::form(Method::UsersChannelSectionsList, &params).probe();
-        let v = match client.call::<Value>(&call, Priority::Background).await {
-            Ok(v) => v,
-            Err(e) => return failed(diag, Kind::Sections, &e, &[("page", &n)]),
-        };
-        section_shape(diag, &v, &n);
-        cursor = next_cursor(&v);
-        if cursor.is_none() {
-            return diag.line(Kind::Sections, Stage::Counted, "done", &[("pages", &n)]);
-        }
-    }
-    diag.line(Kind::Sections, Stage::Counted, "page-cap", &[("pages", &SECTION_PAGES.to_string())]);
+/// A whole number as a line tells it, else what kind of value it is (`-` when absent).
+fn number(v: Option<&Value>) -> String {
+    v.map_or_else(|| "-".to_string(), |v| v.as_u64().map_or_else(|| type_of(v).to_string(), |n| n.to_string()))
 }
 
-/// The cursor of the next page, when the answer names one.
-fn next_cursor(v: &Value) -> Option<String> {
-    [v.pointer("/response_metadata/next_cursor"), v.get("next_cursor"), v.get("cursor")]
-        .into_iter()
-        .flatten()
-        .find_map(Value::as_str)
-        .filter(|c| !c.is_empty())
-        .map(str::to_string)
-}
-
-/// One page's shape: its fields, then each section's.
-fn section_shape(diag: &Diag, v: &Value, page: &str) {
+/// One page's shape (`asked`: the cursor it was asked with): its fields, its `count`, whether
+/// its top-level `cursor` is the one it was asked with, its `entities`, then each section's.
+pub(crate) fn section_shape(diag: &Diag, v: &Value, page: &str, asked: Option<&str>) {
     key_lines(diag, Kind::Sections, "page_key", std::iter::once(v), page);
-    let list = ["channel_sections", "sections"].into_iter().find_map(|k| v.get(k).and_then(Value::as_array));
-    let Some(list) = list else {
+    let top = v.get("cursor").and_then(Value::as_str);
+    let same = asked.map_or("-", |a| yn(top == Some(a)));
+    let next = v.pointer("/response_metadata/next_cursor").and_then(Value::as_str).is_some_and(|c| !c.is_empty());
+    let count = number(v.get("count"));
+    let pairs = [
+        ("page", page),
+        ("count", &count),
+        ("cursor", yn(top.is_some())),
+        ("next_cursor", yn(next)),
+        ("cursor_same", same),
+    ];
+    diag.line(Kind::Sections, Stage::Counted, "page", &pairs);
+    entities(diag, v.get("entities"), page);
+    let Some(list) = crate::sections::list(v) else {
         return diag.line(Kind::Sections, Stage::Failed, "parse", &[("page", page)]);
     };
     diag.line(Kind::Sections, Stage::Counted, "sections", &[("page", page), ("count", &list.len().to_string())]);
@@ -465,6 +458,7 @@ fn section_shape(diag: &Diag, v: &Value, page: &str) {
         let ids = ids_page.and_then(|p| p.get("channel_ids")).and_then(Value::as_array).map_or(0, Vec::len).to_string();
         let ids_cursor = ids_page.and_then(|p| p.get("cursor")).and_then(Value::as_str).is_some_and(|c| !c.is_empty());
         let next = s.get("next_channel_section_id").is_some_and(|n| !n.is_null());
+        let ids_count = number(ids_page.and_then(|p| p.get("count")));
         let pairs = [
             ("page", page),
             ("n", n.as_str()),
@@ -475,6 +469,7 @@ fn section_shape(diag: &Diag, v: &Value, page: &str) {
             ("ids_page", yn(ids_page.is_some())),
             ("ids_cursor", yn(ids_cursor)),
             ("next_id", yn(next)),
+            ("ids_count", ids_count.as_str()),
         ];
         diag.line(Kind::Sections, Stage::Parsed, "section", &pairs);
         let sorts = s.as_object().into_iter().flatten().filter(|(k, _)| k.contains("sort") || k.contains("order"));
@@ -487,6 +482,23 @@ fn section_shape(diag: &Diag, v: &Value, page: &str) {
             );
         }
     }
+}
+
+/// What a page's `entities` is: its type and size, the names of its fields (an id is `other`)
+/// and of its entries' fields.
+fn entities(diag: &Diag, v: Option<&Value>, page: &str) {
+    let Some(v) = v else {
+        return diag.line(Kind::Sections, Stage::Field, "entities", &[("page", page), ("type", "absent")]);
+    };
+    let (count, entries): (usize, Vec<&Value>) = match v {
+        Value::Object(o) => (o.len(), o.values().collect()),
+        Value::Array(a) => (a.len(), a.iter().collect()),
+        _ => (0, Vec::new()),
+    };
+    let pairs = [("page", page), ("type", type_of(v)), ("count", &count.to_string())];
+    diag.line(Kind::Sections, Stage::Field, "entities", &pairs);
+    key_lines(diag, Kind::Sections, "entities_key", std::iter::once(v).filter(|v| v.is_object()), page);
+    key_lines(diag, Kind::Sections, "entity_key", entries.into_iter(), page);
 }
 
 #[cfg(test)]

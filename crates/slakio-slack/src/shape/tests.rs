@@ -28,7 +28,7 @@ fn a_section_says_its_shape_never_its_name_or_its_channels() {
         ],
         "response_metadata": {"next_cursor": ""}
     });
-    section_shape(&d, &page, "1");
+    section_shape(&d, &page, "1", None);
     let t = text(&d, &path);
     for secret in ["L0SECRET", "Secret", "C0SECRET", "secret_emoji", "dGVhbTpDMDE"] {
         assert!(!t.contains(secret), "{secret} in {t}");
@@ -44,8 +44,8 @@ fn a_section_says_its_shape_never_its_name_or_its_channels() {
     assert!(t.contains("sections field page_key name=response_metadata entries=1 page=1"), "{t}");
     assert!(t.contains("sections field section_key name=channel_ids_page entries=1 page=1"), "{t}");
     assert!(t.contains("sections field section_key name=next_channel_section_id entries=2 page=1"), "{t}");
-    assert_eq!(next_cursor(&page), None);
-    assert_eq!(next_cursor(&json!({"response_metadata": {"next_cursor": "abc"}})), Some("abc".to_string()));
+    assert!(t.contains("sections counted page page=1 count=- cursor=no next_cursor=no cursor_same=-"), "{t}");
+    assert!(t.contains("sections field entities page=1 type=absent"), "{t}");
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn a_section_s_sort_fields_and_a_profile_s_pictures_are_told_at_most_forty_times
         section.insert(format!("sort_{i}"), json!("alphabetical"));
         profile.insert(format!("image_{i}"), json!("x"));
     }
-    section_shape(&d, &json!({"ok": true, "channel_sections": [section]}), "1");
+    section_shape(&d, &json!({"ok": true, "channel_sections": [section]}), "1", None);
     boot_shape(&d, &json!({"ok": true, "self": {"profile": profile}}));
     let text = text(&d, &path);
     assert_eq!(text.lines().filter(|l| l.contains("sections field sort")).count(), KEYS_MAX, "{text}");
@@ -169,4 +169,49 @@ fn entries_without_a_photo_are_tallied_once_not_skipped_silently() {
         "{t}"
     );
     assert_eq!(t.matches("avatar counted decoded from=lookup results=3 pictured=0").count(), 2, "{t}");
+}
+
+#[test]
+fn a_page_tells_its_count_its_cursor_and_its_entities_never_their_values() {
+    let (d, path) = log();
+    let page = json!({
+        "ok": true, "count": 9, "cursor": "U0VDUkVUQ1VSU09S",
+        "entities": {"C0SECRET1": {"id": "C0SECRET1", "name": "Secret Room"}, "apps": {"name": "x"}},
+        "channel_sections": [{"channel_section_id": "L0SECRET1", "name": "", "type": "standard",
+            "channel_ids_page": {"channel_ids": ["C0SECRET1"], "count": 7, "cursor": "U0VDUkVUSURT"}}],
+    });
+    section_shape(&d, &page, "2", Some("U0VDUkVUQ1VSU09S"));
+    let t = text(&d, &path);
+    for secret in ["SECRET", "Secret", "U0VDUkVU"] {
+        assert!(!t.contains(secret), "{secret} in {t}");
+    }
+    assert!(t.contains("sections counted page page=2 count=9 cursor=yes next_cursor=no cursor_same=yes"), "{t}");
+    assert!(t.contains("next_id=no ids_count=7"), "{t}");
+    assert!(t.contains("sections field entities page=2 type=object count=2"), "{t}");
+    assert!(t.contains("sections field entities_key name=apps entries=1 page=2"), "{t}");
+    assert!(t.contains("sections field entities_key name=other entries=1 page=2"), "an id is never told: {t}");
+    assert!(t.contains("sections field entity_key name=name entries=2 page=2"), "{t}");
+}
+
+#[test]
+fn the_sidebar_preferences_and_the_counts_entries_tell_names_only() {
+    let (d, path) = log();
+    let boot = json!({"ok": true, "prefs": {
+        "channel_sort": "alphabetical", "sidebar_behavior": "Secret Free Text", "dm_sort_order": true,
+        "theme": "dark", "muted_channels": "C0SECRET"}});
+    boot_shape(&d, &boot);
+    let counts = json!({"ok": true, "channels": [{"id": "C0SECRET", "latest": "1767603600.000100", "has_unreads": true}],
+        "ims": [{"id": "D0SECRET", "last_read": "1767603600.000100"}], "mpims": []});
+    let raw = Raw { status: 200, retry_after: None, body: counts.to_string().into_bytes() };
+    answered(&d, Method::ClientCounts, &raw);
+    let t = text(&d, &path);
+    for secret in ["SECRET", "Secret", "1767603600"] {
+        assert!(!t.contains(secret), "{secret} in {t}");
+    }
+    assert!(t.contains("boot-shape field pref name=channel_sort value=alphabetical"), "{t}");
+    assert!(t.contains("boot-shape field pref name=sidebar_behavior value=text"), "{t}");
+    assert!(t.contains("boot-shape field pref name=dm_sort_order value=true"), "{t}");
+    assert!(!t.contains("name=theme") && !t.contains("name=muted_channels"), "{t}");
+    assert!(t.contains("counts-shape field channels_key name=latest entries=1"), "{t}");
+    assert!(t.contains("counts-shape field ims_key name=last_read entries=1"), "{t}");
 }

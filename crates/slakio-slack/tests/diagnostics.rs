@@ -123,7 +123,8 @@ impl Run {
         for e in extra {
             address(e, &mut out);
         }
-        out.extend(["LFAKE", "fake-page-2", "fake-ids-cursor"].map(str::to_string));
+        out.extend(["LFAKE", "fake-page-2", "fake-ids-", "ZmFrZS10b3At", "Agents"].map(str::to_string));
+        out.extend(s.sections.iter().map(|x| x.name.unsanitized().to_string()));
         // A part this short (`72`, `png`, `com`) says nothing; the hosts may be told.
         let hosts =
             [AVATAR_HOSTS.as_slice(), &slakio_core::images::EMOJI_HOSTS, &[slakio_core::model::FILE_HOST, "i0.wp.com"]]
@@ -168,7 +169,7 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
         let diag = Diag::to(path.clone());
         let mut r = Run::new(diag.clone()).await;
         assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
-        r.until(SECTIONS, 2).await;
+        r.until(SECTIONS, 1).await;
         let target = r.target("design-review");
         let Event::History(page) = r.ask(Command::History { target, before: None, limit: 20 }).await else { panic!() };
         let Event::Emoji { emoji } = r.ask(Command::Emoji).await else { panic!() };
@@ -211,10 +212,12 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
             "boot-shape field present name=starred type=array count=1",
             "boot-shape field ims_key name=is_open",
             "sections asked ok page=1 cursor=no",
-            "sections asked ok page=2 cursor=yes",
-            "sections parsed section page=1 n=0 type=standard",
-            "is_custom=yes ids=2 ids_page=yes ids_cursor=yes next_id=yes",
-            "sections counted done pages=2",
+            "sections counted page page=1 count=6 cursor=yes next_cursor=no cursor_same=-",
+            "sections field entities page=1 type=object count=0",
+            "sections parsed section page=1 n=0 type=temporary_channels",
+            "sections parsed section page=1 n=2 type=standard",
+            "is_custom=yes ids=6 ids_page=yes ids_cursor=yes next_id=yes ids_count=6",
+            "sections counted done pages=1 why=count-reached",
             &format!("d_host={} d_allowed=yes", AVATAR_HOSTS[2]),
             "avatar status 302 id=",
             "avatar redirected refused id=",
@@ -246,9 +249,11 @@ fn the_sidebar_probe_is_counted_and_stops_at_its_page_cap() {
         let path = scratch("cap");
         let diag = Diag::to(path.clone());
         let mut r = Run::new(diag.clone()).await;
-        let endless = json!({"ok": true, "channel_sections": [], "response_metadata": {"next_cursor": "more"}});
-        for _ in 0..8 {
-            r.fake.fail_next(SECTIONS, Fault::Answer(endless.clone()));
+        // Each page a section never seen, naming one not seen yet, and a next page.
+        for n in 0..8 {
+            let endless = json!({"ok": true, "count": 100, "response_metadata": {"next_cursor": format!("more-{n}")},
+                "channel_sections": [{"channel_section_id": format!("L{n}"), "next_channel_section_id": format!("L{}", n + 1)}]});
+            r.fake.fail_next(SECTIONS, Fault::Answer(endless));
         }
         assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
         r.until(SECTIONS, 5).await;
@@ -263,5 +268,50 @@ fn the_sidebar_probe_is_counted_and_stops_at_its_page_cap() {
         assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
         tokio::time::sleep(Duration::from_millis(300)).await;
         assert_eq!(r.calls(SECTIONS), 5);
+    });
+}
+
+#[test]
+fn a_top_level_cursor_on_every_page_asks_exactly_one_page() {
+    rt().block_on(async {
+        let path = scratch("top-cursor");
+        let diag = Diag::to(path.clone());
+        let mut r = Run::new(diag.clone()).await;
+        // Slack's answer now: a top-level cursor always, no `response_metadata`, the chain open.
+        let forever = json!({"ok": true, "count": 9, "cursor": "c2FtZQ==", "entities": {},
+            "channel_sections": [{"channel_section_id": "L1", "type": "stars", "next_channel_section_id": "L2"}]});
+        for _ in 0..8 {
+            r.fake.fail_next(SECTIONS, Fault::Answer(forever.clone()));
+        }
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        r.until(SECTIONS, 1).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        diag.flush();
+        assert_eq!(r.calls(SECTIONS), 1, "the top-level cursor is no next page");
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("sections counted done pages=1 why=no-cursor"), "{text}");
+        assert!(!text.contains("page=2"), "{text}");
+    });
+}
+
+#[test]
+fn the_older_paged_spelling_is_read_to_its_closed_chain() {
+    rt().block_on(async {
+        let path = scratch("paged");
+        let diag = Diag::to(path.clone());
+        let mut r = Run::new(diag.clone()).await;
+        r.fake.set_sections_paged(true);
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        r.until(SECTIONS, 2).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        diag.flush();
+        assert_eq!(r.calls(SECTIONS), 2, "the second page, then no more");
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("sections asked ok page=2 cursor=yes"), "{text}");
+        assert!(
+            text.contains("sections counted page page=1 count=6 cursor=no next_cursor=yes cursor_same=-"),
+            "{text}"
+        );
+        assert!(text.contains("sections counted done pages=2 why=count-reached"), "{text}");
     });
 }

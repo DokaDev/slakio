@@ -19,6 +19,7 @@
 //! a socket opened with it is refused `401`.
 
 mod shapes;
+mod sidebar;
 mod socket;
 
 pub use socket::ClientFrame;
@@ -120,6 +121,8 @@ struct Shared {
     hello: bool,
     /// The start bundle's own profile leaves its photo out (a user without one of their own).
     no_own_photo: bool,
+    /// The sidebar's sections come in the older spelling, two pages ([`sidebar::paged`]).
+    sections_paged: bool,
     client_frames: Vec<ClientFrame>,
     /// Session tokens no longer accepted.
     revoked: Vec<String>,
@@ -257,6 +260,13 @@ impl FakeSlack {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).no_own_photo = !photo;
     }
 
+    /// Whether the sidebar's sections come in the older spelling, two pages named by
+    /// `response_metadata.next_cursor` (they come as one page, as Slack gives them now, unless
+    /// told otherwise).
+    pub fn set_sections_paged(&self, paged: bool) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).sections_paged = paged;
+    }
+
     /// Every frame the clients sent over their sockets, in order.
     pub fn client_frames(&self) -> Vec<ClientFrame> {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).client_frames.clone()
@@ -282,12 +292,12 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     if upgrade {
         return socket::serve(stream, logged, shared).await;
     }
-    let (fault, delay, no_own_photo) = {
+    let (fault, delay, no_own_photo, paged) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());
         let revoked = s.revoked(&logged).then(|| Fault::Api("invalid_auth".to_string()));
         let fault = revoked.or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front));
-        (fault, s.delay, s.no_own_photo)
+        (fault, s.delay, s.no_own_photo, s.sections_paged)
     };
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
@@ -316,7 +326,11 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
             return write_raw(stream, status, &headers, &body).await;
         }
         None | Some(Fault::Pass) => {
-            let mut answer = shapes::answer(&world, team, &logged);
+            let mut answer = if paged && logged.method() == "users.channelSections.list" {
+                sidebar::paged(&world, team, &logged)
+            } else {
+                shapes::answer(&world, team, &logged)
+            };
             if no_own_photo && let Some(p) = answer.pointer_mut("/self/profile").and_then(|p| p.as_object_mut()) {
                 p.retain(|k, _| !k.starts_with("image_") && k != "is_custom_image");
             }

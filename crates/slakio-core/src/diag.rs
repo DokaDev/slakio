@@ -57,6 +57,8 @@ pub enum Kind {
     Sections,
     /// The shape of `client.userBoot`.
     BootShape,
+    /// The shape of `client.counts`.
+    Counts,
     /// The picture cache on disk as a whole (its sweep).
     PictureCache,
 }
@@ -71,6 +73,7 @@ impl Kind {
             Kind::EmojiList => "emoji-list",
             Kind::Sections => "sections",
             Kind::BootShape => "boot-shape",
+            Kind::Counts => "counts-shape",
             Kind::PictureCache => "picture-cache",
         }
     }

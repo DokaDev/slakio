@@ -20,7 +20,7 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
         "activity.feed" => activity(world, team, request),
         "messages.list" => messages_list(world, team, request),
         "emoji.list" => emoji_list(world, team),
-        "users.channelSections.list" => channel_sections(world, team, request),
+        "users.channelSections.list" => crate::sidebar::answer(world, team),
         _ => json!({"ok": false, "error": "unknown_method"}),
     };
     if let Some(o) = out.as_object_mut() {
@@ -30,7 +30,7 @@ pub(crate) fn answer(world: &World, team: usize, request: &Logged) -> Value {
 }
 
 /// The value of form field `key` of `request`, decoded.
-fn field(request: &Logged, key: &str) -> Option<String> {
+pub(crate) fn field(request: &Logged, key: &str) -> Option<String> {
     request.fields().into_iter().find(|(k, _)| *k == key).map(|(_, v)| decode(v))
 }
 
@@ -61,33 +61,6 @@ fn decode(v: &str) -> String {
 /// The workspace this fake serves: the world's `team`-th.
 fn served(world: &World, team: usize) -> Option<&slakio_core::model::Workspace> {
     world.snapshot().workspaces.get(team)
-}
-
-/// The sidebar's sections, two pages of them (synthetic: one section of the user's own named
-/// after the workspace's first channel, Slack's channels section, then the DMs section on the
-/// page the first one's cursor names).
-fn channel_sections(world: &World, team: usize, request: &Logged) -> Value {
-    let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
-    let s = world.snapshot();
-    let of = |dm: bool| -> Vec<&str> {
-        let mine = s.conversations.iter().filter(|c| c.workspace == ws.id);
-        mine.filter(|c| matches!(c.kind, ConversationKind::Dm { .. }) == dm).map(|c| c.id.as_str()).collect()
-    };
-    let (channels, dms) = (of(false), of(true));
-    let first = s.conversations.iter().find(|c| c.workspace == ws.id).map(|c| c.name.unsanitized().to_string());
-    let page = |id: &str, ids: &[&str], cursor: &str| json!({"channel_ids": ids, "count": ids.len(), "cursor": cursor, "id": id});
-    if field(request, "cursor").as_deref() == Some("fake-page-2") {
-        let dm = json!({"channel_section_id": "LFAKE3", "name": "", "type": "direct_messages", "emoji": "",
-            "next_channel_section_id": null, "last_updated": 1_767_603_600, "channel_ids_page": page("LFAKE3", &dms, "")});
-        return json!({"ok": true, "channel_sections": [dm], "last_updated": 1_767_603_600, "count": 3});
-    }
-    let own = json!({"channel_section_id": "LFAKE1", "name": first.unwrap_or_default(), "type": "standard",
-        "emoji": "star", "next_channel_section_id": "LFAKE2", "last_updated": 1_767_603_600,
-        "channel_ids_page": page("LFAKE1", &channels[..channels.len().min(2)], "fake-ids-cursor")});
-    let all = json!({"channel_section_id": "LFAKE2", "name": "", "type": "channels", "emoji": "",
-        "next_channel_section_id": "LFAKE3", "last_updated": 1_767_603_600, "channel_ids_page": page("LFAKE2", &channels, "")});
-    json!({"ok": true, "channel_sections": [own, all], "last_updated": 1_767_603_600, "count": 3,
-        "response_metadata": {"next_cursor": "fake-page-2"}})
 }
 
 /// The workspace's own emoji ([`slakio_world::emoji::list`]), as `emoji.list` names them.
