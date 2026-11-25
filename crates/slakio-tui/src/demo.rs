@@ -63,7 +63,7 @@ impl Backend for DemoBackend {
                 }
             }
             // The world's invented pictures, by their addresses' paths.
-            Command::Image { source, max } => {
+            Command::Image { source, max, .. } => {
                 let path = source.address().split_once(".com").map_or("", |(_, p)| p);
                 match slakio_world::pictures::served(path).filter(|b| b.len() as u64 <= max) {
                     Some(bytes) => Event::Image { bytes },

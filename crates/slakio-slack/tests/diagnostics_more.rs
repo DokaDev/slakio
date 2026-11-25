@@ -289,8 +289,11 @@ fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
         let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
         has(&r.text(), "self-photo source lookup host=");
         let photo = b.users.iter().find_map(|u| u.avatar.clone()).expect("a photo");
-        let image =
-            Command::Image { source: slakio_core::images::Source::Avatar(photo), max: slakio_core::images::BYTES_MAX };
+        let image = Command::Image {
+            source: slakio_core::images::Source::Avatar(photo),
+            max: slakio_core::images::BYTES_MAX,
+            list: false,
+        };
         assert!(matches!(r.ask(image).await, Event::Failed { .. }));
         let text = r.text();
         has(&text, "avatar cap-reached lane-picture");

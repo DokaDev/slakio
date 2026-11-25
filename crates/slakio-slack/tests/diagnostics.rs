@@ -180,13 +180,13 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
         let photo = page.users.iter().find_map(|u| u.avatar.clone()).expect("a photo");
         let thumb = page.messages.iter().flat_map(|m| &m.files).find_map(|f| f.thumb.clone()).expect("a copy");
         for source in [Source::Avatar(photo), Source::Thumb(thumb), Source::Emoji(emoji_picture.expect("an emoji"))] {
-            assert!(matches!(r.ask(Command::Image { source, max: BYTES_MAX }).await, Event::Image { .. }));
+            assert!(matches!(r.ask(Command::Image { source, max: BYTES_MAX, list: false }).await, Event::Image { .. }));
         }
         let cdn = format!("https://i0.wp.com/{}/img/ava_0001-72.png?ssl=1", AVATAR_HOSTS[2]);
         let to_cdn = vec![("location".to_string(), cdn.clone())];
         r.fake.fail_next(PICTURES, Fault::Raw { status: 302, headers: to_cdn, body: Vec::new() });
         // Gravatar sending elsewhere: its Slack fallback is asked instead, and draws.
-        let fallen = r.ask(Command::Image { source: Source::Avatar(gravatar()), max: BYTES_MAX }).await;
+        let fallen = r.ask(Command::Image { source: Source::Avatar(gravatar()), max: BYTES_MAX, list: false }).await;
         assert!(matches!(fallen, Event::Image { .. }), "{fallen:?}");
         diag.flush();
         let text = std::fs::read_to_string(&path).unwrap();

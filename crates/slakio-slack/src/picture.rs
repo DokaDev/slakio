@@ -73,10 +73,11 @@ pub(crate) fn avatar_headers(os: Os) -> Vec<(&'static str, String)> {
     ]
 }
 
-/// The bytes of the picture at `source`, at most `max` of them, within [`DEADLINE`].
-pub(crate) async fn picture(client: &Client, source: &Source, max: u64) -> Result<Vec<u8>, SlackError> {
+/// The bytes of the picture at `source`, at most `max` of them, within [`DEADLINE`]; one for the
+/// `list` keeps to its part of the pictures' share.
+pub(crate) async fn picture(client: &Client, source: &Source, max: u64, list: bool) -> Result<Vec<u8>, SlackError> {
     let note = Note::new(client.diag(), source);
-    let read = match tokio::time::timeout(DEADLINE, read(client, source, max, &note)).await {
+    let read = match tokio::time::timeout(DEADLINE, read(client, (source, list), max, &note)).await {
         Ok(read) => read,
         Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
     };
@@ -167,12 +168,17 @@ impl<'a> Note<'a> {
     }
 }
 
-async fn read(client: &Client, source: &Source, max: u64, note: &Note<'_>) -> Result<Vec<u8>, SlackError> {
+async fn read(
+    client: &Client,
+    (source, list): (&Source, bool),
+    max: u64,
+    note: &Note<'_>,
+) -> Result<Vec<u8>, SlackError> {
     let mut url = source.checked().ok_or_else(|| api("not_a_picture_address"))?;
     let mut hops = 0;
     let mut answer = loop {
         note.asked(&url, hops);
-        let answer = client.fetch_picture(&url, source).await?;
+        let answer = client.fetch_picture(&url, source, list).await?;
         let mut fallback = None;
         let to = match (answer.status, source) {
             (301 | 302 | 303 | 307 | 308, Source::Thumb(_)) => {

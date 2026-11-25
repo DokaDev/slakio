@@ -96,8 +96,9 @@ pub enum Command {
     Cancel { request: Generation },
     /// The picture at `source` (a thumbnail or a profile photo of the request's workspace), at
     /// most `max` bytes of it, as it came: answered with [`Event::Image`]. Read in the
-    /// background; nothing is saved.
-    Image { source: crate::images::Source, max: u64 },
+    /// background; nothing is saved. One for the `list` (a DM row's photo, or one asked ahead)
+    /// keeps to its part of the pictures' share, so the timeline's always have the rest.
+    Image { source: crate::images::Source, max: u64, list: bool },
     /// The request's workspace's own emoji (Slack's `emoji.list`), read in the background:
     /// answered with [`Event::Emoji`].
     Emoji,

@@ -252,7 +252,7 @@ async fn picture(
     pictures: &mut Vec<InFlight>,
     (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
     id: Generation,
-    (source, max): (slakio_core::images::Source, u64),
+    (source, max, list): (slakio_core::images::Source, u64, bool),
 ) -> bool {
     pictures.retain(|p| !p.task.is_finished());
     if pictures.len() >= PICTURES_MAX {
@@ -262,7 +262,8 @@ async fn picture(
         return tx.send(Envelope::failed(id, e.kind(), e.detail())).await.is_ok();
     }
     let max = max.min(slakio_core::images::BYTES_MAX);
-    let work = async move { crate::picture::picture(&client, &source, max).await.map(|bytes| Event::Image { bytes }) };
+    let work =
+        async move { crate::picture::picture(&client, &source, max, list).await.map(|bytes| Event::Image { bytes }) };
     pictures.push(spawn_once(tasks, tx, id, work));
     true
 }
@@ -286,7 +287,7 @@ async fn downloads(
     match command {
         Command::Download { file, dir, max } => download(tasks, downloading, (client, tx), id, (file, dir, max)).await,
         Command::Cancel { request } => cancel(downloading, &tx, id, request).await,
-        Command::Image { source, max } => picture(tasks, pictures, (client, tx), id, (source, max)).await,
+        Command::Image { source, max, list } => picture(tasks, pictures, (client, tx), id, (source, max, list)).await,
         // The workspace's own emoji ([`crate::emoji`]), on a task of its own.
         Command::Emoji => {
             spawn_once(tasks, tx, id, async move { crate::emoji::emoji(&client).await });

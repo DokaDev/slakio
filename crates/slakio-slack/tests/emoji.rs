@@ -68,7 +68,7 @@ impl Run {
     }
 
     async fn picture(&mut self, source: Source) -> Result<Vec<u8>, FailKind> {
-        match self.ask(Command::Image { source, max: BYTES_MAX }).await {
+        match self.ask(Command::Image { source, max: BYTES_MAX, list: false }).await {
             Event::Image { bytes } => Ok(bytes),
             Event::Failed { kind, .. } => Err(kind),
             other => panic!("{other:?}"),

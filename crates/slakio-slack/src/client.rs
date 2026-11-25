@@ -166,15 +166,17 @@ impl Client {
     /// Ask for picture `url` (a file's smaller copy on the file host, with the session's cookie
     /// as for a file; or a profile photo on an avatar host, or an emoji on the emoji host, with
     /// no cookie and no token): past
-    /// the kill switch and the cap (each ask counts as one background request of this workspace).
+    /// the kill switch and the cap (each ask counts as one background request of this workspace,
+    /// one for the `list` in its part of the pictures' share).
     /// Switching the network off while it is asked ends it.
     pub(crate) async fn fetch_picture(
         &self,
         url: &str,
         source: &slakio_core::images::Source,
+        list: bool,
     ) -> Result<crate::http::Fetched, SlackError> {
         self.still_signed_in()?;
-        self.governor.picture(&self.lane)?;
+        self.governor.list_picture_if(&self.lane, list)?;
         let headers = match source {
             slakio_core::images::Source::Thumb(_) => crate::picture::thumb_headers(&self.credentials, Os::current()),
             slakio_core::images::Source::Avatar(_) | slakio_core::images::Source::Emoji(_) => {

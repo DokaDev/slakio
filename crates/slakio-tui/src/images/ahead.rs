@@ -200,7 +200,7 @@ impl Images {
             self.missed.remove(&key);
             self.failed.retain(|k| *k != key);
             note::line(&self.diag, &key, Stage::Asked, "ahead", &[]);
-            let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
+            let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX, list: true });
             self.asked.insert(id, key.clone());
             self.entries.insert(key.clone(), Entry::Asked(id));
             self.ahead.sent.push_back(now);

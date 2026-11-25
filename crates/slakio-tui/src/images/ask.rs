@@ -102,7 +102,8 @@ impl Images {
                 let again = self.entries.contains_key(&key).to_string();
                 note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", again)]);
             }
-            let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
+            let list = key.1 == CHIP_PHOTO;
+            let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX, list });
             self.asked.insert(id, key.clone());
             self.failed.retain(|k| *k != key);
             self.entries.insert(key, Entry::Asked(id));

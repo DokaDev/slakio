@@ -24,7 +24,7 @@ async fn ask_all(handle: &mut BackendHandle, id: &mut u64, sources: &[Source]) -
     for four in sources.chunks(4) {
         for source in four {
             *id += 1;
-            let command = Command::Image { source: source.clone(), max: BYTES_MAX };
+            let command = Command::Image { source: source.clone(), max: BYTES_MAX, list: false };
             handle.send(Request { id: Generation(*id), workspace: None, command }).unwrap();
         }
         for _ in four {

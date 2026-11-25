@@ -202,7 +202,7 @@ fn a_file_s_preview_is_never_kept_on_disk_nor_looked_for_there() {
     assert!(images.ask(&mut requests, Instant::now()));
     assert!(images.take_lookups().is_empty(), "not looked for on disk");
     let r = requests.take().pop().expect("asked of the backend at once");
-    assert_eq!(r.command, Command::Image { source: thumb.clone(), max: slakio_core::images::BYTES_MAX });
+    assert_eq!(r.command, Command::Image { source: thumb.clone(), max: slakio_core::images::BYTES_MAX, list: false });
     let png = slakio_world::pictures::png(thumb.address(), 64, 64);
     let job = images.answered(r.id, png).expect("a job");
     let result = run(&job, Some((9, 18)), images.cache.as_ref(), &diag);
@@ -376,8 +376,9 @@ fn disk_looks_leave_the_network_its_four_slots() {
     images.ask(&mut requests, Instant::now());
     assert_eq!(images.take_lookups().len(), 10);
     let asked: Vec<_> = requests.take().into_iter().map(|r| r.command).collect();
-    let thumbs: Vec<_> =
-        (0..IN_FLIGHT_MAX).map(|n| Command::Image { source: thumb(n), max: slakio_core::images::BYTES_MAX }).collect();
+    let thumbs: Vec<_> = (0..IN_FLIGHT_MAX)
+        .map(|n| Command::Image { source: thumb(n), max: slakio_core::images::BYTES_MAX, list: false })
+        .collect();
     assert_eq!(asked, thumbs, "the previews take all {IN_FLIGHT_MAX} slots beside the looks");
     let _ = std::fs::remove_dir_all(&dir);
 }

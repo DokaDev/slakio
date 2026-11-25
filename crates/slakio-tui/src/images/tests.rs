@@ -40,7 +40,7 @@ fn fetch(images: &mut Images, requests: &mut Requests, source: &Source) -> Job {
     assert_eq!(images.look(&ws(), source), Look::Pending);
     assert!(images.ask(requests, now));
     let r = requests.take().pop().expect("asked");
-    assert_eq!(r.command, Command::Image { source: source.clone(), max: BYTES_MAX });
+    assert_eq!(r.command, Command::Image { source: source.clone(), max: BYTES_MAX, list: false });
     assert_eq!(r.workspace, Some(ws()));
     images.answered(r.id, vec![1, 2, 3]).expect("a job")
 }
@@ -188,7 +188,7 @@ fn a_photo_in_the_list_s_chip_is_a_picture_of_its_own_beside_the_slot_s() {
     assert_eq!(images.look_as(&ws(), &photo, CHIP_PHOTO), Look::Pending, "the chip's is not the slot's");
     assert!(images.ask(&mut requests, Instant::now()));
     let r = requests.take().pop().expect("asked for the chip");
-    assert_eq!(r.command, Command::Image { source: photo.clone(), max: BYTES_MAX });
+    assert_eq!(r.command, Command::Image { source: photo.clone(), max: BYTES_MAX, list: true });
     let chip = images.answered(r.id, vec![1]).expect("a job");
     assert_eq!(chip.shape, Shape::Photo { cols: 2, rows: 1 });
     assert_ne!(chip.id, slot.id);
@@ -483,7 +483,7 @@ fn a_list_photo_yields_its_room_to_a_timeline_picture() {
     images.ask(&mut requests, Instant::now());
     let asked = requests.take();
     assert_eq!(asked.len(), 1, "{asked:?}");
-    assert_eq!(asked[0].command, Command::Image { source: preview.clone(), max: BYTES_MAX });
+    assert_eq!(asked[0].command, Command::Image { source: preview.clone(), max: BYTES_MAX, list: false });
     let job = images.answered(asked[0].id, vec![1]).expect("a job");
     images.decoded(key(&job), Ok(ready(&job, 10)));
     let sent = images.take_graphics();

@@ -59,7 +59,7 @@ impl Run {
     }
 
     async fn picture(&mut self, source: Source, max: u64) -> Result<Vec<u8>, FailKind> {
-        match self.ask(Command::Image { source, max }).await {
+        match self.ask(Command::Image { source, max, list: false }).await {
             Event::Image { bytes } => Ok(bytes),
             Event::Failed { kind, .. } => Err(kind),
             other => panic!("{other:?}"),
@@ -277,7 +277,11 @@ fn a_picture_that_trickles_ends_at_its_deadline() {
         r.id += 1;
         let id = Generation(r.id);
         r.handle
-            .send(Request { id, workspace: None, command: Command::Image { source: thumb, max: BYTES_MAX } })
+            .send(Request {
+                id,
+                workspace: None,
+                command: Command::Image { source: thumb, max: BYTES_MAX, list: false },
+            })
             .unwrap();
         // Its first bytes came: then the clock runs by itself (paused, it jumps to each timer).
         for _ in 0..500 {
@@ -530,5 +534,34 @@ fn a_dm_peer_s_photo_comes_with_the_boot_before_the_dm_is_opened() {
             assert_eq!(body.get("include_profile_only_if_stale"), None, "the whole profile is asked for");
             assert!(body["updated_ids"].as_object().unwrap().values().all(|v| v == &json!(0)), "{body}");
         }
+    });
+}
+
+#[test]
+fn photos_drawn_down_a_whole_sidebar_leave_the_next_timeline_its_photos() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let mut photos: Vec<Source> = Vec::new();
+        for a in r.world.snapshot().users.iter().filter_map(|u| u.avatar.clone()) {
+            if !photos.contains(&Source::Avatar(a.clone())) {
+                photos.push(Source::Avatar(a));
+            }
+        }
+        assert!(photos.len() >= 38, "{} photos", photos.len());
+        // The sidebar scrolled through: 30 DM rows' photos, the list's.
+        let mut refused = 0;
+        for photo in &photos[..30] {
+            match r.ask(Command::Image { source: photo.clone(), max: BYTES_MAX, list: true }).await {
+                Event::Image { .. } => {}
+                Event::Failed { kind: FailKind::CapReached, .. } => refused += 1,
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(refused, 10, "the list's photos keep to two thirds of the workspace's 30 a minute");
+        // The channel opened next: each of its 8 people's photos comes at once, none waits.
+        for photo in &photos[30..38] {
+            assert_eq!(r.picture(photo.clone(), BYTES_MAX).await.map(|_| ()), Ok(()), "{photo:?}");
+        }
+        assert_eq!(r.picture_requests().len(), 28);
     });
 }
