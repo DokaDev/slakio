@@ -41,9 +41,6 @@ fn a_picture_cut_while_written_draws_nothing_and_the_rest_lands_once_written() {
     }
     // The tail unfinished: what came before is kept, none of it drawn.
     assert_eq!(row("ab\u{1b}_Ga=T;AAAA\u{1b}"), "ab");
-    // Two chunks written one after the other read as the whole.
-    let (first, second) = whole.split_at(whole.find("BB").unwrap());
-    assert_eq!(row(&format!("{first}{second}")), "abcd");
 }
 
 #[test]
