@@ -54,12 +54,17 @@ impl Machine {
     }
 
     fn start(&self, env: &[(&str, &str)]) -> Option<Run> {
+        self.start_at(env, (120, 40))
+    }
+
+    /// [`Machine::start`] in a terminal of `size` (columns, rows).
+    fn start_at(&self, env: &[(&str, &str)], size: (u16, u16)) -> Option<Run> {
         let ws = &self.world.snapshot().workspaces[0];
         let creds = format!("{}|{TOKEN}|{COOKIE}", ws.id);
         let addr = self.fake.addr().to_string();
         let mut all = vec![("SLAKIO_TEST_CREDENTIALS", creds.as_str()), ("SLAKIO_TEST_SLACK_ADDR", addr.as_str())];
         all.extend_from_slice(env);
-        Run::spawn(&self.dir, &self.dir.join("config.toml"), &self.dir.join("typescript"), &all, (120, 40))
+        Run::spawn(&self.dir, &self.dir.join("config.toml"), &self.dir.join("typescript"), &all, size)
     }
 
     fn written(&self) -> Vec<u8> {
@@ -232,6 +237,10 @@ fn a_panic_while_a_picture_is_kept_leaves_it_shown_and_says_so() {
     assert!(!log.contains("https://") && !log.contains("files-tmb") && !log.contains("avatars/"), "{log}");
 }
 
+/// A terminal tall enough for every message the opened conversation shows, its pictures and
+/// files' cards drawn, with rows to spare.
+const TALL: (u16, u16) = (120, 300);
+
 #[test]
 fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let m = Machine::new("kept");
@@ -251,7 +260,20 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let pictures = || fetches().len() - previews();
     let kept = m.dir.join("cache").join("slakio").join("pictures");
     let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
-    let Some(mut run) = m.start(&env) else { return };
+    // Until nothing more is fetched (the DM rows' photos come four at a time, a slow machine
+    // takes a while between them): two seconds with no new fetch, previews too, and (`kept`)
+    // every picture fetched kept.
+    let settle = |what: &str, kept: bool| {
+        let settled = std::cell::Cell::new((usize::MAX, Instant::now()));
+        wait_until(what, || {
+            let now = fetches().len();
+            if (kept && files() != pictures()) || now != settled.get().0 {
+                settled.set((now, Instant::now()));
+            }
+            settled.get().1.elapsed() >= Duration::from_secs(2)
+        });
+    };
+    let Some(mut run) = m.start_at(&env, TALL) else { return };
     run.wait_for("the list", |t| t.contains("deploys"));
     wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
     std::thread::sleep(Duration::from_millis(300));
@@ -264,18 +286,17 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
     // Everything fetched is kept before the run ends.
     wait_until("each picture kept", || files() > 0 && files() == pictures());
-    // Until nothing more is fetched (the DM rows' photos come four at a time, a slow machine
-    // takes a while between them): two seconds with every picture fetched kept and no new one.
-    let settled = std::cell::Cell::new((usize::MAX, Instant::now()));
-    wait_until("the pictures settled", || {
-        let now = (pictures(), files());
-        if now.0 != now.1 || now.0 != settled.get().0 {
-            settled.set((now.0, Instant::now()));
-        }
-        settled.get().1.elapsed() >= Duration::from_secs(2)
-    });
+    settle("the pictures settled", true);
     std::thread::sleep(Duration::from_millis(800));
     assert_eq!(files(), pictures());
+    // The messages fit with room to spare, the preview drawn: nothing was pushed off the screen
+    // while it came (a photo shown only before it came would be one run's and not the other's).
+    let screen = run.output();
+    let lines: Vec<Vec<char>> = screen.lines().map(|l| l.chars().collect()).collect();
+    let title = lines.iter().position(|l| l.iter().collect::<String>().contains("▌#design-review")).expect("its title");
+    let left = lines[title].iter().rposition(|c| *c == '╭').expect("the timeline's corner");
+    let top: String = lines[title + 1].iter().skip(left + 1).take_while(|c| **c != '│').collect();
+    assert!(top.trim().is_empty(), "the timeline's top row is free: {top:?}\n{screen}");
     run.quit();
     let (fetched, previewed) = (pictures(), previews());
     assert!(fetched >= 1 && previewed >= 1, "a preview and photos: {fetched} {previewed}");
@@ -290,7 +311,7 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
         }
     }
     let _ = std::fs::remove_file(m.dir.join("typescript"));
-    let Some(mut run) = m.start(&env) else { return };
+    let Some(mut run) = m.start_at(&env, TALL) else { return };
     run.wait_for("the list", |t| t.contains("deploys"));
     run.type_bytes(b" d");
     run.wait_for("every DM row", |t| t.contains("Alex Morgan") && t.contains("Mallory"));
@@ -298,6 +319,8 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     run.wait_for("the message", |t| t.contains("design-review"));
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
     wait_until("placeholders drawn", || contains(&m.written(), "\u{10EEEE}".as_bytes()));
+    // As long as the first run: whatever it would fetch again, it has by then.
+    settle("the second run's pictures settled", false);
     std::thread::sleep(Duration::from_millis(800));
     run.quit();
     assert_eq!(pictures(), fetched, "nothing fetched again: every photo came from the disk");
