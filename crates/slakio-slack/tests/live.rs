@@ -902,3 +902,43 @@ fn sections_changed_live_are_read_again_after_a_pause_at_most_once_a_gap() {
         assert_eq!(r.calls(SECTIONS) - before, 2);
     });
 }
+
+/// Every task of the backend ended and let its client go: the governor is held by the test alone.
+async fn client_let_go(governor: &Arc<Governor>) {
+    until("every task let the client go", || Arc::strong_count(governor) == 1).await;
+}
+
+/// The UI gone, the live updates' tasks end with it (the sections waiting to be read again too),
+/// and let the client go.
+#[test]
+fn the_ui_gone_ends_every_task_of_the_live_updates() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        r.fake.push(&json!({"type": "channel_section_upserted"}));
+        let Run { fake, handle, governor, .. } = r;
+        drop(handle);
+        client_let_go(&governor).await;
+        drop(fake);
+    });
+}
+
+/// Signed out, the live updates' tasks end (a read of the sections waiting ends with them), and
+/// the client is let go once the UI drops the handle.
+#[test]
+fn signed_out_the_live_updates_end_every_task() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        r.fake.push(&json!({"type": "channel_section_upserted"}));
+        r.fake.revoke(TOKEN, true);
+        r.lost().await;
+        assert!(matches!(r.live().await, Live::Connection { state: Connection::SignedOut, .. }));
+        let Run { fake, handle, governor, .. } = r;
+        drop(handle);
+        client_let_go(&governor).await;
+        drop(fake);
+    });
+}

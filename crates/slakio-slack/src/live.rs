@@ -164,7 +164,7 @@ pub(crate) async fn run(client: Arc<Client>, ctx: Arc<Session>, tx: mpsc::Sender
     let (out, rx) = mpsc::channel::<Out>(OUTBOX);
     tokio::spawn(outbox(Arc::clone(&client), Arc::clone(&ctx), rx, tx));
     let resections = Arc::new(tokio::sync::Notify::new());
-    tokio::spawn(resection(Arc::clone(&client), Arc::clone(&ctx), Arc::clone(&resections), out.clone(), settings));
+    let _reading = spawn_resection(&client, &ctx, &resections, &out, settings);
     let mut jitter = RandomIds::default();
     // What the UI was last told while not connected: lost, or held by the budget; and whether
     // the network was switched off since the last hello.
@@ -243,6 +243,29 @@ async fn recount(client: Arc<Client>, ws: WorkspaceId, out: mpsc::Sender<Out>) {
         .collect();
     counts.sort_unstable_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     let _ = out.send((Live::Counts { workspace: ws, counts }, None)).await;
+}
+
+/// [`resection`] on a task of its own, until signed out or the sender returned is dropped (the
+/// run ended: the UI gone, signed out): the outbox ends only once every sender of `out` is gone,
+/// the reads' too.
+fn spawn_resection(
+    client: &Arc<Client>,
+    ctx: &Arc<Session>,
+    wake: &Arc<tokio::sync::Notify>,
+    out: &mpsc::Sender<Out>,
+    settings: Realtime,
+) -> tokio::sync::oneshot::Sender<()> {
+    let (reading, ended) = tokio::sync::oneshot::channel::<()>();
+    let reads = resection(Arc::clone(client), Arc::clone(ctx), Arc::clone(wake), out.clone(), settings);
+    let signed_out = Arc::clone(client);
+    tokio::spawn(async move {
+        tokio::select! {
+            () = reads => {}
+            _ = ended => {}
+            () = signed_out.signed_out() => {}
+        }
+    });
+    reading
 }
 
 /// The sidebar's sections read again each time `wake` is told they changed: after
