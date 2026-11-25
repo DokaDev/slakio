@@ -1,22 +1,23 @@
 ---
 source: crates/slakio-tui/tests/settings_flows.rs
+assertion_line: 91
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
 │▎╭ Settings ────────────────────────────────────────────╮ │
-│ │                                       12 more above  │ │
-│ │   Download folder  ‹ ~/Downlo…s/slakio ›  Enter: ty… │ │
-│ │   Download limit   ‹ 1024              ›  MB: large… │ │
-│ │ Connection                                           │ │
-├─│   Network          ‹ on                ›  applies o… │ │
+│ │                                       16 more above  │ │
 │ │   Live updates     ‹ on                ›  applies o… │ │
 │ │   Restore tabs     ‹ on                ›  applies o… │ │
 │ │   Message cache    ‹ on                ›  applies o… │ │
+├─│ Sidebar                                              │ │
+│ │   Channel order    ‹ alphabetical      ›  By name    │ │
+│ │   DM order         ‹ recent            ›  Newest fi… │ │
 │ │                                                      │ │
 │ │──────────────────────────────────────────────────────│ │
-│ │ off: nothing is kept on disk between runs (every     │ │
-│ │ start fetches).                                      │ │
-│ │ Set with :set cache=…                                │ │
+│ │ How the sidebar orders Direct messages and Apps, and │ │
+│ │ how the DMs view does. :sort-section sets one        │ │
+│ │ section.                                             │ │
+│ │ Set with :set dm_sort=…                              │ │
 │ │ Saved to /home/me/.config/slakio/config.toml         │ │
 │ │ More settings in /home/me/.config/slakio/config.toml │ │
 │ ╰────── j/k move · h/l change · Enter keep · Esc close ╯ │

@@ -92,6 +92,7 @@ fn a_workspace_s_new_sections_take_the_place_of_its_own_among_the_others() {
         workspace: WorkspaceId::new(ws),
         name: crate::sanitize::Remote::new(""),
         kind: SectionKind::Channels,
+        sort: None,
     };
     let mut s = Snapshot {
         sections: vec![section("T1", "a"), section("T2", "b"), section("T2", "c"), section("T3", "d")],

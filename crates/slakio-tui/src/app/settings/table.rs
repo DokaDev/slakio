@@ -14,6 +14,7 @@ pub enum Group {
     Language,
     Files,
     Network,
+    Sidebar,
 }
 
 impl Group {
@@ -24,6 +25,7 @@ impl Group {
             Group::Language => Label::SettingsGroupLanguage,
             Group::Files => Label::SettingsGroupFiles,
             Group::Network => Label::SettingsGroupNetwork,
+            Group::Sidebar => Label::SettingsGroupSidebar,
         }
     }
 }
@@ -153,6 +155,26 @@ pub const SETTINGS: &[Spec] = &[
         Label::SettingsAboutRestore,
     ),
     on_restart("cache", Label::SettingsLabelCache, Group::Network, Values::Fixed(ON_OFF), Label::SettingsAboutCache),
+    row(
+        "channel_sort",
+        Label::SettingsLabelChannelSort,
+        Group::Sidebar,
+        Values::Fixed(&[
+            ("alphabetical", Some(Label::SettingsSortAlphabetical)),
+            ("recent", Some(Label::SettingsSortRecent)),
+        ]),
+        Label::SettingsAboutChannelSort,
+    ),
+    row(
+        "dm_sort",
+        Label::SettingsLabelDmSort,
+        Group::Sidebar,
+        Values::Fixed(&[
+            ("recent", Some(Label::SettingsSortRecent)),
+            ("alphabetical", Some(Label::SettingsSortAlphabetical)),
+        ]),
+        Label::SettingsAboutDmSort,
+    ),
 ];
 
 /// The row of setting `key`.
@@ -227,7 +249,10 @@ mod tests {
     #[test]
     fn the_groups_are_in_screen_order_and_each_once() {
         let groups: Vec<Group> = groups().into_iter().map(|(g, _)| g).collect();
-        assert_eq!(groups, [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network]);
+        assert_eq!(
+            groups,
+            [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network, Group::Sidebar]
+        );
     }
 
     /// A group's heading never reads as one of its rows (Korean once named the pictures group and
@@ -235,7 +260,7 @@ mod tests {
     #[test]
     fn no_group_is_named_as_a_row() {
         use slakio_core::i18n::{I18n, Lang};
-        let groups = [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network];
+        let groups = [Group::Display, Group::Pictures, Group::Language, Group::Files, Group::Network, Group::Sidebar];
         for lang in [Lang::En, Lang::Ko] {
             let i18n = I18n::new(lang);
             for g in groups {

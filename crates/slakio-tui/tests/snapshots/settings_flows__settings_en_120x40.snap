@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/settings_flows.rs
+assertion_line: 73
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
@@ -23,15 +24,15 @@ expression: d.snap()
 │         │   Live updates     ‹ on                 ›  applies on next launch                                │         │
 │ ▾ Channe│   Restore tabs     ‹ on                 ›  applies on next launch                                │         │
 │   # anno│   Message cache    ‹ on                 ›  applies on next launch                                │         │
-│   # desi│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
+│   # desi│ Sidebar                                                                                          │         │
+│   # feed│   Channel order    ‹ alphabetical       ›  By name                                               │         │
+│   # feed│   DM order         ‹ recent             ›  Newest first                                          │         │
+│   # feed│──────────────────────────────────────────────────────────────────────────────────────────────────│         │
 │   # feed│ The colours. h/l show each theme at once; Enter keeps the one shown; c copies it to a new theme  │         │
 │   # feed│ file. Theme files go in themes/ next to the config file.                                         │         │
 │   # feed│ Set with :set theme=…                                                                            │         │
 │   # feed│ Saved to /home/me/.config/slakio/config.toml                                                     │         │
 │   # feed│ More settings in /home/me/.config/slakio/config.toml                                             │         │
-│   # feed│                                                                                                  │         │
-│   # feed│                                                                                                  │         │
-│   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │
 │   # feed│                                                                                                  │         │

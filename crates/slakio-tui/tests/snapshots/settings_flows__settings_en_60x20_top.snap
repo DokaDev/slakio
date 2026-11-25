@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/settings_flows.rs
+assertion_line: 89
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
@@ -10,7 +11,7 @@ expression: d.snap()
 │ │   View rows        ‹ expanded          ›  A row per… │ │
 ├─│   Nerd Font icons  ‹ off               ›  Text and…  │ │
 │ │                                                      │ │
-│ │                                       14 more below  │ │
+│ │                                       17 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter      │ │
 │ │ keeps the one shown; c copies it to a new theme      │ │

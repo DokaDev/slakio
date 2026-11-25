@@ -148,6 +148,9 @@ pub enum ShellAction {
     TodoFilter,
     /// Order To-dos (`:sort <value>`; alone, the orders to pick).
     TodoSort,
+    /// The section under the list's cursor ordered by name, or the newest first, whichever it
+    /// is not (`:sort-section`); kept with the layout.
+    SortSection,
 }
 
 /// Actions of the work area's panes (Normal and VISUAL mode) and its history.
@@ -438,6 +441,7 @@ pub const REGISTRY: &[ActionSpec] = &[
     shell(ShellAction::TodoClear, "todo.clear", Label::ActionTodoClear, &[]),
     shell(ShellAction::TodoFilter, "todo.filter", Label::ActionTodoFilter, &["filter"]),
     shell(ShellAction::TodoSort, "todo.sort", Label::ActionTodoSort, &["sort"]),
+    shell(ShellAction::SortSection, "list.sort_section", Label::ActionSortSection, &["sort-section"]),
     pane(PaneAction::Next, "pane.next", Label::ActionPaneNext, &[]),
     pane(PaneAction::Prev, "pane.prev", Label::ActionPanePrev, &[]),
     pane(PaneAction::First, "pane.first", Label::ActionPaneFirst, &[]),

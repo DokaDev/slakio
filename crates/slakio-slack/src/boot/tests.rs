@@ -407,3 +407,43 @@ fn a_closed_dm_or_group_dm_is_listed_closed_and_keeps_its_section() {
     assert_eq!(state("D3"), (false, "T1:dms".into()), "in is_open: open");
     assert_eq!(state("D4"), (false, "T1:dms".into()), "not said: open");
 }
+
+#[test]
+fn a_conversation_s_newest_message_is_the_counts_latest_else_a_dm_s_update() {
+    let b: wire::UserBoot = serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team"},
+        "channels": [{"id": "C1", "name": "general"}, {"id": "C2", "name": "quiet"}],
+        "ims": [
+            {"id": "D1", "user": "U1", "updated": 1_767_600_000_123_u64},
+            {"id": "D2", "user": "U2", "updated": "1767600000456"},
+            {"id": "D3", "user": "U3", "updated": 1_767_600_000_789_u64},
+            {"id": "D4", "user": "U4", "updated": 17},
+        ],
+    }))
+    .unwrap();
+    let counts: wire::Counts = serde_json::from_value(json!({
+        "channels": [{"id": "C1", "latest": "1767603600.000100"}, {"id": "C2", "latest": "not a time"}],
+        "mpims": [],
+        "ims": [{"id": "D3", "latest": "1767603700.000200"}],
+    }))
+    .unwrap();
+    let s = snapshot(b, Some(counts), Vec::new(), NOW);
+    let latest = |id| find(&s, id).latest.map(|t| t.0);
+    assert_eq!(latest("C1"), Some(1_767_603_600_000_100));
+    assert_eq!(latest("C2"), None, "not a time: unknown");
+    assert_eq!(latest("D1"), Some(1_767_600_000_123_000), "the DM's update, in milliseconds");
+    assert_eq!(latest("D2"), Some(1_767_600_000_456_000), "as text too");
+    assert_eq!(latest("D3"), Some(1_767_603_700_000_200), "the counts' first");
+    assert_eq!(latest("D4"), None, "not a time of a plausible size");
+    let kinds: Vec<(SectionKind, Option<slakio_core::model::Sort>)> =
+        s.sections.iter().map(|x| (x.kind, x.sort)).collect();
+    assert_eq!(
+        kinds,
+        [
+            (SectionKind::Channels, Some(slakio_core::model::Sort::Alphabetical)),
+            (SectionKind::DirectMessages, Some(slakio_core::model::Sort::Recent))
+        ],
+        "ordered as Slack's desktop app orders them by default"
+    );
+}

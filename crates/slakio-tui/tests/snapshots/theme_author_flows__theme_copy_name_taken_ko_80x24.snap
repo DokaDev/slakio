@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/theme_author_flows.rs
+assertion_line: 80
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -14,7 +15,7 @@ expression: d.snap()
 │ │   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊)        │ │
 │ │   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊)      │ │
 │ │   ＊＊＊            ‹ on                 ›  GIF·APNG ＊＊＊ ＊＊＊       │ │
-│ │                                                          ＊＊＊ 10＊ ＊  │ │
+│ │                                                          ＊＊＊ 13＊ ＊  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ ＊＊＊ ＊＊: Nord                                                        │ │
 │ │ terminal＊ ＊＊＊: Enter＊ ＊＊ ＊＊, Esc＊ ＊＊                         │ │

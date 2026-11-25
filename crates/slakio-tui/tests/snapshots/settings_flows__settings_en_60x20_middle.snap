@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/settings_flows.rs
+assertion_line: 93
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────╮
@@ -12,7 +13,7 @@ expression: d.snap()
 │ │ Pictures                                             │ │
 │ │   Avatars          ‹ initials          ›  Coloured…  │ │
 │ │   Images           ‹ auto              ›  Where kno… │ │
-│ │                                       11 more below  │ │
+│ │                                       14 more below  │ │
 │ │──────────────────────────────────────────────────────│ │
 │ │ Previews of shared pictures and profile photos,      │ │
 │ │ where the terminal draws them (also :images).        │ │

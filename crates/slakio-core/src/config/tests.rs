@@ -245,3 +245,19 @@ fn a_saved_setting_is_the_user_s_alone() {
     assert_eq!(mode(&path), 0o600);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_sidebar_orders_are_read() {
+    let d = Config::default();
+    assert_eq!((d.channel_sort.as_str(), d.dm_sort.as_str()), ("alphabetical", "recent"));
+    let cfg = parse("channel_sort = \"Recent\"\ndm_sort = \"alphabetical\"\n").unwrap();
+    assert_eq!((cfg.channel_sort.as_str(), cfg.dm_sort.as_str()), ("recent", "alphabetical"));
+    assert_eq!(
+        parse("dm_sort = \"oldest\""),
+        Err(ConfigError::Value {
+            key: "dm_sort".into(),
+            value: "\"oldest\"".into(),
+            allowed: "alphabetical, recent".into()
+        })
+    );
+}

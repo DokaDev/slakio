@@ -1,8 +1,8 @@
 use super::super::shell::View;
 use super::super::todos::TodoView;
 use super::*;
-use slakio_core::model::SectionKind;
 use slakio_core::model::{Org, SavedItem, SavedState};
+use slakio_core::model::{SectionKind, Sort};
 use slakio_world::World;
 
 fn model() -> Model {
@@ -12,7 +12,7 @@ fn model() -> Model {
 /// The rows of `view`, sections in `collapsed` folded, no group folded, To-dos unfiltered.
 fn rows_of(m: &Model, ws: usize, view: View, collapsed: &HashSet<SectionId>) -> Vec<Row> {
     let ws = m.workspaces().get(ws).map_or_else(|| WorkspaceId::new("T-none"), |w| w.id.clone());
-    m.rows(&ws, view, collapsed, &HashSet::new(), &TodoView::default())
+    m.rows(&ws, view, (collapsed, &HashSet::new()), &Sorting::default(), &TodoView::default())
 }
 
 /// The id of workspace `i`.
@@ -433,7 +433,7 @@ fn empty_starred_external_and_apps_sections_are_not_shown_the_others_are() {
     let ws = s.workspaces[0].id.clone();
     let mut add = |name: &str, kind: SectionKind| {
         let id = SectionId::new(format!("empty-{name}"));
-        s.sections.push(Section { id, workspace: ws.clone(), name: Remote::new(name), kind });
+        s.sections.push(Section { id, workspace: ws.clone(), name: Remote::new(name), kind, sort: None });
     };
     for (name, kind) in [
         ("Empty starred", SectionKind::Favorites),
@@ -520,6 +520,7 @@ fn sections_unknown(a: &WorkspaceId, part: &Snapshot) -> Snapshot {
         workspace: a.clone(),
         name: "".into(),
         kind,
+        sort: None,
     };
     s.sections = vec![of("channels", SectionKind::Channels), of("dms", SectionKind::DirectMessages)];
     for c in &mut s.conversations {
@@ -564,4 +565,104 @@ fn a_boot_that_does_not_know_slack_s_sections_keeps_those_shown_before() {
     m.merge(&a, &known, false);
     let kinds: Vec<SectionKind> = m.snapshot.sections.iter().filter(|x| x.workspace == a).map(|x| x.kind).collect();
     assert_eq!(kinds, [SectionKind::Channels, SectionKind::DirectMessages]);
+}
+
+/// The names of the conversations of section `kind` of workspace 0, as Home lists them with
+/// `sorting`.
+fn listed_in(m: &Model, kind: SectionKind, sorting: &Sorting) -> Vec<String> {
+    let ws = ws(m, 0);
+    let rows = m.rows(&ws, View::Home, (&HashSet::new(), &HashSet::new()), sorting, &TodoView::default());
+    let at = m.snapshot.sections.iter().find(|s| s.workspace == ws && s.kind == kind).unwrap().id.clone();
+    rows.iter()
+        .filter_map(|r| if let Row::Conversation(i) = r { Some(m.conversation(*i)) } else { None })
+        .filter(|c| c.section == at)
+        .map(|c| c.name.unsanitized().to_string())
+        .collect()
+}
+
+/// The demo world with workspace 0's Channels ordered (`Some(order)`), its first channels named
+/// and dated so the orders differ.
+fn ordered_model(order: Option<Sort>) -> Model {
+    let mut s = World::demo().snapshot().clone();
+    let ws = s.workspaces[0].id.clone();
+    let channels = s.sections.iter_mut().find(|x| x.workspace == ws && x.kind == SectionKind::Channels).unwrap();
+    channels.sort = order;
+    let at = channels.id.clone();
+    let mut mine: Vec<&mut Conversation> =
+        s.conversations.iter_mut().filter(|c| c.workspace == ws && c.section == at).collect();
+    // Listed b, Alpha, c, alpha2: by name Alpha, alpha2, b, c; the newest first c, b, then the
+    // two not known as listed.
+    for (c, (name, latest)) in mine.iter_mut().zip([("b", Some(2)), ("Alpha", None), ("c", Some(3)), ("alpha2", None)])
+    {
+        c.name = Remote::new(name);
+        c.latest = latest.map(slakio_core::model::Ts);
+    }
+    s.conversations.retain(|c| {
+        c.workspace != ws || c.section != at || ["b", "Alpha", "c", "alpha2"].contains(&c.name.unsanitized())
+    });
+    Model::new(s)
+}
+
+#[test]
+fn a_section_listed_in_order_keeps_it_whatever_the_settings() {
+    let m = model();
+    let listed = listed_in(&m, SectionKind::Channels, &Sorting::default());
+    let recent = Sorting { channels: Sort::Recent, dms: Sort::Alphabetical, ..Sorting::default() };
+    assert_eq!(listed_in(&m, SectionKind::Channels, &recent), listed, "the demo's sections keep their order");
+    let m = ordered_model(None);
+    assert_eq!(listed_in(&m, SectionKind::Channels, &Sorting::default()), ["b", "Alpha", "c", "alpha2"]);
+}
+
+#[test]
+fn an_ordered_section_is_by_name_or_the_newest_first_as_the_settings_and_its_own_choice_say() {
+    let m = ordered_model(Some(Sort::Alphabetical));
+    let by_name = Sorting::default();
+    assert_eq!(listed_in(&m, SectionKind::Channels, &by_name), ["Alpha", "alpha2", "b", "c"], "case ignored");
+    let newest = Sorting { channels: Sort::Recent, ..Sorting::default() };
+    assert_eq!(listed_in(&m, SectionKind::Channels, &newest), ["c", "b", "Alpha", "alpha2"], "unknown last, as listed");
+    // The section's own choice wins over the setting.
+    let ws = ws(&m, 0);
+    let at =
+        m.snapshot.sections.iter().find(|s| s.workspace == ws && s.kind == SectionKind::Channels).unwrap().id.clone();
+    let mut own = newest.clone();
+    own.sections.insert(at, Sort::Alphabetical);
+    assert_eq!(listed_in(&m, SectionKind::Channels, &own), ["Alpha", "alpha2", "b", "c"]);
+}
+
+#[test]
+fn the_dms_view_takes_the_order_of_direct_messages() {
+    let mut s = World::demo().snapshot().clone();
+    let ws = s.workspaces[0].id.clone();
+    let dms: Vec<usize> = (0..s.conversations.len())
+        .filter(|i| s.conversations[*i].workspace == ws && s.conversations[*i].is_dm())
+        .collect();
+    assert!(dms.len() >= 2);
+    // The last DM listed is the newest.
+    let last = *dms.last().unwrap();
+    s.conversations[last].latest = Some(slakio_core::model::Ts(9));
+    let view = |s: &Snapshot| {
+        let m = Model::new(s.clone());
+        let rows =
+            m.rows(&ws, View::Dms, (&HashSet::new(), &HashSet::new()), &Sorting::default(), &TodoView::default());
+        rows.iter().filter_map(|r| if let Row::Conversation(i) = r { Some(*i) } else { None }).collect::<Vec<_>>()
+    };
+    assert_eq!(view(&s), dms, "Direct messages listed in order: so is the view");
+    s.sections
+        .iter_mut()
+        .filter(|x| x.workspace == ws && x.kind == SectionKind::DirectMessages)
+        .for_each(|x| x.sort = Some(Sort::Recent));
+    assert_eq!(view(&s)[0], last, "the newest first");
+}
+
+#[test]
+fn a_message_makes_its_conversation_the_newest() {
+    let mut m = ordered_model(Some(Sort::Recent));
+    let newest = Sorting { channels: Sort::Recent, ..Sorting::default() };
+    let ws = ws(&m, 0);
+    let alpha = m.conversations().iter().find(|c| c.name == "Alpha").unwrap().id.clone();
+    assert!(m.bump(&ws, &alpha, false, slakio_core::model::Ts(5)));
+    assert_eq!(listed_in(&m, SectionKind::Channels, &newest), ["Alpha", "c", "b", "alpha2"]);
+    // An older message changes nothing of the order.
+    assert!(m.bump(&ws, &alpha, false, slakio_core::model::Ts(1)));
+    assert_eq!(m.conversations().iter().find(|c| c.id == alpha).unwrap().latest, Some(slakio_core::model::Ts(5)));
 }

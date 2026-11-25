@@ -21,7 +21,7 @@
 use serde::Deserialize;
 use slakio_core::backend::Live;
 use slakio_core::diag::{Diag, Kind, Stage};
-use slakio_core::model::{ConversationId, Section, SectionId, SectionKind, WorkspaceId};
+use slakio_core::model::{ConversationId, Section, SectionId, SectionKind, Sort, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
 
@@ -85,6 +85,17 @@ fn kind(t: &str) -> Option<SectionKind> {
     })
 }
 
+/// How a section orders its conversations unless the UI says otherwise, as Slack's desktop app
+/// does by default: DMs and apps the newest first, the others by name.
+fn default_sort(kind: SectionKind) -> Sort {
+    match kind {
+        SectionKind::DirectMessages | SectionKind::Apps => Sort::Recent,
+        SectionKind::Favorites | SectionKind::Custom | SectionKind::External | SectionKind::Channels => {
+            Sort::Alphabetical
+        }
+    }
+}
+
 /// The longest id of a section the user made that is taken.
 const ID_MAX: usize = 32;
 
@@ -145,6 +156,7 @@ impl Sidebar {
             workspace: ws.clone(),
             name: Remote::new(name),
             kind,
+            sort: Some(default_sort(kind)),
         };
         let (mut sections, mut custom) = (Vec::new(), HashMap::new());
         for (n, s) in order(listed.unwrap_or_default()).into_iter().enumerate() {

@@ -159,6 +159,12 @@ async fn dnd(client: &Client, ids: &[String], now: u64) -> HashMap<String, bool>
     out
 }
 
+/// The newest message's time of each conversation Slack's counts list it for.
+fn latest_of(counts: &wire::Counts) -> HashMap<String, Ts> {
+    let all = [&counts.channels, &counts.mpims, &counts.ims].into_iter().flatten().flatten();
+    all.filter_map(|n| Some((n.id.clone(), Ts(wire::ts(n.latest.as_deref()?)?)))).collect()
+}
+
 /// The unread counts of each conversation Slack listed: (unread, mentions).
 pub(crate) fn unread_counts(counts: wire::Counts) -> HashMap<String, (u32, u32)> {
     let mut out = HashMap::new();
@@ -184,6 +190,13 @@ fn snapshot(
     let (Some(team), Some(me)) = (boot.team, boot.me) else { return (Snapshot::default(), Vec::new()) };
     let ws = WorkspaceId::new(&team.id);
     let counts_failed = counts.is_none();
+    let mut latest = counts.as_ref().map(latest_of).unwrap_or_default();
+    // A DM's newest message, when the counts do not tell it: when Slack last changed it.
+    for im in boot.ims.iter().flatten() {
+        if let Some(at) = im.updated.as_ref().and_then(wire::updated).filter(|_| !latest.contains_key(&im.id)) {
+            latest.insert(im.id.clone(), Ts(at));
+        }
+    }
     let unread = counts.map(unread_counts).unwrap_or_default();
     let muted: HashSet<String> = boot.prefs.as_ref().map(wire::Prefs::muted).unwrap_or_default();
     let starred: HashSet<String> = boot.starred.unwrap_or_default().into_iter().collect();
@@ -192,7 +205,7 @@ fn snapshot(
     let conversation = |(id, name, kind, facts, closed): Listed| {
         let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
         let section = sidebar.place(&id, facts);
-        let external = facts.external;
+        let (external, latest) = (facts.external, latest.get(&id).copied());
         Conversation {
             muted: muted.contains(&id),
             id: ConversationId::new(id),
@@ -204,6 +217,7 @@ fn snapshot(
             closed,
             unread,
             mentions,
+            latest,
         }
     };
     let channels = boot.channels.unwrap_or_default();

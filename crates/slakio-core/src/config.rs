@@ -11,6 +11,8 @@
 //! avatars = "initials"     # a person's initials on a colored chip, "image" (profile photos), or "off"
 //! density = "comfortable"  # messages as in GUI Slack (avatar block, name over the text), or "compact"
 //! nav_rows = "expanded"    # the view switcher a row per view, or "collapsed" to the view shown
+//! channel_sort = "alphabetical" # the sidebar's channels by name, or "recent" (newest first)
+//! dm_sort = "recent"       # the sidebar's DMs and apps newest first, or "alphabetical"
 //! network = "on"           # "off": nothing is sent to Slack at all (also SLAKIO_NETWORK=off)
 //! live = "on"              # "off": no live updates (their socket may show you as active)
 //! cache = "on"             # "off": nothing is kept on disk between runs (every start fetches)
@@ -65,6 +67,12 @@ pub struct Config {
     /// The view switcher a row per view (`expanded`) or folded to the view shown
     /// (`collapsed`) ([`NAV_ROWS`]).
     pub nav_rows: String,
+    /// How the sidebar orders the conversations of its sections but Direct messages and Apps:
+    /// `alphabetical` or `recent` ([`SORTS`]).
+    pub channel_sort: String,
+    /// How the sidebar orders Direct messages and Apps, and the DMs view: `recent` or
+    /// `alphabetical` ([`SORTS`]).
+    pub dm_sort: String,
     /// `off`: no request leaves the process ([`NETWORK`]); the environment can turn it off too.
     pub network: String,
     /// `off`: no live updates' socket is opened, the rest of the network stays ([`LIVE`]).
@@ -108,6 +116,8 @@ impl Default for Config {
             avatars: "initials".to_string(),
             density: "comfortable".to_string(),
             nav_rows: "expanded".to_string(),
+            channel_sort: "alphabetical".to_string(),
+            dm_sort: "recent".to_string(),
             network: "on".to_string(),
             live: "on".to_string(),
             cache: "on".to_string(),
@@ -160,6 +170,9 @@ pub const DENSITIES: &[&str] = &["comfortable", "compact"];
 
 /// The values `nav_rows` takes.
 pub const NAV_ROWS: &[&str] = &["expanded", "collapsed"];
+
+/// The values `channel_sort` and `dm_sort` take.
+pub const SORTS: &[&str] = &["alphabetical", "recent"];
 
 /// The values `network` takes.
 pub const NETWORK: &[&str] = &["on", "off"];
@@ -251,6 +264,8 @@ fn parse(text: &str) -> Result<Config, ConfigError> {
             "avatars" => cfg.avatars = one_of(item, AVATARS).ok_or_else(|| bad(AVATARS.join(", ")))?,
             "density" => cfg.density = one_of(item, DENSITIES).ok_or_else(|| bad(DENSITIES.join(", ")))?,
             "nav_rows" => cfg.nav_rows = one_of(item, NAV_ROWS).ok_or_else(|| bad(NAV_ROWS.join(", ")))?,
+            "channel_sort" => cfg.channel_sort = one_of(item, SORTS).ok_or_else(|| bad(SORTS.join(", ")))?,
+            "dm_sort" => cfg.dm_sort = one_of(item, SORTS).ok_or_else(|| bad(SORTS.join(", ")))?,
             "network" => cfg.network = one_of(item, NETWORK).ok_or_else(|| bad(NETWORK.join(", ")))?,
             "live" => cfg.live = one_of(item, LIVE).ok_or_else(|| bad(LIVE.join(", ")))?,
             "cache" => cfg.cache = one_of(item, CACHE).ok_or_else(|| bad(CACHE.join(", ")))?,

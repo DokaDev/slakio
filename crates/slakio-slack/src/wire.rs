@@ -167,7 +167,7 @@ pub struct Im {
     pub connected_team_ids: Option<Vec<String>>,
     #[serde(default, deserialize_with = "loose")]
     pub is_open: Option<bool>,
-    /// When it last changed (Slack's own clock; not read yet).
+    /// When it last changed: milliseconds since the Unix epoch, as Slack gives it.
     #[serde(default, deserialize_with = "loose")]
     pub updated: Option<serde_json::Value>,
 }
@@ -188,6 +188,9 @@ pub struct Count {
     pub id: String,
     pub has_unreads: Option<bool>,
     pub mention_count: Option<u32>,
+    /// Its newest message's timestamp, when Slack gives it.
+    #[serde(default, deserialize_with = "loose")]
+    pub latest: Option<String>,
 }
 
 /// `conversations.view`: the conversation's newest messages under `history`, and (some of)
@@ -582,7 +585,7 @@ pub struct MessagesList {
 }
 
 mod stamps;
-pub use stamps::ts;
+pub use stamps::{ts, updated};
 
 #[cfg(test)]
 mod tests;

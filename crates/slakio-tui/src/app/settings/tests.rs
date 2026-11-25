@@ -359,3 +359,26 @@ fn animate_is_a_pictures_row_and_set_turns_it_off_and_on() {
         }
     }
 }
+
+#[test]
+fn the_sidebar_orders_are_sidebar_rows_set_and_read_at_launch() {
+    use slakio_core::model::Sort;
+    let mut a = app();
+    for (setting, default, other) in [("channel_sort", "alphabetical", "recent"), ("dm_sort", "recent", "alphabetical")]
+    {
+        let k = find(setting).unwrap();
+        assert_eq!(SETTINGS[k].group, table::Group::Sidebar);
+        assert_eq!(a.setting_value(k), default, "{setting}");
+        let line = format!("set {setting}={}", other.to_uppercase());
+        let Some(Ok((row, value))) = table::parse_set(&line) else { panic!("{line}") };
+        a.apply_setting(row, &value, Instant::now()).unwrap();
+        assert_eq!(a.setting_value(k), other);
+        assert_eq!(saved(&mut a), [(setting, other.to_string())]);
+    }
+    assert_eq!((a.shell.sorting.channels, a.shell.sorting.dms), (Sort::Recent, Sort::Alphabetical));
+    assert_eq!((a.prefs.config.channel_sort.as_str(), a.prefs.config.dm_sort.as_str()), ("recent", "alphabetical"));
+    let mut b = App::new(Lang::En, Theme::terminal());
+    let cfg = Config { channel_sort: "recent".into(), dm_sort: "alphabetical".into(), ..Config::default() };
+    b.load_at_start(TRUECOLOR, &cfg, true, Instant::now());
+    assert_eq!((b.shell.sorting.channels, b.shell.sorting.dms), (Sort::Recent, Sort::Alphabetical));
+}

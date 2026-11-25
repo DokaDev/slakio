@@ -98,6 +98,8 @@ pub struct Shell {
     /// The first row on screen.
     pub list_top: usize,
     pub collapsed: HashSet<SectionId>,
+    /// How the sections order their conversations.
+    pub sorting: super::model::Sorting,
     /// Folded groups of saved items.
     pub groups: HashSet<Group>,
     /// How To-dos are filtered and ordered, and its changes waiting for the backend.
@@ -118,6 +120,7 @@ impl Default for Shell {
             list_cursor: 0,
             list_top: 0,
             collapsed: HashSet::new(),
+            sorting: super::model::Sorting::default(),
             groups: HashSet::new(),
             todo: TodoView::default(),
             list_hidden: false,
@@ -139,7 +142,7 @@ impl Shell {
 
     pub fn rows(&self, model: &Model) -> Vec<Row> {
         let Some(ws) = self.current(model) else { return vec![] };
-        model.rows(&ws.id, self.view, &self.collapsed, &self.groups, &self.todo)
+        model.rows(&ws.id, self.view, (&self.collapsed, &self.groups), &self.sorting, &self.todo)
     }
 
     /// The id of the row under the cursor, to find it again once the rows change.
@@ -261,7 +264,8 @@ impl Shell {
             | ShellAction::TodoMove
             | ShellAction::TodoClear
             | ShellAction::TodoFilter
-            | ShellAction::TodoSort => {}
+            | ShellAction::TodoSort
+            | ShellAction::SortSection => {}
         }
         self.scroll(list_height);
         // An item's second line shows with it.

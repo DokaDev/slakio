@@ -7,7 +7,7 @@
 use super::todos::Group;
 use slakio_core::backend::{Connection, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, SavedId, Section, SectionId, Target, User, UserId, Workspace, WorkspaceColor,
+    Conversation, ConversationId, SavedId, Section, SectionId, Target, Ts, User, UserId, Workspace, WorkspaceColor,
     WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
@@ -339,14 +339,16 @@ impl Model {
     }
 
     /// A message by someone else came live into conversation `id` of `ws`: one more unread (and
-    /// one more mention when it mentions the user, or every message of a DM does), and a closed
-    /// DM is open again. Muting
+    /// one more mention when it mentions the user, or every message of a DM does), posted at
+    /// `at` (its newest message now), and a closed DM is open again. Muting
     /// changes what badges show, not the counts ([`Conversation::badges`]). `true` when listed.
-    pub fn bump(&mut self, ws: &WorkspaceId, id: &ConversationId, mention: bool) -> bool {
+    pub fn bump(&mut self, ws: &WorkspaceId, id: &ConversationId, mention: bool, at: Ts) -> bool {
         let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
             return false;
         };
-        // A message opens a closed DM again, as in Slack's sidebar.
+        // Its newest message now (what orders it by recency), and a closed DM open again, as in
+        // Slack's sidebar.
+        c.latest = c.latest.max(Some(at));
         let reopened = std::mem::take(&mut c.closed);
         // Counts Slack did not give stay unknown: one more on an unknown count is still unknown.
         if self.counts_unknown.contains(ws) {
@@ -514,6 +516,7 @@ pub mod activity;
 mod forget;
 mod photos;
 mod rows;
+pub use rows::Sorting;
 mod saved;
 mod sections;
 #[cfg(test)]

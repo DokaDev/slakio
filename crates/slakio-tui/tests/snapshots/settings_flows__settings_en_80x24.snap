@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/settings_flows.rs
+assertion_line: 73
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -15,7 +16,7 @@ expression: d.snap()
 │ │   Animate          ‹ on                 ›  GIF/APNG pictures move        │ │
 │ │ Locale                                                                   │ │
 │ │   Language         ‹ auto               ›  applies on next launch        │ │
-│ │                                                            8 more below  │ │
+│ │                                                           11 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ The colours. h/l show each theme at once; Enter keeps the one shown; c   │ │
 │ │ copies it to a new theme file. Theme files go in themes/ next to the     │ │

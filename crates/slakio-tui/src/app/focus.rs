@@ -189,6 +189,7 @@ impl App {
             // Saved in the config file: the app's.
             ShellAction::ToggleNavRows => return self.toggle_nav_rows(now),
             ShellAction::NavSelect if self.shell.nav_folded => return self.toggle_nav_rows(now),
+            ShellAction::SortSection => return self.sort_section(now),
             ShellAction::TodoToggle
             | ShellAction::TodoMove
             | ShellAction::TodoClear

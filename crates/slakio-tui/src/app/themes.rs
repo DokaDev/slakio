@@ -36,6 +36,7 @@ impl App {
         self.prefs.theme_dir = cfg.path.as_deref().and_then(theme_file::dir);
         self.prefs.config = cfg.clone();
         self.prefs.writable = writable;
+        self.use_sorting(cfg);
         self.prefs.download_env = std::env::var(super::settings::DOWNLOAD_ENV).ok().filter(|v| !v.is_empty());
         self.prefs.network_env =
             std::env::var(super::settings::NETWORK_ENV).ok().filter(|v| v.eq_ignore_ascii_case("off"));

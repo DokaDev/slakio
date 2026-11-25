@@ -18,6 +18,7 @@ use crate::keymap::KeyChord;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use slakio_core::config::{self, Config};
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::model::Sort;
 use std::path::PathBuf;
 use std::time::Instant;
 use table::{SETTINGS, Values};
@@ -103,6 +104,8 @@ impl App {
             "density" => "comfortable",
             "nav_rows" if self.shell.nav_folded => "collapsed",
             "nav_rows" => "expanded",
+            "channel_sort" => self.shell.sorting.channels.name(),
+            "dm_sort" => self.shell.sorting.dms.name(),
             "icons" if s.icons => "on",
             "icons" => "off",
             "avatars" if !s.avatars => "off",
@@ -143,6 +146,12 @@ impl App {
                 self.effects.push(Effect::Save { key, value: value.clone() });
                 self.info(Msg::NavRowsChanged { name: value }, now);
                 return Ok(());
+            }
+            "channel_sort" | "dm_sort" => {
+                let order = Sort::named(&value).unwrap_or(Sort::Alphabetical);
+                self.sort_sections(|s| if key == "dm_sort" { s.dms = order } else { s.channels = order });
+                let c = &mut self.prefs.config;
+                if key == "dm_sort" { &mut c.dm_sort } else { &mut c.channel_sort }.clone_from(&value);
             }
             "downloads" => return self.set_downloads(&value, now),
             "download_max_mb" => {

@@ -53,6 +53,7 @@ pub mod search;
 pub mod settings;
 pub mod shell;
 pub mod signin;
+mod sorting;
 mod splits;
 pub mod status;
 mod tabs;

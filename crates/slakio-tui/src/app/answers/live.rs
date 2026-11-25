@@ -39,7 +39,7 @@ impl App {
                 // messages (sent from another client) are read.
                 let counts = !changed && (thread.is_none() || broadcast);
                 if counts && self.model.me(&workspace) != Some(&message.user) {
-                    drawn |= self.model.bump(&workspace, &conversation, mention);
+                    drawn |= self.model.bump(&workspace, &conversation, mention, message.ts);
                 }
                 // A new mention is listed in Activity (a reply too), and Activity read again.
                 if mention && !changed && self.model.me(&workspace) != Some(&message.user) {

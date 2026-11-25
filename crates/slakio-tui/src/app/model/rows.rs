@@ -1,20 +1,65 @@
-//! The list panel's rows of a view.
+//! The list panel's rows of a view: a section's conversations in the order it takes
+//! ([`Sorting`]), the DMs view's as Direct messages take theirs.
 
 use super::super::shell::View;
 use super::super::todos::{Group, TodoView};
 use super::{Model, Row};
-use slakio_core::model::{SectionId, SectionKind, WorkspaceId};
-use std::collections::HashSet;
+use slakio_core::model::{Conversation, Section, SectionId, SectionKind, Sort, WorkspaceId};
+use std::collections::{HashMap, HashSet};
+
+/// How the list orders the conversations of a section that is ordered ([`Section::sort`]; one
+/// that is not keeps the order listed).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Sorting {
+    /// Every section but Direct messages and Apps (`channel_sort`).
+    pub channels: Sort,
+    /// Direct messages and Apps, and the DMs view (`dm_sort`).
+    pub dms: Sort,
+    /// The user's own choice for a section (`:sort-section`), over both.
+    pub sections: HashMap<SectionId, Sort>,
+}
+
+impl Default for Sorting {
+    fn default() -> Self {
+        Self { channels: Sort::Alphabetical, dms: Sort::Recent, sections: HashMap::new() }
+    }
+}
+
+impl Sorting {
+    /// The order section `s` takes; `None`: the order listed.
+    pub fn of(&self, s: &Section) -> Option<Sort> {
+        s.sort?;
+        let setting = match s.kind {
+            SectionKind::DirectMessages | SectionKind::Apps => self.dms,
+            SectionKind::Favorites | SectionKind::Custom | SectionKind::External | SectionKind::Channels => {
+                self.channels
+            }
+        };
+        Some(self.sections.get(&s.id).copied().unwrap_or(setting))
+    }
+}
+
+/// `convs` in `order` (stable: those alike keep the order listed): by name, case ignored; or the
+/// newest first, those whose newest message is not known last.
+fn ordered(mut convs: Vec<(usize, &Conversation)>, order: Option<Sort>) -> Vec<(usize, &Conversation)> {
+    match order {
+        None => {}
+        Some(Sort::Alphabetical) => convs.sort_by_cached_key(|(_, c)| c.name.unsanitized().to_lowercase()),
+        Some(Sort::Recent) => convs.sort_by_key(|(_, c)| std::cmp::Reverse(c.latest)),
+    }
+    convs
+}
 
 impl Model {
     /// The rows of `view` in workspace `ws`, sections in `collapsed` and groups in `groups`
-    /// folded, To-dos as `opts` filters and orders them.
+    /// folded, conversations in the order `sorting` gives their section, To-dos as `opts`
+    /// filters and orders them.
     pub fn rows(
         &self,
         ws: &WorkspaceId,
         view: View,
-        collapsed: &HashSet<SectionId>,
-        groups: &HashSet<Group>,
+        (collapsed, groups): (&HashSet<SectionId>, &HashSet<Group>),
+        sorting: &Sorting,
         opts: &TodoView,
     ) -> Vec<Row> {
         if self.workspace(ws).is_none() {
@@ -29,10 +74,11 @@ impl Model {
                     // user's own and Starred.
                     let keeps_closed = matches!(s.kind, SectionKind::Favorites | SectionKind::Custom);
                     let shown = convs.clone().filter(|(_, c)| c.section == s.id && (keeps_closed || !c.closed));
+                    let shown = ordered(shown.collect(), sorting.of(s));
                     // Starred, External connections and Apps show only when they list a
                     // conversation; the others always do.
                     let hides = matches!(s.kind, SectionKind::Favorites | SectionKind::External | SectionKind::Apps);
-                    if hides && shown.clone().next().is_none() {
+                    if hides && shown.is_empty() {
                         continue;
                     }
                     if !rows.is_empty() {
@@ -40,7 +86,7 @@ impl Model {
                     }
                     rows.push(Row::Section(si));
                     if !collapsed.contains(&s.id) {
-                        rows.extend(shown.map(|(i, _)| Row::Conversation(i)));
+                        rows.extend(shown.into_iter().map(|(i, _)| Row::Conversation(i)));
                     }
                 }
                 // Saved messages, after the sections (Slack's Home "Saved").
@@ -55,7 +101,16 @@ impl Model {
                 rows
             }
             View::Todos => self.todo_rows(ws, groups, opts),
-            View::Dms => convs.filter(|(_, c)| c.is_dm()).map(|(i, _)| Row::Conversation(i)).collect(),
+            // In the order Direct messages take theirs.
+            View::Dms => {
+                let dms =
+                    self.snapshot.sections.iter().find(|s| &s.workspace == ws && s.kind == SectionKind::DirectMessages);
+                let order = dms.and_then(|s| sorting.of(s)).map(|_| sorting.dms);
+                ordered(convs.filter(|(_, c)| c.is_dm()).collect(), order)
+                    .into_iter()
+                    .map(|(i, _)| Row::Conversation(i))
+                    .collect()
+            }
             View::Activity => self.notice_rows(),
             // Not built yet: the list panel says so.
             View::Files => vec![],

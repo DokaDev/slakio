@@ -231,7 +231,7 @@ fn a_theme_file_that_cannot_be_used_is_shown_never_kept() {
 
 #[test]
 fn set_errors_say_what_is_wrong_in_both_languages() {
-    let keys = "theme, density, nav_rows, icons, avatars, images, animate, language, downloads, download_max_mb, network, live, restore, cache";
+    let keys = "theme, density, nav_rows, icons, avatars, images, animate, language, downloads, download_max_mb, network, live, restore, cache, channel_sort, dm_sort";
     let cases = [
         ("set colour=red", format!("No setting colour (one of {keys})")),
         ("set live=maybe", "live cannot be maybe (one of on, off)".to_string()),
@@ -553,9 +553,9 @@ fn rows_are_named_by_label_and_the_selected_one_says_its_set_key() {
         }
     }
     let en = "Theme | Density | View rows | Nerd Font icons | Avatars | Images | Animate | Language | Download folder | \
-              Download limit | Network | Live updates | Restore tabs | Message cache";
+              Download limit | Network | Live updates | Restore tabs | Message cache | Channel order | DM order";
     let ko = "＊＊ | ＊＊ | ＊＊ ＊ | Nerd Font ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊＊ | ＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ ＊＊ | ＊＊＊＊ | \
-              ＊＊＊ ＊＊＊＊ | ＊ ＊＊ | ＊＊＊ ＊＊";
+              ＊＊＊ ＊＊＊＊ | ＊ ＊＊ | ＊＊＊ ＊＊ | ＊＊ ＊＊ | DM ＊＊";
     assert_eq!(got, [en, ko, en, ko], "at 80 and 120 columns, in English and Korean");
     // The keys stay findable: `:images` and `:avatars` in the help.
     for word in [":images", ":avatars"] {

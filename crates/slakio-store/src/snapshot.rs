@@ -12,7 +12,7 @@ use rusqlite::{Connection, Row, Transaction, params};
 use slakio_core::backend::Snapshot;
 use slakio_core::model::{
     Conversation, ConversationId, ConversationKind, Org, Presence, SavedId, SavedItem, SavedState, Section, SectionId,
-    SectionKind, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
+    SectionKind, Sort, Ts, User, UserId, Workspace, WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 
@@ -60,6 +60,21 @@ fn section_kind(n: i64) -> rusqlite::Result<SectionKind> {
         4 => SectionKind::External,
         5 => SectionKind::Apps,
         _ => return Err(damaged("section kind")),
+    })
+}
+
+fn sort_code(s: Sort) -> i64 {
+    match s {
+        Sort::Alphabetical => 0,
+        Sort::Recent => 1,
+    }
+}
+
+fn sort(n: i64) -> rusqlite::Result<Sort> {
+    Ok(match n {
+        0 => Sort::Alphabetical,
+        1 => Sort::Recent,
+        _ => return Err(damaged("section order")),
     })
 }
 
@@ -135,8 +150,8 @@ fn put_conversation(tx: &Transaction<'_>, ord: usize, c: &Conversation) -> rusql
     };
     tx.execute(
         "INSERT INTO conversations (ord, id, workspace, kind, private, peers, name, section, external, muted, unread, mentions,
-             closed)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+             closed, latest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             int(ord as u64)?,
             c.id.as_str(),
@@ -150,7 +165,8 @@ fn put_conversation(tx: &Transaction<'_>, ord: usize, c: &Conversation) -> rusql
             c.muted,
             c.unread,
             c.mentions,
-            c.closed
+            c.closed,
+            c.latest.map(|t| int(t.0)).transpose()?
         ],
     )?;
     Ok(())
@@ -175,6 +191,7 @@ fn conversation(r: &Row<'_>) -> rusqlite::Result<Conversation> {
         muted: r.get("muted")?,
         unread: count(r.get("unread")?)?,
         mentions: count(r.get("mentions")?)?,
+        latest: r.get::<_, Option<i64>>("latest")?.map(uint).transpose()?.map(Ts),
     })
 }
 
@@ -249,8 +266,15 @@ fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> ru
     }
     for (i, sec) in s.sections.iter().enumerate() {
         tx.execute(
-            "INSERT INTO sections (workspace, ord, id, name, kind) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, int(i as u64)?, sec.id.as_str(), sec.name.unsanitized(), section_code(sec.kind)],
+            "INSERT INTO sections (workspace, ord, id, name, kind, sort) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                id,
+                int(i as u64)?,
+                sec.id.as_str(),
+                sec.name.unsanitized(),
+                section_code(sec.kind),
+                sec.sort.map(sort_code)
+            ],
         )?;
     }
     for (i, c) in s.conversations.iter().enumerate() {
@@ -310,6 +334,7 @@ fn read(conn: &Connection, ws: &WorkspaceId) -> rusqlite::Result<Option<Snapshot
             workspace: WorkspaceId::new(r.get::<_, String>("workspace")?),
             name: Remote::new(r.get::<_, String>("name")?),
             kind: section_kind(r.get("kind")?)?,
+            sort: r.get::<_, Option<i64>>("sort")?.map(sort).transpose()?,
         })
     })?;
     let conversations = all(conn, "SELECT * FROM conversations WHERE workspace = ?1 ORDER BY ord", id, conversation)?;

@@ -346,6 +346,7 @@ Type `:` and the command, then `Enter`.
 | `:todos` | `:later` | Show To-dos |
 | `:filter` |  | Filter To-dos by state or reminder |
 | `:sort` |  | Order To-dos |
+| `:sort-section` |  | Order the section by name, or the newest first |
 | `:open` |  | Open a message's link (or :open &lt;url&gt;) |
 | `:download` |  | Download a file shared in a message |
 | `:vsplit` | `:vs` | Split right (thread, else same) |

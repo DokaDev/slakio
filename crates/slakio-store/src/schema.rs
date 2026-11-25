@@ -92,6 +92,11 @@ pub const MIGRATIONS: &[&str] = &[
     "DELETE FROM meta WHERE 0;",
     // 6: whether a DM or group DM is closed in Slack's sidebar; kept before: open.
     "ALTER TABLE conversations ADD COLUMN closed INTEGER NOT NULL DEFAULT 0;",
+    // 7: when a conversation's newest message was posted (NULL: not known) and how a section
+    // orders its conversations (NULL: as listed; 0 by name, 1 by recency); kept before: unknown,
+    // as listed.
+    "ALTER TABLE conversations ADD COLUMN latest INTEGER;
+     ALTER TABLE sections ADD COLUMN sort INTEGER;",
 ];
 
 /// Where a database stands against `migrations`.

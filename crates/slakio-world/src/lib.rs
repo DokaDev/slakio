@@ -467,6 +467,8 @@ impl World {
                 workspace: ws.clone(),
                 name: (*name).into(),
                 kind: *kind,
+                // The demo's sections keep the order listed.
+                sort: None,
             });
             let mut names: Vec<String> = channels.iter().map(|c| c.to_string()).collect();
             if *kind == SectionKind::Channels {
@@ -555,6 +557,7 @@ impl World {
             muted,
             unread,
             mentions,
+            latest: None,
         });
         self.plans.insert(id, Plan { team, name: plan_name, count, history, posters, start, step });
     }

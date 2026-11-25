@@ -12,7 +12,9 @@ mod scripted;
 use ratatui::crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use scripted::Scripted;
 use slakio_core::backend::{Command, Envelope, Event, Found, Generation, Hit, Live};
-use slakio_core::model::{Conversation, ConversationId, Message, Section, SectionId, SectionKind, Target, Ts, UserId};
+use slakio_core::model::{
+    Conversation, ConversationId, Message, Section, SectionId, SectionKind, Sort, Target, Ts, UserId,
+};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::model::{Row, SignedIn};
 use slakio_tui::app::shell::View;
@@ -53,12 +55,14 @@ fn sections_that_come_later_replace_the_workspace_s_and_the_cursor_stays_on_its_
         workspace: ws.clone(),
         name: "Channels".into(),
         kind: SectionKind::Channels,
+        sort: None,
     };
     let dms = Section {
         id: SectionId::new(format!("{}:dms", ws.as_str())),
         workspace: ws.clone(),
         name: "Direct messages".into(),
         kind: SectionKind::DirectMessages,
+        sort: None,
     };
     let places: Vec<(ConversationId, SectionId)> = (s.d.app.model.conversations().iter())
         .filter(|c| c.workspace == ws)
@@ -92,6 +96,7 @@ fn sections_of_a_workspace_not_listed_change_nothing() {
         workspace: ws.clone(),
         name: "Channels".into(),
         kind: SectionKind::Channels,
+        sort: None,
     };
     push(&mut s, Live::Sections { workspace: ws, sections: vec![section], places: Vec::new() });
     s.keys("j");
@@ -268,6 +273,7 @@ fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_th
                 workspace: ws.clone(),
                 name: if *kind == SectionKind::Custom { "Mine".into() } else { "".into() },
                 kind: *kind,
+                sort: None,
             })
             .collect();
         // One conversation in each (the others of the workspace left out), so every header
@@ -296,4 +302,55 @@ fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_th
             assert!(screen.contains(&start), "{lang:?}: {name} in {screen}");
         }
     }
+}
+
+/// The names of the conversations Home lists in workspace 0's Channels, in order.
+fn channels_listed(s: &Scripted) -> Vec<String> {
+    let ws = &s.d.app.model.workspaces()[0].id;
+    let at = (s.d.app.list_rows().iter())
+        .find_map(|r| match r {
+            Row::Section(i) if s.d.app.model.section(*i).kind == SectionKind::Channels => {
+                Some(s.d.app.model.section(*i).id.clone())
+            }
+            _ => None,
+        })
+        .unwrap();
+    (s.d.app.list_rows().iter())
+        .filter_map(|r| if let Row::Conversation(i) = r { Some(s.d.app.model.conversation(*i)) } else { None })
+        .filter(|c| c.section == at && c.workspace == *ws)
+        .map(|c| c.name.unsanitized().to_string())
+        .collect()
+}
+
+#[test]
+fn sort_section_switches_the_section_under_the_cursor_and_the_cursor_stays() {
+    let mut snapshot = World::demo().snapshot().clone();
+    let ws = snapshot.workspaces[0].id.clone();
+    let section = snapshot.sections.iter_mut().find(|x| x.workspace == ws && x.kind == SectionKind::Channels).unwrap();
+    section.sort = Some(Sort::Alphabetical);
+    let at = section.id.clone();
+    // The channel last by name is the newest.
+    let last = (snapshot.conversations.iter_mut())
+        .filter(|c| c.workspace == ws && c.section == at)
+        .max_by_key(|c| c.name.unsanitized().to_lowercase())
+        .unwrap();
+    last.latest = Some(Ts(1_767_603_600_000_000));
+    let last = last.name.unsanitized().to_string();
+    let mut s = Scripted::booted(true, Some(snapshot));
+    s.d.app.show_unfolded(View::Home);
+    let by_name = channels_listed(&s);
+    assert_eq!(by_name.last(), Some(&last), "by name: {by_name:?}");
+    let second = by_name[1].clone();
+    s.d.list_cursor_on(&second);
+    s.keys(":");
+    s.d.type_text("sort-section");
+    s.keys("enter");
+    let newest = channels_listed(&s);
+    assert_eq!(newest[0], last, "the newest first now: {newest:?}");
+    assert_eq!(under_cursor(&s).as_deref(), Some(second.as_str()), "the cursor stays on its conversation");
+    // Again: by name again.
+    s.keys(":");
+    s.d.type_text("sort-section");
+    s.keys("enter");
+    assert_eq!(channels_listed(&s), by_name);
 }

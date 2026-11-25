@@ -227,6 +227,7 @@ fn sections_slack_could_not_tell_keep_those_kept_before() {
         workspace: ws.clone(),
         name: Remote::new(""),
         kind,
+        sort: None,
     };
     next.sections = vec![of("channels", SectionKind::Channels), of("dms", SectionKind::DirectMessages)];
     for c in &mut next.conversations {
@@ -258,4 +259,15 @@ fn a_closed_dm_comes_back_closed() {
     let back = store.snapshot(&ids(&s)).unwrap().unwrap();
     let closed: Vec<&ConversationId> = back.conversations.iter().filter(|c| c.closed).map(|c| &c.id).collect();
     assert_eq!(closed, [&s.conversations[at].id]);
+}
+
+#[test]
+fn a_conversation_s_newest_message_and_a_section_s_order_come_back() {
+    let mut store = writer("snap-order");
+    let mut s = World::new(5).snapshot().clone();
+    s.conversations[0].latest = Some(Ts(1_767_603_600_000_100));
+    s.sections[0].sort = Some(Sort::Recent);
+    s.sections[1].sort = Some(Sort::Alphabetical);
+    store.put_snapshot(&s).unwrap();
+    assert_parts(&store, &s, "orders");
 }

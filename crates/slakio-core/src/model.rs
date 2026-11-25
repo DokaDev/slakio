@@ -136,12 +136,41 @@ pub enum SectionKind {
     Apps,
 }
 
+/// How a sidebar section orders its conversations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Sort {
+    /// By name, case ignored.
+    Alphabetical,
+    /// The newest message first; those without one known last.
+    Recent,
+}
+
+impl Sort {
+    /// Its name in the settings, the layout file and `:sort-section`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Sort::Alphabetical => "alphabetical",
+            Sort::Recent => "recent",
+        }
+    }
+
+    /// The order named `name` ([`Sort::name`]).
+    pub fn named(name: &str) -> Option<Sort> {
+        [Sort::Alphabetical, Sort::Recent].into_iter().find(|s| s.name() == name)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Section {
     pub id: SectionId,
     pub workspace: WorkspaceId,
+    /// The user's name of a section they made; empty for a built-in one (the UI names it).
     pub name: Remote,
     pub kind: SectionKind,
+    /// `None`: its conversations stay in the order listed. `Some`: they are ordered, by the
+    /// order given here unless the UI's settings (`channel_sort`, `dm_sort`) or the user's
+    /// choice for the section say another.
+    pub sort: Option<Sort>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,6 +200,9 @@ pub struct Conversation {
     pub unread: u32,
     /// Unread messages that mention the user (always ≤ `unread`).
     pub mentions: u32,
+    /// When its newest message was posted, as far as known (what orders a section by
+    /// recency).
+    pub latest: Option<Ts>,
 }
 
 impl Conversation {

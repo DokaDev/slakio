@@ -1,5 +1,6 @@
 ---
 source: crates/slakio-tui/tests/theme_author_flows.rs
+assertion_line: 75
 expression: d.snap()
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────╮
@@ -13,7 +14,7 @@ expression: d.snap()
 │ │   Avatars          ‹ initials           ›  Coloured initials (default)   │ │
 │ │   Images           ‹ auto               ›  Where known to work (default) │ │
 │ │   Animate          ‹ on                 ›  GIF/APNG pictures move        │ │
-│ │                                                           10 more below  │ │
+│ │                                                           13 more below  │ │
 │ │──────────────────────────────────────────────────────────────────────────│ │
 │ │ Copy to: terminal-copy                                                   │ │
 │ │ A copy of terminal: Enter writes it and uses it, Esc cancels             │ │

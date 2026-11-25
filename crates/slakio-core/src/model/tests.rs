@@ -21,6 +21,7 @@ fn dms_and_group_dms_are_dms() {
         muted: false,
         unread: 0,
         mentions: 0,
+        latest: None,
     };
     assert!(!c(ConversationKind::Channel { private: false }).is_dm());
     assert!(c(ConversationKind::Dm { user: UserId::new("U1") }).is_dm());
@@ -40,6 +41,7 @@ fn muted_channels_badge_mentions_only_and_muted_dms_nothing() {
         muted,
         unread: 5,
         mentions: 2,
+        latest: None,
     };
     let channel = ConversationKind::Channel { private: false };
     assert_eq!(c(channel.clone(), false).badges(), (5, 2));
