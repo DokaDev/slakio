@@ -187,9 +187,9 @@ fn a_photo_in_the_list_s_chip_is_a_picture_of_its_own_beside_the_slot_s() {
     let slot = fetch(&mut images, &mut requests, &photo);
     assert_eq!(images.look_as(&ws(), &photo, CHIP_PHOTO), Look::Pending, "the chip's is not the slot's");
     assert!(images.ask(&mut requests, Instant::now()));
-    let r = requests.take().pop().expect("asked for the chip");
-    assert_eq!(r.command, Command::Image { source: photo.clone(), max: BYTES_MAX, list: true });
-    let chip = images.answered(r.id, vec![1]).expect("a job");
+    assert!(requests.take().is_empty(), "nothing asked again: made from the slot's bytes");
+    let chip = images.take_lookups().pop().expect("the chip's job");
+    assert_eq!((chip.bytes.as_slice(), chip.from_cache), (&[1, 2, 3][..], false), "the bytes fetched");
     assert_eq!(chip.shape, Shape::Photo { cols: 2, rows: 1 });
     assert_ne!(chip.id, slot.id);
     // Each result goes to its own picture, whichever comes first.
@@ -608,3 +608,69 @@ fn with_the_diagnostics_on_the_frame_s_emoji_share_and_the_in_flight_cap_are_tol
 }
 
 mod room;
+
+#[test]
+fn a_photo_on_its_way_for_one_place_is_waited_for_by_the_other() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
+    // The chip's asked for first, as the list's.
+    images.look_as(&ws(), &photo, CHIP_PHOTO);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().expect("asked for the chip");
+    assert_eq!(r.command, Command::Image { source: photo.clone(), max: BYTES_MAX, list: true });
+    // The slot wants it while it is on its way: not asked twice.
+    for _ in 0..3 {
+        assert_eq!(images.look(&ws(), &photo), Look::Pending);
+        images.look_as(&ws(), &photo, CHIP_PHOTO);
+        images.ask(&mut requests, Instant::now());
+        assert!(requests.take().is_empty() && images.take_lookups().is_empty(), "the slot waits");
+    }
+    let chip = images.answered(r.id, vec![7, 7]).expect("a job");
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, Instant::now());
+    assert!(requests.take().is_empty());
+    let slot = images.take_lookups().pop().expect("the slot's job, from the chip's bytes");
+    assert_eq!((slot.bytes.as_slice(), slot.shape), (&[7, 7][..], PHOTO));
+    images.decoded(key(&slot), Ok(ready(&slot, 5)));
+    images.decoded(key(&chip), Ok(ready(&chip, 5)));
+    assert!(matches!(images.look(&ws(), &photo), Look::Ready { id, .. } if id == slot.id));
+    // Failed for the chip, the slot asks for it itself (as the timeline's).
+    let other = Source::Avatar(format!("https://{}/y.png", slakio_core::images::AVATAR_HOSTS[0]));
+    images.look_as(&ws(), &other, CHIP_PHOTO);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().expect("asked for the chip");
+    assert!(images.failed(r.id, &FailKind::CapReached, Instant::now()));
+    images.look(&ws(), &other);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().expect("asked for the slot");
+    assert_eq!(r.command, Command::Image { source: other, max: BYTES_MAX, list: false });
+}
+
+#[test]
+fn the_bytes_of_the_last_photos_fetched_are_kept_and_forgotten_with_them() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let photo = |n: usize| Source::Avatar(format!("https://{}/{n}.png", slakio_core::images::AVATAR_HOSTS[0]));
+    for n in 0..=FETCHED_MAX {
+        let job = fetch(&mut images, &mut requests, &photo(n));
+        images.decoded(key(&job), Ok(ready(&job, 5)));
+    }
+    assert_eq!(images.fetched.len(), FETCHED_MAX, "at most so many");
+    assert!(images.fetched.iter().all(|f| f.0 != photo(0)), "the oldest went first");
+    // The first one's chip: fetched again, its bytes gone.
+    images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+    images.ask(&mut requests, Instant::now());
+    assert_eq!(requests.take().len(), 1);
+    // A photo no one's any more, photos off, someone else signed in: its bytes go too.
+    images.forget_photo(photo(1).address());
+    assert!(images.fetched.iter().all(|f| f.0 != photo(1)));
+    images.forget_photos();
+    assert!(images.fetched.is_empty());
+    let job = fetch(&mut images, &mut requests, &photo(70));
+    images.decoded(key(&job), Ok(ready(&job, 5)));
+    images.forget_kept();
+    assert!(images.fetched.is_empty());
+    // A file's preview or an emoji fills one place only: its bytes are not kept.
+    let job = fetch(&mut images, &mut requests, &thumb(1));
+    images.decoded(key(&job), Ok(ready(&job, 5)));
+    assert!(images.fetched.is_empty());
+}

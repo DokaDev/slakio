@@ -73,12 +73,24 @@ fn asked(s: &Scripted) -> Vec<(Generation, Source)> {
         .collect()
 }
 
-/// Draw a frame and ask for what it wanted, as the binary's loop does.
+/// Draw a frame and ask for what it wanted, as the binary's loop does (a picture made from what
+/// is here already is decoded at once).
 fn frame(s: &mut Scripted) -> Vec<(Generation, Source)> {
     s.d.screen();
     s.d.app.ask_images(s.d.now);
     s.pump();
+    decode_all(s);
     asked(s)
+}
+
+/// Each picture waiting to be decoded, decoded as the binary does.
+fn decode_all(s: &mut Scripted) {
+    for effect in s.d.app.take_effects() {
+        if let Effect::Decode(job) = effect {
+            let result = prepare(&job, Some((9, 18)));
+            s.d.app.images.decoded((job.source, job.request), result);
+        }
+    }
 }
 
 /// Answer picture request `id` with a photo and decode it as the binary does.
@@ -87,12 +99,7 @@ fn deliver(s: &mut Scripted, id: Generation) {
     s.b.held.remove(i);
     s.b.push(Envelope { generation: id, event: Event::Image { bytes: slakio_world::pictures::png("p", 72, 72) } });
     s.pump();
-    for effect in s.d.app.take_effects() {
-        if let Effect::Decode(job) = effect {
-            let result = prepare(&job, Some((9, 18)));
-            s.d.app.images.decoded((job.source, job.request), result);
-        }
-    }
+    decode_all(s);
 }
 
 /// Frames until nothing more is asked, every picture delivered; each frame's new requests must
@@ -596,12 +603,12 @@ fn more_photos_on_screen_than_the_terminal_holds_are_asked_once_and_none_shown_i
     }
     assert!(frame(&mut s).is_empty(), "settled");
     assert!(all.len() <= ENTRIES_MAX, "{} asked for, the terminal holds {ENTRIES_MAX}", all.len());
-    // A photo is asked for once per place it fills, the list's chip and the timeline's slot.
+    // A photo is asked for once, whether it fills the list's chip, the timeline's slot or both.
     let mut per: std::collections::HashMap<&Source, usize> = Default::default();
     for source in &all {
         *per.entry(source).or_default() += 1;
     }
-    assert!(per.values().all(|n| *n <= 2), "a photo asked for more than once per place: {per:?}");
+    assert!(per.values().all(|n| *n == 1), "a photo asked for more than once: {per:?}");
     assert_eq!(s.d.app.images.held().0, all.len());
 }
 
@@ -657,7 +664,45 @@ fn the_timeline_s_photos_are_asked_first_and_the_list_s_yield_their_room() {
 }
 
 #[test]
-fn a_person_in_the_timeline_and_the_list_is_fetched_at_most_twice() {
+fn the_list_s_photos_are_asked_as_the_list_s_so_the_timeline_s_keep_their_share() {
+    let (mut s, peers) = crowded(100, 90, 20);
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let screen = s.d.screen();
+    let shown: BTreeSet<String> = (peers.iter().enumerate())
+        .filter(|(k, _)| screen.contains(&format!("note {k} ")))
+        .filter_map(|(_, p)| s.d.app.model.user(&ws, p)?.avatar.clone())
+        .collect();
+    assert!(!shown.is_empty(), "photos in the timeline");
+    let (mut timeline, mut list) = (0, 0);
+    for _ in 0..40 {
+        frame(&mut s);
+        let now: Vec<(Generation, Source, bool)> = (s.b.held.iter())
+            .filter_map(|r| match &r.command {
+                Command::Image { source, list, .. } => Some((r.id, source.clone(), *list)),
+                _ => None,
+            })
+            .collect();
+        if now.is_empty() {
+            break;
+        }
+        for (id, source, is_list) in now {
+            let Source::Avatar(a) = &source else { panic!("{source:?}") };
+            // Someone in both places is asked for once, as the timeline's.
+            assert_eq!(is_list, !shown.contains(a), "{a}: asked as the list's: {is_list}");
+            if is_list {
+                list += 1
+            } else {
+                timeline += 1
+            }
+            deliver(&mut s, id);
+        }
+    }
+    assert_eq!(timeline, shown.len(), "each timeline photo asked for once");
+    assert!(list > 0, "the DM rows' own photos asked for as the list's");
+}
+
+#[test]
+fn a_person_in_the_timeline_and_the_list_is_fetched_once() {
     use slakio_tui::images::PHOTO;
     // Room for every photo on screen, then more photos on screen than the terminal holds.
     for (extra, room) in [(20, true), (80, false)] {
@@ -673,7 +718,7 @@ fn a_person_in_the_timeline_and_the_list_is_fetched_at_most_twice() {
             }
         }
         assert!(frame(&mut s).is_empty(), "{extra}: settled");
-        assert!(per.values().all(|n| *n <= 2), "{extra}: once per place at most: {per:?}");
+        assert!(per.values().all(|n| *n == 1), "{extra}: once for both places: {per:?}");
         if room {
             let list: Vec<String> = expected(&s).into_iter().map(|p| p.address).collect();
             let screen = s.d.screen();
@@ -685,7 +730,7 @@ fn a_person_in_the_timeline_and_the_list_is_fetched_at_most_twice() {
                 .collect();
             assert!(!both.is_empty(), "someone in both places");
             for source in &both {
-                assert_eq!(per.get(source), Some(&2), "{source:?}: once for the slot, once for the chip");
+                assert_eq!(per.get(source), Some(&1), "{source:?}: once, for the slot and the chip");
                 assert!(matches!(s.d.app.images.look_as(&ws, source, PHOTO), Look::Ready { .. }));
                 assert!(matches!(s.d.app.images.look_as(&ws, source, CHIP_PHOTO), Look::Ready { .. }));
             }
@@ -892,4 +937,49 @@ fn a_bot_s_photo_in_the_timeline_stands_beside_the_app_mark() {
     });
     let header = header.unwrap_or_else(|| panic!("the bot's photo and name on one row:\n{}", s.d.screen()));
     assert!(header.contains(&format!("{name} app")), "{header}");
+}
+
+#[test]
+fn a_person_shown_as_a_chip_is_drawn_in_the_timeline_with_no_fetch_of_their_own() {
+    use slakio_tui::images::PHOTO;
+    let mut s = dms(120, 40, true);
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    // The DM rows drawn: their photos fetched, as the list's.
+    let chips: Vec<Source> = fill(&mut s);
+    assert!(!chips.is_empty(), "DM rows with photos:\n{}", s.d.screen());
+    // A channel opened where DM peers post.
+    s.keys("space h");
+    s.d.list_cursor_on("general");
+    s.keys("enter");
+    settle(&mut s);
+    let screen = s.d.screen();
+    // The people whose chip was drawn and whose name the timeline shows.
+    let m = &s.d.app.model;
+    let posters: Vec<Source> = (0..m.conversations().len())
+        .filter_map(|i| match &m.conversation(i).kind {
+            ConversationKind::Dm { user } => m.user(&ws, user),
+            _ => None,
+        })
+        .filter(|u| screen.contains(u.display_name.line().as_str()))
+        .filter_map(|u| u.avatar.clone().map(Source::Avatar))
+        .filter(|a| chips.contains(a))
+        .collect();
+    assert!(!posters.is_empty(), "someone with a chip posts in the timeline:\n{screen}");
+    let mut asked_again = Vec::new();
+    for _ in 0..20 {
+        let now = frame(&mut s);
+        if now.is_empty() {
+            break;
+        }
+        for (id, source) in now {
+            asked_again.extend(chips.contains(&source).then(|| source.clone()));
+            deliver(&mut s, id);
+        }
+    }
+    assert!(asked_again.is_empty(), "fetched again for the timeline: {asked_again:?}");
+    s.d.screen();
+    for p in &posters {
+        let look = s.d.app.images.look_as(&ws, p, PHOTO);
+        assert!(matches!(look, Look::Ready { .. }), "{p:?}: drawn in the timeline from the chip's bytes: {look:?}");
+    }
 }

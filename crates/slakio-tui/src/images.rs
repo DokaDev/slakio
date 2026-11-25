@@ -4,8 +4,9 @@
 //! two cells each, [`Shape::Emoji`]), drawn with the kitty graphics protocol where the terminal draws it
 //! ([`detect`]); elsewhere, and while a picture is not there yet, the text card and the initials
 //! stay as they are. A picture is kept per address and the cells it fills ([`Shape`]): a photo
-//! shown in both places is two pictures to the terminal, fetched once each (at most two fetches
-//! a run while the screen does not change and neither is removed or fails).
+//! shown in both places is two pictures to the terminal, fetched once (the bytes of the last
+//! [`FETCHED_MAX`] photos fetched are kept, and its other place is decoded from them; while one
+//! place's is on its way, the other's waits for it).
 //!
 //! How a picture comes: drawing a frame notes the pictures it would show ([`Images::look`]);
 //! after the frame the app asks the backend for those it does not have ([`Images::ask`], at most
@@ -69,6 +70,8 @@ pub const BYTES_CAP: usize = 24 * 1024 * 1024;
 pub const RETRY_AFTER: Duration = Duration::from_secs(60);
 /// How long one that found the backend busy or offline waits (that passes quickly).
 pub const RETRY_SOON: Duration = Duration::from_secs(2);
+/// The most photos whose fetched bytes are kept, for their other place ([`Images::ask`]).
+pub const FETCHED_MAX: usize = 64;
 /// The most pictures that failed whose reason is kept (the oldest is forgotten, and asked for
 /// again when it is drawn again).
 pub const FAILED_MAX: usize = 1024;
@@ -250,6 +253,8 @@ pub struct Images {
     anims: animate::Anims,
     /// The DM peers' photos asked for ahead of their rows ([`ahead`]).
     ahead: ahead::Ahead,
+    /// The bytes of the last [`FETCHED_MAX`] photos fetched, the oldest first.
+    fetched: VecDeque<(Source, Vec<u8>)>,
 }
 
 impl Images {
@@ -286,6 +291,7 @@ impl Images {
             self.lookups.retain(|j| j.empty);
             self.missed.clear();
             self.forget_ahead();
+            self.fetched.clear();
         }
         self.on = on;
     }
@@ -333,6 +339,7 @@ impl Images {
         self.held.retain(|k| !gone(k));
         self.failed.retain(|k| !gone(k));
         self.asked.retain(|_, k| !gone(k));
+        self.fetched.retain(|(s, _)| !gone(&(s.clone(), PHOTO)));
         for key in keys {
             if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&key) {
                 self.bytes -= bytes;

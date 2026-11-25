@@ -2,11 +2,11 @@
 //! ([`Images::answered`], [`Images::failed`]).
 
 use super::cached::LOOKUPS_MAX;
-use super::{CHIP_PHOTO, Entry, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why, note};
+use super::{CHIP_PHOTO, Entry, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why, note};
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::diag::Stage;
-use slakio_core::images::BYTES_MAX;
+use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
 use slakio_core::picture_cache::PictureCache;
 use std::collections::HashSet;
@@ -98,6 +98,14 @@ impl Images {
             if self.on_disk(&key) && !self.missed.remove(&key) {
                 continue;
             }
+            // Fetched for its other place: decoded from those bytes; on its way there: waits.
+            if self.made_from_fetched(&key) {
+                asked = true;
+                continue;
+            }
+            if self.fetching(&key.0) {
+                continue;
+            }
             if self.diag.on() {
                 let again = self.entries.contains_key(&key).to_string();
                 note::line(&self.diag, &key, Stage::Asked, "ui", &[("again", again)]);
@@ -116,12 +124,39 @@ impl Images {
         asked
     }
 
+    /// `source` is being fetched (for another place: a photo's other shape).
+    pub(super) fn fetching(&self, source: &Source) -> bool {
+        self.entries.iter().any(|(k, e)| k.0 == *source && matches!(e, Entry::Asked(_) | Entry::Decoding(_)))
+    }
+
+    /// `key` is made ready from the bytes fetched for its address in its other place, when they
+    /// are kept: a job of its own (as a look on disk is), nothing asked. `true` when it was.
+    pub(super) fn made_from_fetched(&mut self, key: &Key) -> bool {
+        let Some(bytes) = self.fetched.iter().find(|f| f.0 == key.0).map(|f| f.1.clone()) else { return false };
+        let id = self.next_id();
+        // Never a backend's request id (those count up from one), and never two at once.
+        let request = Generation(u64::MAX - u64::from(id));
+        self.entries.insert(key.clone(), Entry::Looking(request));
+        self.failed.retain(|k| k != key);
+        let (source, shape) = key.clone();
+        let epoch = self.cache.as_ref().map_or(0, PictureCache::epoch);
+        self.lookups.push(Job { source, request, id, bytes, shape, from_cache: false, empty: false, epoch });
+        true
+    }
+
     /// The bytes picture request `id` asked for came: the job that makes them ready, when it is
-    /// one of these (the picture's id is given now).
+    /// one of these (the picture's id is given now). A photo's are kept for its other place.
     pub fn answered(&mut self, id: Generation, bytes: Vec<u8>) -> Option<Job> {
         let key = self.asked.remove(&id)?;
         if self.entries.get(&key) != Some(&Entry::Asked(id)) {
             return None;
+        }
+        if matches!(key.0, Source::Avatar(_)) {
+            self.fetched.retain(|f| f.0 != key.0);
+            self.fetched.push_back((key.0.clone(), bytes.clone()));
+            if self.fetched.len() > FETCHED_MAX {
+                self.fetched.pop_front();
+            }
         }
         self.entries.insert(key.clone(), Entry::Decoding(id));
         let (source, shape) = key;

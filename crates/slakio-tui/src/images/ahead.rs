@@ -193,6 +193,14 @@ impl Images {
                 self.ahead.flying.insert(key);
                 return true;
             }
+            // Fetched for the timeline: made from those bytes; on its way there: not asked twice.
+            if self.made_from_fetched(&key) {
+                self.ahead.flying.insert(key);
+                return true;
+            }
+            if self.fetching(&key.0) {
+                continue;
+            }
             if !self.may_fetch(now) {
                 self.ahead.queue.push_front((ws, key));
                 return false;

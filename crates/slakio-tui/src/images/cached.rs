@@ -177,6 +177,7 @@ impl Images {
     /// Someone else signed in to a workspace: the pictures kept on disk go (off the loop's
     /// thread, a job of its own that answers nothing), whoever's they were.
     pub fn forget_kept(&mut self) {
+        self.fetched.clear();
         if self.cache.is_none() {
             return;
         }
