@@ -116,12 +116,13 @@ impl App {
     }
 
     /// The photo of each 1:1 DM's peer the list lists, top down, out of view too (to ask for
-    /// ahead, [`crate::images::Images::offer_ahead`]).
+    /// ahead, [`crate::images::Images::offer_ahead`]); none of a workspace signed out.
     fn dm_photos(&self) -> Vec<(WorkspaceId, Source)> {
         let rows = self.list_rows().into_iter().filter_map(|r| match r {
             Row::Conversation(i) => Some(self.model.conversation(i)),
             _ => None,
         });
+        let rows = rows.filter(|c| !self.signed_out_in(&c.workspace));
         rows.filter_map(|c| match &c.kind {
             ConversationKind::Dm { user } => {
                 Some((c.workspace.clone(), Source::Avatar(self.model.user(&c.workspace, user)?.avatar.clone()?)))

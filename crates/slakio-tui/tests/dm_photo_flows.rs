@@ -691,3 +691,30 @@ fn a_person_in_the_timeline_and_the_list_is_fetched_at_most_twice() {
         }
     }
 }
+
+#[test]
+fn a_signed_out_workspace_s_dm_rows_get_no_photo_ahead() {
+    // Home at 120x16: the channels fill the list, the DM rows are out of view.
+    let mut s = Scripted::booted(true, None);
+    s.d.app.resize(120, 16);
+    photos_on(&mut s);
+    let dir = std::env::temp_dir().join(format!("slakio-dm-ahead-signed-out-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    s.d.app.images.cache = Some(slakio_core::picture_cache::PictureCache::new(dir.clone()));
+    assert!(expected(&s).is_empty(), "no DM row on screen");
+    frame(&mut s);
+    assert!(s.d.app.images.ahead_waiting() > 0, "signed in: the DM rows' photos wait to be asked ahead");
+    // A request refused for the sign-in: the workspace is signed out.
+    s.d.list_cursor_on("deploys");
+    s.keys("enter");
+    let i = s.b.held.iter().position(|r| matches!(r.command, Command::History { .. })).expect("a page asked");
+    s.b.fail(i, slakio_core::backend::FailKind::Auth);
+    s.pump();
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    assert!(s.d.app.signed_out_in(&ws));
+    for _ in 0..3 {
+        frame(&mut s);
+        assert_eq!(s.d.app.images.ahead_waiting(), 0, "signed out: none waits");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
