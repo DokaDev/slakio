@@ -389,3 +389,38 @@ fn a_boot_answer_without_a_photo_keeps_the_photo_shown() {
     m.merge(&a, &without, false);
     assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(other.as_str()), "a real new photo replaces it");
 }
+
+#[test]
+fn empty_starred_external_and_apps_sections_are_not_shown_the_others_are() {
+    let mut s = World::demo().snapshot().clone();
+    let ws = s.workspaces[0].id.clone();
+    let mut add = |name: &str, kind: SectionKind| {
+        let id = SectionId::new(format!("empty-{name}"));
+        s.sections.push(Section { id, workspace: ws.clone(), name: Remote::new(name), kind });
+    };
+    for (name, kind) in [
+        ("Empty starred", SectionKind::Favorites),
+        ("Empty external", SectionKind::External),
+        ("Empty apps", SectionKind::Apps),
+        ("Empty custom", SectionKind::Custom),
+        ("Empty channels", SectionKind::Channels),
+        ("Empty DMs", SectionKind::DirectMessages),
+    ] {
+        add(name, kind);
+    }
+    // A filled Apps section shows.
+    let dm = s.conversations.iter().position(|c| c.workspace == ws && c.is_dm()).unwrap();
+    add("Apps", SectionKind::Apps);
+    s.conversations[dm].section = SectionId::new("empty-Apps");
+    let m = Model::new(s);
+    let rows = rows_of(&m, 0, View::Home, &HashSet::new());
+    let headers: Vec<&str> = rows
+        .iter()
+        .filter_map(|r| if let Row::Section(i) = r { Some(m.section(*i).name.unsanitized()) } else { None })
+        .collect();
+    assert_eq!(
+        headers,
+        ["Favorites", "Ops", "Channels", "Direct messages", "Empty custom", "Empty channels", "Empty DMs", "Apps"]
+    );
+    assert!(!rows.windows(2).any(|w| w[0] == Row::Spacer && w[1] == Row::Spacer), "no blank row doubled");
+}

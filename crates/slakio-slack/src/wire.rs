@@ -41,6 +41,9 @@ pub struct UserBoot {
     /// The ids of the conversations the user starred.
     #[serde(default, deserialize_with = "lenient")]
     pub starred: Option<Vec<String>>,
+    /// The ids of the DMs and group DMs open in the sidebar.
+    #[serde(default, deserialize_with = "lenient")]
+    pub is_open: Option<Vec<String>>,
 }
 
 /// The user's preferences, of which the client reads the conversations muted.
@@ -141,12 +144,29 @@ pub struct Channel {
     pub is_archived: Option<bool>,
     /// Shared with another workspace of the same organization (not Slack Connect).
     pub is_org_shared: Option<bool>,
+    #[serde(default, deserialize_with = "loose")]
+    pub is_starred: Option<bool>,
+    /// A group DM's people, the user among them.
+    #[serde(default, deserialize_with = "lenient")]
+    pub members: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Im {
     pub id: String,
     pub user: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub is_starred: Option<bool>,
+    /// With a person of another organization (Slack Connect).
+    #[serde(default, deserialize_with = "loose")]
+    pub is_ext_shared: Option<bool>,
+    #[serde(default, deserialize_with = "lenient")]
+    pub connected_team_ids: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "loose")]
+    pub is_open: Option<bool>,
+    /// When it last changed (Slack's own clock; not read yet).
+    #[serde(default, deserialize_with = "loose")]
+    pub updated: Option<serde_json::Value>,
 }
 
 /// `client.counts`.

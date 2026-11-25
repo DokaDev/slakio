@@ -10,7 +10,8 @@
 //! Slack's mention count; a DM's (and a group DM's) count is Slack's too, every message there
 //! being for the user. A conversation the user muted keeps its counts here: the UI shows a muted
 //! channel's mentions only, a muted DM's nothing. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
-//! within the organization is not), and a DM with a person of another team.
+//! within the organization is not), and a DM or group DM Slack marks so or with a person of
+//! another team. Group DMs show when open in the sidebar (`is_open`).
 
 use crate::client::Client;
 use crate::error::SlackError;
@@ -50,8 +51,17 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     let sidebar = crate::sidebar::Sidebar::new(&team.id, crate::sections::fetch(client).await, client.diag());
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
-    // The user too, when the start bundle has no photo of them.
+    // The user too, when the start bundle has no photo of them; and the people of the group DMs
+    // shown.
     let mut asked = peers.clone();
+    let open: HashSet<&str> = boot.is_open.iter().flatten().map(String::as_str).collect();
+    let grouped =
+        boot.channels.iter().flatten().filter(|c| shown_group(c, &open)).flat_map(|c| c.members.iter().flatten());
+    for m in grouped.filter(|m| **m != self_.id) {
+        if !asked.contains(m) {
+            asked.push(m.clone());
+        }
+    }
     let bundled = self_.profile.as_ref().and_then(wire::Profile::avatar).is_some();
     crate::shape::own_profile(client.diag(), self_);
     let before = people.standing(&self_.id);
@@ -145,10 +155,12 @@ fn snapshot(
     let unread = counts.map(unread_counts).unwrap_or_default();
     let muted: HashSet<String> = boot.prefs.as_ref().map(wire::Prefs::muted).unwrap_or_default();
     let starred: HashSet<String> = boot.starred.unwrap_or_default().into_iter().collect();
-    let conversation = |id: String, name: String, kind: ConversationKind, external: bool| {
+    let open_ids = boot.is_open.unwrap_or_default();
+    let open: HashSet<&str> = open_ids.iter().map(String::as_str).collect();
+    let conversation = |id: String, name: String, kind: ConversationKind, facts: Facts| {
         let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
-        let facts = Facts { dm: !matches!(kind, ConversationKind::Channel { .. }), starred: starred.contains(&id) };
         let section = sidebar.place(&id, facts);
+        let external = facts.external;
         Conversation {
             muted: muted.contains(&id),
             id: ConversationId::new(id),
@@ -161,24 +173,10 @@ fn snapshot(
             mentions,
         }
     };
-    let mut conversations: Vec<Conversation> = boot
-        .channels
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|c| c.is_archived != Some(true) && c.is_mpim != Some(true))
-        .map(|c| {
-            let name = c.name.unwrap_or_else(|| c.id.clone());
-            let kind = ConversationKind::Channel { private: c.is_private == Some(true) };
-            conversation(c.id, name, kind, c.is_ext_shared == Some(true))
-        })
-        .collect();
-    conversations.extend(boot.ims.unwrap_or_default().into_iter().filter_map(|im| {
-        let user = im.user?;
-        let peer = known.iter().find(|u| u.id.as_str() == user);
-        let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
-        let external = peer.is_some_and(|u| matches!(u.org, Org::External(_)));
-        Some(conversation(im.id, name, ConversationKind::Dm { user: UserId::new(user) }, external))
-    }));
+    let channels = boot.channels.unwrap_or_default();
+    let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), &known, &me);
+    let conversations: Vec<Conversation> =
+        listed.into_iter().map(|(id, name, kind, facts)| conversation(id, name, kind, facts)).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
     let avatar = own_photo(&me, &known);
     let presence = match boot.dnd.as_ref().and_then(|d| d.active(now)) {
@@ -211,6 +209,75 @@ fn snapshot(
         taken: Ts(now_micros()),
         counts_failed,
     }
+}
+
+/// The conversations of the start bundle's `channels` (group DMs among them) and `ims`, the
+/// sidebar shows: each one's id, name, kind and what places it (`starred`, `open`: the start
+/// bundle's lists; `known`: the people named; `me`: the user).
+fn listed(
+    channels: Vec<wire::Channel>,
+    ims: Vec<wire::Im>,
+    (starred, open): (&HashSet<String>, &HashSet<&str>),
+    known: &[User],
+    me: &wire::Me,
+) -> Vec<(String, String, ConversationKind, Facts)> {
+    let peer_of = |id: &str| known.iter().find(|u| u.id.as_str() == id);
+    let outside = |id: &str| peer_of(id).is_some_and(|u| matches!(u.org, Org::External(_)));
+    let mut out = Vec::new();
+    for c in channels.into_iter().filter(|c| c.is_archived != Some(true)) {
+        let star = c.is_starred == Some(true) || starred.contains(&c.id);
+        if c.is_mpim != Some(true) {
+            let kind = ConversationKind::Channel { private: c.is_private == Some(true) };
+            let facts = Facts { starred: star, external: c.is_ext_shared == Some(true), ..Facts::default() };
+            out.push((c.id.clone(), c.name.unwrap_or(c.id), kind, facts));
+            continue;
+        }
+        // A group DM: shown when open in the sidebar.
+        if !shown_group(&c, open) {
+            continue;
+        }
+        let users: Vec<UserId> = c.members.iter().flatten().filter(|m| **m != me.id).map(UserId::new).collect();
+        let name = group_name(&users, known, c.name.as_deref(), me.name.as_deref()).unwrap_or_else(|| c.id.clone());
+        let external = c.is_ext_shared == Some(true) || users.iter().any(|u| outside(u.as_str()));
+        let facts = Facts { dm: true, starred: star, external, app: false };
+        out.push((c.id, name, ConversationKind::GroupDm { users }, facts));
+    }
+    out.extend(ims.into_iter().filter_map(|im| {
+        let user = im.user?;
+        let peer = peer_of(&user);
+        let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
+        let shared = im.is_ext_shared == Some(true) || im.connected_team_ids.as_ref().is_some_and(|t| !t.is_empty());
+        let facts = Facts {
+            dm: true,
+            starred: im.is_starred == Some(true) || starred.contains(&im.id),
+            external: shared || outside(&user),
+            app: peer.is_some_and(|u| u.bot),
+        };
+        Some((im.id, name, ConversationKind::Dm { user: UserId::new(user) }, facts))
+    }));
+    out
+}
+
+/// A group DM the sidebar shows: not archived, and open (`open`: the start bundle's `is_open`).
+fn shown_group(c: &wire::Channel, open: &HashSet<&str>) -> bool {
+    c.is_mpim == Some(true) && c.is_archived != Some(true) && open.contains(c.id.as_str())
+}
+
+/// A group DM's name: its people's names (`users`, the user left out) when all are known, else
+/// the handles in Slack's `mpdm-one--two--three-1` (`own`: the user's, left out).
+fn group_name(users: &[UserId], known: &[User], handle: Option<&str>, own: Option<&str>) -> Option<String> {
+    let names: Option<Vec<&str>> =
+        users.iter().map(|u| known.iter().find(|k| k.id == *u).map(|k| k.display_name.unsanitized())).collect();
+    if let Some(names) = names.filter(|n| !n.is_empty()) {
+        return Some(names.join(", "));
+    }
+    let inner = handle?.strip_prefix("mpdm-")?;
+    let inner = inner
+        .rsplit_once('-')
+        .filter(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        .map_or(inner, |(h, _)| h);
+    let handles: Vec<&str> = inner.split("--").filter(|h| !h.is_empty() && Some(*h) != own).collect();
+    (!handles.is_empty()).then(|| handles.join(", "))
 }
 
 /// The user's own photo: the start bundle's, else the one looked up or learned of them

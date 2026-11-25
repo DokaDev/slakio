@@ -132,9 +132,33 @@ fn a_starred_conversation_goes_to_starred_unless_in_a_section_of_the_user_s_own(
     let starred = Facts { starred: true, ..Facts::default() };
     assert_eq!(s.place("C1", starred).as_str(), "T1:LC", "a section of the user's own first");
     assert_eq!(s.place("C2", starred).as_str(), "T1:stars");
-    assert_eq!(s.place("D2", Facts { dm: true, starred: true }).as_str(), "T1:stars");
-    assert_eq!(s.place("D3", Facts { dm: true, starred: false }).as_str(), "T1:dms");
+    assert_eq!(s.place("D2", Facts { dm: true, starred: true, ..Facts::default() }).as_str(), "T1:stars");
+    assert_eq!(s.place("D3", Facts { dm: true, ..Facts::default() }).as_str(), "T1:dms");
     // Without Slack listing Starred, a starred conversation stays where it was.
     let plain = Sidebar::new("T1", None, &Diag::default());
     assert_eq!(plain.place("C2", starred).as_str(), "T1:channels");
+}
+
+#[test]
+fn a_conversation_goes_to_the_first_section_that_takes_it() {
+    let list = listed(json!([
+        {"channel_section_id": "LS", "type": "stars", "next_channel_section_id": "LC"},
+        {"channel_section_id": "LC", "type": "standard", "name": "Mine", "next_channel_section_id": "LX",
+         "channel_ids_page": {"channel_ids": ["C1"], "count": 1}},
+        {"channel_section_id": "LX", "type": "slack_connect", "next_channel_section_id": "LA"},
+        {"channel_section_id": "LA", "type": "recent_apps", "next_channel_section_id": null},
+    ]));
+    let s = Sidebar::new("T1", Some(list), &Diag::default());
+    let all = Facts { dm: true, starred: true, external: true, app: true };
+    assert_eq!(s.place("C1", all).as_str(), "T1:LC", "a section of the user's own first");
+    assert_eq!(s.place("D1", all).as_str(), "T1:stars");
+    assert_eq!(s.place("D1", Facts { starred: false, ..all }).as_str(), "T1:external");
+    assert_eq!(s.place("D1", Facts { dm: true, app: true, ..Facts::default() }).as_str(), "T1:apps");
+    let channel = Facts { app: true, ..Facts::default() };
+    assert_eq!(s.place("C2", channel).as_str(), "T1:channels", "only a DM is an app's");
+    assert_eq!(s.place("D2", Facts { dm: true, ..Facts::default() }).as_str(), "T1:dms");
+    // Without Slack listing them, shared and app conversations stay where they were.
+    let plain = Sidebar::new("T1", None, &Diag::default());
+    assert_eq!(plain.place("D1", all).as_str(), "T1:dms");
+    assert_eq!(plain.place("C1", Facts { dm: false, ..all }).as_str(), "T1:channels");
 }

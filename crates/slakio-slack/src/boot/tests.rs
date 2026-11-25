@@ -204,3 +204,97 @@ fn the_conversations_slack_lists_as_starred_go_to_starred() {
     assert_eq!(find(&s, "D1").section.as_str(), "T1:stars");
     assert_eq!(find(&s, "C2").section.as_str(), "T1:channels");
 }
+
+fn known_person(id: &str, shown: &str, bot: bool) -> User {
+    User {
+        id: UserId::new(id),
+        workspace: WorkspaceId::new("T1"),
+        name: Remote::new(shown.to_lowercase()),
+        display_name: Remote::new(shown),
+        org: Org::Own,
+        bot,
+        presence: Presence::Unknown,
+        avatar: None,
+    }
+}
+
+fn placed() -> wire::UserBoot {
+    serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team"},
+        "starred": ["C1", "D2"],
+        "is_open": ["G1", "D1"],
+        "channels": [
+            {"id": "C1", "name": "general"},
+            {"id": "C2", "name": "stars-itself", "is_starred": true},
+            {"id": "C3", "name": "partners", "is_ext_shared": true},
+            {"id": "C4", "name": "mine", "is_starred": true},
+            {"id": "C5", "name": "plain"},
+            {"id": "G1", "name": "mpdm-me--ann--bob-1", "is_mpim": true, "members": ["U0", "U1", "U2"]},
+            {"id": "G2", "name": "mpdm-me--cy-1", "is_mpim": true, "members": ["U0", "U3"]},
+            {"id": "G3", "name": "mpdm-me--dee-1", "is_mpim": true, "is_archived": true, "members": ["U0", "U4"]},
+        ],
+        "ims": [
+            {"id": "D1", "user": "U1", "is_open": true, "updated": 1_767_600_000_000_u64},
+            {"id": "D2", "user": "U2", "is_starred": false},
+            {"id": "D3", "user": "UB"},
+            {"id": "D4", "user": "U4", "is_ext_shared": true},
+            {"id": "D5", "user": "U5", "connected_team_ids": ["T9"]},
+        ],
+    }))
+    .unwrap()
+}
+
+#[test]
+fn starred_shared_app_and_open_group_conversations_go_to_their_sections() {
+    let listed: Vec<crate::sidebar::ChannelSection> = serde_json::from_value(json!([
+        {"channel_section_id": "LS", "type": "stars", "next_channel_section_id": "LC"},
+        {"channel_section_id": "LC", "type": "standard", "name": "Mine", "next_channel_section_id": "LX",
+         "channel_ids_page": {"channel_ids": ["C4"], "count": 1}},
+        {"channel_section_id": "LX", "type": "slack_connect", "next_channel_section_id": "LH"},
+        {"channel_section_id": "LH", "type": "channels", "next_channel_section_id": "LD"},
+        {"channel_section_id": "LD", "type": "direct_messages", "next_channel_section_id": "LA"},
+        {"channel_section_id": "LA", "type": "recent_apps", "next_channel_section_id": null},
+    ]))
+    .unwrap();
+    let known = vec![known_person("U1", "Ann", false), known_person("UB", "Robot", true)];
+    let sidebar = Sidebar::new("T1", Some(listed), &Diag::default());
+    let s = super::snapshot(placed(), None, known.clone(), NOW, sidebar);
+    let section = |id| find(&s, id).section.as_str().to_string();
+    for (id, want) in [
+        ("C1", "T1:stars"),
+        ("C2", "T1:stars"),
+        ("D2", "T1:stars"),
+        ("C3", "T1:external"),
+        ("D4", "T1:external"),
+        ("D5", "T1:external"),
+        ("C4", "T1:LC"),
+        ("C5", "T1:channels"),
+        ("D1", "T1:dms"),
+        ("G1", "T1:dms"),
+        ("D3", "T1:apps"),
+    ] {
+        assert_eq!(section(id), want, "{id}");
+    }
+    assert!(find(&s, "D4").external && find(&s, "D5").external, "shared DMs are Slack Connect");
+    let group = find(&s, "G1");
+    assert_eq!(group.kind, ConversationKind::GroupDm { users: vec![UserId::new("U1"), UserId::new("U2")] });
+    assert_eq!(group.name.unsanitized(), "ann, bob", "Bob is not known: the handles, the user's left out");
+    for gone in ["G2", "G3"] {
+        assert!(s.conversations.iter().all(|c| c.id.as_str() != gone), "{gone}: closed or archived");
+    }
+    // Without Slack's sections, the group DM still shows, in Direct messages.
+    let plain = snapshot(placed(), None, known, NOW);
+    assert_eq!(find(&plain, "G1").section.as_str(), "T1:dms");
+    assert_eq!(find(&plain, "C1").section.as_str(), "T1:channels", "no Starred listed: where it was");
+}
+
+#[test]
+fn a_group_dm_is_named_by_its_people_when_all_are_known() {
+    let users = [UserId::new("U1"), UserId::new("U2")];
+    let known = [known_person("U1", "Ann", false), known_person("U2", "Bob", false)];
+    assert_eq!(group_name(&users, &known, Some("mpdm-x--y-1"), None).as_deref(), Some("Ann, Bob"));
+    assert_eq!(group_name(&users, &[], Some("mpdm-me--ann--bob-12"), Some("me")).as_deref(), Some("ann, bob"));
+    assert_eq!(group_name(&users, &[], Some("odd"), None), None);
+    assert_eq!(group_name(&[], &[], Some("mpdm-me-1"), Some("me")), None);
+}

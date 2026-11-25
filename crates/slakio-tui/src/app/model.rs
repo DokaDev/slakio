@@ -8,8 +8,8 @@ use super::shell::View;
 use super::todos::{Group, TodoView};
 use slakio_core::backend::{Connection, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, SavedId, Section, SectionId, Target, User, UserId, Workspace, WorkspaceColor,
-    WorkspaceId,
+    Conversation, ConversationId, SavedId, Section, SectionId, SectionKind, Target, User, UserId, Workspace,
+    WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
@@ -481,6 +481,12 @@ impl Model {
             View::Home => {
                 let mut rows = vec![];
                 for (si, s) in self.snapshot.sections.iter().enumerate().filter(|(_, s)| &s.workspace == ws) {
+                    // As Slack's desktop app: Starred, External connections and Apps show only
+                    // when they hold a conversation; the others always do.
+                    let hides = matches!(s.kind, SectionKind::Favorites | SectionKind::External | SectionKind::Apps);
+                    if hides && !convs.clone().any(|(_, c)| c.section == s.id) {
+                        continue;
+                    }
                     if !rows.is_empty() {
                         rows.push(Row::Spacer);
                     }

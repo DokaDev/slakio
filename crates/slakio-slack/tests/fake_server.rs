@@ -184,13 +184,19 @@ fn the_backend_boots_from_the_start_bundle_and_reads_a_conversation() {
         );
         assert_eq!(snapshot.workspaces[0].id, ws.id);
         assert_eq!(snapshot.saved, None, "saved items are unknown, not none");
-        let expected = world
-            .snapshot()
-            .conversations
-            .iter()
-            .filter(|c| c.workspace == ws.id && !matches!(c.kind, ConversationKind::GroupDm { .. }))
-            .count();
-        assert_eq!(snapshot.conversations.len(), expected);
+        // Every conversation, the open group DMs too, named as the world names them, in the
+        // sections the world puts them in (by kind: the backend names its sections itself).
+        let listed: Vec<_> = world.snapshot().conversations.iter().filter(|c| c.workspace == ws.id).collect();
+        assert_eq!(snapshot.conversations.len(), listed.len());
+        let kind_of = |s: &slakio_core::backend::Snapshot, id: &slakio_core::model::SectionId| {
+            s.sections.iter().find(|x| &x.id == id).map(|x| x.kind)
+        };
+        for want in listed {
+            let got = snapshot.conversations.iter().find(|c| c.id == want.id).expect("listed");
+            assert_eq!(got.name, want.name, "{}", want.id);
+            assert_eq!(kind_of(&snapshot, &got.section), kind_of(world.snapshot(), &want.section), "{}", want.id);
+        }
+        assert!(snapshot.conversations.iter().any(|c| matches!(c.kind, ConversationKind::GroupDm { .. })));
         // The second request is signed in: it carries the team.
         assert!(fake.log()[1].query.contains(&format!("slack_route={}", ws.id)));
 

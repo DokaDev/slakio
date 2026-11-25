@@ -8,7 +8,9 @@
 //! place; with no list at all the sidebar is those two alone.
 //!
 //! A conversation goes to the first of: a section the user made that lists it, Starred (when
-//! starred and Slack lists Starred for the user), then Channels or Direct messages.
+//! starred), External connections (when shared with another organization), Apps (a DM with an
+//! app), then Channels or Direct messages; each of Starred, External connections and Apps only
+//! when Slack lists it for the user.
 //!
 //! A section the user made lists only the conversations of its first page of ids: no allowed
 //! method reads the others, which stay in their default section (the diagnostics tell the gap).
@@ -86,6 +88,8 @@ pub(crate) struct Sidebar {
     /// The section the user made that lists a conversation (the first in order).
     custom: HashMap<String, SectionId>,
     starred: Option<SectionId>,
+    external: Option<SectionId>,
+    apps: Option<SectionId>,
     channels: SectionId,
     dms: SectionId,
 }
@@ -96,6 +100,10 @@ pub(crate) struct Facts {
     /// A DM or a group DM.
     pub(crate) dm: bool,
     pub(crate) starred: bool,
+    /// Shared with another organization (Slack Connect).
+    pub(crate) external: bool,
+    /// A DM with an app.
+    pub(crate) app: bool,
 }
 
 impl Sidebar {
@@ -160,8 +168,9 @@ impl Sidebar {
         };
         let (channels, dms) = (of(SectionKind::Channels, "channels"), of(SectionKind::DirectMessages, "dms"));
         let listed = |kind| sections.iter().find(|s| s.kind == kind).map(|s| s.id.clone());
-        let starred = listed(SectionKind::Favorites);
-        Self { sections, custom, starred, channels, dms }
+        let (starred, external, apps) =
+            (listed(SectionKind::Favorites), listed(SectionKind::External), listed(SectionKind::Apps));
+        Self { sections, custom, starred, external, apps, channels, dms }
     }
 
     /// The section conversation `id` is listed in.
@@ -171,6 +180,8 @@ impl Sidebar {
             .get(id)
             .cloned()
             .or_else(|| pick(f.starred, &self.starred))
+            .or_else(|| pick(f.external, &self.external))
+            .or_else(|| pick(f.app && f.dm, &self.apps))
             .unwrap_or_else(|| if f.dm { self.dms.clone() } else { self.channels.clone() })
     }
 }

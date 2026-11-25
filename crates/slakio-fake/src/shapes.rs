@@ -82,6 +82,7 @@ fn user_boot(world: &World, team: usize) -> Value {
     }
     let mut channels = Vec::new();
     let mut ims = Vec::new();
+    let mut open = Vec::new();
     for (n, c) in s.conversations.iter().filter(|c| c.workspace == ws.id).enumerate() {
         match &c.kind {
             ConversationKind::Channel { private } => {
@@ -99,8 +100,16 @@ fn user_boot(world: &World, team: usize) -> Value {
             ConversationKind::Dm { user } => {
                 ims.push(json!({"id": c.id.as_str(), "user": user.as_str(), "is_im": true, "is_open": true}))
             }
-            ConversationKind::GroupDm { .. } => {
-                channels.push(json!({"id": c.id.as_str(), "name": c.name.unsanitized(), "is_mpim": true}));
+            ConversationKind::GroupDm { users } => {
+                // Named by handle as Slack does, the user among its people, and open.
+                let handle =
+                    |id: &str| s.users.iter().find(|u| u.id.as_str() == id).map(|u| u.name.unsanitized().to_string());
+                let members: Vec<&str> =
+                    std::iter::once(ws.me.as_str()).chain(users.iter().map(|u| u.as_str())).collect();
+                let handles: Vec<String> = members.iter().filter_map(|m| handle(m)).collect();
+                let name = format!("mpdm-{}-1", handles.join("--"));
+                channels.push(json!({"id": c.id.as_str(), "name": name, "is_mpim": true, "members": members}));
+                open.push(c.id.as_str());
             }
         }
     }
@@ -132,7 +141,7 @@ fn user_boot(world: &World, team: usize) -> Value {
         "starred": starred,
         "channels": channels,
         "ims": ims,
-        "is_open": [],
+        "is_open": open,
         "prefs": {"all_notifications_prefs": all_prefs, "muted_channels": legacy.join(","), "theme": "light"},
         "dnd": dnd,
     })
