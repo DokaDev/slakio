@@ -300,6 +300,56 @@ fn a_refusal_for_a_picture_no_longer_waited_for_still_pauses_photos_ahead() {
     paused_until(&mut t, start + RETRY_AFTER, "busy");
 }
 
+/// A run whose only DM row's photo, asked for ahead, failed for `kind`; then two hours of a
+/// frame every ten seconds, everything else answered at once: the requests for it after that,
+/// each with how long after the failure it was asked.
+fn after_failing(kind: &FailKind) -> Vec<(Request, Duration)> {
+    let mut t = T::new(&format!("failed-{kind:?}").replace(['{', '}', ' ', ':', '"'], ""));
+    let (looks, _) = t.frame(&[], 1);
+    t.look(looks);
+    let (_, asked) = t.frame(&[], 1);
+    assert!(asked.len() == 1 && is_dm(&asked[0]));
+    t.images.failed(asked[0].id, kind, t.now);
+    let failed = t.now;
+    let mut again = Vec::new();
+    for _ in 0..720 {
+        let since = t.now - failed;
+        again.extend(t.pump(&[], 1, 1).into_iter().map(|r| (r, since)));
+        t.now += Duration::from_secs(10);
+    }
+    again
+}
+
+#[test]
+fn a_photo_ahead_that_failed_for_a_while_is_asked_again_once_its_wait_is_over() {
+    let passing = [
+        FailKind::Network,
+        FailKind::Busy,
+        FailKind::Offline,
+        FailKind::CapReached,
+        FailKind::RateLimited { retry_after: None },
+    ];
+    for kind in passing {
+        let again = after_failing(&kind);
+        assert_eq!(again.len(), 1, "{kind:?}: asked again, once");
+        // Its wait (or the pause) is the minute a failure for a while waits, at least.
+        assert!(again[0].1 >= RETRY_AFTER, "{kind:?}: asked again after {:?}", again[0].1);
+    }
+}
+
+#[test]
+fn a_photo_ahead_that_cannot_be_shown_is_not_asked_again() {
+    let lasting = [
+        FailKind::Api { code: "not_an_image".into() },
+        FailKind::Api { code: "file_not_found".into() },
+        FailKind::TooLarge,
+        FailKind::Auth,
+    ];
+    for kind in lasting {
+        assert!(after_failing(&kind).is_empty(), "{kind:?}: not asked again");
+    }
+}
+
 #[test]
 fn a_photo_ahead_on_disk_is_not_fetched() {
     let mut first = T::new("kept");

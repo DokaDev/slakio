@@ -20,7 +20,8 @@
 //!
 //! A photo that comes while its row is on screen is drawn as any other. One whose row is not
 //! goes to the terminal only when it fits beside what the terminal holds and what is on its way,
-//! removing nothing; otherwise it is let go (the disk has it). Each is asked ahead once a run.
+//! removing nothing; otherwise it is let go (the disk has it). Each is asked ahead once a run,
+//! or again once its wait is over when it failed only for a while.
 //! Pictures or photos turned off, nothing waits to be asked ahead.
 
 use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, IN_FLIGHT_MAX, Images, Key, RETRY_AFTER, note};
@@ -71,7 +72,7 @@ impl Images {
                 break;
             }
             let key = (source, CHIP_PHOTO);
-            if self.entries.contains_key(&key) || self.ahead.done.contains(&key) || !queued.insert(key.clone()) {
+            if !self.free(&key, None) || self.ahead.done.contains(&key) || !queued.insert(key.clone()) {
                 continue;
             }
             self.ahead.queue.push_back((ws, key));
@@ -103,6 +104,33 @@ impl Images {
         self.ahead.paused_until = Some(self.ahead.paused_until.map_or(until, |t| t.max(until)));
     }
 
+    /// Photo `key`, asked for ahead, failed for `kind`: for a while only (busy, offline, the
+    /// budget, a 429, the network), it may be asked ahead again once its wait is over; one that
+    /// cannot be shown (gone, not a picture, too large, refused) never is this run.
+    pub(super) fn failed_ahead(&mut self, key: &Key, kind: &FailKind) {
+        let passing = matches!(
+            kind,
+            FailKind::Busy
+                | FailKind::Offline
+                | FailKind::CapReached
+                | FailKind::RateLimited { .. }
+                | FailKind::Network
+        );
+        if passing {
+            self.ahead.done.remove(key);
+        }
+    }
+
+    /// `key` may be asked for ahead at `now` (or `None`: whenever): not here, or failed for a while
+    /// and its wait over.
+    fn free(&self, key: &Key, now: Option<Instant>) -> bool {
+        match self.entries.get(key) {
+            None => true,
+            Some(Entry::Failed { again: Some(at), .. }) => now.is_none_or(|now| *at <= now),
+            Some(_) => false,
+        }
+    }
+
     /// The photos asked for ahead still on their way.
     fn flying(&mut self) -> usize {
         let entries = &self.entries;
@@ -131,10 +159,11 @@ impl Images {
             return false;
         }
         while let Some((ws, key)) = self.ahead.queue.pop_front() {
-            if self.entries.contains_key(&key) || self.ahead.done.contains(&key) {
+            if !self.free(&key, Some(now)) || self.ahead.done.contains(&key) {
                 continue;
             }
             if !self.missed.contains(&key) {
+                self.failed.retain(|k| *k != key);
                 self.look_up(key.clone());
                 self.ahead.flying.insert(key);
                 return true;
@@ -144,6 +173,7 @@ impl Images {
                 return false;
             }
             self.missed.remove(&key);
+            self.failed.retain(|k| *k != key);
             note::line(&self.diag, &key, Stage::Asked, "ahead", &[]);
             let id = requests.ask(Some(ws), Command::Image { source: key.0.clone(), max: BYTES_MAX });
             self.asked.insert(id, key.clone());

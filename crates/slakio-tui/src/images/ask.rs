@@ -134,7 +134,9 @@ impl Images {
         // waited for too): nothing more is asked ahead a while.
         self.pause_ahead(kind, now);
         let Some(key) = self.asked.remove(&id) else { return false };
-        self.ahead.flying.remove(&key);
+        if self.ahead.flying.remove(&key) {
+            self.failed_ahead(&key, kind);
+        }
         let why = match kind {
             FailKind::TooLarge => Why::TooLarge,
             FailKind::Api { code } if code == "not_an_image" => Why::Unreadable,
