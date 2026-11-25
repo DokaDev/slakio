@@ -1,5 +1,5 @@
 use super::*;
-use crate::images::cached::{run, start};
+use crate::images::cached::{LOOKUPS_MAX, run, start};
 use crate::images::{Job, Look, PHOTO, RETRY_AFTER, graphics};
 use slakio_core::backend::{FailKind, Generation, Request};
 use slakio_core::diag::Diag;
@@ -225,6 +225,23 @@ fn photos_ahead_leave_most_of_the_picture_share_even_when_each_is_redirected() {
     // At most two fifths of a workspace's picture share, so what is on screen keeps the rest.
     assert!(minute * 5 <= limits.lane_picture_per_minute as usize * 2, "{minute} hops a minute");
     assert!(hour * 5 <= limits.lane_picture_per_hour as usize * 2, "{hour} hops an hour");
+}
+
+#[test]
+fn a_photo_ahead_waits_while_the_looks_on_disk_are_at_their_most() {
+    let mut t = T::new("looks");
+    let screen: Vec<Key> = (0..LOOKUPS_MAX).map(shown).collect();
+    let (mut looks, _) = t.frame(&screen, 0);
+    assert_eq!(looks.len(), LOOKUPS_MAX);
+    for _ in 0..3 {
+        let (more, _) = t.frame(&screen, 3);
+        assert!(more.is_empty(), "no look ahead past {LOOKUPS_MAX} waiting: {}", more.len());
+    }
+    // One ends: there is room for one look, and the photo ahead takes it.
+    t.look(vec![looks.remove(0)]);
+    let (more, _) = t.frame(&screen, 3);
+    assert_eq!(more.len(), 1);
+    assert_eq!(more[0].source, dm(0));
 }
 
 #[test]

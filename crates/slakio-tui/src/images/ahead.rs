@@ -25,6 +25,7 @@
 //! or again once its wait is over when it failed only for a while.
 //! Pictures or photos turned off, nothing waits to be asked ahead.
 
+use super::cached::LOOKUPS_MAX;
 use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, IN_FLIGHT_MAX, Images, Key, RETRY_AFTER, note};
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind};
@@ -170,6 +171,11 @@ impl Images {
                 continue;
             }
             if !self.missed.contains(&key) {
+                // Within the looks waiting at once, as any look.
+                if self.looking() >= LOOKUPS_MAX {
+                    self.ahead.queue.push_front((ws, key));
+                    return false;
+                }
                 self.failed.retain(|k| *k != key);
                 self.look_up(key.clone());
                 self.ahead.flying.insert(key);
