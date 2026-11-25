@@ -127,12 +127,14 @@ impl Saved {
             tabs.push(t);
         }
         doc["tab"] = Item::ArrayOfTables(tabs);
+        // Only what reads back is written: a sidebar of another shape left out, a list cut.
         let mut sidebars = ArrayOfTables::new();
-        for s in &self.sidebar {
+        for s in self.sidebar.iter().filter(|s| workspace_id(s.workspace.as_str())).take(MAX_SIDEBARS) {
             let mut t = Table::new();
             t["workspace"] = value(s.workspace.as_str());
             let ids = |ids: &mut dyn Iterator<Item = &SectionId>| {
-                value(ids.map(SectionId::as_str).collect::<toml_edit::Array>())
+                let ids = ids.map(SectionId::as_str).filter(|id| section_id(id)).take(MAX_SECTIONS);
+                value(ids.collect::<toml_edit::Array>())
             };
             t["collapsed"] = ids(&mut s.collapsed.iter());
             for order in [Sort::Alphabetical, Sort::Recent] {
@@ -310,7 +312,7 @@ fn sidebar(t: &Table) -> Result<SavedSidebar, String> {
     let workspace = t
         .get("workspace")
         .and_then(Item::as_str)
-        .filter(|s| !s.is_empty() && s.len() <= MAX_ID && s.bytes().all(|b| b.is_ascii_alphanumeric()))
+        .filter(|s| workspace_id(s))
         .map(WorkspaceId::new)
         .ok_or("a sidebar without a workspace")?;
     let ids = |key: &str| -> Result<Vec<SectionId>, String> {
@@ -322,8 +324,7 @@ fn sidebar(t: &Table) -> Result<SavedSidebar, String> {
         list.iter()
             .map(|v| {
                 v.as_str()
-                    .filter(|s| !s.is_empty() && s.len() <= MAX_SECTION_ID)
-                    .filter(|s| s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-:".contains(&b)))
+                    .filter(|s| section_id(s))
                     .map(SectionId::new)
                     .ok_or_else(|| format!("a section id in {key} of another shape"))
             })
@@ -335,6 +336,16 @@ fn sidebar(t: &Table) -> Result<SavedSidebar, String> {
         sort.extend(ids(order.name())?.into_iter().map(|id| (id, order)));
     }
     Ok(SavedSidebar { workspace, collapsed, sort })
+}
+
+/// `s` is a workspace's id of the shape a sidebar holds.
+fn workspace_id(s: &str) -> bool {
+    !s.is_empty() && s.len() <= MAX_ID && s.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
+/// `s` is a section's id of the shape a sidebar holds.
+fn section_id(s: &str) -> bool {
+    !s.is_empty() && s.len() <= MAX_SECTION_ID && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-:".contains(&b))
 }
 
 /// A whole number at least zero, when there is one.

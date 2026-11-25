@@ -244,3 +244,27 @@ fn a_sidebar_of_another_shape_or_too_long_is_not_read() {
     let fine = format!("version = 1\n{}", "[[sidebar]]\nworkspace = \"T1\"\n".repeat(MAX_SIDEBARS));
     assert_eq!(Saved::parse(&fine).map(|s| s.sidebar.len()), Ok(MAX_SIDEBARS));
 }
+
+/// What the file could not read back is not written: an id of another shape, a workspace of
+/// another shape, more sections or sidebars than read; the tabs and the rest read back.
+#[test]
+fn a_sidebar_is_written_only_as_it_reads_back() {
+    let mut saved = with_sidebars();
+    let many: Vec<SectionId> = (0..MAX_SECTIONS + 5).map(|i| SectionId::new(format!("S{i}"))).collect();
+    saved.sidebar[0].collapsed.splice(1..1, [SectionId::new("T1:chan nels"), SectionId::new("")]);
+    saved.sidebar[0].sort.push((SectionId::new("x".repeat(129)), Sort::Recent));
+    saved.sidebar[1].collapsed = many.clone();
+    saved.sidebar[1].sort = many.iter().map(|id| (id.clone(), Sort::Alphabetical)).collect();
+    let other = SavedSidebar { workspace: WorkspaceId::new("T:3"), collapsed: Vec::new(), sort: Vec::new() };
+    saved.sidebar.push(other);
+    let read = Saved::parse(&saved.to_text()).expect("read back");
+    assert_eq!(read.tabs, two_tabs().tabs, "the tabs are kept");
+    let mut want = with_sidebars().sidebar;
+    want[1].collapsed = many[..MAX_SECTIONS].to_vec();
+    want[1].sort = many[..MAX_SECTIONS].iter().map(|id| (id.clone(), Sort::Alphabetical)).collect();
+    assert_eq!(read.sidebar, want);
+    // More sidebars than read: the first ones.
+    let one = with_sidebars().sidebar[0].clone();
+    let lots = Saved { sidebar: vec![one; MAX_SIDEBARS + 1], ..two_tabs() };
+    assert_eq!(Saved::parse(&lots.to_text()).map(|s| (s.tabs.len(), s.sidebar.len())), Ok((2, MAX_SIDEBARS)));
+}
