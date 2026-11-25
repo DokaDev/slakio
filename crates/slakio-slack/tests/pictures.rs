@@ -114,7 +114,7 @@ fn a_copy_goes_with_the_cookie_a_photo_with_nothing_of_the_session() {
         assert_eq!(log.len(), 2);
         assert!(log[0].path.starts_with("/files-tmb/"));
         assert!(header(&log[0], "cookie").is_some_and(|c| c.contains("cookie-TEST")), "the copy: the cookie");
-        assert!(log[1].path.starts_with("/avatars/"));
+        assert!(slakio_world::pictures::is_avatar_path(&log[1].path), "{}", log[1].path);
         assert_eq!(header(&log[1], "cookie"), None, "the photo: no cookie");
         assert_eq!(header(&log[1], "referer"), None);
         assert_eq!(header(&log[1], "origin"), None);
@@ -381,6 +381,7 @@ fn a_photo_never_follows_a_redirect_to_an_address_a_photo_may_not_come_from() {
 fn the_user_s_own_photo_is_looked_up_when_the_start_bundle_has_none() {
     rt().block_on(async {
         let mut r = Run::new().await;
+        r.fake.set_own_photo(false);
         let s = match r.ask(Command::Boot).await {
             Event::Booted(s) => *s,
             other => panic!("{other:?}"),
@@ -462,6 +463,7 @@ fn the_gravatar_fallback_stays_within_the_hop_cap() {
 fn the_user_s_own_photo_a_page_tells_reaches_the_screen_when_the_start_had_none() {
     rt().block_on(async {
         let mut r = Run::new().await;
+        r.fake.set_own_photo(false);
         // The start's lookup fails: the user's own record has no photo.
         r.fake.fail_next("users/info", Fault::Status { status: 503, retry_after: None });
         let Event::Booted(s) = r.ask(Command::Boot).await else { panic!("booted") };

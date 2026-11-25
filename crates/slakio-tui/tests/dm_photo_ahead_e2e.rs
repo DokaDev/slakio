@@ -73,7 +73,8 @@ impl Machine {
             .filter_map(|c| {
                 let ConversationKind::Dm { user } = &c.kind else { return None };
                 let u = s.users.iter().find(|u| u.id == *user && u.workspace == *ws)?;
-                let path = u.avatar.as_ref()?.split_once("/avatars/").map(|(_, p)| format!("/avatars/{p}"))?;
+                let path =
+                    u.avatar.as_ref()?.strip_prefix("https://")?.split_once('/').map(|(_, p)| format!("/{p}"))?;
                 Some((c.name.unsanitized().to_string(), path))
             })
             .collect()
@@ -82,7 +83,12 @@ impl Machine {
     /// How many times each photo path was fetched.
     fn photo_fetches(&self) -> HashMap<String, usize> {
         let mut per = HashMap::new();
-        for l in self.fake.log().into_iter().filter(|l| l.method() == PICTURES && l.path.starts_with("/avatars/")) {
+        for l in self
+            .fake
+            .log()
+            .into_iter()
+            .filter(|l| l.method() == PICTURES && slakio_world::pictures::is_avatar_path(&l.path))
+        {
             *per.entry(l.path.clone()).or_default() += 1;
         }
         per
@@ -127,4 +133,35 @@ fn dm_rows_out_of_view_get_their_photos_ahead() {
     let kept = m.dir.join("cache").join("slakio").join("pictures");
     let files = std::fs::read_dir(&kept).map_or(0, |d| d.count());
     assert!(files >= ahead, "the photos fetched ahead are kept on disk: {files} < {ahead}");
+}
+
+#[test]
+fn a_dm_peer_without_a_photo_of_their_own_gets_no_photo_fetched() {
+    let m = Machine::new("not-custom");
+    let dms = m.dm_photos();
+    assert!(!dms.is_empty(), "some DM peers with a photo");
+    // The DMs' people as the edge cache answers: each with a photo address, all marked as
+    // having no photo of their own (Slack's default only).
+    let s = m.world.snapshot();
+    let ws = &s.workspaces[0].id;
+    let results: Vec<serde_json::Value> = (s.conversations.iter().filter(|c| c.workspace == *ws))
+        .filter_map(|c| match &c.kind {
+            ConversationKind::Dm { user } => s.users.iter().find(|u| u.id == *user && u.workspace == *ws),
+            _ => None,
+        })
+        .map(|u| {
+            serde_json::json!({"id": u.id.as_str(), "team_id": ws.as_str(), "name": u.name.unsanitized(),
+                "profile": {"real_name": u.display_name.unsanitized(), "image_72": u.avatar, "is_custom_image": false}})
+        })
+        .collect();
+    m.fake.fail_next("users/info", slakio_fake::Fault::Answer(serde_json::json!({"ok": true, "results": results})));
+    let Some(run) = m.start() else { return };
+    wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
+    run.wait_for("the list", |t| t.contains("# backend"));
+    wait_until("the DMs' people looked up", || m.fake.methods().iter().any(|x| x == "users/info"));
+    std::thread::sleep(Duration::from_secs(6));
+    let per = m.photo_fetches();
+    run.quit();
+    let fetched: Vec<&String> = per.keys().filter(|p| dms.iter().any(|(_, path)| path == *p)).collect();
+    assert!(fetched.is_empty(), "no photo of a DM peer is fetched: {fetched:?}");
 }

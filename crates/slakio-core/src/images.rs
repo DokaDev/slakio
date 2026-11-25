@@ -95,6 +95,45 @@ pub fn gravatar_fallback(url: &str) -> Option<String> {
     [AVATAR_HOSTS[0], AVATAR_HOSTS[2]].contains(&host_of(&to)?).then_some(to)
 }
 
+/// The 72-pixel copy of an original profile photo `url` (`image_original`): the address on
+/// Slack's avatar host ([`AVATAR_HOSTS`]`[0]`) of `<date>/<file>_72.<ext>`, the extension kept
+/// (the host refuses another), kept by [`avatar_address`] again. `url` is the upload on Amazon's
+/// storage, `https://s3-<region>.amazonaws.com/slack-files2/avatars/<date>/<file>_original.<ext>`,
+/// or the same file on the avatar host, `https://<avatar host>/<date>/<file>_original.<ext>`, and
+/// nothing more: a date `YYYY-MM-DD`, a file name of letters, digits, `-` and `_`, an extension of
+/// letters and digits; no query, no fragment, no other host. `None` for anything else.
+///
+/// Derived from gammons/slk (MIT, Copyright (c) 2026 Grant Ammons): the two forms of an original
+/// photo's address and the sized copy on the avatar host with the extension kept.
+pub fn avatar_sized(url: &str) -> Option<String> {
+    if url.len() > ADDRESS_MAX {
+        return None;
+    }
+    let rest = url.strip_prefix("https://")?;
+    let (host, path) = rest.split_once('/')?;
+    let path = if host == AVATAR_HOSTS[0] {
+        path
+    } else {
+        let region = host.strip_prefix("s3-")?.strip_suffix(".amazonaws.com")?;
+        let plain = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-';
+        if region.is_empty() || !region.bytes().all(plain) {
+            return None;
+        }
+        path.strip_prefix("slack-files2/avatars/")?
+    };
+    let (date, name) = path.split_once('/')?;
+    let dated = date.len() == 10
+        && date.bytes().enumerate().all(|(i, b)| if i == 4 || i == 7 { b == b'-' } else { b.is_ascii_digit() });
+    let (stem, ext) = name.rsplit_once('.')?;
+    let file = stem.strip_suffix("_original")?;
+    let file_ok = !file.is_empty() && file.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    let ext_ok = (1..=8).contains(&ext.len()) && ext.bytes().all(|b| b.is_ascii_alphanumeric());
+    if !(dated && file_ok && ext_ok) {
+        return None;
+    }
+    avatar_address(&format!("https://{}/{date}/{file}_72.{ext}", AVATAR_HOSTS[0]))
+}
+
 /// `url` when a workspace's own emoji may be fetched from it: an address on one of
 /// [`EMOJI_HOSTS`]. Bytes outside ASCII (a name of another script in the path, as Slack may
 /// write it raw) are percent-encoded first, as a browser sends them; the host is matched as

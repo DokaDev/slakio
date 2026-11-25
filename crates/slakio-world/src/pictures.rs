@@ -18,9 +18,25 @@ pub(crate) fn hash(s: &str) -> u32 {
     s.bytes().fold(0x811C_9DC5, |h, b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193))
 }
 
-/// The profile photo of person `id` of workspace `ws`: two people in three have one; bots none.
+/// The day the world's photos were uploaded: the dated folder of their addresses.
+const UPLOADED: &str = "2026-01-05";
+
+/// The profile photo of person `id` of workspace `ws` (its 72-pixel copy on the avatar host, as
+/// Slack names one: `<date>/<file>_72.<ext>`): two people in three have one; bots none.
 pub fn avatar(ws: &slakio_core::model::WorkspaceId, id: &str, bot: bool) -> Option<String> {
-    (!bot && !hash(id).is_multiple_of(3)).then(|| format!("https://{}/avatars/{ws}/{id}-72.png", AVATAR_HOSTS[0]))
+    (!bot && !hash(id).is_multiple_of(3)).then(|| format!("https://{}/{UPLOADED}/{ws}-{id}_72.png", AVATAR_HOSTS[0]))
+}
+
+/// The photo `avatar` (one [`avatar`] made) as uploaded, as the edge cache and the start bundle
+/// name it (`image_original`): the file on Amazon's storage whose 72-pixel copy `avatar` is.
+pub fn original(avatar: &str) -> Option<String> {
+    let file = avatar.strip_prefix(&format!("https://{}/{UPLOADED}/", AVATAR_HOSTS[0]))?.strip_suffix("_72.png")?;
+    Some(format!("https://s3-us-west-2.amazonaws.com/slack-files2/avatars/{UPLOADED}/{file}_original.png"))
+}
+
+/// `path` is a profile photo's path: one [`avatar`] makes (dated), or one under `/avatars/`.
+pub fn is_avatar_path(path: &str) -> bool {
+    path.starts_with("/avatars/") || path.strip_prefix('/').is_some_and(|p| p.starts_with(&format!("{UPLOADED}/")))
 }
 
 /// The smaller copy of file `id` (named `name`, of workspace `team`), when it is a picture.
@@ -33,13 +49,13 @@ pub fn thumb(team: &str, id: &str, name: &str) -> Option<String> {
 }
 
 /// The picture at `path` (an address's path the world made), as PNG bytes: a photo for an
-/// `/avatars/` path, a file's copy for a `/files-tmb/` one, an emoji for one of
+/// [`is_avatar_path`] path, a file's copy for a `/files-tmb/` one, an emoji for one of
 /// [`crate::emoji::picture`]'s; `None` for any other.
 pub fn served(path: &str) -> Option<Vec<u8>> {
     if crate::emoji::is_path(path) {
         return Some(png(path, crate::emoji::SIDE, crate::emoji::SIDE));
     }
-    if path.starts_with("/avatars/") {
+    if is_avatar_path(path) {
         return Some(png(path, AVATAR_SIDE, AVATAR_SIDE));
     }
     path.starts_with("/files-tmb/").then(|| png(path, THUMB_SIZE.0, THUMB_SIZE.1))

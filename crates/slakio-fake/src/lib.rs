@@ -49,7 +49,7 @@ impl Logged {
             return FILES;
         }
         if self.path.starts_with("/files-tmb/")
-            || self.path.starts_with("/avatars/")
+            || slakio_world::pictures::is_avatar_path(&self.path)
             || slakio_world::emoji::is_path(&self.path)
         {
             return PICTURES;
@@ -95,7 +95,8 @@ pub enum Fault {
 pub const FILES: &str = "files";
 
 /// The name the pictures go by (files' smaller copies, `/files-tmb/…`, profile photos,
-/// `/avatars/…`, and emoji, `/<team>/<name>/<hex>.png`, all made by [`slakio_world::pictures`]).
+/// dated or `/avatars/…` ([`slakio_world::pictures::is_avatar_path`]), and emoji,
+/// `/<team>/<name>/<hex>.png`, all made by [`slakio_world::pictures`]).
 pub const PICTURES: &str = "pictures";
 
 /// The most bytes of a file the fake serves.
@@ -117,6 +118,8 @@ struct Shared {
     refuse_retry_after: Option<String>,
     /// A socket says hello when it opens (the default).
     hello: bool,
+    /// The start bundle's own profile leaves its photo out (a user without one of their own).
+    no_own_photo: bool,
     client_frames: Vec<ClientFrame>,
     /// Session tokens no longer accepted.
     revoked: Vec<String>,
@@ -248,6 +251,12 @@ impl FakeSlack {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).hello = hello;
     }
 
+    /// Whether the start bundle's own profile carries the user's photo (it does unless told
+    /// otherwise): without it, the user's photo is looked up.
+    pub fn set_own_photo(&self, photo: bool) {
+        self.shared.lock().unwrap_or_else(PoisonError::into_inner).no_own_photo = !photo;
+    }
+
     /// Every frame the clients sent over their sockets, in order.
     pub fn client_frames(&self) -> Vec<ClientFrame> {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner).client_frames.clone()
@@ -273,11 +282,12 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     if upgrade {
         return socket::serve(stream, logged, shared).await;
     }
-    let (fault, delay) = {
+    let (fault, delay, no_own_photo) = {
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());
         let revoked = s.revoked(&logged).then(|| Fault::Api("invalid_auth".to_string()));
-        (revoked.or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front)), s.delay)
+        let fault = revoked.or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front));
+        (fault, s.delay, s.no_own_photo)
     };
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
@@ -305,7 +315,13 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         Some(Fault::Raw { status, headers, body }) => {
             return write_raw(stream, status, &headers, &body).await;
         }
-        None | Some(Fault::Pass) => (200, String::new(), shapes::answer(&world, team, &logged).to_string()),
+        None | Some(Fault::Pass) => {
+            let mut answer = shapes::answer(&world, team, &logged);
+            if no_own_photo && let Some(p) = answer.pointer_mut("/self/profile").and_then(|p| p.as_object_mut()) {
+                p.retain(|k, _| !k.starts_with("image_") && k != "is_custom_image");
+            }
+            (200, String::new(), answer.to_string())
+        }
     };
     let head = format!(
         "HTTP/1.1 {status} FAKE\r\ncontent-type: application/json; charset=utf-8\r\ncontent-length: {}\r\n{extra}connection: close\r\n\r\n",

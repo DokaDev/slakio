@@ -163,6 +163,10 @@ fn entries_without_a_photo_are_tallied_once_not_skipped_silently() {
     photos(&d, &persons, "lookup");
     photos(&d, &persons, "lookup");
     let t = text(&d, &path);
-    assert_eq!(t.matches("avatar skipped no-photo from=lookup no_profile=1 no_photo=2 of=3").count(), 1, "{t}");
+    assert_eq!(
+        t.matches("avatar skipped no-photo from=lookup no_profile=1 no_photo=2 not_custom=0 of=3").count(),
+        1,
+        "{t}"
+    );
     assert_eq!(t.matches("avatar counted decoded from=lookup results=3 pictured=0").count(), 2, "{t}");
 }

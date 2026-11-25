@@ -102,6 +102,11 @@ fn user_boot(world: &World, team: usize) -> Value {
     let Some(ws) = served(world, team) else { return json!({"ok": false, "error": "invalid_auth"}) };
     let s = world.snapshot();
     let me = s.users.iter().find(|u| u.id == ws.me);
+    // The user's own profile as the start bundle writes it ([`edge_profile`]).
+    let mut own = person(world, ws.me.as_str()).map_or(Value::Null, |p| p["profile"].clone());
+    if let Some(profile) = own.as_object_mut() {
+        edge_profile(profile, ws.me.as_str());
+    }
     let mut channels = Vec::new();
     let mut ims = Vec::new();
     for (n, c) in s.conversations.iter().filter(|c| c.workspace == ws.id).enumerate() {
@@ -144,7 +149,7 @@ fn user_boot(world: &World, team: usize) -> Value {
     };
     json!({
         "ok": true,
-        "self": {"id": ws.me.as_str(), "name": me.map(|u| u.name.unsanitized()), "team_id": ws.id.as_str()},
+        "self": {"id": ws.me.as_str(), "name": me.map(|u| u.name.unsanitized()), "team_id": ws.id.as_str(), "profile": own},
         "team": {"id": ws.id.as_str(), "name": ws.name.unsanitized(), "domain": "fake"},
         "starred": channels.iter().take(1).map(|c| c["id"].clone()).collect::<Vec<_>>(),
         "channels": channels,
@@ -362,10 +367,29 @@ fn person(world: &World, id: &str) -> Option<Value> {
     }))
 }
 
+/// A profile as the edge cache and the start bundle write one: the photo only as uploaded
+/// (`image_original`, with `avatar_hash` and `is_custom_image`), never a sized copy; none of the
+/// three for one without a photo of their own, only `avatar_hash`.
+fn edge_profile(profile: &mut serde_json::Map<String, Value>, id: &str) {
+    let photo = profile.remove("image_72").and_then(|p| p.as_str().map(str::to_string));
+    profile.remove("image_48");
+    profile.insert("avatar_hash".into(), json!("0123abcd4567"));
+    // The hostile person's upload is on a host no photo may come from.
+    let original = if id.ends_with("666") {
+        Some("https://evil.example/slack-files2/avatars/2026-01-05/x_original.png".to_string())
+    } else {
+        photo.as_deref().and_then(slakio_world::pictures::original)
+    };
+    if let Some(original) = original {
+        profile.insert("image_original".into(), json!(original));
+        profile.insert("is_custom_image".into(), json!(true));
+    }
+}
+
 /// The edge cache's people lookup: `updated_ids` (id → version) in the JSON body; every id it
-/// knows comes back, the others are listed as failed. Asked with `include_profile_only_if_stale`,
-/// it judges every record current and leaves the profile's photo fields out: a model of the
-/// answer seen for ids sent at version 0.
+/// knows comes back (its profile as [`edge_profile`] writes it), the others are listed as failed.
+/// Asked with `include_profile_only_if_stale`, it judges every record current and leaves the
+/// profile's photo fields out: a model of the answer seen for ids sent at version 0.
 fn edge_users(world: &World, request: &Logged) -> Value {
     let body: Value = serde_json::from_str(&request.body).unwrap_or_default();
     let Some(ids) = body.get("updated_ids").and_then(Value::as_object) else {
@@ -376,8 +400,11 @@ fn edge_users(world: &World, request: &Logged) -> Value {
     for id in ids.keys() {
         match person(world, id) {
             Some(mut p) => {
-                if current && let Some(profile) = p["profile"].as_object_mut() {
-                    profile.retain(|k, _| !k.starts_with("image_"));
+                if let Some(profile) = p["profile"].as_object_mut() {
+                    edge_profile(profile, id);
+                    if current {
+                        profile.retain(|k, _| !k.starts_with("image_"));
+                    }
                 }
                 results.push(p);
             }

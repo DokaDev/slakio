@@ -233,26 +233,29 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
     if !diag.on() {
         return;
     }
-    let (mut no_profile, mut no_photo, mut pictured) = (0usize, 0usize, 0usize);
+    let (mut no_profile, mut no_photo, mut not_custom, mut pictured) = (0usize, 0usize, 0usize, 0usize);
     for p in persons.iter().take(ENTRIES_MAX) {
         let Some(profile) = &p.profile else {
             no_profile += 1;
             continue;
         };
         pictured += usize::from(profile.avatar().is_some());
-        let fields = [("image_72", &profile.image_72), ("image_48", &profile.image_48)];
-        let Some((field, url)) = fields.iter().find_map(|(f, u)| u.as_deref().map(|u| (*f, u))) else {
+        if profile.is_custom_image == Some(false) {
+            not_custom += 1;
+            continue;
+        }
+        let Some((field, url)) = profile.given() else {
             no_photo += 1;
             continue;
         };
         let source = Source::Avatar(url.to_string());
         let id = diag.id(url);
         let pairs = [("id", id.as_str()), ("host", &host(url)), ("field", field), ("from", from)];
-        match (profile.avatar(), refusal(&source)) {
-            (Some(kept), _) => {
+        match (profile.photo(), refusal(&source)) {
+            (Some((field, kept)), _) => {
                 if diag.first(Kind::Avatar, Stage::Parsed, &kept) {
                     let id = diag.id(&kept);
-                    let pairs = [("id", id.as_str()), ("host", &host(&kept)), ("from", from)];
+                    let pairs = [("id", id.as_str()), ("host", &host(&kept)), ("from", from), ("field", field)];
                     diag.line(Kind::Avatar, Stage::Parsed, "ok", &pairs);
                 }
             }
@@ -263,12 +266,14 @@ pub(crate) fn photos(diag: &Diag, persons: &[wire::Person], from: &str) {
             }
         }
     }
-    let counts = [persons.len(), pictured, no_profile, no_photo].map(|c| c.to_string());
+    let counts = [persons.len(), pictured, no_profile, no_photo, not_custom].map(|c| c.to_string());
     let decoded = [("from", from), ("results", &*counts[0]), ("pictured", &*counts[1])];
     diag.line(Kind::Avatar, Stage::Counted, "decoded", &decoded);
     // Those without a photo: once a run for each tally (a skip is no longer silent).
-    if no_profile + no_photo > 0 && diag.first(Kind::Avatar, Stage::Skipped, &format!("{from} {}", counts.join(" "))) {
-        let pairs = [("from", from), ("no_profile", &*counts[2]), ("no_photo", &*counts[3]), ("of", &*counts[0])];
+    let skipped = no_profile + no_photo + not_custom;
+    if skipped > 0 && diag.first(Kind::Avatar, Stage::Skipped, &format!("{from} {}", counts.join(" "))) {
+        let (n, p, c, of) = (&*counts[2], &*counts[3], &*counts[4], &*counts[0]);
+        let pairs = [("from", from), ("no_profile", n), ("no_photo", p), ("not_custom", c), ("of", of)];
         diag.line(Kind::Avatar, Stage::Skipped, "no-photo", &pairs);
     }
 }
@@ -283,7 +288,7 @@ pub(crate) fn own_seen(diag: &Diag, persons: &[wire::Person], me: Option<&slakio
     if !diag.first(Kind::SelfPhoto, Stage::Seen, "view") {
         return;
     }
-    let raw = p.profile.as_ref().is_some_and(|f| f.image_72.is_some() || f.image_48.is_some());
+    let raw = p.profile.as_ref().is_some_and(|f| f.given().is_some());
     let photo = match (p.profile.as_ref().and_then(wire::Profile::avatar), raw) {
         (Some(_), _) => "yes",
         (None, true) => "refused",
@@ -301,12 +306,16 @@ pub(crate) fn own_profile(diag: &Diag, me: &wire::Me) {
     let Some(profile) = &me.profile else {
         return diag.line(Kind::SelfPhoto, Stage::Parsed, "bundle", &[("read", "no")]);
     };
-    let url = profile.image_72.as_deref().or(profile.image_48.as_deref());
+    let url = profile.given().map(|(_, u)| u);
     let id = url.map(|u| diag.id(u)).unwrap_or_default();
-    match (profile.avatar(), url) {
-        (Some(kept), _) => {
-            let pairs = [("read", "yes"), ("photo", "ok"), ("host", &host(&kept)), ("id", &diag.id(&kept))];
+    match (profile.photo(), url) {
+        (Some((field, kept)), _) => {
+            let id = diag.id(&kept);
+            let pairs = [("read", "yes"), ("photo", "ok"), ("host", &host(&kept)), ("id", &id), ("field", field)];
             diag.line(Kind::SelfPhoto, Stage::Parsed, "bundle", &pairs);
+        }
+        (None, _) if profile.is_custom_image == Some(false) => {
+            diag.line(Kind::SelfPhoto, Stage::Parsed, "bundle", &[("read", "yes"), ("photo", "not_custom")]);
         }
         (None, Some(u)) => {
             let why = refusal(&Source::Avatar(u.to_string())).unwrap_or("other");

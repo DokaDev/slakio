@@ -134,6 +134,18 @@ fn the_user_s_own_photo_comes_from_the_start_bundle_s_profile() {
 }
 
 #[test]
+fn the_user_s_own_photo_comes_from_the_start_bundle_s_original_as_its_72_pixel_copy() {
+    let original = "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/1234_abc_original.jpg";
+    let own = json!({"image_original": original, "avatar_hash": "0123abcd4567", "is_custom_image": true});
+    let s = snapshot(me_with(own), None, Vec::new(), NOW);
+    let want = format!("https://{}/2026-01-05/1234_abc_72.jpg", slakio_core::images::AVATAR_HOSTS[0]);
+    assert_eq!(s.users[0].avatar.as_deref(), Some(want.as_str()));
+    // No photo of their own: none.
+    let s = snapshot(me_with(json!({"image_original": original, "is_custom_image": false})), None, Vec::new(), NOW);
+    assert_eq!(s.users[0].avatar, None);
+}
+
+#[test]
 fn the_user_s_own_photo_looked_up_or_learned_is_kept_not_dropped() {
     let host = slakio_core::images::AVATAR_HOSTS[2];
     let learned = format!("https://{host}/img/avatars/ava_0010-72.png");

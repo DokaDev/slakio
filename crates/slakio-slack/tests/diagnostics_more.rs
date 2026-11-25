@@ -96,6 +96,7 @@ fn a_host_that_cannot_be_reached_is_the_network() {
 fn the_user_s_own_lookup_says_what_it_gave_and_the_answer_s_counts() {
     rt().block_on(async {
         let mut r = Run::new("lookup", None).await;
+        r.fake.set_own_photo(false);
         let me = World::demo().snapshot().workspaces[0].me.as_str().to_string();
         r.fake.fail_next("users/info", Fault::Answer(json!({"ok": true, "results": [], "pending_ids": [me]})));
         assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
@@ -112,6 +113,7 @@ fn the_user_s_own_lookup_says_what_it_gave_and_the_answer_s_counts() {
 fn a_lookup_answer_tells_its_entries_names_photo_hosts_and_what_it_decoded() {
     rt().block_on(async {
         let mut r = Run::new("lookup-shape", None).await;
+        r.fake.set_own_photo(false);
         let me = World::demo().snapshot().workspaces[0].me.as_str().to_string();
         let original = "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/1234_SECRETFILE_original.jpg";
         let answer = json!({"ok": true, "results": [{"id": me, "name": "secretme", "updated": 1, "profile": {
@@ -131,9 +133,12 @@ fn a_lookup_answer_tells_its_entries_names_photo_hosts_and_what_it_decoded() {
         has(&text, "avatar counted image name=image_original entries=1");
         has(&text, "avatar counted image_host name=image_original host=s3-us-west-2.amazonaws.com urls=1");
         has(&text, "avatar counted marks avatar_hash=1 is_custom_image=1 custom_true=1 of=1");
-        has(&text, "avatar counted decoded from=lookup results=1 pictured=0");
-        has(&text, "avatar skipped no-photo from=lookup no_profile=0 no_photo=1 of=1");
-        has(&text, "self-photo lookup result standing=unpictured in_results=yes photo=none");
+        // The original's 72-pixel copy on the avatar host is taken.
+        has(&text, "avatar counted decoded from=lookup results=1 pictured=1");
+        has(&text, &format!("host={} from=lookup field=image_original", slakio_core::images::AVATAR_HOSTS[0]));
+        assert!(!text.contains("avatar skipped"), "{text}");
+        has(&text, "self-photo lookup result standing=pictured in_results=yes photo=ok");
+        has(&text, &format!("self-photo source lookup host={}", slakio_core::images::AVATAR_HOSTS[0]));
     });
 }
 
@@ -141,6 +146,7 @@ fn a_lookup_answer_tells_its_entries_names_photo_hosts_and_what_it_decoded() {
 fn the_user_s_own_lookup_tells_the_answer_not_what_a_page_gave_before() {
     rt().block_on(async {
         let mut r = Run::new("lookup-real", None).await;
+        r.fake.set_own_photo(false);
         let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
         let (me, team) = (b.workspaces[0].me.as_str().to_string(), b.workspaces[0].id.as_str().to_string());
         let photo = format!("https://{}/avatars/me_72.png", slakio_core::images::AVATAR_HOSTS[0]);
@@ -252,6 +258,7 @@ fn a_list_asked_before_the_boot_and_slack_s_error_code_are_told() {
 fn a_failed_lookup_and_where_the_own_photo_came_from_are_told() {
     rt().block_on(async {
         let mut r = Run::new("sources", None).await;
+        r.fake.set_own_photo(false);
         // The first boot's lookup fails: no photo of the user.
         r.fake.fail_next("users/info", Fault::Status { status: 503, retry_after: None });
         let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
@@ -278,6 +285,7 @@ fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
     rt().block_on(async {
         let limits = Limits { lane_picture_per_minute: 0, ..Limits::default() };
         let mut r = Run::limited("share", None, limits).await;
+        r.fake.set_own_photo(false);
         let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
         has(&r.text(), "self-photo source lookup host=");
         let photo = b.users.iter().find_map(|u| u.avatar.clone()).expect("a photo");

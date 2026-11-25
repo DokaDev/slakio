@@ -218,3 +218,65 @@ fn an_emoji_address_too_long_is_refused_before_it_is_encoded() {
     let fits = format!("https://{host}/T1/{}/a.png", "\u{C548}".repeat(200));
     assert!(emoji_address(&fits).is_some_and(|a| a.len() <= ADDRESS_MAX));
 }
+
+#[test]
+fn an_original_photo_becomes_its_72_pixel_copy_on_the_avatar_host() {
+    let avatars = AVATAR_HOSTS[0];
+    let sized = format!("https://{avatars}/2026-01-05/1234567_abcdef0123_72.jpg");
+    for original in [
+        "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/1234567_abcdef0123_original.jpg"
+            .to_string(),
+        format!("https://{avatars}/2026-01-05/1234567_abcdef0123_original.jpg"),
+    ] {
+        assert_eq!(avatar_sized(&original).as_deref(), Some(sized.as_str()), "{original}");
+    }
+    let png = "https://s3-eu-west-1.amazonaws.com/slack-files2/avatars/2025-12-31/T1-U2_original.PNG";
+    assert_eq!(avatar_sized(png), Some(format!("https://{avatars}/2025-12-31/T1-U2_72.PNG")), "the extension kept");
+}
+
+#[test]
+fn an_original_photo_on_a_lookalike_host_or_an_odd_path_is_no_photo() {
+    let avatars = AVATAR_HOSTS[0];
+    let tail = "2026-01-05/1234_abc_original.jpg";
+    for bad in [
+        // Lookalike hosts.
+        format!("https://s3-us-west-2.amazonaws.com.evil.example/slack-files2/avatars/{tail}"),
+        format!("https://s3-us-west-2.amazonaws.com@evil.invalid/slack-files2/avatars/{tail}"),
+        format!("https://evil.example/s3-us-west-2.amazonaws.com/slack-files2/avatars/{tail}"),
+        format!("https://s3-.amazonaws.com/slack-files2/avatars/{tail}"),
+        format!("https://s3-us.west.amazonaws.com/slack-files2/avatars/{tail}"),
+        format!("https://S3-US-WEST-2.amazonaws.com/slack-files2/avatars/{tail}"),
+        format!("https://s3-us-west-2.amazonaws.com:443/slack-files2/avatars/{tail}"),
+        format!("https://evils3-us-west-2.amazonaws.com/slack-files2/avatars/{tail}"),
+        format!("https://x{avatars}/{tail}"),
+        format!("https://{avatars}.evil.example/{tail}"),
+        format!("https://{}/{tail}", AVATAR_HOSTS[1]),
+        format!("https://{}/{tail}", AVATAR_HOSTS[2]),
+        format!("http://{avatars}/{tail}"),
+        // Another bucket or folder.
+        format!("https://s3-us-west-2.amazonaws.com/other-bucket/avatars/{tail}"),
+        format!("https://s3-us-west-2.amazonaws.com/slack-files2/{tail}"),
+        // Paths that climb, nest or smuggle.
+        format!("https://{avatars}/../{tail}"),
+        format!("https://{avatars}/2026-01-05/../1234_abc_original.jpg"),
+        format!("https://{avatars}/2026-01-05/a/1234_abc_original.jpg"),
+        format!("https://{avatars}/2026-01-05/..%2f1234_abc_original.jpg"),
+        format!("https://{avatars}/2026-01-05/1234.abc_original.jpg"),
+        format!("https://{avatars}/{tail}?x=1"),
+        format!("https://{avatars}/2026-01-05/1234_abc_original.jpg?.png"),
+        format!("https://{avatars}/{tail}#frag"),
+        format!("https://{avatars}/2026-01-05/1234_abc_original.jp%67"),
+        format!("https://{avatars}/2026-01-05/1234_abc_original."),
+        format!("https://{avatars}/2026-01-05/1234_abc_original"),
+        format!("https://{avatars}/2026-01-05/_original.jpg"),
+        format!("https://{avatars}/2026-01-05/1234_abc_72.jpg"),
+        format!("https://{avatars}/2026-1-05/1234_abc_original.jpg"),
+        format!("https://{avatars}/2026-01-0x/1234_abc_original.jpg"),
+        format!("https://{avatars}/20260105xx/1234_abc_original.jpg"),
+        format!("https://{avatars}/2026-01-05/1234 abc_original.jpg"),
+        format!("https://{avatars}/2026-01-05/{}_original.jpg", "a".repeat(2100)),
+        String::new(),
+    ] {
+        assert_eq!(avatar_sized(&bad), None, "{bad}");
+    }
+}

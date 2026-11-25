@@ -181,24 +181,82 @@ pub struct Person {
     pub name: Option<String>,
     pub real_name: Option<String>,
     pub is_bot: Option<bool>,
+    /// One that cannot be read is none: the person is kept, by name.
+    #[serde(default, deserialize_with = "loose")]
     pub profile: Option<Profile>,
 }
 
-#[derive(Debug, Deserialize)]
+/// A person's profile: each field that cannot be read is none, not the whole profile.
+#[derive(Debug, Default, Deserialize)]
 pub struct Profile {
+    #[serde(default, deserialize_with = "loose")]
     pub display_name: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
     pub real_name: Option<String>,
-    /// The profile photo, 72 and 48 pixels square.
+    /// The profile photo in its sizes (pixels square) and as uploaded (`image_original`, the only
+    /// one the edge cache and the start bundle carry).
+    #[serde(default, deserialize_with = "loose")]
     pub image_72: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
     pub image_48: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_192: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_512: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_original: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_1024: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_32: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub image_24: Option<String>,
+    /// `false`: the person has no photo of their own (only Slack's default): none is fetched.
+    #[serde(default, deserialize_with = "loose")]
+    pub is_custom_image: Option<bool>,
 }
 
 impl Profile {
-    /// The profile photo, when it is on an avatar host ([`slakio_core::images::avatar_address`]).
+    /// The photo fields, best first: 72 and 48 pixels, the larger ones, the original (as its
+    /// 72-pixel copy, [`slakio_core::images::avatar_sized`]), the largest, the smaller ones, and
+    /// last the original as it is.
+    pub fn candidates(&self) -> [(&'static str, Option<&str>); 9] {
+        [
+            ("image_72", self.image_72.as_deref()),
+            ("image_48", self.image_48.as_deref()),
+            ("image_192", self.image_192.as_deref()),
+            ("image_512", self.image_512.as_deref()),
+            ("image_original", self.image_original.as_deref()),
+            ("image_1024", self.image_1024.as_deref()),
+            ("image_32", self.image_32.as_deref()),
+            ("image_24", self.image_24.as_deref()),
+            ("image_original", self.image_original.as_deref()),
+        ]
+    }
+
+    /// The first photo field Slack gave, and its address as given.
+    pub fn given(&self) -> Option<(&'static str, &str)> {
+        self.candidates().into_iter().find_map(|(f, u)| u.map(|u| (f, u)))
+    }
+
+    /// The profile photo and the field it came from: the first of [`Profile::candidates`] on an
+    /// avatar host ([`slakio_core::images::avatar_address`]); none when the person has no photo
+    /// of their own (`is_custom_image` false).
+    pub fn photo(&self) -> Option<(&'static str, String)> {
+        if self.is_custom_image == Some(false) {
+            return None;
+        }
+        self.candidates().into_iter().enumerate().find_map(|(i, (field, url))| {
+            let url = url?;
+            let kept =
+                if i == 4 { slakio_core::images::avatar_sized(url) } else { slakio_core::images::avatar_address(url) };
+            kept.map(|k| (field, k))
+        })
+    }
+
+    /// The profile photo ([`Profile::photo`]).
     pub fn avatar(&self) -> Option<String> {
-        [&self.image_72, &self.image_48]
-            .into_iter()
-            .find_map(|i| i.as_deref().and_then(slakio_core::images::avatar_address))
+        self.photo().map(|(_, a)| a)
     }
 }
 

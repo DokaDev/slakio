@@ -108,12 +108,12 @@ fn pictures_come_from_their_hosts_are_drawn_and_removed_on_the_way_out() {
     run.wait_for("the message", |t| t.contains("design-review"));
     let pictures = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).collect::<Vec<_>>();
     wait_until("a smaller copy fetched", || pictures().iter().any(|l| l.path.starts_with("/files-tmb/")));
-    wait_until("a photo fetched", || pictures().iter().any(|l| l.path.starts_with("/avatars/")));
+    wait_until("a photo fetched", || pictures().iter().any(|l| slakio_world::pictures::is_avatar_path(&l.path)));
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
     wait_until("placeholders drawn", || contains(&m.written(), "\u{10EEEE}".as_bytes()));
     for l in pictures() {
         let cookie = l.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("cookie")).map(|(_, v)| v.clone());
-        if l.path.starts_with("/avatars/") {
+        if slakio_world::pictures::is_avatar_path(&l.path) {
             assert_eq!(cookie, None, "{}: a photo goes with no cookie", l.path);
         } else {
             assert!(cookie.is_some_and(|c| c.contains(COOKIE)), "{}", l.path);
