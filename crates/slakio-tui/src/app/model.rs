@@ -465,14 +465,29 @@ impl Model {
     }
 
     /// People of `ws` whose names changed: the DM with each is named by their display name
-    /// again (as the boot named it).
+    /// again, and a group DM named by its people's names (as the boot named it) by theirs. Taken
+    /// before [`Self::add_users`], which forgets the names the group DMs were named by.
     pub fn rename_dms(&mut self, ws: &WorkspaceId, users: &[User]) {
-        for c in self.snapshot.conversations.iter_mut().filter(|c| &c.workspace == ws) {
-            let ConversationKind::Dm { user } = &c.kind else { continue };
-            let name = users.iter().find(|u| &u.id == user).map(|u| &u.display_name);
-            if let Some(name) = name.filter(|n| !n.unsanitized().trim().is_empty() && **n != c.name) {
-                c.name = name.clone();
-            }
+        let shown = |u: &User| !u.display_name.unsanitized().trim().is_empty();
+        let new = |id: &UserId| users.iter().find(|u| &u.id == id).filter(|u| shown(u));
+        let names = |ids: &[UserId], now: bool| -> Option<String> {
+            let one = |id| if now { new(id).or_else(|| self.user(ws, id)) } else { self.user(ws, id) };
+            let names: Option<Vec<&str>> = ids.iter().map(|id| one(id).map(|u| u.display_name.unsanitized())).collect();
+            names.filter(|n| !n.is_empty()).map(|n| n.join(", "))
+        };
+        let renamed: Vec<(usize, Remote)> = (self.snapshot.conversations.iter().enumerate())
+            .filter(|(_, c)| &c.workspace == ws)
+            .filter_map(|(i, c)| match &c.kind {
+                ConversationKind::Dm { user } => new(user).map(|u| (i, u.display_name.clone())),
+                ConversationKind::GroupDm { users: ids } if ids.iter().any(|id| new(id).is_some()) => {
+                    let named = names(ids, false).is_some_and(|n| c.name == n.as_str());
+                    named.then(|| names(ids, true)).flatten().map(|n| (i, Remote::new(n)))
+                }
+                ConversationKind::Channel { .. } | ConversationKind::GroupDm { .. } => None,
+            })
+            .collect();
+        for (i, name) in renamed {
+            self.snapshot.conversations[i].name = name;
         }
     }
 

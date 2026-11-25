@@ -67,7 +67,7 @@ impl App {
             Live::Counts { workspace, counts } => self.model.recount(&workspace, &counts),
             // Only people shown already: a workspace's every profile change comes this way. It
             // tells their names and photo; whether they are around, a bot or of another
-            // organization stays as known (a change does not say it). A DM is renamed with them.
+            // organization stays as known (a change does not say it). A DM, a group DM, is renamed with them.
             Live::People { workspace, users } => {
                 let known: Vec<_> = (users.into_iter())
                     .filter_map(|u| {
@@ -76,8 +76,8 @@ impl App {
                         Some(User { id, workspace: ws, name, display_name, avatar, no_photo, ..old.clone() })
                     })
                     .collect();
-                self.model.add_users(&workspace, &known);
                 self.model.rename_dms(&workspace, &known);
+                self.model.add_users(&workspace, &known);
                 !known.is_empty()
             }
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),

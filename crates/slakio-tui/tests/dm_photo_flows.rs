@@ -1003,3 +1003,25 @@ fn a_display_name_changed_live_renames_the_dm_row() {
     let screen = s.d.screen();
     assert!(screen.contains("Alex M.") && !screen.contains(&before), "{screen}");
 }
+
+/// A display name changed live renames a group DM named by its people's names at once.
+#[test]
+fn a_display_name_changed_live_renames_the_group_dm_row() {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.show_unfolded(View::Dms);
+    let m = &s.d.app.model;
+    let at = (0..m.conversations().len())
+        .find(|&i| matches!(m.conversation(i).kind, ConversationKind::GroupDm { .. }))
+        .expect("a group DM");
+    let ConversationKind::GroupDm { users } = &m.conversation(at).kind else { unreachable!() };
+    let ws = m.conversation(at).workspace.clone();
+    let peers: Vec<User> = users.iter().map(|u| m.user(&ws, u).expect("a known member").clone()).collect();
+    let names = |p: &[User]| p.iter().map(|u| u.display_name.unsanitized().to_string()).collect::<Vec<_>>().join(", ");
+    assert_eq!(m.conversation(at).name.unsanitized(), names(&peers), "named by its people");
+    let mut renamed = peers.clone();
+    renamed[1].display_name = Remote::new("Alex M.");
+    profile_changed(&mut s, renamed[1].clone());
+    assert_eq!(s.d.app.model.conversation(at).name.unsanitized(), names(&renamed), "the group DM row is renamed");
+    let screen = s.d.screen();
+    assert!(screen.contains("Alex M."), "{screen}");
+}
