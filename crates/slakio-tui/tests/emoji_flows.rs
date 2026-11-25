@@ -652,3 +652,31 @@ fn signed_in_again_as_someone_else_the_pictures_kept_on_disk_go() {
     assert!(dir.is_dir(), "the folder stays for the new user's");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_once() {
+    use slakio_core::images::emoji::Custom;
+    use slakio_tui::images::EMOJI_PER_FRAME;
+    let walls: Vec<String> = (0..200).map(|k| format!("many-{k}")).collect();
+    let text = walls.iter().map(|n| format!(":{n}:")).collect::<Vec<_>>().join(" ");
+    let (mut s, ws) = shown(&[(text.as_str(), &[])], 200, 50, true);
+    let list = lists(&frame(&mut s))[0].clone();
+    let emoji =
+        walls.iter().map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n)))).collect();
+    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji } });
+    s.pump();
+    let mut all: Vec<Source> = Vec::new();
+    for _ in 0..30 {
+        // Every frame two seconds after the last: past any photo's or emoji's first wait.
+        s.d.now += std::time::Duration::from_secs(2);
+        s.d.app.images.woke(s.d.now);
+        for r in frame(&mut s) {
+            all.extend(pictures(std::slice::from_ref(&r)));
+            give_picture(&mut s, &r);
+        }
+    }
+    let distinct: std::collections::HashSet<&Source> = all.iter().collect();
+    assert_eq!(distinct.len(), all.len(), "an emoji on screen was asked for again");
+    assert!(all.len() <= EMOJI_PER_FRAME, "{} asked, more than a frame's share", all.len());
+    assert!(frame(&mut s).is_empty(), "settled");
+}

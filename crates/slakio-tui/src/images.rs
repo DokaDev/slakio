@@ -28,8 +28,9 @@
 //! shows ([`Images::not_shown`]); the rest stay text. The timeline's pictures are asked for
 //! before the list's photos, which yield their room to them. A picture that failed says why on
 //! its card (too large, unreadable, not loaded); one that failed for the network or the request
-//! budget is asked again after [`RETRY_AFTER`] ([`RETRY_SOON`] for a busy or offline backend),
-//! when it is drawn again; at most [`FAILED_MAX`] failures are kept. With a cache on disk
+//! budget is asked again when it is drawn again, a preview after [`RETRY_AFTER`] ([`RETRY_SOON`]
+//! for a busy or offline backend), a photo or an emoji after a few seconds, longer each try in a
+//! row ([`backoff`]); at most [`FAILED_MAX`] failures are kept. With a cache on disk
 //! ([`cached`]), a profile photo or an emoji is looked for there before it is asked for, at
 //! once and outside the network's [`IN_FLIGHT_MAX`] (a file's preview never is: it is never
 //! kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
@@ -37,6 +38,7 @@
 mod ahead;
 pub mod animate;
 mod ask;
+pub mod backoff;
 pub mod cached;
 pub mod custom;
 pub mod decode;
@@ -264,6 +266,8 @@ pub struct Images {
     ahead: ahead::Ahead,
     /// The bytes of the last [`FETCHED_MAX`] photos fetched, the oldest first.
     fetched: VecDeque<(Source, Vec<u8>)>,
+    /// How many times in a row each picture failed for a while ([`backoff`]).
+    tries: HashMap<Key, u8>,
 }
 
 impl Images {
@@ -301,6 +305,7 @@ impl Images {
             self.missed.clear();
             self.forget_ahead();
             self.fetched.clear();
+            self.tries.clear();
         }
         self.on = on;
     }
@@ -349,6 +354,7 @@ impl Images {
         self.failed.retain(|k| !gone(k));
         self.asked.retain(|_, k| !gone(k));
         self.fetched.retain(|(s, _)| !gone(&(s.clone(), PHOTO)));
+        self.tries.retain(|k, _| !gone(k));
         for key in keys {
             if let Some(Entry::Ready { id, bytes, .. }) = self.entries.remove(&key) {
                 self.bytes -= bytes;
@@ -490,6 +496,9 @@ impl Images {
             return;
         };
         let ahead = self.ahead.flying.remove(&key);
+        if !matches!(result, Err(Refused::NotCached)) {
+            self.tries.remove(&key);
+        }
         let mut p = match result {
             Ok(p) => p,
             Err(Refused::NotCached) => return self.not_cached(key),

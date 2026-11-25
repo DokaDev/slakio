@@ -45,6 +45,10 @@ pub const AHEAD_PER_HOUR: usize = 40;
 /// The most photos waiting to be asked for ahead.
 pub const AHEAD_QUEUE_MAX: usize = 128;
 
+/// How long nothing is asked ahead after a busy or offline backend or the budget spent, and the
+/// least a photo asked ahead that failed for a while waits to be asked again.
+pub(super) const AHEAD_PAUSE: Duration = RETRY_AFTER;
+
 const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(3600);
 
@@ -114,8 +118,8 @@ impl Images {
     /// said and at least that, at most an hour. A pause only ever lasts longer, never shorter.
     pub(super) fn pause_ahead(&mut self, kind: &FailKind, now: Instant) {
         let pause = match kind {
-            FailKind::Busy | FailKind::Offline | FailKind::CapReached => RETRY_AFTER,
-            FailKind::RateLimited { retry_after } => retry_after.unwrap_or(RETRY_AFTER).max(RETRY_AFTER),
+            FailKind::Busy | FailKind::Offline | FailKind::CapReached => AHEAD_PAUSE,
+            FailKind::RateLimited { retry_after } => retry_after.unwrap_or(AHEAD_PAUSE).max(AHEAD_PAUSE),
             _ => return,
         };
         // At most an hour, whatever the answer said (and never past what an instant holds).

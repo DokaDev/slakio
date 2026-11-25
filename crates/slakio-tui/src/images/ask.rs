@@ -1,10 +1,11 @@
 //! Asking for the pictures a frame wanted ([`Images::ask`]), and what the backend answered
 //! ([`Images::answered`], [`Images::failed`]).
 
+use super::ahead::AHEAD_PAUSE;
 use super::cached::LOOKUPS_MAX;
 use super::{
-    CDN_IN_FLIGHT_MAX, CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, PHOTO,
-    RETRY_AFTER, RETRY_SOON, Why, note,
+    CDN_IN_FLIGHT_MAX, CHIP_PHOTO, Entry, FAILED_MAX, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key,
+    PHOTO, Why, backoff, note,
 };
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
@@ -225,7 +226,8 @@ impl Images {
         // waited for too): nothing more is asked ahead a while.
         self.pause_ahead(kind, now);
         let Some(key) = self.asked.remove(&id) else { return false };
-        if self.ahead.flying.remove(&key) {
+        let ahead = self.ahead.flying.remove(&key);
+        if ahead {
             self.failed_ahead(&key, kind);
         }
         let why = match kind {
@@ -233,11 +235,20 @@ impl Images {
             FailKind::Api { code } if code == "not_an_image" => Why::Unreadable,
             _ => Why::NotLoaded,
         };
-        let again = match kind {
-            FailKind::Busy | FailKind::Offline => Some(now + RETRY_SOON),
-            k if k.retryable() || *k == FailKind::CapReached => Some(now + RETRY_AFTER),
-            _ => None,
-        };
+        // One more failure in a row: a photo's or an emoji's wait grows with it.
+        let tries = self.tries.get(&key).copied().unwrap_or(0).saturating_add(1);
+        let wait = backoff::wait(&key.0, kind, tries);
+        // A photo asked ahead waits at least the pause of the photos ahead.
+        let wait = if ahead { wait.map(|w| w.max(AHEAD_PAUSE)) } else { wait };
+        let again = wait.and_then(|wait| now.checked_add(wait));
+        if again.is_some() {
+            if self.tries.len() >= FAILED_MAX {
+                self.tries.clear();
+            }
+            self.tries.insert(key.clone(), tries);
+        } else {
+            self.tries.remove(&key);
+        }
         note::line(&self.diag, &key, Stage::Failed, &note::fail_word(kind), &[("retry", note::retry(again, now))]);
         // Asked of Slack and failed: a photo's other place, waiting for it, takes the same answer
         // (not asked again before its wait is over). Refused here, the other may still go.

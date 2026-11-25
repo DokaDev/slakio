@@ -775,3 +775,71 @@ fn previews_keep_to_four_while_photos_take_twelve() {
     assert_eq!(more.len(), 1, "{more:?}");
     assert!(matches!(&more[0].command, Command::Image { source: Source::Thumb(_), .. }));
 }
+
+/// `source` drawn and asked at `at`, then failed for `kind`: whether it was asked.
+fn ask_then_fail(images: &mut Images, requests: &mut Requests, source: &Source, kind: &FailKind, at: Instant) -> bool {
+    images.look(&ws(), source);
+    images.ask(requests, at);
+    let Some(r) = requests.take().pop() else { return false };
+    assert!(images.failed(r.id, kind, at));
+    true
+}
+
+/// `source` drawn at `at`: whether it is asked again then.
+fn asked_at(images: &mut Images, requests: &mut Requests, source: &Source, at: Instant) -> bool {
+    images.look(&ws(), source);
+    images.ask(requests, at);
+    !requests.take().is_empty()
+}
+
+#[test]
+fn a_photo_refused_by_the_budget_is_asked_again_after_two_then_five_then_fifteen_seconds() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    let mut at = Instant::now();
+    assert!(ask_then_fail(&mut images, &mut requests, &photo(0), &FailKind::CapReached, at));
+    for wait in [2, 5, 15, 15] {
+        let wait = Duration::from_secs(wait);
+        assert!(!asked_at(&mut images, &mut requests, &photo(0), at + wait - Duration::from_millis(100)), "{wait:?}");
+        at += wait;
+        images.look(&ws(), &photo(0));
+        images.ask(&mut requests, at);
+        let r = requests.take().pop().unwrap_or_else(|| panic!("asked again after {wait:?}"));
+        assert!(images.failed(r.id, &FailKind::CapReached, at));
+    }
+    // It comes: the next failure starts from two seconds again.
+    images.look(&ws(), &photo(0));
+    at += Duration::from_secs(15);
+    images.ask(&mut requests, at);
+    let r = requests.take().pop().expect("asked");
+    let job = images.answered(r.id, vec![1]).expect("a job");
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    assert!(matches!(images.look(&ws(), &photo(0)), Look::Ready { .. }));
+    images.forget_photo(photo(0).address());
+    assert!(ask_then_fail(&mut images, &mut requests, &photo(0), &FailKind::Network, at));
+    assert!(asked_at(&mut images, &mut requests, &photo(0), at + Duration::from_secs(2)));
+}
+
+#[test]
+fn a_429_waits_what_it_says_when_longer() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    let said = FailKind::RateLimited { retry_after: Some(Duration::from_secs(40)) };
+    assert!(ask_then_fail(&mut images, &mut requests, &emoji(0), &said, now));
+    assert!(!asked_at(&mut images, &mut requests, &emoji(0), now + Duration::from_secs(39)));
+    assert!(asked_at(&mut images, &mut requests, &emoji(0), now + Duration::from_secs(40)));
+}
+
+#[test]
+fn a_preview_still_waits_a_minute_after_the_budget() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    assert!(ask_then_fail(&mut images, &mut requests, &thumb(0), &FailKind::CapReached, now));
+    assert!(!asked_at(&mut images, &mut requests, &thumb(0), now + RETRY_AFTER - Duration::from_secs(1)));
+    assert!(asked_at(&mut images, &mut requests, &thumb(0), now + RETRY_AFTER));
+}
+
+#[test]
+fn the_loop_wakes_for_a_two_second_retry() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    assert!(ask_then_fail(&mut images, &mut requests, &photo(0), &FailKind::CapReached, now));
+    assert_eq!(images.retry_at(), Some(now + Duration::from_secs(2)));
+    assert!(images.woke(now + Duration::from_secs(2)));
+}
