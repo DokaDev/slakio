@@ -57,10 +57,14 @@ fn sections_that_come_in_time_are_in_the_boot_answer_and_no_update_follows() {
         let fake = FakeSlack::start(World::new(7)).await.unwrap();
         let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
         let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        // The rest of the boot is slow (do not disturb, read last, before the grace starts): the
+        // sections, asked first, are in by then however loaded the machine is.
+        fake.fail_next("dnd.teamInfo", Fault::Late(Duration::from_secs(3)));
         let mut handle = slakio_slack::serve(client);
         handle.send(Request { id: Generation(1), workspace: None, command: Command::Boot }).unwrap();
         let booted = next(&mut handle, Duration::from_secs(20)).await.expect("the boot answer");
         let Event::Booted(s) = booted.event else { panic!("{booted:?}") };
+        assert!(fake.methods().iter().any(|m| m == "dnd.teamInfo"), "the boot read do not disturb");
         assert!(!s.sections_unknown);
         assert!(s.sections.iter().any(|x| x.kind == SectionKind::Favorites));
         assert!(next(&mut handle, Duration::from_millis(300)).await.is_none(), "nothing follows");
