@@ -541,6 +541,10 @@ mod tests {
                     if bot && room >= width(&app) + width(name).min(2) {
                         assert!(tag.contains("app") || tag.contains(APP_MARK), "{name} {ext} {room}: {tag:?}");
                     }
+                    // A tag shows wherever one mark leaves the name its floor.
+                    if room >= width(name).min(NAME_FLOOR) + 2 {
+                        assert!(!tag.is_empty(), "{name} {bot} {ext} {room}");
+                    }
                     if tag.is_empty() {
                         continue;
                     }
