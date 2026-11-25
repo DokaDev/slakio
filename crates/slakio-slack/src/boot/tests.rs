@@ -333,3 +333,21 @@ fn a_group_dm_s_name_never_holds_the_user_s_own_handle() {
     assert_eq!(group.kind, ConversationKind::GroupDm { users: vec![UserId::new("U1")] });
     assert_eq!(group.name.unsanitized(), "ann, bob");
 }
+
+#[test]
+fn a_dm_connected_only_with_the_workspace_s_own_team_or_organization_is_not_slack_connect() {
+    let b: wire::UserBoot = serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team", "enterprise_id": "E1"},
+        "ims": [
+            {"id": "D1", "user": "U1", "connected_team_ids": ["T1"]},
+            {"id": "D2", "user": "U2", "connected_team_ids": ["E1", "T1"]},
+            {"id": "D3", "user": "U3", "connected_team_ids": ["T1", "T9"]},
+            {"id": "D4", "user": "U4", "connected_team_ids": []},
+        ],
+    }))
+    .unwrap();
+    let s = snapshot(b, None, Vec::new(), NOW);
+    let external: Vec<&str> = s.conversations.iter().filter(|c| c.external).map(|c| c.id.as_str()).collect();
+    assert_eq!(external, ["D3"], "only a team of another organization makes it shared");
+}

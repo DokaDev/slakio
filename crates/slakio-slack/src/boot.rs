@@ -175,7 +175,8 @@ fn snapshot(
         }
     };
     let channels = boot.channels.unwrap_or_default();
-    let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), &known, &me);
+    let own_teams: Vec<&str> = std::iter::once(team.id.as_str()).chain(team.enterprise_id.as_deref()).collect();
+    let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), (&known, &own_teams), &me);
     let conversations: Vec<Conversation> =
         listed.into_iter().map(|(id, name, kind, facts)| conversation(id, name, kind, facts)).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
@@ -218,12 +219,13 @@ fn snapshot(
 
 /// The conversations of the start bundle's `channels` (group DMs among them) and `ims`, the
 /// sidebar shows: each one's id, name, kind and what places it (`starred`, `open`: the start
-/// bundle's lists; `known`: the people named; `me`: the user).
+/// bundle's lists; `known`: the people named; `own_teams`: the workspace's team and
+/// organization; `me`: the user).
 fn listed(
     channels: Vec<wire::Channel>,
     ims: Vec<wire::Im>,
     (starred, open): (&HashSet<String>, &HashSet<&str>),
-    known: &[User],
+    (known, own_teams): (&[User], &[&str]),
     me: &wire::Me,
 ) -> Vec<(String, String, ConversationKind, Facts)> {
     let peer_of = |id: &str| known.iter().find(|u| u.id.as_str() == id);
@@ -264,7 +266,10 @@ fn listed(
         let user = im.user?;
         let peer = peer_of(&user);
         let name = peer.map_or_else(|| user.clone(), |u| u.display_name.unsanitized().to_string());
-        let shared = im.is_ext_shared == Some(true) || im.connected_team_ids.as_ref().is_some_and(|t| !t.is_empty());
+        // Connected with a team that is neither the workspace's nor its organization's (one
+        // of the same organization is no Slack Connect).
+        let connected = im.connected_team_ids.iter().flatten().any(|t| !own_teams.contains(&t.as_str()));
+        let shared = im.is_ext_shared == Some(true) || connected;
         let facts = Facts {
             dm: true,
             starred: im.is_starred == Some(true) || starred.contains(&im.id),

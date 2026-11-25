@@ -132,6 +132,9 @@ pub struct Me {
 pub struct Team {
     pub id: String,
     pub name: Option<String>,
+    /// The organization (Enterprise Grid) the workspace belongs to, when one.
+    #[serde(default, deserialize_with = "loose")]
+    pub enterprise_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
