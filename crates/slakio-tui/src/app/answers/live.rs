@@ -16,11 +16,13 @@ use std::time::Instant;
 impl App {
     /// `live` arrived at `now`. `true` when the screen changed. The list's cursor stays on its
     /// row (a conversation, a header) when rows come and go around it, a header that is gone
-    /// among them. Sections that come before the user moved it from where the boot put it put it
-    /// at the top again.
+    /// among them. Sections of the workspace shown that come before the user moved it from where
+    /// the boot put it put it at the top again.
     pub(super) fn on_live(&mut self, live: Live, now: Instant) -> bool {
         let anchor = self.shell.anchor(&self.model);
-        let rehome = matches!(live, Live::Sections { .. }) && self.shell.untouched();
+        let shown = self.shell.current_id(&self.model);
+        let rehome = matches!(&live, Live::Sections { workspace, .. } if Some(workspace) == shown.as_ref())
+            && self.shell.untouched();
         let changed = self.live_update(live, now);
         if changed {
             let h = self.list_height();

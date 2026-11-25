@@ -151,10 +151,9 @@ fn sections_that_come_late_after_a_click_on_the_cursor_s_row_leave_it_there() {
     assert_eq!(under_cursor(&s), clicked, "the cursor stays on the conversation clicked");
 }
 
-/// Rows that moved around the cursor the boot put at the top (a newer message reorders the DMs
-/// listed first) are no move of the user's: sections that come later still put it at the top.
-#[test]
-fn sections_that_come_late_after_a_reorder_before_the_cursor_moved_put_it_at_the_top() {
+/// Booted with the first workspace's DMs listed first, newest first; a newer message moved the
+/// DM the boot put the cursor on down a row, the user's cursor not moved. The cursor's row.
+fn booted_reordered() -> (Scripted, usize) {
     let mut snap = World::demo().snapshot().clone();
     let ws = snap.workspaces[0].id.clone();
     let dms = (snap.sections.iter()).position(|x| x.workspace == ws && x.kind == SectionKind::DirectMessages).unwrap();
@@ -178,7 +177,7 @@ fn sections_that_come_late_after_a_reorder_before_the_cursor_moved_put_it_at_the
         edited: false,
         files: Vec::new(),
     };
-    let (workspace, conversation) = (ws.clone(), next.id.clone());
+    let (workspace, conversation) = (ws, next.id);
     let live = Live::Message {
         workspace,
         conversation,
@@ -191,11 +190,34 @@ fn sections_that_come_late_after_a_reorder_before_the_cursor_moved_put_it_at_the
     };
     push(&mut s, live);
     assert_eq!(s.d.app.list_cursor(), at + 1, "the DM the cursor is on went down a row");
+    (s, at + 1)
+}
+
+/// Rows that moved around the cursor the boot put at the top (a newer message reorders the DMs
+/// listed first) are no move of the user's: sections that come later still put it at the top.
+#[test]
+fn sections_that_come_late_after_a_reorder_before_the_cursor_moved_put_it_at_the_top() {
+    let (mut s, _) = booted_reordered();
     let (live, last) = late_mine(&s);
     push(&mut s, live);
     let top = first(&s);
     assert!(matches!(s.d.app.list_rows()[top], Row::Conversation(i) if s.d.app.model.conversation(i).id == last));
     assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (top, 0), "the cursor and the view at the top");
+}
+
+/// Sections of a workspace not shown leave the cursor of the one shown where it is.
+#[test]
+fn sections_of_another_workspace_leave_the_shown_one_s_cursor_on_its_row() {
+    let (mut s, at) = booted_reordered();
+    let dm = under_cursor(&s);
+    let other = s.d.app.model.workspaces()[1].id.clone();
+    let sections: Vec<Section> = (s.d.app.model.sections().iter()).filter(|x| x.workspace == other).cloned().collect();
+    let places: Vec<(ConversationId, SectionId)> = (s.d.app.model.conversations().iter())
+        .filter(|c| c.workspace == other)
+        .map(|c| (c.id.clone(), c.section.clone()))
+        .collect();
+    push(&mut s, Live::Sections { workspace: other, sections, places });
+    assert_eq!((s.d.app.list_cursor(), under_cursor(&s)), (at, dm), "the cursor stays on its DM");
 }
 
 #[test]
