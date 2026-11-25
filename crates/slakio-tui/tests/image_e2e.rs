@@ -15,9 +15,7 @@
 mod pty;
 
 use pty::{COOKIE, Run, TOKEN};
-use slakio_core::model::ConversationKind;
 use slakio_fake::{FakeSlack, PICTURES};
-use slakio_tui::images::AHEAD_PER_MINUTE;
 use slakio_world::World;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -251,14 +249,16 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let fetches = || m.fake.log().into_iter().filter(|l| l.method() == PICTURES).collect::<Vec<_>>();
     let previews = || fetches().iter().filter(|l| l.path.starts_with("/files-tmb/")).count();
     let pictures = || fetches().len() - previews();
-    let photos =
-        || fetches().into_iter().filter(|l| !l.path.starts_with("/files-tmb/")).map(|l| l.path).collect::<Vec<_>>();
     let kept = m.dir.join("cache").join("slakio").join("pictures");
     let files = || std::fs::read_dir(&kept).map_or(0, |d| d.count());
     let Some(mut run) = m.start(&env) else { return };
     run.wait_for("the list", |t| t.contains("deploys"));
     wait_until("the start", || m.fake.methods().iter().any(|x| x == "client.userBoot"));
     std::thread::sleep(Duration::from_millis(300));
+    // The list shows every DM row (the first to the last), so each peer's photo is one on screen
+    // and none is left to ask for ahead in a later run.
+    run.type_bytes(b" d");
+    run.wait_for("every DM row", |t| t.contains("Alex Morgan") && t.contains("Mallory"));
     run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
     run.wait_for("the message", |t| t.contains("design-review"));
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
@@ -267,7 +267,7 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     std::thread::sleep(Duration::from_millis(800));
     assert_eq!(files(), pictures());
     run.quit();
-    let (fetched, previewed, first) = (pictures(), previews(), photos());
+    let (fetched, previewed) = (pictures(), previews());
     assert!(fetched >= 1 && previewed >= 1, "a preview and photos: {fetched} {previewed}");
     #[cfg(unix)]
     {
@@ -282,31 +282,15 @@ fn a_second_run_draws_the_pictures_kept_on_disk_without_fetching_them() {
     let _ = std::fs::remove_file(m.dir.join("typescript"));
     let Some(mut run) = m.start(&env) else { return };
     run.wait_for("the list", |t| t.contains("deploys"));
+    run.type_bytes(b" d");
+    run.wait_for("every DM row", |t| t.contains("Alex Morgan") && t.contains("Mallory"));
     run.type_bytes(format!(":open {}\r", m.picture_link()).as_bytes());
     run.wait_for("the message", |t| t.contains("design-review"));
     wait_until("a picture sent", || contains(&m.written(), b"\x1b_Ga=T,U=1,f=100"));
     wait_until("placeholders drawn", || contains(&m.written(), "\u{10EEEE}".as_bytes()));
     std::thread::sleep(Duration::from_millis(800));
     run.quit();
-    // Every photo kept came from the disk. The second run fetches only the DM rows' photos asked
-    // for ahead that the first had not come to (its minute's share is smaller than the DMs), each
-    // at most once per place it fills: a peer whose photo the timeline showed is a second picture.
-    let again = photos().split_off(first.len());
-    let s = m.world.snapshot();
-    let ws = &s.workspaces[0].id;
-    let peers: Vec<String> = (s.conversations.iter().filter(|c| c.workspace == *ws))
-        .filter_map(|c| match &c.kind {
-            ConversationKind::Dm { user } => Some(format!("/avatars/{ws}/{user}-72.png")),
-            _ => None,
-        })
-        .collect();
-    assert!(again.len() <= AHEAD_PER_MINUTE, "nothing fetched again but photos ahead: {again:?}");
-    for p in &again {
-        assert!(peers.contains(p), "{p}: fetched again, not a DM row's photo ahead");
-        let n = first.iter().chain(&again).filter(|q| *q == p).count();
-        assert!(n <= 2, "{p}: fetched {n} times");
-    }
-    assert_eq!(pictures(), fetched + again.len());
+    assert_eq!(pictures(), fetched, "nothing fetched again: every photo came from the disk");
     assert!(previews() > previewed, "the preview fetched again: never kept");
     // Kept out of backups when it was made, once.
     let excluded = std::fs::read_to_string(&calls).unwrap_or_default();
