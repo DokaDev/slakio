@@ -540,3 +540,48 @@ fn the_background_minute_holds_across_workspaces_and_leaves_the_user_room() {
     clock.advance(WINDOW);
     g.dial(&c).unwrap();
 }
+
+#[test]
+fn the_list_s_photos_leave_the_timeline_a_third_of_a_workspace_s_picture_minute() {
+    let (g, clock) = governor(Limits::default(), true);
+    let a = g.lane();
+    let list = (0..40).filter(|_| g.list_picture_if(&a, true).is_ok()).count();
+    assert_eq!(list, 20, "two thirds of the workspace's 30 a minute");
+    let full = Err(SlackError::CapReached { why: "this workspace's list photos' share is reached" });
+    assert_eq!(g.list_picture_if(&a, true), full);
+    // A whole sidebar drawn, the timeline's pictures still go: the rest of the 30, no more.
+    let timeline = (0..40).filter(|_| g.picture(&a).is_ok()).count();
+    assert_eq!(list + timeline, 30, "the share itself stays as it is");
+    assert_eq!(g.picture(&a), Err(SlackError::CapReached { why: "this workspace's picture share is reached" }));
+    // The timeline may use the whole share; the list then has what is left.
+    clock.advance(WINDOW);
+    assert_eq!((0..25).filter(|_| g.picture(&a).is_ok()).count(), 25);
+    assert_eq!((0..40).filter(|_| g.list_picture_if(&a, true).is_ok()).count(), 5);
+    assert_eq!(
+        g.list_picture_if(&a, true),
+        Err(SlackError::CapReached { why: "this workspace's picture share is reached" })
+    );
+    // A minute later the list's part is free again.
+    clock.advance(WINDOW);
+    g.list_picture_if(&a, true).unwrap();
+}
+
+#[test]
+fn the_list_s_photos_keep_to_two_thirds_of_the_process_s_minute_and_every_hour() {
+    let (g, _) = governor(Limits::default(), true);
+    let (a, b, c) = (g.lane(), g.lane(), g.lane());
+    let list = [&a, &b, &c].into_iter().map(|l| (0..40).filter(|_| g.list_picture_if(l, true).is_ok()).count());
+    assert_eq!(list.sum::<usize>(), 30, "two thirds of the process's 45 a minute");
+    let part = Err(SlackError::CapReached { why: "the list's part of the pictures' share is reached" });
+    assert_eq!(g.list_picture_if(&c, true), part);
+    let timeline = [&a, &b, &c].into_iter().map(|l| (0..40).filter(|_| g.picture(l).is_ok()).count());
+    assert_eq!(timeline.sum::<usize>(), 15, "the rest of the 45 for the timelines");
+    // The hours: two thirds of a workspace's 350 (234), and of the process's 500 (334).
+    let (g, _) = governor(hours_only(), true);
+    let (a, b) = (g.lane(), g.lane());
+    assert_eq!((0..400).filter(|_| g.list_picture_if(&a, true).is_ok()).count(), 234);
+    assert_eq!((0..400).filter(|_| g.picture(&a).is_ok()).count(), 350 - 234);
+    assert_eq!((0..400).filter(|_| g.list_picture_if(&b, true).is_ok()).count(), 334 - 234);
+    assert_eq!(g.list_picture_if(&b, true), part);
+    assert_eq!((0..400).filter(|_| g.picture(&b).is_ok()).count(), 500 - 350 - 100, "the process's hour");
+}
