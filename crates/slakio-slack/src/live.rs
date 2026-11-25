@@ -33,7 +33,7 @@ use crate::messages::bot;
 use crate::request::{Ids, RandomIds};
 use events::Frame;
 use slakio_core::backend::{Connection, Envelope, Event, Generation, Live};
-use slakio_core::model::{ConversationId, User, WorkspaceId};
+use slakio_core::model::{ConversationId, User, UserId, WorkspaceId};
 use socket::{Incoming, Socket};
 use std::collections::HashSet;
 use std::sync::{Arc, PoisonError};
@@ -363,27 +363,10 @@ async fn connection(
                 socket.close().await;
                 return lost(hello);
             }
-            Frame::Message { conversation, thread, broadcast, changed, mention, message, bots } => {
-                let author = message.user.as_str().to_string();
-                let users: Vec<User> = bots.into_iter().map(|(id, b)| bot(ws.as_str(), id, b)).collect();
-                let conversation = ConversationId::new(conversation);
-                // A new author is named only in a conversation the user read: the socket brings
-                // every conversation's messages, and a large workspace has many authors.
-                let opened = ctx.opened.lock().unwrap_or_else(PoisonError::into_inner).contains(&conversation);
-                if opened && users.is_empty() && !author.is_empty() && me.as_ref().is_none_or(|m| m.as_str() != author)
-                {
-                    who = Some(author);
-                }
-                Live::Message {
-                    workspace: ws.clone(),
-                    conversation,
-                    thread,
-                    broadcast,
-                    changed,
-                    mention,
-                    message,
-                    users,
-                }
+            f @ Frame::Message { .. } => {
+                let Some((live, author)) = posted(ctx, ws, me.as_ref(), f) else { continue };
+                who = author;
+                live
             }
             Frame::Deleted { conversation, thread, ts } => {
                 Live::Deleted { workspace: ws.clone(), conversation: ConversationId::new(conversation), thread, ts }
@@ -405,6 +388,22 @@ async fn connection(
             return End::Stop;
         }
     }
+}
+
+/// Message frame `f` as the UI's update, and its author when they should be named first (`me`:
+/// the user).
+fn posted(ctx: &Session, ws: &WorkspaceId, me: Option<&UserId>, f: Frame) -> Option<(Live, Option<String>)> {
+    let Frame::Message { conversation, thread, broadcast, changed, mention, message, bots } = f else { return None };
+    let author = message.user.as_str().to_string();
+    let users: Vec<User> = bots.into_iter().map(|(id, b)| bot(ws.as_str(), id, b)).collect();
+    let conversation = ConversationId::new(conversation);
+    // A new author is named only in a conversation the user read: the socket brings every
+    // conversation's messages, and a large workspace has many authors.
+    let opened = ctx.opened.lock().unwrap_or_else(PoisonError::into_inner).contains(&conversation);
+    let who =
+        (opened && users.is_empty() && !author.is_empty() && me.is_none_or(|m| m.as_str() != author)).then_some(author);
+    let workspace = ws.clone();
+    Some((Live::Message { workspace, conversation, thread, broadcast, changed, mention, message, users }, who))
 }
 
 #[cfg(test)]
