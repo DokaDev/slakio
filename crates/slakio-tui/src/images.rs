@@ -17,19 +17,20 @@
 //!
 //! What the terminal holds for slakio is bounded: at most [`ENTRIES_MAX`] pictures and
 //! [`BYTES_CAP`] bytes of them; past that the least recently drawn is removed from the terminal
-//! (and fetched again if it is drawn again), but never one the latest frame or the one before it
-//! looked at: when every picture held is on screen, a list photo makes room for a timeline
-//! picture, and otherwise the new picture is not sent and waits, parked, until it
-//! fits beside those on screen. While the pictures on screen (their count or their bytes) fill the
-//! terminal's room, nothing more is asked for ([`room`]). A frame draws at
-//! most [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]), counting only
-//! what it shows ([`Images::not_shown`]); the rest stay text. The timeline's pictures are asked for before the list's photos, which yield their room
-//! to them. A picture that failed says why on its card (too large, unreadable, not loaded); one
-//! that failed for the network or the request budget is asked again after [`RETRY_AFTER`]
-//! ([`RETRY_SOON`] for a busy or offline backend), when it is drawn again; at most
-//! [`FAILED_MAX`] failures are kept. With a cache on disk ([`cached`]), a profile photo or an
-//! emoji is looked for there before it is asked for, at once and outside the network's
-//! [`IN_FLIGHT_MAX`] (a file's preview never is: it is never kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
+//! (and fetched again if it is drawn again), but never one the latest frame or the one before
+//! it looked at: when every picture held is on screen, a list photo makes room for a timeline
+//! picture, and otherwise the new picture is not sent and waits, parked, until it fits beside
+//! those on screen. While the pictures on screen (their count or their bytes) fill the
+//! terminal's room, nothing more is asked for ([`room`]). A frame draws at most
+//! [`EMOJI_PER_FRAME`] distinct emoji pictures ([`Images::look_emoji`]), counting only what it
+//! shows ([`Images::not_shown`]); the rest stay text. The timeline's pictures are asked for
+//! before the list's photos, which yield their room to them. A picture that failed says why on
+//! its card (too large, unreadable, not loaded); one that failed for the network or the request
+//! budget is asked again after [`RETRY_AFTER`] ([`RETRY_SOON`] for a busy or offline backend),
+//! when it is drawn again; at most [`FAILED_MAX`] failures are kept. With a cache on disk
+//! ([`cached`]), a profile photo or an emoji is looked for there before it is asked for, at
+//! once and outside the network's [`IN_FLIGHT_MAX`] (a file's preview never is: it is never
+//! kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
 
 pub mod animate;
 mod ask;
