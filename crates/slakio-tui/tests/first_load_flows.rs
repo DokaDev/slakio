@@ -2,8 +2,8 @@
 //! 20 people's photos and 40 of the workspace's own emoji on one screen. The timeline's pictures
 //! are asked before the list's photos, in the order the timeline draws them (the newest message
 //! first, each message's emoji left to right, then its author's photo), at most
-//! [`IN_FLIGHT_MAX`] at once and the next as soon as one is in: no wait of its own between asks,
-//! so the screen fills within a frame per four pictures. A frame draws at most
+//! [`CDN_IN_FLIGHT_MAX`] at once and the next as soon as one is in: no wait of its own between asks,
+//! so the screen fills within a frame per twelve pictures. A frame draws at most
 //! [`EMOJI_PER_FRAME`] distinct emoji (the rest stay `:name:`). A picture that fails for the
 //! budget wakes the loop when it may be asked again, with no key pressed.
 
@@ -20,7 +20,7 @@ use slakio_core::model::{Message, Org, Presence, Ts, User, UserId, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::Effect;
 use slakio_tui::images::decode::Shape;
-use slakio_tui::images::{EMOJI_PER_FRAME, IN_FLIGHT_MAX, Look, prepare};
+use slakio_tui::images::{CDN_IN_FLIGHT_MAX, EMOJI_PER_FRAME, Look, prepare};
 
 const PEOPLE: usize = 20;
 const EMOJI: usize = 40;
@@ -118,7 +118,7 @@ fn ready(look: Look) -> bool {
 }
 
 #[test]
-fn twenty_photos_and_the_frame_s_emoji_fill_the_screen_in_order_a_frame_per_four() {
+fn twenty_photos_and_the_frame_s_emoji_fill_the_screen_in_order_a_frame_per_twelve() {
     let (mut s, ws, first) = busy();
     let (mut order, mut frames) = (Vec::new(), 0);
     let mut next = Some(first);
@@ -128,7 +128,7 @@ fn twenty_photos_and_the_frame_s_emoji_fill_the_screen_in_order_a_frame_per_four
             break;
         }
         frames += 1;
-        assert!(asked.len() <= IN_FLIGHT_MAX, "{}", asked.len());
+        assert!(asked.len() <= CDN_IN_FLIGHT_MAX, "{}", asked.len());
         for r in &asked {
             order.push(source(r));
             give(&mut s, r);
@@ -144,14 +144,14 @@ fn twenty_photos_and_the_frame_s_emoji_fill_the_screen_in_order_a_frame_per_four
         .collect();
     assert_eq!(drawn.len(), EMOJI_PER_FRAME, "the frame's share of emoji drawn: {drawn:?}");
     assert!(screen.contains(":e00:") && !screen.contains(":e39:"), "past the share, text:\n{screen}");
-    // Each frame asks four, the next frame the next four: no frame without an ask until done.
+    // Each frame asks twelve, the next frame the next twelve: no frame without an ask until done.
     let timeline = PEOPLE + EMOJI_PER_FRAME;
     assert_eq!(order.len(), timeline, "each asked once, nothing of the list's past the timeline's");
-    assert_eq!(frames, timeline.div_ceil(IN_FLIGHT_MAX), "{frames} frames for {timeline} pictures");
-    // The frame before the list asked the four newest photos. Then the newest message first
+    assert_eq!(frames, timeline.div_ceil(CDN_IN_FLIGHT_MAX), "{frames} frames for {timeline} pictures");
+    // The frame before the list asked the twelve newest photos. Then the newest message first
     // (where the timeline starts drawing), its emoji left to right before its author's photo; the
     // oldest four messages' emoji are past the frame's share.
-    let early = PEOPLE - IN_FLIGHT_MAX;
+    let early = PEOPLE - CDN_IN_FLIGHT_MAX;
     let mut want: Vec<Source> = (early..PEOPLE).rev().map(|k| Source::Avatar(photo(&ws, k))).collect();
     for k in (0..PEOPLE).rev() {
         if k >= PEOPLE - EMOJI_PER_FRAME / 2 {

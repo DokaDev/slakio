@@ -1,6 +1,6 @@
 use super::*;
 use crate::app::requests::Requests;
-use crate::images::{CHIP_PHOTO, IN_FLIGHT_MAX, Look, PHOTO, RETRY_SOON, detect};
+use crate::images::{CDN_IN_FLIGHT_MAX, CHIP_PHOTO, IN_FLIGHT_MAX, Look, PHOTO, RETRY_SOON, detect};
 use slakio_core::backend::{Command, FailKind};
 use slakio_core::images::{AVATAR_HOSTS, EMOJI_HOSTS, Source};
 use slakio_core::model::WorkspaceId;
@@ -59,7 +59,7 @@ fn settle(images: &mut Images, requests: &mut Requests, offline: bool) -> usize 
         images.ask(requests, Instant::now());
         let lookups = images.take_lookups();
         let asked = requests.take();
-        assert!(asked.len() <= IN_FLIGHT_MAX, "the network's bound holds");
+        assert!(asked.len() <= CDN_IN_FLIGHT_MAX, "the network's bound holds");
         assert!(lookups.len() <= LOOKUPS_MAX, "the bound on looks waiting holds");
         // Both screens drawn whole, and nothing asked for either: settled.
         quiet = if ready == 40 && lookups.is_empty() && asked.is_empty() { quiet + 1 } else { 0 };
@@ -417,7 +417,7 @@ fn disk_looks_leave_the_network_its_four_slots() {
 #[test]
 fn a_disk_miss_is_asked_of_the_network_on_the_next_frame() {
     let dir = scratch("miss-next");
-    let shown = people(6);
+    let shown = people(CDN_IN_FLIGHT_MAX + 2);
     let mut images = images(&dir, &Diag::default());
     let mut requests = Requests::default();
     let frame = |images: &mut Images, requests: &mut Requests| {
@@ -428,9 +428,9 @@ fn a_disk_miss_is_asked_of_the_network_on_the_next_frame() {
         (run_looks(images), requests.take())
     };
     let (looked, asked) = frame(&mut images, &mut requests);
-    assert_eq!((looked, asked.len()), (6, 0), "all looked for first, none there");
+    assert_eq!((looked, asked.len()), (shown.len(), 0), "all looked for first, none there");
     let (looked, asked) = frame(&mut images, &mut requests);
-    assert_eq!((looked, asked.len()), (0, IN_FLIGHT_MAX), "then asked, within the network's share");
+    assert_eq!((looked, asked.len()), (0, CDN_IN_FLIGHT_MAX), "then asked, within the network's share");
     let (looked, asked) = frame(&mut images, &mut requests);
     assert_eq!((looked, asked.len()), (0, 0), "not looked for again while the others wait");
     let _ = std::fs::remove_dir_all(&dir);

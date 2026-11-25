@@ -364,8 +364,13 @@ fn emoji_of_a_message_only_measured_off_screen_leave_the_share_to_those_shown() 
     let screen = s.d.screen();
     assert!(screen.contains("oldest") && !screen.contains(":wall-"), "{screen}");
     let want: Vec<Source> = tops.iter().map(|n| emoji(&ws, n)).collect();
-    assert_eq!(asked.len(), slakio_tui::images::IN_FLIGHT_MAX, "the first frame up there asks for those it shows");
-    assert!(asked.iter().all(|a| want.contains(a)), "{asked:?}");
+    // Every one it shows is asked for, first; the rest of the twelve places go to the wall's
+    // own, whose header is still on screen (a message counts as shown once any of it is).
+    assert!(asked.len() <= slakio_tui::images::CDN_IN_FLIGHT_MAX, "{asked:?}");
+    assert_eq!(asked[..want.len()], want[..], "the first frame up there asks for those it shows");
+    let walls: Vec<Source> = walls.iter().map(|n| emoji(&ws, n)).collect();
+    assert!(asked[want.len()..].iter().all(|a| walls.contains(a)), "{asked:?}");
+    assert!(screen.contains("13:00"), "the wall's header is on screen:\n{screen}");
 }
 
 /// Signed in again to `ws` as someone else, then booted and `deploys` opened again with

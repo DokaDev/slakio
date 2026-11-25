@@ -603,7 +603,8 @@ fn with_the_diagnostics_on_the_frame_s_emoji_share_and_the_in_flight_cap_are_tol
     let past = diag.id(&emoji(EMOJI_PER_FRAME));
     let share = format!("emoji skipped share id={past} shape=emoji share={EMOJI_PER_FRAME}");
     assert_eq!(text.matches(&share).count(), 1, "once: {text}");
-    let fifth = text.lines().filter(|l| l.contains("emoji skipped in-flight") && l.contains("in_flight=4")).count();
+    let cap = format!("in_flight={CDN_IN_FLIGHT_MAX}");
+    let fifth = text.lines().filter(|l| l.contains("emoji skipped in-flight") && l.contains(&cap)).count();
     assert_eq!(fifth, 1, "the first one past the cap, once: {text}");
     assert!(!text.contains("example"), "{text}");
 }
@@ -724,4 +725,53 @@ fn a_photo_that_failed_for_one_place_is_not_asked_again_for_the_other_until_its_
         let again = requests.take().len();
         assert_eq!(again, usize::from(kind != FailKind::TooLarge), "{kind:?}");
     }
+}
+
+fn photo(n: usize) -> Source {
+    Source::Avatar(format!("https://{}/2026-01-05/T1-P{n}_72.png", slakio_core::images::AVATAR_HOSTS[0]))
+}
+
+fn emoji(n: usize) -> Source {
+    Source::Emoji(format!("https://{}/T1/e{n}/0.png", slakio_core::images::EMOJI_HOSTS[0]))
+}
+
+#[test]
+fn a_screen_of_photos_and_emoji_asks_twelve_at_once() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    for n in 0..15 {
+        images.look(&ws(), &photo(n));
+        images.look(&ws(), &emoji(n));
+    }
+    images.ask(&mut requests, Instant::now());
+    assert_eq!(requests.take().len(), CDN_IN_FLIGHT_MAX);
+    assert_eq!(CDN_IN_FLIGHT_MAX, 12);
+}
+
+#[test]
+fn previews_keep_to_four_while_photos_take_twelve() {
+    let (mut images, mut requests) = (on(), Requests::default());
+    for n in 0..6 {
+        images.look(&ws(), &thumb(n));
+    }
+    for n in 0..20 {
+        images.look(&ws(), &photo(n));
+    }
+    images.ask(&mut requests, Instant::now());
+    let asked = requests.take();
+    let previews =
+        asked.iter().filter(|r| matches!(&r.command, Command::Image { source: Source::Thumb(_), .. })).count();
+    assert_eq!((previews, asked.len() - previews), (IN_FLIGHT_MAX, CDN_IN_FLIGHT_MAX));
+    // A preview ended: one more preview, no more photos.
+    for n in 0..6 {
+        images.look(&ws(), &thumb(n));
+    }
+    for n in 0..20 {
+        images.look(&ws(), &photo(n));
+    }
+    let first = asked.iter().find(|r| matches!(&r.command, Command::Image { source: Source::Thumb(_), .. })).unwrap();
+    assert!(images.failed(first.id, &FailKind::Api { code: "file_not_available".into() }, Instant::now()));
+    images.ask(&mut requests, Instant::now());
+    let more = requests.take();
+    assert_eq!(more.len(), 1, "{more:?}");
+    assert!(matches!(&more[0].command, Command::Image { source: Source::Thumb(_), .. }));
 }

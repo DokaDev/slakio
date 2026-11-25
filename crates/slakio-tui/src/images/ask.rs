@@ -3,8 +3,8 @@
 
 use super::cached::LOOKUPS_MAX;
 use super::{
-    CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, PHOTO, RETRY_AFTER, RETRY_SOON,
-    Why, note,
+    CDN_IN_FLIGHT_MAX, CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, PHOTO,
+    RETRY_AFTER, RETRY_SOON, Why, note,
 };
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
@@ -19,6 +19,21 @@ impl Images {
     /// The pictures asked of the backend or being decoded from its answer (the network's share).
     pub(super) fn in_flight(&self) -> usize {
         self.entries.values().filter(|e| matches!(e, Entry::Asked(_) | Entry::Decoding(_))).count()
+    }
+
+    /// Of those, the photos and emoji (from the picture hosts).
+    pub(super) fn in_flight_cdn(&self) -> usize {
+        self.in_flight_where(|s| !matches!(s, Source::Thumb(_)))
+    }
+
+    /// Of those, the file previews (from the file host).
+    pub(super) fn in_flight_files(&self) -> usize {
+        self.in_flight_where(|s| matches!(s, Source::Thumb(_)))
+    }
+
+    fn in_flight_where(&self, of: impl Fn(&Source) -> bool) -> usize {
+        let on_way = |e: &Entry| matches!(e, Entry::Asked(_) | Entry::Decoding(_));
+        self.entries.iter().filter(|(k, e)| of(&k.0) && on_way(e)).count()
     }
 
     /// The looks in the cache on disk not ended yet.
@@ -53,7 +68,8 @@ impl Images {
     /// After a frame: what it showed is the most recently drawn, and what it would have shown
     /// is asked for, the timeline's pictures before the list's photos: first everything the
     /// cache on disk may hold is looked for there ([`Images::look_up_all`]), then the rest is
-    /// asked of the backend (at most [`IN_FLIGHT_MAX`] at once, and none while the pictures on
+    /// asked of the backend (at most [`IN_FLIGHT_MAX`] previews and [`CDN_IN_FLIGHT_MAX`] photos
+    /// and emoji at once, each kind waiting only for its own; and none while the pictures on
     /// screen and those on their way fill the terminal's room; a failed one once its wait is
     /// over); what it only laid out is neither. A parked picture that would now fit may be
     /// asked again. Then, everything wanted asked for, a photo ahead ([`super::ahead`]). `true`
@@ -76,15 +92,21 @@ impl Images {
         wanted.sort_by_key(|w| w.1.1 == CHIP_PHOTO);
         let mut asked = self.look_up_all(&wanted, now);
         let mut all = true;
+        // Each kind's first picture past its bound is told, not every one after it.
+        let mut told = [false; 2];
         for (ws, key, _) in wanted {
-            let in_flight = self.in_flight();
-            if in_flight >= IN_FLIGHT_MAX {
-                if self.diag.on() {
-                    note::once(&self.diag, &key, Stage::Skipped, "in-flight", &[("in_flight", in_flight.to_string())]);
+            let (of_kind, most, kind) = match key.0 {
+                Source::Thumb(_) => (self.in_flight_files(), IN_FLIGHT_MAX, 0),
+                Source::Avatar(_) | Source::Emoji(_) => (self.in_flight_cdn(), CDN_IN_FLIGHT_MAX, 1),
+            };
+            if of_kind >= most {
+                if self.diag.on() && !std::mem::replace(&mut told[kind], true) {
+                    note::once(&self.diag, &key, Stage::Skipped, "in-flight", &[("in_flight", of_kind.to_string())]);
                 }
                 all = false;
-                break;
+                continue;
             }
+            let in_flight = self.in_flight();
             if self.full(&key, in_flight + self.looking()) {
                 if self.diag.on() {
                     let staying = self.staying(&key).0.to_string();

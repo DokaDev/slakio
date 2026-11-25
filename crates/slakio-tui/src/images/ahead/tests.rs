@@ -1,6 +1,6 @@
 use super::*;
 use crate::images::cached::{LOOKUPS_MAX, run, start};
-use crate::images::{Job, Look, PHOTO, RETRY_AFTER, graphics};
+use crate::images::{CDN_IN_FLIGHT_MAX, Job, Look, PHOTO, RETRY_AFTER, graphics};
 use slakio_core::backend::{FailKind, Generation, Request};
 use slakio_core::diag::Diag;
 use slakio_core::images::AVATAR_HOSTS;
@@ -121,14 +121,14 @@ impl T {
 #[test]
 fn visible_pictures_are_asked_before_any_photo_ahead() {
     let mut t = T::new("first");
-    let screen: Vec<Key> = (0..6).map(shown).collect();
+    let screen: Vec<Key> = (0..CDN_IN_FLIGHT_MAX + 2).map(shown).collect();
     // The first frame looks on disk for what is on screen: not there.
     let (looks, asked) = t.frame(&screen, 0);
-    assert_eq!((looks.len(), asked.len()), (6, 0));
+    assert_eq!((looks.len(), asked.len()), (screen.len(), 0));
     t.look(looks);
-    // Four on their way, two still waiting: nothing ahead, not even a look on disk.
+    // Twelve on their way, two still waiting: nothing ahead, not even a look on disk.
     let (looks, first) = t.frame(&screen, 10);
-    assert_eq!(first.len(), IN_FLIGHT_MAX);
+    assert_eq!(first.len(), CDN_IN_FLIGHT_MAX);
     assert!(looks.is_empty() && !first.iter().any(is_dm), "nothing ahead while two wait: {looks:?}");
     assert_eq!(t.images.ahead_waiting(), 10);
     first.iter().for_each(|r| t.deliver(r));
@@ -136,7 +136,7 @@ fn visible_pictures_are_asked_before_any_photo_ahead() {
     order.extend(t.pump(&screen, 10, 6));
     let last_shown = order.iter().rposition(|r| !is_dm(r)).expect("the screen's");
     let first_ahead = order.iter().position(is_dm).expect("a photo asked ahead");
-    assert_eq!(order.iter().filter(|r| !is_dm(r)).count(), 6, "each on screen once");
+    assert_eq!(order.iter().filter(|r| !is_dm(r)).count(), screen.len(), "each on screen once");
     assert!(last_shown < first_ahead, "every picture on screen asked first: {order:?}");
 }
 

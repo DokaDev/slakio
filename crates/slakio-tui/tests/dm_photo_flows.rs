@@ -1,7 +1,7 @@
 //! Profile photos in the list's DM rows (`avatars = "image"`, the kitty graphics protocol): a
 //! DM's peer's photo takes the two cells of its initials chip, so the presence mark and the name
 //! stay where they are. Only the rows drawn ask for their photos, in the pictures' one queue
-//! (at most [`IN_FLIGHT_MAX`] at once with the timeline's); a row scrolled, folded or resized
+//! (at most [`CDN_IN_FLIGHT_MAX`] at once with the timeline's); a row scrolled, folded or resized
 //! away, or a list the layout leaves out when the focus moves, draws none of its cells. Group
 //! DMs keep their chip; pictures off, the initials stay and nothing is asked. The selection bar
 //! and a dialog's dim leave the photo's cells as they are (their colour says which picture).
@@ -22,7 +22,7 @@ use slakio_tui::app::Effect;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
 use slakio_tui::images::graphics::{color, delete, is_placeholder};
-use slakio_tui::images::{CHIP_PHOTO, IN_FLIGHT_MAX, Look, prepare};
+use slakio_tui::images::{CDN_IN_FLIGHT_MAX, CHIP_PHOTO, Look, prepare};
 use slakio_tui::screen;
 use std::collections::BTreeSet;
 
@@ -112,7 +112,7 @@ fn fill(s: &mut Scripted) -> Vec<Source> {
         if now.is_empty() {
             return all;
         }
-        assert!(now.len() <= IN_FLIGHT_MAX);
+        assert!(now.len() <= CDN_IN_FLIGHT_MAX);
         for (id, source) in now {
             if let Source::Avatar(a) = &source {
                 assert!(on_screen.contains(a), "{a} asked for, but no DM row on screen shows it");
@@ -458,20 +458,20 @@ fn the_list_s_photos_wait_in_the_pictures_one_queue() {
     settle(&mut s);
     s.keys("space d");
     let list = expected(&s);
-    assert!(list.len() > IN_FLIGHT_MAX, "more DM photos on screen ({}) than may be asked at once", list.len());
+    assert!(list.len() > CDN_IN_FLIGHT_MAX, "more DM photos on screen ({}) than may be asked at once", list.len());
     let first = frame(&mut s);
-    assert_eq!(first.len(), IN_FLIGHT_MAX, "the list and the timeline share {IN_FLIGHT_MAX}: {first:?}");
-    assert_eq!(frame(&mut s).len(), IN_FLIGHT_MAX, "none more while they are on their way");
+    assert_eq!(first.len(), CDN_IN_FLIGHT_MAX, "the list and the timeline share {CDN_IN_FLIGHT_MAX}: {first:?}");
+    assert_eq!(frame(&mut s).len(), CDN_IN_FLIGHT_MAX, "none more while they are on their way");
     // One fails: one more may be asked, never more than the bound.
     let i = s.b.held.iter().position(|r| r.id == first[0].0).unwrap();
     s.b.fail(i, slakio_core::backend::FailKind::Network);
     s.pump();
-    assert_eq!(frame(&mut s).len(), IN_FLIGHT_MAX);
+    assert_eq!(frame(&mut s).len(), CDN_IN_FLIGHT_MAX);
     // Everything delivered as it comes, the bound held at every frame: the list's photos came
     // through the same queue as the timeline's.
     for _ in 0..40 {
         let held = frame(&mut s);
-        assert!(held.len() <= IN_FLIGHT_MAX, "{} at once", held.len());
+        assert!(held.len() <= CDN_IN_FLIGHT_MAX, "{} at once", held.len());
         if held.is_empty() {
             break;
         }
@@ -593,7 +593,7 @@ fn more_photos_on_screen_than_the_terminal_holds_are_asked_once_and_none_shown_i
     let mut all: Vec<Source> = Vec::new();
     for round in 0..40 {
         let now = frame(&mut s);
-        assert!(now.len() <= IN_FLIGHT_MAX, "round {round}: {} at once", now.len());
+        assert!(now.len() <= CDN_IN_FLIGHT_MAX, "round {round}: {} at once", now.len());
         for (id, source) in now {
             all.push(source);
             deliver(&mut s, id);
@@ -626,11 +626,11 @@ fn the_timeline_s_photos_are_asked_first_and_the_list_s_yield_their_room() {
         .filter(|(k, _)| screen.contains(&format!("note {k} ")))
         .map(|(_, p)| address(&s, p))
         .collect();
-    assert!(shown.len() > IN_FLIGHT_MAX, "{} messages shown", shown.len());
+    assert!(shown.len() > CDN_IN_FLIGHT_MAX, "{} messages shown", shown.len());
     assert!(shown.len() + expected(&s).len() > ENTRIES_MAX, "more photos on screen than the terminal holds");
     // The first requests are the timeline's: delivered, the slots' photos are ready, no chip's.
     let first = frame(&mut s);
-    assert_eq!(first.len(), IN_FLIGHT_MAX);
+    assert_eq!(first.len(), CDN_IN_FLIGHT_MAX);
     for (id, _) in &first {
         deliver(&mut s, *id);
     }
@@ -711,7 +711,7 @@ fn a_person_in_the_timeline_and_the_list_is_fetched_once() {
         let mut per: std::collections::HashMap<Source, usize> = Default::default();
         for round in 0..60 {
             let now = frame(&mut s);
-            assert!(now.len() <= IN_FLIGHT_MAX, "{extra}, round {round}: {} at once", now.len());
+            assert!(now.len() <= CDN_IN_FLIGHT_MAX, "{extra}, round {round}: {} at once", now.len());
             for (id, source) in now {
                 *per.entry(source).or_default() += 1;
                 deliver(&mut s, id);

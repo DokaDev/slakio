@@ -10,7 +10,8 @@
 //!
 //! How a picture comes: drawing a frame notes the pictures it would show ([`Images::look`]);
 //! after the frame the app asks the backend for those it does not have ([`Images::ask`], at most
-//! [`IN_FLIGHT_MAX`] at once; what a frame only laid out to measure it is not); the bytes are
+//! [`IN_FLIGHT_MAX`] previews from the file host and [`CDN_IN_FLIGHT_MAX`] photos and emoji from
+//! the picture hosts at once; what a frame only laid out to measure it is not); the bytes are
 //! decoded and made into the commands that send them off the loop's thread (the binary runs
 //! [`prepare`] on a blocking task); the result is sent to the terminal once
 //! ([`Images::take_graphics`], written before the next frame) and drawn as placeholder cells
@@ -57,8 +58,12 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
-/// The most pictures asked for or being decoded at once.
+/// The most file previews (from the file host, with the session's cookie) asked for or being
+/// decoded at once.
 pub const IN_FLIGHT_MAX: usize = 4;
+/// The most profile photos and emoji (from the picture hosts, with nothing of the session) asked
+/// for or being decoded at once: what the backend lets through to those hosts at once.
+pub const CDN_IN_FLIGHT_MAX: usize = 12;
 /// The most pictures the terminal holds for slakio.
 pub const ENTRIES_MAX: usize = 64;
 /// The most distinct emoji pictures one frame draws (the others stay `:name:`): well below
