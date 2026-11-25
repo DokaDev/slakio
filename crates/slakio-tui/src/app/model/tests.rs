@@ -1,4 +1,7 @@
+use super::super::shell::View;
+use super::super::todos::TodoView;
 use super::*;
+use slakio_core::model::SectionKind;
 use slakio_core::model::{Org, SavedItem, SavedState};
 use slakio_world::World;
 
