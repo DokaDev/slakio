@@ -41,6 +41,13 @@ impl App {
                 self.model.mark(&workspace, &conversation, unread, mentions)
             }
             Live::Counts { workspace, counts } => self.model.recount(&workspace, &counts),
+            // Only people shown already: a workspace's every profile change comes this way.
+            Live::People { workspace, users } => {
+                let known: Vec<_> =
+                    users.into_iter().filter(|u| self.model.user(&workspace, &u.id).is_some()).collect();
+                self.model.add_users(&workspace, &known);
+                !known.is_empty()
+            }
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),
         }
     }

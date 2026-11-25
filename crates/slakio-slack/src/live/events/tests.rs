@@ -144,3 +144,22 @@ fn read_elsewhere_carries_both_counts_or_is_left_out() {
     let more = json!({"type": "channel_marked", "channel": "C1", "unread_count_display": 0, "mention_count": 3});
     assert_eq!(of(&more), Frame::Marked { conversation: "C1".into(), unread: 3, mentions: 3 });
 }
+
+#[test]
+fn a_profile_change_carries_the_person_s_record_or_is_left_out() {
+    let user = json!({"id": "U2", "team_id": "T1", "name": "minsu",
+        "profile": {"display_name": "Minsu", "image_original": "x", "is_custom_image": false}});
+    for kind in ["user_change", "user_profile_changed"] {
+        let Frame::Person(p) = of(&json!({"type": kind, "user": user})) else { panic!("{kind}: a person") };
+        assert_eq!(p.id, "U2", "{kind}");
+        assert!(p.profile.as_ref().is_some_and(wire::Profile::not_custom), "{kind}");
+    }
+    for v in [
+        json!({"type": "user_change"}),
+        json!({"type": "user_change", "user": "U2"}),
+        json!({"type": "user_change", "user": {"id": ""}}),
+        json!({"type": "user_profile_changed", "user": {"name": "no id"}}),
+    ] {
+        assert_eq!(of(&v), Frame::Other, "{v}");
+    }
+}

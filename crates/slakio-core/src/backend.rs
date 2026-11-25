@@ -326,6 +326,9 @@ pub enum Live {
     /// came meanwhile in conversations not open is counted there): (conversation, unread,
     /// mentions) of each conversation Slack listed; one it did not list has none, as at a boot.
     Counts { workspace: WorkspaceId, counts: Vec<(ConversationId, u32, u32)> },
+    /// People of `workspace` whose profile changed (a new photo, none of their own any more, a
+    /// new name): each replaces what the UI knows of them; one it does not know is left out.
+    People { workspace: WorkspaceId, users: Vec<User> },
 }
 
 /// Whether a workspace's live updates arrive.

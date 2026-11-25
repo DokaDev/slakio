@@ -108,6 +108,21 @@ fn a_record_saying_no_photo_of_their_own_drops_the_photo_known() {
 }
 
 #[test]
+fn a_profile_change_is_kept_for_a_person_known_and_given_back_for_anyone() {
+    let people = People::default();
+    people.set_team("T1");
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
+    people.learn(&[person("U1", Some(&one))]);
+    let u = people.changed(&person("U1", Some(&two))).unwrap();
+    assert_eq!(u.avatar.as_deref(), Some(two.as_str()));
+    assert_eq!(photo_of(&people, "U1").as_deref(), Some(two.as_str()), "kept: a later page shows it");
+    let u = people.changed(&person("U9", Some(&one))).unwrap();
+    assert_eq!(u.id.as_str(), "U9");
+    assert!(!people.known.lock().unwrap().contains_key("U9"), "one not known is not kept");
+}
+
+#[test]
 fn only_a_person_known_without_a_photo_is_forgotten_to_be_asked_again() {
     let people = People::default();
     people.set_team("T1");

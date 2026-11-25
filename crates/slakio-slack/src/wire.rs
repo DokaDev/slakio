@@ -197,7 +197,7 @@ pub struct View {
 }
 
 /// A person, as a view and the edge cache's `users/info` describe one.
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Person {
     pub id: String,
     pub team_id: Option<String>,
@@ -210,7 +210,7 @@ pub struct Person {
 }
 
 /// A person's profile: each field that cannot be read is none, not the whole profile.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 pub struct Profile {
     #[serde(default, deserialize_with = "loose")]
     pub display_name: Option<String>,

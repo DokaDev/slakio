@@ -14,9 +14,9 @@ mod scripted;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use scripted::Scripted;
-use slakio_core::backend::{Command, Envelope, Event, Generation};
+use slakio_core::backend::{Command, Envelope, Event, Generation, Live};
 use slakio_core::images::{AVATAR_HOSTS, Source};
-use slakio_core::model::ConversationKind;
+use slakio_core::model::{ConversationKind, User};
 use slakio_tui::app::Effect;
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
@@ -717,4 +717,56 @@ fn a_signed_out_workspace_s_dm_rows_get_no_photo_ahead() {
         assert_eq!(s.d.app.images.ahead_waiting(), 0, "signed out: none waits");
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Person `user`'s profile changed, as the live updates push it.
+fn profile_changed(s: &mut Scripted, user: User) {
+    let workspace = user.workspace.clone();
+    let live = Live::People { workspace, users: vec![user] };
+    s.b.push(Envelope { generation: Generation::PUSHED, event: Event::Live(Box::new(live)) });
+    s.pump();
+}
+
+/// The DM peer whose photo the list shows at `p`.
+fn peer_at(s: &Scripted, p: &Photo) -> User {
+    let m = &s.d.app.model;
+    (0..m.conversations().len())
+        .filter_map(|i| match &m.conversation(i).kind {
+            ConversationKind::Dm { user } => m.user(&m.conversation(i).workspace, user),
+            _ => None,
+        })
+        .find(|u| u.avatar.as_ref() == Some(&p.address))
+        .cloned()
+        .expect("the peer")
+}
+
+/// A photo changed live: the next frame asks for the new one and no longer draws the old
+/// picture (the initials stand in until the new one comes); a later profile that says no photo of
+/// their own brings the initials back for good.
+#[test]
+fn a_photo_changed_live_is_asked_for_and_a_photo_gone_brings_the_initials_back() {
+    let mut s = dms(120, 40, true);
+    fill(&mut s);
+    let p = expected(&s)[0].clone();
+    let old = id_of(&s, &p.address);
+    assert!(cells(&s).contains(&(p.x, p.y, old)));
+    let peer = peer_at(&s, &p);
+    let new = format!("https://{}/avatars/{}/{}-new-72.png", AVATAR_HOSTS[0], peer.workspace, peer.id);
+    profile_changed(&mut s, User { avatar: Some(new.clone()), ..peer.clone() });
+    let asked = frame(&mut s);
+    assert!(asked.iter().any(|(_, a)| *a == Source::Avatar(new.clone())), "the new photo asked for: {asked:?}");
+    assert!(cells(&s).iter().all(|c| c.2 != old), "the old picture is not drawn:\n{}", s.d.screen());
+    let (id, _) = asked.into_iter().find(|(_, a)| *a == Source::Avatar(new.clone())).unwrap();
+    deliver(&mut s, id);
+    let now = id_of(&s, &new);
+    assert!(cells(&s).contains(&(p.x, p.y, now)), "the new photo in the chip's cells");
+    exactly_the_rows_on_screen(&s, "the new photo");
+    profile_changed(&mut s, User { avatar: None, no_photo: true, ..peer.clone() });
+    assert!(frame(&mut s).is_empty(), "nothing asked");
+    assert!(cells(&s).iter().all(|c| (c.0, c.1) != (p.x, p.y)), "the initials:\n{}", s.d.screen());
+    exactly_the_rows_on_screen(&s, "no photo of their own");
+    // Someone the app does not show: not added (a workspace's every profile change comes).
+    let stranger = User { id: slakio_core::model::UserId::new("U-STRANGER"), ..peer };
+    profile_changed(&mut s, stranger.clone());
+    assert!(s.d.app.model.user(&stranger.workspace, &stranger.id).is_none());
 }

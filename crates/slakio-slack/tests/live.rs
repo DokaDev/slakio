@@ -828,3 +828,33 @@ fn a_socket_closed_and_refused_for_its_sign_in_is_said_once_and_never_opened_aga
         assert_eq!(r.fake.log().len(), sent, "{:?}", r.fake.methods());
     });
 }
+
+/// A profile change pushes the person's record as it is now, through the same photo checks as a
+/// lookup, with nothing asked of Slack: a new photo (an original as its 72-pixel copy), none on
+/// another host (said nothing of), none of their own any more (said so).
+#[test]
+fn a_profile_change_pushes_the_person_with_their_photo_now_and_asks_nothing() {
+    rt().block_on(async {
+        let mut r = Run::new(QUICK).await;
+        r.boot().await;
+        r.connected().await;
+        let (who, team) = (r.other(), r.ws().id.to_string());
+        let asked = r.fake.log().len();
+        let original = "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-11-25/77_new_original.png";
+        let profile = |p: serde_json::Value| json!({"id": who, "team_id": team, "name": "minsu", "profile": p});
+        r.fake.push(&json!({"type": "user_change",
+            "user": profile(json!({"display_name": "Minsu", "image_original": original, "is_custom_image": true}))}));
+        let Live::People { users, .. } = r.live().await else { panic!("a person") };
+        let want = format!("https://{}/2026-11-25/77_new_72.png", slakio_core::images::AVATAR_HOSTS[0]);
+        assert_eq!((users[0].id.as_str(), users[0].avatar.as_deref()), (who.as_str(), Some(want.as_str())));
+        r.fake.push(&json!({"type": "user_profile_changed",
+            "user": profile(json!({"display_name": "Minsu", "image_72": "https://evil.example/x.png"}))}));
+        let Live::People { users, .. } = r.live().await else { panic!("a person") };
+        assert_eq!((users[0].avatar.as_deref(), users[0].no_photo), (None, false), "another host: nothing said");
+        r.fake.push(&json!({"type": "user_change",
+            "user": profile(json!({"display_name": "Minsu", "image_original": original, "is_custom_image": false}))}));
+        let Live::People { users, .. } = r.live().await else { panic!("a person") };
+        assert_eq!((users[0].avatar.as_deref(), users[0].no_photo), (None, true), "no photo of their own");
+        assert_eq!(r.fake.log().len(), asked, "nothing asked of Slack");
+    });
+}

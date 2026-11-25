@@ -1,6 +1,6 @@
 //! A workspace's live updates: one socket to Slack's realtime host, opened once the workspace has
-//! booted, which only receives — new, changed and deleted messages, conversations read elsewhere
-//! — and pushes them to the UI as [`Event::Live`]. The client sends nothing over it but what its
+//! booted, which only receives — new, changed and deleted messages, conversations read elsewhere,
+//! people's profiles changed — and pushes them to the UI as [`Event::Live`]. The client sends nothing over it but what its
 //! protocol needs (a pong for each ping, a close); no message, typing or read mark ever goes out.
 //!
 //! The socket replays nothing it missed, so when it opens after it was said to be lost (or not
@@ -393,6 +393,11 @@ async fn connection(
                 conversation: ConversationId::new(conversation),
                 unread,
                 mentions,
+            },
+            // A profile changed: the record it carries, through the same photo checks as a lookup.
+            Frame::Person(p) => match ctx.people.changed(&p) {
+                Some(u) => Live::People { workspace: ws.clone(), users: vec![u] },
+                None => continue,
             },
             Frame::Hello | Frame::Other => continue,
         };

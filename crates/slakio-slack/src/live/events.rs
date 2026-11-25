@@ -1,6 +1,7 @@
 //! What the live updates' socket says, read tolerantly: the frames the client acts on — `hello`,
-//! `goodbye`, a message posted, changed or deleted, a conversation read elsewhere — and nothing
-//! else (presence, typing, reactions and the rest are left unread for now). A frame that cannot
+//! `goodbye`, a message posted, changed or deleted, a conversation read elsewhere, a person's
+//! profile changed (`user_change`, `user_profile_changed`: the record they carry, nothing asked)
+//! — and nothing else (presence, typing, reactions and the rest are left unread for now). A frame that cannot
 //! be read, or that lacks what it needs (a channel, a timestamp, the counts), is left out:
 //! unknown is not zero.
 //!
@@ -39,6 +40,8 @@ pub(crate) enum Frame {
         unread: u32,
         mentions: u32,
     },
+    /// A person's record, as it is after their profile changed.
+    Person(wire::Person),
     /// Anything else.
     Other,
 }
@@ -52,6 +55,7 @@ pub(crate) fn frame(text: &str, me: Option<&UserId>) -> Frame {
         Some("goodbye") => Frame::Goodbye,
         Some("message") => message(&v, me).unwrap_or(Frame::Other),
         Some("channel_marked" | "im_marked" | "group_marked" | "mpim_marked") => marked(&v).unwrap_or(Frame::Other),
+        Some("user_change" | "user_profile_changed") => person(&v).unwrap_or(Frame::Other),
         _ => Frame::Other,
     }
 }
@@ -97,6 +101,12 @@ fn mentions(text: &str, me: Option<&UserId>) -> bool {
         text.match_indices(&at).any(|(i, _)| matches!(text.as_bytes().get(i + at.len()), Some(b'>' | b'|')))
     });
     personal || ["<!here", "<!channel", "<!everyone"].iter().any(|w| text.contains(w))
+}
+
+/// The person a profile change carries (`user`, with its `profile`); one without an id is none.
+fn person(v: &Value) -> Option<Frame> {
+    let p: wire::Person = serde_json::from_value(v.get("user")?.clone()).ok()?;
+    (!p.id.is_empty()).then_some(Frame::Person(p))
 }
 
 fn marked(v: &Value) -> Option<Frame> {

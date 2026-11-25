@@ -60,6 +60,19 @@ impl People {
         }
     }
 
+    /// Person `p` as the live updates say their profile is now: kept, when they are known (a new
+    /// photo replaces the old one, one they no longer have is gone, as [`keep`] says), and
+    /// returned for the UI; `None` when Slack gave no name to show.
+    pub(crate) fn changed(&self, p: &wire::Person) -> Option<User> {
+        let team = self.team()?;
+        let u = user(p, &team)?;
+        let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
+        if known.contains_key(&p.id) {
+            keep(&mut known, &p.id, u.clone());
+        }
+        Some(u)
+    }
+
     /// Forget person `id` when no photo of them is known, so the next [`People::names`] asks
     /// Slack for them again (the user's own record, when the start bundle has no photo): also
     /// when an earlier lookup gave no name for them.
