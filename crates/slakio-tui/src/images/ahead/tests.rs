@@ -306,6 +306,14 @@ fn a_429_pauses_photos_ahead_as_long_as_it_says_and_a_shorter_pause_never_shorte
 }
 
 #[test]
+fn a_429_asking_for_ever_pauses_photos_ahead_for_an_hour() {
+    let mut t = refused("429-ever", &FailKind::RateLimited { retry_after: Some(Duration::MAX) });
+    let start = t.now;
+    t.now += Duration::from_secs(3540);
+    paused_until(&mut t, start + Duration::from_secs(3600), "an hour at most");
+}
+
+#[test]
 fn a_refusal_for_a_picture_no_longer_waited_for_still_pauses_photos_ahead() {
     let mut t = T::new("pause-dropped");
     let (looks, _) = t.frame(&[], 3);

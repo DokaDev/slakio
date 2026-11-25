@@ -111,14 +111,15 @@ impl Images {
 
     /// A picture failed for `kind` at `now`: busy, offline or the budget spent, nothing is asked
     /// of the network ahead for [`super::RETRY_AFTER`]; asked to slow down, for as long as it
-    /// said and at least that. A pause only ever lasts longer, never shorter.
+    /// said and at least that, at most an hour. A pause only ever lasts longer, never shorter.
     pub(super) fn pause_ahead(&mut self, kind: &FailKind, now: Instant) {
         let pause = match kind {
             FailKind::Busy | FailKind::Offline | FailKind::CapReached => RETRY_AFTER,
             FailKind::RateLimited { retry_after } => retry_after.unwrap_or(RETRY_AFTER).max(RETRY_AFTER),
             _ => return,
         };
-        let until = now + pause;
+        // At most an hour, whatever the answer said (and never past what an instant holds).
+        let Some(until) = now.checked_add(pause.min(HOUR)) else { return };
         self.ahead.paused_until = Some(self.ahead.paused_until.map_or(until, |t| t.max(until)));
     }
 
