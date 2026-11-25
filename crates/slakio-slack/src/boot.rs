@@ -11,7 +11,8 @@
 //! being for the user. A conversation the user muted keeps its counts here: the UI shows a muted
 //! channel's mentions only, a muted DM's nothing. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
 //! within the organization is not), and a DM or group DM Slack marks so or with a person of
-//! another team. Group DMs show when open in the sidebar (`is_open`); their names never hold the
+//! another team. A DM or group DM is closed when Slack says it is not open in the sidebar (`is_open`): the UI
+//! lists it in a section of the user's own and Starred only. A group DM's name never holds the
 //! user's own handle.
 
 use crate::client::Client;
@@ -69,12 +70,12 @@ pub(crate) async fn boot(
     };
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
-    // The user too, when the start bundle has no photo of them; and the people of the group DMs
-    // shown.
+    // The user too, when the start bundle has no photo of them; and the people of the open group
+    // DMs.
     let mut asked = peers.clone();
     let open: HashSet<&str> = boot.is_open.iter().flatten().map(String::as_str).collect();
     let grouped =
-        boot.channels.iter().flatten().filter(|c| shown_group(c, &open)).flat_map(|c| c.members.iter().flatten());
+        boot.channels.iter().flatten().filter(|c| open_group(c, &open)).flat_map(|c| c.members.iter().flatten());
     for m in grouped.filter(|m| **m != self_.id) {
         if !asked.contains(m) {
             asked.push(m.clone());
@@ -188,7 +189,7 @@ fn snapshot(
     let starred: HashSet<String> = boot.starred.unwrap_or_default().into_iter().collect();
     let open_ids = boot.is_open.unwrap_or_default();
     let open: HashSet<&str> = open_ids.iter().map(String::as_str).collect();
-    let conversation = |id: String, name: String, kind: ConversationKind, facts: Facts| {
+    let conversation = |(id, name, kind, facts, closed): Listed| {
         let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
         let section = sidebar.place(&id, facts);
         let external = facts.external;
@@ -200,6 +201,7 @@ fn snapshot(
             name: Remote::new(name),
             section,
             external,
+            closed,
             unread,
             mentions,
         }
@@ -207,9 +209,8 @@ fn snapshot(
     let channels = boot.channels.unwrap_or_default();
     let own_teams: Vec<&str> = std::iter::once(team.id.as_str()).chain(team.enterprise_id.as_deref()).collect();
     let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), (&known, &own_teams), &me);
-    let facts: Vec<(String, Facts)> = listed.iter().map(|(id, _, _, f)| (id.clone(), *f)).collect();
-    let conversations: Vec<Conversation> =
-        listed.into_iter().map(|(id, name, kind, facts)| conversation(id, name, kind, facts)).collect();
+    let facts: Vec<(String, Facts)> = listed.iter().map(|(id, _, _, f, _)| (id.clone(), *f)).collect();
+    let conversations: Vec<Conversation> = listed.into_iter().map(conversation).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
     let avatar = own_photo(&me, &known);
     // Slack said the user has no photo of their own: in the start bundle, or the lookup.
@@ -250,17 +251,22 @@ fn snapshot(
     (snapshot, facts)
 }
 
-/// The conversations of the start bundle's `channels` (group DMs among them) and `ims`, the
-/// sidebar shows: each one's id, name, kind and what places it (`starred`, `open`: the start
+/// A conversation listed: its id, name, kind, what places it, and whether it is closed in the
+/// sidebar.
+type Listed = (String, String, ConversationKind, Facts, bool);
+
+/// The conversations of the start bundle's `channels` (group DMs among them) and `ims` that are
+/// not archived: each one's id, name, kind, what places it (`starred`, `open`: the start
 /// bundle's lists; `known`: the people named; `own_teams`: the workspace's team and
-/// organization; `me`: the user).
+/// organization; `me`: the user), and whether it is closed (a DM Slack says is not open, a group
+/// DM not in `open`).
 fn listed(
     channels: Vec<wire::Channel>,
     ims: Vec<wire::Im>,
     (starred, open): (&HashSet<String>, &HashSet<&str>),
     (known, own_teams): (&[User], &[&str]),
     me: &wire::Me,
-) -> Vec<(String, String, ConversationKind, Facts)> {
+) -> Vec<Listed> {
     let peer_of = |id: &str| known.iter().find(|u| u.id.as_str() == id);
     let outside = |id: &str| peer_of(id).is_some_and(|u| matches!(u.org, Org::External(_)));
     // The user's own handle: the start bundle's, else the one looked up.
@@ -271,13 +277,11 @@ fn listed(
         if c.is_mpim != Some(true) {
             let kind = ConversationKind::Channel { private: c.is_private == Some(true) };
             let facts = Facts { starred: star, external: c.is_ext_shared == Some(true), ..Facts::default() };
-            out.push((c.id.clone(), c.name.unwrap_or(c.id), kind, facts));
+            out.push((c.id.clone(), c.name.unwrap_or(c.id), kind, facts, false));
             continue;
         }
-        // A group DM: shown when open in the sidebar.
-        if !shown_group(&c, open) {
-            continue;
-        }
+        // A group DM: closed when not open in the sidebar.
+        let closed = !open_group(&c, open);
         // Its people: its members but the user; without members, the people known by the
         // handles of its name (the user's left out).
         let users: Vec<UserId> = match &c.members {
@@ -293,7 +297,7 @@ fn listed(
         let name = group_name(named, known, c.name.as_deref(), own).unwrap_or_else(|| c.id.clone());
         let external = c.is_ext_shared == Some(true) || users.iter().any(|u| outside(u.as_str()));
         let facts = Facts { dm: true, starred: star, external, app: false };
-        out.push((c.id, name, ConversationKind::GroupDm { users }, facts));
+        out.push((c.id, name, ConversationKind::GroupDm { users }, facts, closed));
     }
     out.extend(ims.into_iter().filter_map(|im| {
         let user = im.user?;
@@ -309,13 +313,15 @@ fn listed(
             external: shared || outside(&user),
             app: peer.is_some_and(|u| u.bot),
         };
-        Some((im.id, name, ConversationKind::Dm { user: UserId::new(user) }, facts))
+        // Closed only when Slack says so: not open, and not in the start bundle's is_open.
+        let closed = im.is_open == Some(false) && !open.contains(im.id.as_str());
+        Some((im.id, name, ConversationKind::Dm { user: UserId::new(user) }, facts, closed))
     }));
     out
 }
 
-/// A group DM the sidebar shows: not archived, and open (`open`: the start bundle's `is_open`).
-fn shown_group(c: &wire::Channel, open: &HashSet<&str>) -> bool {
+/// A group DM open in the sidebar: not archived, and in `open` (the start bundle's `is_open`).
+fn open_group(c: &wire::Channel, open: &HashSet<&str>) -> bool {
     c.is_mpim == Some(true) && c.is_archived != Some(true) && open.contains(c.id.as_str())
 }
 

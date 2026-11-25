@@ -310,9 +310,10 @@ fn starred_shared_app_and_open_group_conversations_go_to_their_sections() {
     let group = find(&s, "G1");
     assert_eq!(group.kind, ConversationKind::GroupDm { users: vec![UserId::new("U1"), UserId::new("U2")] });
     assert_eq!(group.name.unsanitized(), "ann, bob", "Bob is not known: the handles, the user's left out");
-    for gone in ["G2", "G3"] {
-        assert!(s.conversations.iter().all(|c| c.id.as_str() != gone), "{gone}: closed or archived");
-    }
+    assert!(s.conversations.iter().all(|c| c.id.as_str() != "G3"), "an archived group DM is not listed");
+    assert!(find(&s, "G2").closed, "a group DM not open is closed");
+    assert_eq!(section("G2"), "T1:dms");
+    assert!(!find(&s, "G1").closed && !find(&s, "D1").closed);
     // Without Slack's sections, the group DM still shows, in Direct messages.
     let plain = snapshot(placed(), None, known, NOW);
     assert_eq!(find(&plain, "G1").section.as_str(), "T1:dms");
@@ -363,4 +364,44 @@ fn a_dm_connected_only_with_the_workspace_s_own_team_or_organization_is_not_slac
     let s = snapshot(b, None, Vec::new(), NOW);
     let external: Vec<&str> = s.conversations.iter().filter(|c| c.external).map(|c| c.id.as_str()).collect();
     assert_eq!(external, ["D3"], "only a team of another organization makes it shared");
+}
+
+#[test]
+fn a_closed_dm_or_group_dm_is_listed_closed_and_keeps_its_section() {
+    let b: wire::UserBoot = serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team"},
+        "starred": ["G2"],
+        "is_open": ["G1", "D3"],
+        "channels": [
+            {"id": "G1", "name": "mpdm-me--ann-1", "is_mpim": true, "members": ["U0", "U1"]},
+            {"id": "G2", "name": "mpdm-me--bob-1", "is_mpim": true, "members": ["U0", "U2"]},
+            {"id": "G3", "name": "mpdm-me--cy-1", "is_mpim": true, "members": ["U0", "U3"]},
+            {"id": "G4", "name": "mpdm-me--dee-1", "is_mpim": true, "members": ["U0", "U4"]},
+        ],
+        "ims": [
+            {"id": "D1", "user": "U1", "is_open": true},
+            {"id": "D2", "user": "U2", "is_open": false},
+            {"id": "D3", "user": "U3", "is_open": false},
+            {"id": "D4", "user": "U4"},
+        ],
+    }))
+    .unwrap();
+    let listed: Vec<crate::sidebar::ChannelSection> = serde_json::from_value(json!([
+        {"channel_section_id": "LS", "type": "stars", "next_channel_section_id": "LC"},
+        {"channel_section_id": "LC", "type": "standard", "name": "Mine", "next_channel_section_id": "LD",
+         "channel_ids_page": {"channel_ids": ["G3"], "count": 1}},
+        {"channel_section_id": "LD", "type": "direct_messages", "next_channel_section_id": null},
+    ]))
+    .unwrap();
+    let s = with_sidebar(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
+    let state = |id| (find(&s, id).closed, find(&s, id).section.as_str().to_string());
+    assert_eq!(state("G1"), (false, "T1:dms".into()), "open");
+    assert_eq!(state("G2"), (true, "T1:stars".into()), "starred, not open: kept in Starred");
+    assert_eq!(state("G3"), (true, "T1:custom:LC".into()), "in a section of the user's own, not open");
+    assert_eq!(state("G4"), (true, "T1:dms".into()));
+    assert_eq!(state("D1"), (false, "T1:dms".into()));
+    assert_eq!(state("D2"), (true, "T1:dms".into()), "Slack says it is not open");
+    assert_eq!(state("D3"), (false, "T1:dms".into()), "in is_open: open");
+    assert_eq!(state("D4"), (false, "T1:dms".into()), "not said: open");
 }

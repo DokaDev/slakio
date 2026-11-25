@@ -340,16 +340,19 @@ impl Model {
     }
 
     /// A message by someone else came live into conversation `id` of `ws`: one more unread (and
-    /// one more mention when it mentions the user, or every message of a DM does). Muting
+    /// one more mention when it mentions the user, or every message of a DM does), and a closed
+    /// DM is open again. Muting
     /// changes what badges show, not the counts ([`Conversation::badges`]). `true` when listed.
     pub fn bump(&mut self, ws: &WorkspaceId, id: &ConversationId, mention: bool) -> bool {
-        // Counts Slack did not give stay unknown: one more on an unknown count is still unknown.
-        if self.counts_unknown.contains(ws) {
-            return false;
-        }
         let Some(c) = self.snapshot.conversations.iter_mut().find(|c| &c.workspace == ws && &c.id == id) else {
             return false;
         };
+        // A message opens a closed DM again, as in Slack's sidebar.
+        let reopened = std::mem::take(&mut c.closed);
+        // Counts Slack did not give stay unknown: one more on an unknown count is still unknown.
+        if self.counts_unknown.contains(ws) {
+            return reopened;
+        }
         c.unread = c.unread.saturating_add(1);
         if mention || c.is_dm() {
             c.mentions = c.mentions.saturating_add(1);
@@ -497,10 +500,14 @@ impl Model {
             View::Home => {
                 let mut rows = vec![];
                 for (si, s) in self.snapshot.sections.iter().enumerate().filter(|(_, s)| &s.workspace == ws) {
-                    // As Slack's desktop app: Starred, External connections and Apps show only
-                    // when they hold a conversation; the others always do.
+                    // As Slack's desktop app: a closed DM is listed only in a section of the
+                    // user's own and Starred.
+                    let keeps_closed = matches!(s.kind, SectionKind::Favorites | SectionKind::Custom);
+                    let shown = convs.clone().filter(|(_, c)| c.section == s.id && (keeps_closed || !c.closed));
+                    // Starred, External connections and Apps show only when they list a
+                    // conversation; the others always do.
                     let hides = matches!(s.kind, SectionKind::Favorites | SectionKind::External | SectionKind::Apps);
-                    if hides && !convs.clone().any(|(_, c)| c.section == s.id) {
+                    if hides && shown.clone().next().is_none() {
                         continue;
                     }
                     if !rows.is_empty() {
@@ -508,9 +515,7 @@ impl Model {
                     }
                     rows.push(Row::Section(si));
                     if !collapsed.contains(&s.id) {
-                        rows.extend(
-                            convs.clone().filter(|(_, c)| c.section == s.id).map(|(i, _)| Row::Conversation(i)),
-                        );
+                        rows.extend(shown.map(|(i, _)| Row::Conversation(i)));
                     }
                 }
                 // Saved messages, after the sections (Slack's Home "Saved").

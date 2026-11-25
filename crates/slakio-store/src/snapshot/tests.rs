@@ -208,7 +208,8 @@ fn every_section_kind_comes_back_and_an_older_version_does_not_read_them() {
     assert_parts(&store, &s, "kinds");
     // A cache that may hold the newer kinds is a newer version's to the one before them.
     let before = &crate::schema::MIGRATIONS[..4];
-    assert_eq!(crate::schema::migrate(&mut store.conn, before).unwrap(), crate::schema::Schema::Newer(5));
+    let now = u32::try_from(crate::schema::MIGRATIONS.len()).unwrap();
+    assert_eq!(crate::schema::migrate(&mut store.conn, before).unwrap(), crate::schema::Schema::Newer(now));
 }
 
 #[test]
@@ -245,4 +246,16 @@ fn sections_slack_could_not_tell_keep_those_kept_before() {
     store.put_snapshot(&next).unwrap();
     let back = store.snapshot(std::slice::from_ref(&ws)).unwrap().unwrap();
     assert_eq!(back.sections, next.sections);
+}
+
+#[test]
+fn a_closed_dm_comes_back_closed() {
+    let mut store = writer("snap-closed");
+    let mut s = World::new(5).snapshot().clone();
+    let at = s.conversations.iter().position(Conversation::is_dm).unwrap();
+    s.conversations[at].closed = true;
+    store.put_snapshot(&s).unwrap();
+    let back = store.snapshot(&ids(&s)).unwrap().unwrap();
+    let closed: Vec<&ConversationId> = back.conversations.iter().filter(|c| c.closed).map(|c| &c.id).collect();
+    assert_eq!(closed, [&s.conversations[at].id]);
 }

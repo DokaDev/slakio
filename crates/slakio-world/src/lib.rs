@@ -551,6 +551,7 @@ impl World {
             name,
             section: section.clone(),
             external,
+            closed: false,
             muted,
             unread,
             mentions,

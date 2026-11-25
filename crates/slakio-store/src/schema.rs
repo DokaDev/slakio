@@ -90,6 +90,8 @@ pub const MIGRATIONS: &[&str] = &[
     // kind it does not know for damage, from reading a cache that may hold them (it sets its
     // cache up again instead).
     "DELETE FROM meta WHERE 0;",
+    // 6: whether a DM or group DM is closed in Slack's sidebar; kept before: open.
+    "ALTER TABLE conversations ADD COLUMN closed INTEGER NOT NULL DEFAULT 0;",
 ];
 
 /// Where a database stands against `migrations`.

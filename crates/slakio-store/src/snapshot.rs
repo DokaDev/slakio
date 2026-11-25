@@ -134,8 +134,9 @@ fn put_conversation(tx: &Transaction<'_>, ord: usize, c: &Conversation) -> rusql
         ConversationKind::GroupDm { users } => (2, false, users.iter().map(UserId::as_str).collect()),
     };
     tx.execute(
-        "INSERT INTO conversations (ord, id, workspace, kind, private, peers, name, section, external, muted, unread, mentions)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO conversations (ord, id, workspace, kind, private, peers, name, section, external, muted, unread, mentions,
+             closed)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             int(ord as u64)?,
             c.id.as_str(),
@@ -148,7 +149,8 @@ fn put_conversation(tx: &Transaction<'_>, ord: usize, c: &Conversation) -> rusql
             c.external,
             c.muted,
             c.unread,
-            c.mentions
+            c.mentions,
+            c.closed
         ],
     )?;
     Ok(())
@@ -169,6 +171,7 @@ fn conversation(r: &Row<'_>) -> rusqlite::Result<Conversation> {
         name: Remote::new(r.get::<_, String>("name")?),
         section: SectionId::new(r.get::<_, String>("section")?),
         external: r.get("external")?,
+        closed: r.get("closed")?,
         muted: r.get("muted")?,
         unread: count(r.get("unread")?)?,
         mentions: count(r.get("mentions")?)?,

@@ -14,8 +14,22 @@ use slakio_core::model::{Workspace, WorkspaceId};
 use std::time::Instant;
 
 impl App {
-    /// `live` arrived at `now`. `true` when the screen changed.
+    /// `live` arrived at `now`. `true` when the screen changed. The list's cursor stays on its
+    /// row (a conversation, a header) when rows come and go around it, a header that is gone
+    /// among them.
     pub(super) fn on_live(&mut self, live: Live, now: Instant) -> bool {
+        let anchor = self.shell.anchor(&self.model);
+        let changed = self.live_update(live, now);
+        if changed {
+            let h = self.list_height();
+            self.shell.clamp(&self.model, h);
+            self.shell.restore(anchor, &self.model, h);
+        }
+        changed
+    }
+
+    /// Take `live` in; `true` when the screen changed.
+    fn live_update(&mut self, live: Live, now: Instant) -> bool {
         match live {
             Live::Message { workspace, conversation, thread, broadcast, changed, mention, message, users } => {
                 self.model.add_users(&workspace, &users);
@@ -49,18 +63,7 @@ impl App {
                 !known.is_empty()
             }
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),
-            // The cursor stays on its row (a conversation, a header) when rows come and go
-            // around it, a header that is gone among them.
-            Live::Sections { workspace, sections, places } => {
-                let anchor = self.shell.anchor(&self.model);
-                if !self.model.resection(&workspace, sections, &places) {
-                    return false;
-                }
-                let h = self.list_height();
-                self.shell.clamp(&self.model, h);
-                self.shell.restore(anchor, &self.model, h);
-                true
-            }
+            Live::Sections { workspace, sections, places } => self.model.resection(&workspace, sections, &places),
         }
     }
 

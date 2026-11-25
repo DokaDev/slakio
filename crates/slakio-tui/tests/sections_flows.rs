@@ -1,16 +1,22 @@
 //! Slack's sidebar sections arriving after the boot answer: they replace the workspace's own,
 //! each conversation moves to its section, and the list's cursor stays on its conversation even
-//! when the header above it is gone.
+//! when the header above it is gone. A DM closed in Slack's sidebar is not listed in Direct
+//! messages, yet the DMs view lists it, a search result or a link opens it, and a message opens
+//! it again.
 
 #[path = "support/demo.rs"]
 mod demo;
 #[path = "support/scripted.rs"]
 mod scripted;
 
+use ratatui::crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use scripted::Scripted;
-use slakio_core::backend::{Envelope, Event, Generation, Live};
-use slakio_core::model::{ConversationId, Section, SectionId, SectionKind};
-use slakio_tui::app::model::Row;
+use slakio_core::backend::{Command, Envelope, Event, Found, Generation, Hit, Live};
+use slakio_core::model::{Conversation, ConversationId, Message, Section, SectionId, SectionKind, Target, Ts, UserId};
+use slakio_core::sanitize::Remote;
+use slakio_tui::app::model::{Row, SignedIn};
+use slakio_tui::app::shell::View;
+use slakio_world::World;
 
 fn push(s: &mut Scripted, live: Live) {
     s.b.push(Envelope { generation: Generation::PUSHED, event: Event::Live(Box::new(live)) });
@@ -91,4 +97,137 @@ fn sections_of_a_workspace_not_listed_change_nothing() {
     s.keys("j");
     assert!(s.d.app.model.workspaces().is_empty());
     assert!(s.d.app.list_rows().is_empty());
+}
+
+/// Booted from the demo world with its first workspace's first DM closed, both workspaces
+/// signed in on their hosts; that DM.
+fn with_a_closed_dm() -> (Scripted, Conversation) {
+    let mut snapshot = World::demo().snapshot().clone();
+    let ws = snapshot.workspaces[0].id.clone();
+    let dm = snapshot.conversations.iter_mut().find(|c| c.workspace == ws && c.is_dm()).unwrap();
+    dm.closed = true;
+    let dm = dm.clone();
+    let mut s = Scripted::connected(true);
+    s.b.snapshot = Some(snapshot.clone());
+    let hosts = ["acme.slack.com", "other-co.slack.com"];
+    let signed: Vec<SignedIn> = (snapshot.workspaces.iter().zip(hosts))
+        .map(|(w, host)| SignedIn {
+            id: w.id.clone(),
+            name: w.name.unsanitized().to_string(),
+            read_only: true,
+            host: host.to_string(),
+            user: String::new(),
+        })
+        .collect();
+    s.d.app.connect_workspaces(s.b.caps, &signed);
+    s.pump();
+    while !s.b.held.is_empty() {
+        s.b.answer(0);
+        s.pump();
+    }
+    (s, dm)
+}
+
+/// Whether the list panel lists conversation `id`.
+fn lists(s: &Scripted, id: &ConversationId) -> bool {
+    (s.d.app.list_rows().iter()).any(|r| matches!(r, Row::Conversation(i) if s.d.app.model.conversation(*i).id == *id))
+}
+
+fn target(c: &Conversation) -> Target {
+    Target::Conversation { workspace: c.workspace.clone(), conversation: c.id.clone() }
+}
+
+#[test]
+fn a_closed_dm_is_not_in_direct_messages_but_the_dms_view_lists_it() {
+    let (mut s, dm) = with_a_closed_dm();
+    s.d.app.show_unfolded(View::Home);
+    assert!(!lists(&s, &dm.id), "closed: not in Direct messages");
+    assert!(s.d.app.model.conversations().iter().any(|c| c.id == dm.id), "still known");
+    s.d.app.show_unfolded(View::Dms);
+    assert!(lists(&s, &dm.id), "the DMs view lists every DM");
+}
+
+#[test]
+fn a_search_result_in_a_closed_dm_opens_it() {
+    let (mut s, dm) = with_a_closed_dm();
+    s.keys("space s");
+    for c in "hello".chars() {
+        s.d.app.handle_event(TermEvent::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)), s.d.now);
+    }
+    s.pump();
+    s.keys("enter");
+    let at = s.b.held.iter().position(|r| matches!(r.command, Command::Search { .. })).expect("a search asked");
+    let r = s.b.held.remove(at);
+    let Command::Search { query, .. } = r.command else { unreachable!() };
+    let ts = Ts(1_767_603_600_000_100);
+    let hit = Hit {
+        conversation: dm.id.clone(),
+        name: Remote::new("dm"),
+        ts,
+        thread: None,
+        user: UserId::new("U-NOBODY"),
+        author: Remote::new("someone"),
+        text: Remote::new("hello"),
+        permalink: String::new(),
+    };
+    let found = Found {
+        workspace: r.workspace.unwrap(),
+        query,
+        page: 1,
+        pages: 1,
+        total: 1,
+        hits: vec![hit],
+        users: Vec::new(),
+    };
+    s.b.push(Envelope { generation: r.id, event: Event::Found(Box::new(found)) });
+    s.pump();
+    s.keys("enter");
+    let want = target(&dm);
+    assert!(
+        s.b.held
+            .iter()
+            .any(|r| matches!(&r.command, Command::Around { target, at, .. } if *target == want && *at == ts)),
+        "read around the result in the closed DM: {:?}",
+        s.b.held
+    );
+}
+
+#[test]
+fn a_link_to_a_closed_dm_opens_it() {
+    let (mut s, dm) = with_a_closed_dm();
+    s.keys(":");
+    s.d.type_text(&format!("open https://acme.slack.com/archives/{}", dm.id));
+    s.keys("enter");
+    let want = target(&dm);
+    assert!(s.d.app.pane_showing(&want).is_some(), "the closed DM opens: {:?}", s.b.held);
+}
+
+#[test]
+fn a_message_in_a_closed_dm_opens_it_again() {
+    let (mut s, dm) = with_a_closed_dm();
+    s.d.app.show_unfolded(View::Home);
+    let me = s.d.app.model.me(&dm.workspace).unwrap().clone();
+    let other =
+        (World::demo().snapshot().users.iter()).find(|u| u.workspace == dm.workspace && u.id != me).unwrap().id.clone();
+    let message = Message {
+        ts: Ts(1_767_603_600_000_100),
+        user: other,
+        text: Remote::new("back"),
+        thread: None,
+        reactions: Vec::new(),
+        edited: false,
+        files: Vec::new(),
+    };
+    let live = Live::Message {
+        workspace: dm.workspace.clone(),
+        conversation: dm.id.clone(),
+        thread: None,
+        broadcast: false,
+        changed: false,
+        mention: false,
+        message,
+        users: Vec::new(),
+    };
+    push(&mut s, live);
+    assert!(lists(&s, &dm.id), "open again, in Direct messages");
 }
