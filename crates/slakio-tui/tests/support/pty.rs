@@ -169,6 +169,15 @@ fn screen(t: &str, rows: usize, cols: usize) -> String {
                         }
                     }
                 }
+                // A string the terminal takes in without drawing it (a kitty picture is one), up
+                // to its end (`ESC \`): none of it lands on the screen.
+                Some('_' | 'P' | '^' | 'X') => {
+                    while let Some(n) = chars.next() {
+                        if n == '\u{1b}' && chars.next_if_eq(&'\\').is_some() {
+                            break;
+                        }
+                    }
+                }
                 _ => {}
             },
             '\r' => c = 0,
