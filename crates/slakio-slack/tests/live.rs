@@ -908,15 +908,14 @@ async fn client_let_go(governor: &Arc<Governor>) {
     until("every task let the client go", || Arc::strong_count(governor) == 1).await;
 }
 
-/// The UI gone, the live updates' tasks end with it (the sections waiting to be read again too),
-/// and let the client go.
+/// The UI gone, the live updates' tasks end with it (the one that reads the sections again,
+/// waiting to be told they changed, too), and let the client go.
 #[test]
 fn the_ui_gone_ends_every_task_of_the_live_updates() {
     rt().block_on(async {
         let mut r = Run::new(QUICK).await;
         r.boot().await;
         r.connected().await;
-        r.fake.push(&json!({"type": "channel_section_upserted"}));
         let Run { fake, handle, governor, .. } = r;
         drop(handle);
         client_let_go(&governor).await;
@@ -932,10 +931,14 @@ fn signed_out_the_live_updates_end_every_task() {
         let mut r = Run::new(QUICK).await;
         r.boot().await;
         r.connected().await;
+        let before = r.calls("users.channelSections.list");
         r.fake.push(&json!({"type": "channel_section_upserted"}));
         r.fake.revoke(TOKEN, true);
         r.lost().await;
         assert!(matches!(r.live().await, Live::Connection { state: Connection::SignedOut, .. }));
+        // Past the pause before the read, and then some: none was asked.
+        tokio::time::sleep(QUICK.resection_wait + Duration::from_millis(500)).await;
+        assert_eq!(r.calls("users.channelSections.list"), before, "the sections are not read signed out");
         let Run { fake, handle, governor, .. } = r;
         drop(handle);
         client_let_go(&governor).await;
