@@ -3,8 +3,8 @@
 
 use super::cached::LOOKUPS_MAX;
 use super::{
-    CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, RETRY_AFTER, RETRY_SOON, Why,
-    note,
+    CHIP_PHOTO, Entry, FETCHED_BYTES_MAX, FETCHED_MAX, IN_FLIGHT_MAX, Images, Job, Key, PHOTO, RETRY_AFTER, RETRY_SOON,
+    Why, note,
 };
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind, Generation};
@@ -217,6 +217,16 @@ impl Images {
             _ => None,
         };
         note::line(&self.diag, &key, Stage::Failed, &note::fail_word(kind), &[("retry", note::retry(again, now))]);
+        // Asked of Slack and failed: a photo's other place, waiting for it, takes the same answer
+        // (not asked again before its wait is over). Refused here, the other may still go.
+        if matches!(key.0, Source::Avatar(_))
+            && !matches!(kind, FailKind::CapReached | FailKind::Busy | FailKind::Offline)
+        {
+            let other = (key.0.clone(), if key.1 == CHIP_PHOTO { PHOTO } else { CHIP_PHOTO });
+            if !self.entries.contains_key(&other) {
+                self.fail(other, why, again);
+            }
+        }
         self.fail(key, why, again);
         true
     }

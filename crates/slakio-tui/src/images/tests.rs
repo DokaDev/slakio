@@ -698,3 +698,30 @@ fn the_photos_bytes_kept_for_their_other_place_stay_within_a_few_mebibytes() {
     assert!(images.fetched.iter().all(|f| f.0 != photo(100)));
     assert_eq!(images.fetched.len(), FETCHED_BYTES_MAX / mib);
 }
+
+#[test]
+fn a_photo_that_failed_for_one_place_is_not_asked_again_for_the_other_until_its_wait_is_over() {
+    let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
+    for kind in [FailKind::Network, FailKind::RateLimited { retry_after: None }, FailKind::TooLarge] {
+        let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+        images.look_as(&ws(), &photo, CHIP_PHOTO);
+        images.ask(&mut requests, now);
+        let r = requests.take().pop().expect("asked for the chip");
+        // The slot waits for it, then takes its failure as its own.
+        images.look(&ws(), &photo);
+        images.ask(&mut requests, now);
+        assert!(images.failed(r.id, &kind, now));
+        for _ in 0..3 {
+            images.look_as(&ws(), &photo, CHIP_PHOTO);
+            assert!(matches!(images.look(&ws(), &photo), Look::Failed(_)), "{kind:?}");
+            images.ask(&mut requests, now);
+            assert!(requests.take().is_empty(), "not asked again: {kind:?}");
+        }
+        // Its wait over, it is asked once for both.
+        images.look_as(&ws(), &photo, CHIP_PHOTO);
+        images.look(&ws(), &photo);
+        images.ask(&mut requests, now + RETRY_AFTER);
+        let again = requests.take().len();
+        assert_eq!(again, usize::from(kind != FailKind::TooLarge), "{kind:?}");
+    }
+}
