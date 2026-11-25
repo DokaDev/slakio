@@ -5,7 +5,8 @@
 //! without it, never on the cache's word, a failed or slow start, or no answer at all (the
 //! status line says so once). Until then nothing is saved over the file, so a run that ends
 //! early, or whose start fails, does not lose it. Tabs the user opened meanwhile stay as they
-//! are, the saved ones after them.
+//! are, the saved ones after them. Each workspace's sidebar (the sections folded, those the user
+//! ordered) is taken at once, and kept with the tabs.
 
 use super::status::Level;
 use super::{App, Focus};
@@ -17,6 +18,7 @@ use std::time::Instant;
 impl App {
     /// The tabs of the last run, to open as soon as the workspaces have answered.
     pub fn restore_layout(&mut self, saved: Saved, now: Instant) {
+        self.restore_sidebar(&saved.sidebar);
         self.restoring = Some(saved);
         self.try_restore(now);
     }
@@ -30,13 +32,13 @@ impl App {
     /// the last run waits to be opened (the file keeps it).
     pub fn layout_to_save(&self) -> Option<Saved> {
         self.backend?;
-        self.restoring.is_none().then(|| self.work.saved())
+        self.restoring.is_none().then(|| Saved { sidebar: self.sidebar_to_save(), ..self.work.saved() })
     }
 
     /// A number that moves whenever what [`App::layout_to_save`] gives may have changed, so the
     /// layout is written out only then.
     pub fn layout_stamp(&self) -> (u64, bool) {
-        (self.work.edits(), self.backend.is_none() || self.restoring.is_some())
+        (self.work.edits().wrapping_add(self.shell.sidebar_edits), self.backend.is_none() || self.restoring.is_some())
     }
 
     /// The backend's own word on workspace `ws` is in: its boot answered (not the cache's), or

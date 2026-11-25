@@ -30,7 +30,7 @@ fn one(c: &str) -> Saved {
         zoomed: false,
         panes: vec![SavedPane { target, panel: None }],
     };
-    Saved { tabs: vec![tab], current: 0 }
+    Saved { tabs: vec![tab], current: 0, sidebar: Vec::new() }
 }
 
 #[test]

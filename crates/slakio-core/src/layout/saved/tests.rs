@@ -38,7 +38,7 @@ fn two_tabs() -> Saved {
         zoomed: false,
         panes: vec![SavedPane { target: conv("T2", "C2"), panel: None }],
     };
-    Saved { tabs: vec![first, second], current: 1 }
+    Saved { tabs: vec![first, second], current: 1, sidebar: Vec::new() }
 }
 
 #[test]
@@ -178,7 +178,7 @@ proptest! {
     #[test]
     fn written_then_read_is_the_same(tabs in prop::collection::vec(saved_tab(), 0..5), current in 0usize..5) {
         let current = if current < tabs.len() { current } else { 0 };
-        let saved = Saved { tabs, current };
+        let saved = Saved { tabs, current, sidebar: Vec::new() };
         prop_assert_eq!(Saved::parse(&saved.to_text()), Ok(saved));
     }
 
@@ -188,4 +188,59 @@ proptest! {
         let _ = Saved::parse(&text);
         let _ = Saved::parse(&format!("version = 1\n[[tab]]\ntree = [\"{text}\"]\n"));
     }
+}
+
+fn with_sidebars() -> Saved {
+    let sidebar = |ws: &str, collapsed: &[&str], sort: &[(&str, Sort)]| SavedSidebar {
+        workspace: WorkspaceId::new(ws),
+        collapsed: collapsed.iter().map(|s| SectionId::new(*s)).collect(),
+        sort: sort.iter().map(|(s, o)| (SectionId::new(*s), *o)).collect(),
+    };
+    Saved {
+        sidebar: vec![
+            sidebar(
+                "T1",
+                &["T1:channels", "T1:custom:L01"],
+                &[("T1:dms", Sort::Alphabetical), ("T1:custom:L01", Sort::Recent)],
+            ),
+            sidebar("T2", &[], &[("SDEMO.2_x", Sort::Recent)]),
+        ],
+        ..two_tabs()
+    }
+}
+
+#[test]
+fn each_workspace_s_sidebar_is_kept_with_the_tabs_in_version_1() {
+    let saved = with_sidebars();
+    let text = saved.to_text();
+    assert!(text.contains("version = 1") && text.contains("[[sidebar]]"), "{text}");
+    assert!(text.contains("collapsed = [\"T1:channels\", \"T1:custom:L01\"]"), "{text}");
+    assert!(text.contains("alphabetical = [\"T1:dms\"]") && text.contains("recent = [\"T1:custom:L01\"]"), "{text}");
+    assert_eq!(Saved::parse(&text), Ok(saved));
+    // A file of an earlier version of this one, without sidebars, reads as before.
+    assert!(!two_tabs().to_text().contains("sidebar"));
+    assert_eq!(Saved::parse(&two_tabs().to_text()), Ok(two_tabs()));
+}
+
+#[test]
+fn a_sidebar_of_another_shape_or_too_long_is_not_read() {
+    let good = with_sidebars().to_text();
+    for (bad, why) in [
+        (good.replace("\"T1:channels\"", "\"T1:chan nels\""), "an id with a blank"),
+        (good.replace("\"T1:channels\"", "\"\""), "an empty id"),
+        (good.replace("\"T1:channels\"", &format!("\"{}\"", "x".repeat(129))), "an id too long"),
+        (good.replace("\"T1:channels\"", "1"), "an id that is no text"),
+        (good.replace("workspace = \"T2\"", "workspace = \"T:2\""), "a workspace of another shape"),
+        (good.replace("workspace = \"T2\"", "nothing = 1"), "a sidebar without a workspace"),
+        (good.replace("collapsed = [\"T1:channels\", \"T1:custom:L01\"]", "collapsed = \"T1:channels\""), "not a list"),
+    ] {
+        assert!(Saved::parse(&bad).is_err(), "{why}: {bad}");
+    }
+    let ids = (0..=MAX_SECTIONS).map(|i| format!("\"S{i}\"")).collect::<Vec<_>>().join(", ");
+    let many = format!("version = 1\n[[sidebar]]\nworkspace = \"T1\"\ncollapsed = [{ids}]\n");
+    assert!(Saved::parse(&many).is_err(), "too many sections");
+    let sidebars = format!("version = 1\n{}", "[[sidebar]]\nworkspace = \"T1\"\n".repeat(MAX_SIDEBARS + 1));
+    assert!(Saved::parse(&sidebars).is_err(), "too many sidebars");
+    let fine = format!("version = 1\n{}", "[[sidebar]]\nworkspace = \"T1\"\n".repeat(MAX_SIDEBARS));
+    assert_eq!(Saved::parse(&fine).map(|s| s.sidebar.len()), Ok(MAX_SIDEBARS));
 }

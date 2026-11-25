@@ -22,6 +22,12 @@
 //! workspace = "T01"
 //! conversation = "C01"
 //! thread = 1700000000000100  # a thread: its first message's timestamp
+//!
+//! [[sidebar]]                # a workspace's sidebar sections the user folded or ordered
+//! workspace = "T01"
+//! collapsed = ["T01:channels"]
+//! alphabetical = ["T01:dms"] # ordered by name, whatever the settings say
+//! recent = ["T01:custom:L01"] # the newest first, whatever the settings say
 //! ```
 //!
 //! The tree is written first-node-first: a split is `row` or `column` with its share's five
@@ -32,7 +38,7 @@
 //! is read as an ordinary pane.
 
 use super::{Dir, Node, PaneId, Share};
-use crate::model::{ConversationId, Target, Ts, WorkspaceId};
+use crate::model::{ConversationId, SectionId, Sort, Target, Ts, WorkspaceId};
 use toml_edit::{ArrayOfTables, DocumentMut, Item, Table, value};
 
 /// The version of the file this code writes and reads.
@@ -45,6 +51,12 @@ pub const MAX_PANES: usize = 64;
 pub const MAX_NAME: usize = 100;
 /// The longest an id may be.
 const MAX_ID: usize = 64;
+/// The most workspaces' sidebars a file may hold.
+pub const MAX_SIDEBARS: usize = 64;
+/// The most sections a sidebar's list may name.
+pub const MAX_SECTIONS: usize = 256;
+/// The longest a section's id may be.
+const MAX_SECTION_ID: usize = 128;
 
 /// The tabs, in their order, and the one shown.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -52,6 +64,16 @@ pub struct Saved {
     pub tabs: Vec<SavedTab>,
     /// The tab shown (an index into `tabs`).
     pub current: usize,
+    /// Each workspace's sidebar as the user left it.
+    pub sidebar: Vec<SavedSidebar>,
+}
+
+/// A workspace's sidebar: the sections folded, and those the user chose an order for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SavedSidebar {
+    pub workspace: WorkspaceId,
+    pub collapsed: Vec<SectionId>,
+    pub sort: Vec<(SectionId, Sort)>,
 }
 
 /// A tab: its layout, by the panes' indices ([`PaneId`] `i` is `panes[i]`).
@@ -105,6 +127,22 @@ impl Saved {
             tabs.push(t);
         }
         doc["tab"] = Item::ArrayOfTables(tabs);
+        let mut sidebars = ArrayOfTables::new();
+        for s in &self.sidebar {
+            let mut t = Table::new();
+            t["workspace"] = value(s.workspace.as_str());
+            let ids = |ids: &mut dyn Iterator<Item = &SectionId>| {
+                value(ids.map(SectionId::as_str).collect::<toml_edit::Array>())
+            };
+            t["collapsed"] = ids(&mut s.collapsed.iter());
+            for order in [Sort::Alphabetical, Sort::Recent] {
+                t[order.name()] = ids(&mut s.sort.iter().filter(|(_, o)| *o == order).map(|(id, _)| id));
+            }
+            sidebars.push(t);
+        }
+        if !sidebars.is_empty() {
+            doc["sidebar"] = Item::ArrayOfTables(sidebars);
+        }
         doc.to_string()
     }
 
@@ -127,7 +165,17 @@ impl Saved {
         };
         let current = index(doc.get("current"), "current")?.unwrap_or(0);
         let current = if current < tabs.len() { current } else { 0 };
-        Ok(Saved { tabs, current })
+        let sidebar = match doc.get("sidebar") {
+            None => Vec::new(),
+            Some(item) => {
+                let all = item.as_array_of_tables().ok_or("sidebar is not a list of tables")?;
+                if all.len() > MAX_SIDEBARS {
+                    return Err(format!("more than {MAX_SIDEBARS} sidebars"));
+                }
+                all.iter().map(sidebar).collect::<Result<Vec<_>, _>>()?
+            }
+        };
+        Ok(Saved { tabs, current, sidebar })
     }
 }
 
@@ -254,6 +302,39 @@ fn pane(t: &Table) -> Result<SavedPane, String> {
     };
     let panel = index(t.get("panel"), "panel")?.map(|i| PaneId(i as u64));
     Ok(SavedPane { target, panel })
+}
+
+/// A workspace's sidebar of the file: ids of the shape this version writes, at most
+/// [`MAX_SECTIONS`] in each list.
+fn sidebar(t: &Table) -> Result<SavedSidebar, String> {
+    let workspace = t
+        .get("workspace")
+        .and_then(Item::as_str)
+        .filter(|s| !s.is_empty() && s.len() <= MAX_ID && s.bytes().all(|b| b.is_ascii_alphanumeric()))
+        .map(WorkspaceId::new)
+        .ok_or("a sidebar without a workspace")?;
+    let ids = |key: &str| -> Result<Vec<SectionId>, String> {
+        let Some(item) = t.get(key) else { return Ok(Vec::new()) };
+        let list = item.as_array().ok_or_else(|| format!("{key} is not a list"))?;
+        if list.len() > MAX_SECTIONS {
+            return Err(format!("more than {MAX_SECTIONS} sections in {key}"));
+        }
+        list.iter()
+            .map(|v| {
+                v.as_str()
+                    .filter(|s| !s.is_empty() && s.len() <= MAX_SECTION_ID)
+                    .filter(|s| s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-:".contains(&b)))
+                    .map(SectionId::new)
+                    .ok_or_else(|| format!("a section id in {key} of another shape"))
+            })
+            .collect()
+    };
+    let collapsed = ids("collapsed")?;
+    let mut sort = Vec::new();
+    for order in [Sort::Alphabetical, Sort::Recent] {
+        sort.extend(ids(order.name())?.into_iter().map(|id| (id, order)));
+    }
+    Ok(SavedSidebar { workspace, collapsed, sort })
 }
 
 /// A whole number at least zero, when there is one.

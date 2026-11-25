@@ -40,7 +40,7 @@ impl Work {
         // The tab shown, counted among those saved.
         let current = self.tabs.current().map_or(0, |c| tabs[..c.min(tabs.len())].iter().flatten().count());
         let tabs: Vec<SavedTab> = tabs.into_iter().flatten().collect();
-        Saved { current: if current < tabs.len() { current } else { 0 }, tabs }
+        Saved { current: if current < tabs.len() { current } else { 0 }, tabs, sidebar: Vec::new() }
     }
 
     /// Open the tabs `saved` after those open, leaving out the panes whose target `keep`

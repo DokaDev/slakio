@@ -354,3 +354,65 @@ fn sort_section_switches_the_section_under_the_cursor_and_the_cursor_stays() {
     s.keys("enter");
     assert_eq!(channels_listed(&s), by_name);
 }
+
+/// The demo world with workspace 0's Channels and Direct messages ordered as Slack's are.
+fn ordered_world() -> slakio_core::backend::Snapshot {
+    let mut snapshot = World::demo().snapshot().clone();
+    let ws = snapshot.workspaces[0].id.clone();
+    for s in snapshot.sections.iter_mut().filter(|x| x.workspace == ws) {
+        s.sort = match s.kind {
+            SectionKind::Channels => Some(Sort::Alphabetical),
+            SectionKind::DirectMessages => Some(Sort::Recent),
+            _ => None,
+        };
+    }
+    snapshot
+}
+
+/// The list's cursor on the header of workspace 0's section of `kind` (Home shown); its id.
+fn on_header(s: &mut Scripted, kind: SectionKind) -> SectionId {
+    let rows = s.d.app.list_rows();
+    let at = rows.iter().position(|r| matches!(r, Row::Section(i) if s.d.app.model.section(*i).kind == kind)).unwrap();
+    let Row::Section(i) = rows[at] else { unreachable!() };
+    s.d.app.focus_list_row(at);
+    s.d.app.model.section(i).id.clone()
+}
+
+#[test]
+fn folded_and_ordered_sections_are_kept_with_the_layout_and_taken_again_at_the_next_start() {
+    use slakio_core::layout::saved::Saved;
+    let mut s = Scripted::booted(true, Some(ordered_world()));
+    s.d.app.show_unfolded(View::Home);
+    let stamp = s.d.app.layout_stamp();
+    let channels = on_header(&mut s, SectionKind::Channels);
+    s.keys("enter");
+    assert_ne!(s.d.app.layout_stamp(), stamp, "a fold is written out");
+    let stamp = s.d.app.layout_stamp();
+    let dms = on_header(&mut s, SectionKind::DirectMessages);
+    s.keys(":");
+    s.d.type_text("sort-section");
+    s.keys("enter");
+    assert_ne!(s.d.app.layout_stamp(), stamp, "an order chosen is written out");
+    let saved = s.d.app.layout_to_save().expect("a layout to keep");
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let mine = saved.sidebar.iter().find(|x| x.workspace == ws).expect("workspace 0's sidebar");
+    assert_eq!(mine.collapsed, std::slice::from_ref(&channels));
+    assert_eq!(mine.sort, [(dms.clone(), Sort::Alphabetical)]);
+    // Through the file, into the next start: folded and ordered again, and kept again even
+    // before its workspace answers.
+    let back = Saved::parse(&saved.to_text()).unwrap();
+    let mut next = Scripted::connected(true);
+    next.d.app.restore_layout(back.clone(), next.d.now);
+    next.b.snapshot = Some(ordered_world());
+    next.pump();
+    next.b.answer(0);
+    next.pump();
+    let header_of = |s: &Scripted, id: &SectionId| {
+        s.d.app.list_rows().iter().any(|r| matches!(r, Row::Section(i) if s.d.app.model.section(*i).id == *id))
+    };
+    assert!(header_of(&next, &channels));
+    let channel_rows = channels_listed(&next);
+    assert!(channel_rows.is_empty(), "Channels folded again: {channel_rows:?}");
+    let restored = next.d.app.layout_to_save().unwrap();
+    assert_eq!(restored.sidebar, back.sidebar, "kept as it was read");
+}

@@ -100,6 +100,12 @@ pub struct Shell {
     pub collapsed: HashSet<SectionId>,
     /// How the sections order their conversations.
     pub sorting: super::model::Sorting,
+    /// A number that moves each time a section is folded or unfolded, or ordered by the user
+    /// (what the layout file keeps of the sidebar).
+    pub sidebar_edits: u64,
+    /// The workspace the layout file named each section folded or ordered there with, for a
+    /// section no workspace lists (yet).
+    pub sidebar_homes: std::collections::HashMap<SectionId, WorkspaceId>,
     /// Folded groups of saved items.
     pub groups: HashSet<Group>,
     /// How To-dos are filtered and ordered, and its changes waiting for the backend.
@@ -121,6 +127,8 @@ impl Default for Shell {
             list_top: 0,
             collapsed: HashSet::new(),
             sorting: super::model::Sorting::default(),
+            sidebar_edits: 0,
+            sidebar_homes: std::collections::HashMap::new(),
             groups: HashSet::new(),
             todo: TodoView::default(),
             list_hidden: false,
@@ -208,7 +216,9 @@ impl Shell {
             ShellAction::ListOpen => open = self.open_row(model).map(|target| Open { target, focus: true }),
             ShellAction::ListPeek => match list.get(self.list_cursor) {
                 Some(Row::Section(i)) => {
-                    self.collapsed.remove(&model.section(*i).id);
+                    if self.collapsed.remove(&model.section(*i).id) {
+                        self.sidebar_edits += 1;
+                    }
                 }
                 Some(Row::Group(g)) => {
                     self.groups.remove(g);
@@ -227,7 +237,9 @@ impl Shell {
                 }
                 Some(Row::Section(i)) => {
                     let id = model.section(*i).id.clone();
-                    if !self.collapsed.insert(id) {
+                    if self.collapsed.insert(id) {
+                        self.sidebar_edits += 1;
+                    } else {
                         *here = Region::ViewSwitcher;
                     }
                 }
@@ -378,6 +390,7 @@ impl Shell {
                 if !self.collapsed.remove(&id) {
                     self.collapsed.insert(id);
                 }
+                self.sidebar_edits += 1;
                 None
             }
             Some(Row::Group(g)) => {

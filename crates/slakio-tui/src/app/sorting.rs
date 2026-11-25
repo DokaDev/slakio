@@ -1,12 +1,16 @@
 //! How the sidebar's sections order their conversations: the settings (`channel_sort`,
 //! `dm_sort`) and the user's choice for one section (`:sort-section`, which switches the section
-//! under the list's cursor between by name and the newest first).
+//! under the list's cursor between by name and the newest first), kept with the layout as each
+//! workspace's sidebar ([`SavedSidebar`]) with the sections folded.
 
 use super::App;
 use super::model::{Row, Sorting};
 use slakio_core::config::Config;
 use slakio_core::i18n::{Label, Msg};
+use slakio_core::layout::saved::SavedSidebar;
 use slakio_core::model::Sort;
+use slakio_core::model::{SectionId, WorkspaceId};
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 impl App {
@@ -52,6 +56,55 @@ impl App {
         self.sort_sections(|sorting| {
             sorting.sections.insert(s.id.clone(), next);
         });
+        self.shell.sidebar_edits += 1;
         self.info(Msg::SectionSortChanged { name: next.name().to_string() }, now);
+    }
+
+    /// Each workspace's sidebar to keep: the sections folded and those the user ordered, by
+    /// workspace (one the model lists the section of, else the one the layout file named it
+    /// with), each list in id order; a workspace with neither is left out.
+    pub(super) fn sidebar_to_save(&self) -> Vec<SavedSidebar> {
+        let home = |id: &SectionId| -> Option<WorkspaceId> {
+            let listed = self.model.sections().iter().find(|s| s.id == *id).map(|s| s.workspace.clone());
+            listed.or_else(|| self.shell.sidebar_homes.get(id).cloned())
+        };
+        let mut by: BTreeMap<WorkspaceId, SavedSidebar> = BTreeMap::new();
+        for id in &self.shell.collapsed {
+            if let Some(ws) = home(id) {
+                by.entry(ws.clone())
+                    .or_insert_with(|| SavedSidebar { workspace: ws, collapsed: Vec::new(), sort: Vec::new() })
+                    .collapsed
+                    .push(id.clone());
+            }
+        }
+        for (id, order) in &self.shell.sorting.sections {
+            if let Some(ws) = home(id) {
+                by.entry(ws.clone())
+                    .or_insert_with(|| SavedSidebar { workspace: ws, collapsed: Vec::new(), sort: Vec::new() })
+                    .sort
+                    .push((id.clone(), *order));
+            }
+        }
+        let mut out: Vec<SavedSidebar> = by.into_values().collect();
+        for s in &mut out {
+            s.collapsed.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
+            s.sort.sort_unstable_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+        }
+        out
+    }
+
+    /// The sidebars the layout file kept, folded and ordered again (before the workspaces have
+    /// answered: by the sections' ids).
+    pub(super) fn restore_sidebar(&mut self, saved: &[SavedSidebar]) {
+        for s in saved {
+            for id in &s.collapsed {
+                self.shell.collapsed.insert(id.clone());
+                self.shell.sidebar_homes.insert(id.clone(), s.workspace.clone());
+            }
+            for (id, order) in &s.sort {
+                self.shell.sorting.sections.insert(id.clone(), *order);
+                self.shell.sidebar_homes.insert(id.clone(), s.workspace.clone());
+            }
+        }
     }
 }
