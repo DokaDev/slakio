@@ -14,6 +14,7 @@ use scripted::Scripted;
 use slakio_core::backend::{Command, Envelope, Event, Snapshot};
 use slakio_core::model::Presence;
 use slakio_tui::app::shell::View;
+use slakio_tui::text::width;
 use slakio_world::World;
 
 /// The world's snapshot with the user in do not disturb and `alerts` muted though it mentions
@@ -269,6 +270,8 @@ fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
         (long, true, false, "Partner… app  Shipped"),
         (long, false, true, "Partner… ext  Shipped"),
         (long, true, true, "Partner… ⊞ ⇄  Shipped"),
+        ("\u{AE40}\u{D55C}\u{BE5B}\u{B2D8}", true, true, "\u{AE40}\u{D55C}\u{BE5B}\u{B2D8} ⊞ ⇄  Shipped"),
+        ("\u{AE40}\u{D55C}\u{BE5B}\u{B2D8}", false, true, "\u{AE40}\u{D55C}\u{BE5B}\u{B2D8} ext  Shipped"),
     ];
     for theme in [slakio_tui::theme::Theme::terminal(), slakio_tui::theme::Theme::no_color()] {
         for ((name, bot, ext, want), w) in cases.into_iter().flat_map(|c| [(c, 120), (c, 90)]) {
@@ -276,7 +279,8 @@ fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
             assert!(line.contains(want), "{w} {name} {bot} {ext}: want {want:?} in {line:?}");
             let screen = s.d.screen();
             let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
-            let x = line[..line.find(want).unwrap()].chars().count() + want.find(' ').unwrap() + 1;
+            let name_w = width(want.split(' ').next().unwrap());
+            let x = width(&line[..line.find(want).unwrap()]) + name_w + 1;
             let style = s.d.buffer()[(x as u16, y as u16)].style();
             assert!(style.add_modifier.contains(ratatui::style::Modifier::ITALIC), "{line}");
             assert!(!style.add_modifier.contains(ratatui::style::Modifier::BOLD), "{line}");
@@ -303,13 +307,17 @@ fn stacked_tags_leave_the_name_six_cells() {
         (56, long, true, false, "PB Partne… app · "),
         (56, long, false, true, "PB Partne… ext · "),
         (56, long, true, true, "PB Partne… ⊞ ⇄ · "),
+        (50, "\u{AE40}\u{D55C}\u{BE5B}\u{B2D8}", true, true, "\u{AE40} \u{AE40}… ⊞ · "),
+        (56, "\u{AE40}\u{D55C}\u{BE5B}\u{B2D8}", true, true, "\u{AE40} \u{AE40}\u{D55C}\u{BE5B}… ⊞ ⇄ · "),
     ];
-    for (w, name, bot, ext, want) in cases {
-        let (_, s) = compact_sender(slakio_tui::theme::Theme::terminal(), w, name, bot, ext);
-        let screen = s.d.screen();
-        let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
-        let header = screen.lines().nth(y - 1).unwrap();
-        assert!(header.contains(&format!("││ {want}")), "{w} {name} {bot} {ext}: want {want:?} in {header:?}");
+    for theme in [slakio_tui::theme::Theme::terminal(), slakio_tui::theme::Theme::no_color()] {
+        for (w, name, bot, ext, want) in cases {
+            let (_, s) = compact_sender(theme.clone(), w, name, bot, ext);
+            let screen = s.d.screen();
+            let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
+            let header = screen.lines().nth(y - 1).unwrap();
+            assert!(header.contains(&format!("││ {want}")), "{w} {name} {bot} {ext}: want {want:?} in {header:?}");
+        }
     }
 }
 
