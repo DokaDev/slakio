@@ -9,7 +9,7 @@ expression: s.d.snap()
 │ Files                      ││                                                │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│                                                │
-│ ▾ Favorites                ││     No conversation open                       │
+│ ▾ Starred                  ││     No conversation open                       │
 │   # backend                ││     Pick one in the list and press Enter.      │
 │   # incidents           3  ││                                                │
 │                            ││     Enter    Open                              │

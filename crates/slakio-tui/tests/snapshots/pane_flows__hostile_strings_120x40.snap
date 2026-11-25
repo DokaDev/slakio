@@ -9,7 +9,7 @@ expression: mask_hangul(&s)
 │ Files                      ││       ⇩ ../../.ssh/authorized_keys  Plain Text · 400 B                                 │
 │ To-dos                   6 ││       ⇩ invoice_fdp.exe  Binary · 70 KB                                                │
 ├─▾──────────────────────────┤│       ⇩ evil.txt  Plain Text · 64 B                                                    │
-│ ▾ Favorites                ││       ⇩ CON.txt  Plain Text · 10 B                                                     │
+│ ▾ Starred                  ││       ⇩ CON.txt  Plain Text · 10 B                                                     │
 │   # backend                ││       ⇩ ..  Binary · 1 B                                                               │
 │   # incidents           3  ││       :blink: 2                                                                        │
 │                            ││                                                                                        │

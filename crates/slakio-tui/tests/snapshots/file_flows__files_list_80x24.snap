@@ -9,7 +9,7 @@ expression: s.d.snap()
 │ Files                      ││                                                │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│                                                │
-│ ▾ Favorites                ││                                                │
+│ ▾ Starred                  ││                                                │
 │   # backend                ││                                                │
 │   # in╭ Download which file? ────────────────────────────────────────╮       │
 │       │ a  Q3-report.pdf                                PDF · 1.2 MB │       │

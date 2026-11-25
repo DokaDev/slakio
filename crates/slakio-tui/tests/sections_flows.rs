@@ -238,9 +238,12 @@ fn a_message_in_a_closed_dm_opens_it_again() {
 }
 
 #[test]
-fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_the_user_s_own_keeps_its_name() {
+fn a_built_in_section_is_named_in_the_ui_s_language_and_one_of_the_user_s_own_keeps_its_name() {
     use slakio_core::i18n::{I18n, Label, Lang};
-    for lang in [Lang::En, Lang::Ko] {
+    // A built-in section comes without a name from Slack, yet one kept from an older cache holds
+    // Slack's English one: the UI's language names it all the same.
+    let english = ["Starred", "", "External connections", "Channels", "Direct messages", "Apps"];
+    for (lang, cached) in [(Lang::En, false), (Lang::Ko, false), (Lang::En, true), (Lang::Ko, true)] {
         let i18n = I18n::new(lang);
         let label = |l: Label| i18n.label(l).to_string();
         let names = [
@@ -271,7 +274,11 @@ fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_th
             .map(|(i, kind)| Section {
                 id: SectionId::new(format!("{ws}:s{i}")),
                 workspace: ws.clone(),
-                name: if *kind == SectionKind::Custom { "Mine".into() } else { "".into() },
+                name: match (kind, cached) {
+                    (SectionKind::Custom, _) => "Mine".into(),
+                    (_, true) => english[i].into(),
+                    (_, false) => "".into(),
+                },
                 kind: *kind,
                 sort: None,
             })
@@ -300,6 +307,11 @@ fn a_built_in_section_without_a_name_is_named_in_the_ui_s_language_and_one_of_th
         for name in &names {
             let start: String = name.replace(' ', "").chars().take(8).collect();
             assert!(screen.contains(&start), "{lang:?}: {name} in {screen}");
+        }
+        if lang == Lang::Ko {
+            for name in ["Externalconnections", "Directmessages"] {
+                assert!(!screen.contains(name), "{name} is not shown in Korean: {screen}");
+            }
         }
     }
 }

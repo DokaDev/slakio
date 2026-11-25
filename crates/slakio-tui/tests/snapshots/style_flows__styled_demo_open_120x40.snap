@@ -17,8 +17,8 @@ expression: screen_styled(&d)
     [bdr 0..1] [warn B 27..28] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
 ├─▾──────────────────────────┤│                                                                                        │
     [bdr 0..2] [dim 2..3] [bdr 3..30] [acc 30..31] [acc 119..120]
-│ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
-    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
+│ ▾ Starred                  ││  KN   Kate Nam  06:13                                                                  │
+    [bdr 0..1] [dim 2..3] [mut B 4..11] [bdr 29..30] [acc 30..31] [av/av B 32..36] [ B 38..46] [dim 48..53] [acc 119..120]
 │   # backend                ││       Suspect the DB pool 🎉                                                           │
     [bdr 0..1] [/cl 1..29] [bdr 29..30] [acc 30..31] [av/av B 32..36] [acc 119..120]
 │   # incidents           3  ││                                                                                        │

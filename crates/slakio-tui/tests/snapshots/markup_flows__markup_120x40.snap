@@ -10,7 +10,7 @@ expression: s.d.snap()
 │ Files                      ││                                                                                        │
 │ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
-│ ▾ Favorites                ││                                                                                        │
+│ ▾ Starred                  ││                                                                                        │
 │   # backend                ││                                                                                        │
 │   # incidents           3  ││                                                                                        │
 │                            ││                                                                                        │

@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files                      ││ now latency fine      │▎please we still design │
 │ To-dos                   6 ││ review latency        │▎review retry tomorrow  │
 ├─▾──────────────────────────┤│ roadmap broken should │▎a rollback             │
-│ ▾ Favorites                ││ for                   │                        │
+│ ▾ Starred                  ││ for                   │                        │
 │   # backend                ││                       │ Grafana app  13:51     │
 │▎  # incidents           3  ││ ＊＊＊  06:59         ├─ Message #incidents ───┤
 │                            ││ Confirmed             │ › Press i to write     │

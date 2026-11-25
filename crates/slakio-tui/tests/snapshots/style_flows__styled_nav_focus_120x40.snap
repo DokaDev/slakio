@@ -17,8 +17,8 @@ expression: screen_styled(&d)
     [acc 0..1] [warn B 27..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ├─▾──────────────────────────┤│                                                                                        │
     [acc 0..2] [dim 2..3] [acc 3..30] [bdr 30..31] [bdr 119..120]
-│ ▾ Favorites                ││                                                                                        │
-    [acc 0..1] [dim 2..3] [mut B 4..13] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│ ▾ Starred                  ││                                                                                        │
+    [acc 0..1] [dim 2..3] [mut B 4..11] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # backend                ││                                                                                        │
     [acc 0..1] [/cl 1..29] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # incidents           3  ││                                                                                        │

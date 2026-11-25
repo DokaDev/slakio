@@ -17,8 +17,8 @@ expression: screen_styled(&d)
     [ B 0..1] [ B 27..28] [ B 29..30]
 ├─▾──────────────────────────┤│                                                │
     [ B 0..2] [ B D 2..3] [ B 3..30]
-│ ▾ Favorites                ││     No conversation open                       │
-    [ B 0..1] [ D 2..3] [ B 4..13] [ B 29..30] [ B 36..56]
+│ ▾ Starred                  ││     No conversation open                       │
+    [ B 0..1] [ D 2..3] [ B 4..11] [ B 29..30] [ B 36..56]
 │▎  # backend                ││     Pick one in the list and press Enter.      │
     [ B 0..1] [ B 29..30]
 │   # incidents           3  ││                                                │

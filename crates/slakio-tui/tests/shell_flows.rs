@@ -21,7 +21,7 @@ fn the_demo_opens_on_home_of_the_first_workspace_at_three_sizes() {
     for (w, h) in [(80, 24), (120, 40), (200, 50)] {
         let d = Demo::new(w, h);
         let s = d.screen();
-        assert!(s.contains("Favorites") && s.contains("# backend"), "{s}");
+        assert!(s.contains("Starred") && s.contains("# backend"), "{s}");
         // A narrow status line drops hints of least worth before it cuts the name.
         assert!(d.status_line().contains("▌A comp"), "the workspace keeps its name: {}", d.status_line());
         assert!(d.status_line().contains("demo"), "the status line says the data is invented");
@@ -123,7 +123,7 @@ fn list_keys_move_jump_and_fold() {
     d.keys("g g");
     assert_eq!(d.app.list_cursor(), 0);
     d.keys("enter");
-    assert!(d.screen().contains("▸ Favorites"), "folded");
+    assert!(d.screen().contains("▸ Starred"), "folded");
     assert_eq!(d.app.list_rows().len(), rows - 2);
     // Down past the blank row under the folded section, and up again onto Ops.
     d.keys("down down up");
@@ -155,9 +155,9 @@ fn the_list_panel_hides_and_comes_back() {
     let mut d = Demo::new(120, 40);
     d.keys("space e");
     assert!(d.app.list_hidden());
-    assert!(!d.screen().contains("Favorites"));
+    assert!(!d.screen().contains("Starred"));
     d.command("list");
-    assert!(d.screen().contains("Favorites"), "{}", d.screen());
+    assert!(d.screen().contains("Starred"), "{}", d.screen());
 }
 
 #[test]

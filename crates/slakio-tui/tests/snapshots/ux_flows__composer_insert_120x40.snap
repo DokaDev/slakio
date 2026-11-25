@@ -10,7 +10,7 @@ expression: s
 │ Files                      ││  HJ   Hyunwoo Jung  06:05                                                              │
 │ To-dos                   6 ││       Schema production after invoice cache is should                                  │
 ├─▾──────────────────────────┤│                                                                                        │
-│ ▾ Favorites                ││  KN   Kate Nam  06:13                                                                  │
+│ ▾ Starred                  ││  KN   Kate Nam  06:13                                                                  │
 │▎  # backend                ││       Suspect the DB pool 🎉                                                           │
 │   # incidents           3  ││                                                                                        │
 │                            ││  LJ   Lily Jeon  06:19                                                                 │

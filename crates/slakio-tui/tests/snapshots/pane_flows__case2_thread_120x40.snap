@@ -9,7 +9,7 @@ expression: mask_hangul(&s)
 │ Files                      ││▎    release                                        │     merge                         │
 │ To-dos                   6 ││▎    ⤷ 1,200 replies · last 03:23                   │                                   │
 ├─▾──────────────────────────┤│                                                    │ JH  Jiwon Han  03:18              │
-│ ▾ Favorites                ││ DC  Dan Cho  07:30                                 │     Budget should timeout timeout │
+│ ▾ Starred                  ││ DC  Dan Cho  07:30                                 │     Budget should timeout timeout │
 │   # backend                ││     Still index lunch index                        │     after tomorrow budget meeting │
 │   # incidents           3  ││     ⤷ 6 replies · last 07:36                       │     someone production release    │
 │                            ││                                                    │                                   │

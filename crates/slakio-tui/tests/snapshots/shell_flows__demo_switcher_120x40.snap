@@ -10,7 +10,7 @@ expression: d.snap()
 │ ╰──── Enter switch · Esc close ╯                                                                                     │
 │ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
-│ ▾ Favorites                ││                                                                                        │
+│ ▾ Starred                  ││                                                                                        │
 │   # backend                ││                                                                                        │
 │   # incidents           3  ││                                                                                        │
 │                            ││                                                                                        │

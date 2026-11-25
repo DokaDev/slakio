@@ -10,7 +10,7 @@ expression: s.d.snap()
 │ Files                      ││ KN  Kate Nam  09:00                            │
 │ To-dos                   6 ││     Deploy of api is cancelled done: run `make │
 ├─▾──────────────────────────┤│     ship` & ask @Minsu Kim or @Me in #alerts   │
-│ ▾ Favorites                ││                                                │
+│ ▾ Starred                  ││                                                │
 │   # backend                ││ KN  Kate Nam  09:10                            │
 │   # incidents           3  ││     see the runbook or                         │
 │                            ││     https://status.example.com @here 🎉        │

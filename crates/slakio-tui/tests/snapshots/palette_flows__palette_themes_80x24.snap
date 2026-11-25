@@ -9,7 +9,7 @@ expression: small.snap()
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │ To-dos  │ : theme                                                  │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
-│ ▾ Favori│  auto               Tokyo Night or ANSI (defau…  current │         │
+│ ▾ Starre│  auto               Tokyo Night or ANSI (defau…  current │         │
 │   # back│  terminal           Your terminal's own colours          │er.      │
 │   # inci│  dark               Dark, 24-bit colour                  │         │
 │         │  light              Light, 24-bit colour                 │         │

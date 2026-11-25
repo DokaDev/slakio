@@ -10,7 +10,7 @@ expression: mask_hangul(&s)
 │ Files                      ││     staging should                             │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│ KN  Kate Nam  06:51                            │
-│ ▾ Favorites                ││     Production roadmap customer build alert    │
+│ ▾ Starred                  ││     Production roadmap customer build alert    │
 │▎  # backend                ││     now latency fine review latency roadmap    │
 │   # incidents           3  ││     broken should for                          │
 │                            ││                                                │

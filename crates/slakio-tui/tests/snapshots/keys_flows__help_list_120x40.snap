@@ -9,7 +9,7 @@ expression: s
 │ Files   │ ▾ List panel                                                                                     │         │
 │ To-dos  │   Next row                                                                              j / Down │         │
 ├─▾───────│   Previous row                                                                            k / Up │         │
-│ ▾ Favori│   First row                                                                           g g / Home │         │
+│ ▾ Starre│   First row                                                                           g g / Home │         │
 │   # back│   Last row                                                                               G / End │         │
 │   # inci│   Half a page down                                                                        Ctrl+D │         │
 │         │   Half a page up                                                                          Ctrl+U │         │

@@ -10,7 +10,7 @@ expression: d.snap()
 │ ＊＊    │   ＊＊              ‹ terminal           ›  ＊＊＊ ＊＊ ＊                                       │         │
 │ ＊ ＊   │   ＊＊              ‹ comfortable        ›  GUI ＊＊＊＊ (＊＊)                                  │         │
 ├─▾───────│   ＊＊ ＊           ‹ expanded           ›  ＊＊＊＊ ＊ ＊ (＊＊)                                │         │
-│ ▾ Favori│   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
+│ ▾ ＊＊  │   Nerd Font ＊＊＊  ‹ off                ›  ＊＊＊ ＊＊ ＊＊＊                                   │         │
 │   # back│ ＊＊                                                                                             │         │
 │   # inci│   ＊＊＊            ‹ initials           ›  ＊ ＊＊ ＊＊＊ (＊＊)                                │         │
 │         │   ＊＊＊            ‹ auto               ›  ＊＊＊ ＊＊ ＊＊ (＊＊)                              │         │
@@ -22,7 +22,7 @@ expression: d.snap()
 │   # big-│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
 │   # long│ ＊＊                                                                                             │         │
 │         │   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
-│ ▾ Channe│   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
+│ ▾ ＊＊  │   ＊＊＊ ＊＊＊＊   ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # anno│   ＊ ＊＊           ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # desi│   ＊＊＊ ＊＊       ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # feed│ ＊＊＊＊                                                                                         │         │

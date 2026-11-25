@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files   ╭ Commands ────────────────────────────────────────────────╮         │
 │ To-dos  │ : dm                                                     │         │
 ├─▾───────├──────────────────────────────────────────────────────────┤         │
-│ ▾ Favori│  :dms       Show DMs                             Space d │         │
+│ ▾ Starre│  :dms       Show DMs                             Space d │         │
 │   # back│  :download  Download a file shared in a message          │er.      │
 │   # inci│  :filter    Filter To-dos by state or reminder         f │         │
 │         ╰─────────────────── Tab/↑↓ select · Enter run · Esc close ╯         │

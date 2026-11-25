@@ -10,7 +10,7 @@ expression: s.d.snap()
 │ Files                      ││  JP   Jiho Park  08:32                                                                 │
 │ To-dos                   6 ││       SELECT count(*) FROM jobs WHERE state = 'stuck';                                 │
 ├─▾──────────────────────────┤│       👀 4   🔥 4   🎉 1                                                               │
-│ ▾ Favorites                ││                                                                                        │
+│ ▾ Starred                  ││                                                                                        │
 │   # backend                ││  JP   Jiho Park  09:26                                                                 │
 │   # incidents           3  ││       Production queue customer merge tomorrow a metrics                               │
 │                            ││                                                                                        │

@@ -16,8 +16,8 @@ expression: screen_styled(&d)
     [bdr 0..1] [warn B 27..28] [bdr 29..31] [/cl 31..36] [acc/cl 36..64] [/cl 64..83] [acc 83..84] [acc 119..120]
 ├─▾──────────────────────────┤│                                                    │ JH  Jiwon Han  03:18              │
     [bdr 0..2] [dim 2..3] [bdr 3..31] [acc 83..84] [av/av B 85..87] [ B 89..98] [dim 100..105] [acc 119..120]
-│ ▾ Favorites                ││ DC  Dan Cho  07:30                                 │     Budget should timeout timeout │
-    [bdr 0..1] [dim 2..3] [mut B 4..13] [bdr 29..31] [av/av B 32..34] [ B 36..43] [dim 45..50] [acc 83..84] [acc 119..120]
+│ ▾ Starred                  ││ DC  Dan Cho  07:30                                 │     Budget should timeout timeout │
+    [bdr 0..1] [dim 2..3] [mut B 4..11] [bdr 29..31] [av/av B 32..34] [ B 36..43] [dim 45..50] [acc 83..84] [acc 119..120]
 │   # backend                ││     Still index lunch index                        │     after tomorrow budget meeting │
     [bdr 0..1] [mut 4..5] [bdr 29..31] [acc 83..84] [acc 119..120]
 │   # incidents           3  ││     ⤷ 6 replies · last 07:36                       │     someone production release    │

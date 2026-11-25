@@ -10,7 +10,7 @@ expression: d.snap()
 │ Files   │   Density          ‹ comfortable        ›  As in GUI Slack (default)                             │         │
 │ To-dos  │   View rows        ‹ expanded           ›  A row per view (default)                              │         │
 ├─▾───────│   Nerd Font icons  ‹ off                ›  Text and plain symbols only                           │         │
-│ ▾ Favori│ Pictures                                                                                         │         │
+│ ▾ Starre│ Pictures                                                                                         │         │
 │   # back│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
 │   # inci│   Images           ‹ auto               ›  Where known to work (default)                         │         │
 │         │   Animate          ‹ on                 ›  GIF/APNG pictures move                                │         │

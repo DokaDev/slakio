@@ -163,12 +163,12 @@ fn right(f: &mut Frame, row: Rect, text: &str, style: Style) -> u16 {
     w
 }
 
-/// The name a section header shows: its own (a section of the user's own keeps the user's), else
-/// its kind's in the UI's language (Slack's built-in sections come without one).
+/// The name a section header shows: a section of the user's own keeps the user's name; a built-in
+/// one is named in the UI's language, whatever name it holds (an older cache kept Slack's).
 fn section_name(app: &App, s: &slakio_core::model::Section) -> String {
     use slakio_core::model::SectionKind;
     let own = s.name.line();
-    if !own.as_str().trim().is_empty() {
+    if s.kind == SectionKind::Custom && !own.as_str().trim().is_empty() {
         return own.into_string();
     }
     let label = match s.kind {

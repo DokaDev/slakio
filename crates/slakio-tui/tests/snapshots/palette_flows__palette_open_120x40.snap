@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files                      ││                                                                                        │
 │ To-dos                   6 ││                                                                                        │
 ├─▾─────────────────────╭ Commands ────────────────────────────────────────────────────────────╮                       │
-│ ▾ Favorites           │ : type a command or an action name                                   │                       │
+│ ▾ Starred             │ : type a command or an action name                                   │                       │
 │   # backend           ├──────────────────────────────────────────────────────────────────────┤                       │
 │   # incidents         │  :workspace            Switch workspace                      Space W │                       │
 │                       │  :help                 Keyboard help                          ? · F1 │                       │

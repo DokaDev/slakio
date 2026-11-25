@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files                      ││     Ticket review pager pager production on    │
 │ To-dos                   6 ││     build alert the on draft                   │
 ├─▾──────────────────────────┤│                                                │
-│ ▾ Favorites                ││ SR  Sam Rivera  07:14                          │
+│ ▾ Starred                  ││ SR  Sam Rivera  07:14                          │
 │   # backend                ││     Meeting moved to 3pm                       │
 │▎  # incidents           3  │├─ Message #backend ─────────────────────────────┤
 │                            ││ › Press i to write                             │

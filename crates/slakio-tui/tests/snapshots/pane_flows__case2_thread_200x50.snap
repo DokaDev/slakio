@@ -9,7 +9,7 @@ expression: mask_hangul(&s)
 │ Files                            ││▎      ⤷ 1,200 replies · last 03:23                                                                   │                                                           │
 │ To-dos                         6 ││                                                                                                      │  MK   Minsu Kim  03:12                                    │
 ├─▾────────────────────────────────┤│  DC   Dan Cho  07:30                                                                                 │       Build rollback done broken merge                    │
-│ ▾ Favorites                      ││       Still index lunch index                                                                        │                                                           │
+│ ▾ Starred                        ││       Still index lunch index                                                                        │                                                           │
 │   # backend                      ││       ⤷ 6 replies · last 07:36                                                                       │  NS   Nina Seo  03:13                                     │
 │   # incidents                 3  ││                                                                                                      │       Latency today design draft metrics done build build │
 │                                  ││  OH   Owen Hwang  07:37                                                                              │                                                           │

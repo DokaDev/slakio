@@ -10,7 +10,7 @@ expression: d.snap()
 │ Files   │   Theme            ‹ terminal           ›  Your terminal's own colours                           │         │
 │ To-dos  │   Density          ‹ comfortable        ›  As in GUI Slack (default)                             │         │
 ├─▾───────│   View rows        ‹ expanded           ›  A row per view (default)                              │         │
-│ ▾ Favori│   Nerd Font icons  ‹ off                ›  Text and plain symbols only                           │         │
+│ ▾ Starre│   Nerd Font icons  ‹ off                ›  Text and plain symbols only                           │         │
 │   # back│ Pictures                                                                                         │         │
 │   # inci│   Avatars          ‹ initials           ›  Coloured initials (default)                           │         │
 │         │   Images           ‹ auto               ›  Where known to work (default)                         │         │

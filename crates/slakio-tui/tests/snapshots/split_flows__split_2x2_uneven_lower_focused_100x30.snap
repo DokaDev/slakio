@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files                      ││                                 │     invoice draft production     │
 │ To-dos                   6 ││ KN  Kate Nam  07:05             │     ⤷ 7 replies · last 06:56     │
 ├─▾──────────────────────────┤│     Ticket review pager pager   │                                  │
-│ ▾ Favorites                ││     production on build alert   │ AS  Ava Shin  07:37              │
+│ ▾ Starred                  ││     production on build alert   │ AS  Ava Shin  07:37              │
 │   # backend                ││     the on draft                │     The ticket merge             │
 │   # incidents           3  ││                                 │                                  │
 │                            ││ SR  Sam Rivera  07:14           │ DB  Deploy Bot app  07:50        │

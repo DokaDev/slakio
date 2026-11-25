@@ -9,7 +9,7 @@ expression: d.snap()
 │ Files                      ││ build alert the on    │▎please we still design │
 │ To-dos                   6 ││ draft                 │▎review retry tomorrow  │
 ├─▾──────────────────────────┤│                       │▎a rollback             │
-│ ▾ Favorites                ││ Sam Rivera  07:14     │                        │
+│ ▾ Starred                  ││ Sam Rivera  07:14     │                        │
 │   # backend                ││ Meeting moved to 3pm  │ Grafana app  13:51     │
 │   # incidents           3  │├─ Message #backend ────┼─ Message #incidents ───┤
 │                            ││ › Press i to write    │ › Press i to write     │

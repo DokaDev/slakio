@@ -10,7 +10,7 @@ expression: s.d.snap()
 │ Files                      ││     customer (edited)                          │
 │ To-dos                   6 ││                                                │
 ├─▾──────────────────────────┤│ QF  Quinn Ford ext  12:08                      │
-│ ▾ Favorites                ││     A is on staging again roadmap now broken   │
+│ ▾ Starred                  ││     A is on staging again roadmap now broken   │
 │   # backend                ││     someone index cache cache tracing          │
 │   # incidents           3  ││                                                │
 │                            ││ JL  Jiyoung Lee  12:54                         │
