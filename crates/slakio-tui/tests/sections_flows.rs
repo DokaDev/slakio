@@ -84,6 +84,44 @@ fn sections_that_come_later_replace_the_workspace_s_and_the_cursor_stays_on_its_
     assert_eq!(under_cursor(&s).as_deref(), Some(dm.as_str()), "the cursor stays on its conversation");
 }
 
+/// Sections that come late on a first boot, before the user moved the list's cursor: the cursor
+/// and the view go to the top, not after the row the boot's defaults put first.
+#[test]
+fn sections_that_come_late_before_the_cursor_moved_put_it_at_the_top() {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.resize(120, 12);
+    s.pump();
+    let first = |s: &Scripted| (s.d.app.list_rows().iter()).position(|r| matches!(r, Row::Conversation(_))).unwrap();
+    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (first(&s), 0), "the boot put it at the top");
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    // A section of the user's own, above the others, holds the last channel listed.
+    let mine = Section {
+        id: SectionId::new("custom:S1"),
+        workspace: ws.clone(),
+        name: "Mine".into(),
+        kind: SectionKind::Custom,
+        sort: None,
+    };
+    let last = (s.d.app.list_rows().iter().rev())
+        .find_map(|r| match r {
+            Row::Conversation(i) if !s.d.app.model.conversation(*i).is_dm() => {
+                Some(s.d.app.model.conversation(*i).id.clone())
+            }
+            _ => None,
+        })
+        .unwrap();
+    let mut sections = vec![mine.clone()];
+    sections.extend(s.d.app.model.sections().iter().filter(|x| x.workspace == ws).cloned());
+    let places: Vec<(ConversationId, SectionId)> = (s.d.app.model.conversations().iter())
+        .filter(|c| c.workspace == ws)
+        .map(|c| (c.id.clone(), if c.id == last { mine.id.clone() } else { c.section.clone() }))
+        .collect();
+    push(&mut s, Live::Sections { workspace: ws, sections, places });
+    let top = first(&s);
+    assert!(matches!(s.d.app.list_rows()[top], Row::Conversation(i) if s.d.app.model.conversation(i).id == last));
+    assert_eq!((s.d.app.list_cursor(), s.d.app.list_top()), (top, 0), "the cursor and the view at the top");
+}
+
 #[test]
 fn sections_of_a_workspace_not_listed_change_nothing() {
     let mut s = Scripted::connected(true);

@@ -113,6 +113,9 @@ pub struct Shell {
     pub list_hidden: bool,
     /// The list cursor goes to the first conversation once the rows are known.
     pending_home: bool,
+    /// Where the boot put the list cursor (the view, the cursor, the first row on screen), until
+    /// the user moves it.
+    boot_home: Option<(View, usize, usize)>,
 }
 
 impl Default for Shell {
@@ -133,6 +136,7 @@ impl Default for Shell {
             todo: TodoView::default(),
             list_hidden: false,
             pending_home: true,
+            boot_home: None,
         }
     }
 }
@@ -180,6 +184,7 @@ impl Shell {
         here: &mut Region,
     ) -> Option<Open> {
         let mut open = None;
+        self.boot_home = None;
         let list = self.rows(model);
         let page = list_height.max(1) as isize;
         match action {
@@ -477,11 +482,28 @@ impl Shell {
     pub fn clamp(&mut self, model: &Model, list_height: usize) {
         self.nav_cursor = self.nav_cursor.min(View::ALL.len() - 1);
         let loaded = self.current(model).is_some_and(|w| model.is_loaded_in(&w.id));
-        if loaded && std::mem::take(&mut self.pending_home) {
+        let home = loaded && std::mem::take(&mut self.pending_home);
+        if home {
             self.home_cursor(model);
         }
         self.list_cursor = self.list_cursor.min(self.rows(model).len().saturating_sub(1));
         self.scroll(list_height);
+        if home {
+            self.boot_home = Some((self.view, self.list_cursor, self.list_top));
+        }
+    }
+
+    /// The list cursor is still where the boot put it: the user has not moved it since.
+    pub fn untouched(&self) -> bool {
+        self.boot_home == Some((self.view, self.list_cursor, self.list_top))
+    }
+
+    /// Put the list cursor and the view at the top again, as the boot did (sections that came
+    /// later moved the rows before the user moved the cursor).
+    pub fn rehome(&mut self, model: &Model, list_height: usize) {
+        self.home_cursor(model);
+        self.scroll(list_height);
+        self.boot_home = Some((self.view, self.list_cursor, self.list_top));
     }
 
     /// The view shown: index into [`View::ALL`].
