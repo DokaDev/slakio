@@ -218,8 +218,8 @@ fn thread_cut_at(w: u16, h: u16) {
     assert!(bot < notice, "the notice after the last reply (the bot's): {screen}");
 }
 
-/// In the compact column a long name keeps eight cells at least: one tag goes before the name is
-/// cut shorter, `app` first, so `ext` (another organization: the mark to trust less) stays; the
+/// In the compact column a long name is cut to leave its tags room: a bot of another organization
+/// keeps both, `app` (its name may pass for a person's) and `ext` (the mark to trust less); the
 /// tags are faint and italic, a style no name is drawn in (also without color).
 #[test]
 fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
@@ -250,13 +250,10 @@ fn compact_tags_leave_the_name_room_and_read_apart_from_a_name() {
         s.b.push(e);
         s.pump();
         let screen = s.d.screen();
-        let line = screen.lines().find(|l| l.contains("Partner")).unwrap_or_else(|| panic!("{screen}"));
-        let rest = line.split("Partner").nth(1).unwrap().split('…').next().unwrap();
-        assert!("Partner".len() + rest.chars().count() + 1 >= 8, "the name keeps 8 cells: {line}");
-        assert!(!line.contains("app ext") && !line.contains("app"), "app went first: {line}");
-        assert!(line.contains("… ext"), "the other organization's mark stays: {line}");
-        let (y, row) = screen.lines().enumerate().find(|(_, l)| l.contains("… ext")).unwrap();
-        let x = row[..row.find("… ext").unwrap()].chars().count() + 2;
+        let line = screen.lines().find(|l| l.contains("… app ext")).unwrap_or_else(|| panic!("both marks:\n{screen}"));
+        assert!(line.contains("Part… app ext"), "the name cut, its start kept: {line}");
+        let (y, row) = screen.lines().enumerate().find(|(_, l)| l.contains("… app ext")).unwrap();
+        let x = row[..row.find("… app ext").unwrap()].chars().count() + 2;
         let style = s.d.buffer()[(x as u16, y as u16)].style();
         assert!(style.add_modifier.contains(ratatui::style::Modifier::ITALIC), "{row}");
         assert!(!style.add_modifier.contains(ratatui::style::Modifier::BOLD), "{row}");
