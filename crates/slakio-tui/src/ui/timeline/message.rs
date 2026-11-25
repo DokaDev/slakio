@@ -365,7 +365,10 @@ fn compact(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Lai
 /// (GUI Slack's APP badge: its name is whatever it chose to post as; a bot's per-name author id
 /// is one even when its person is no longer kept), ` ext` for a sender of another organization
 /// (a Slack Connect peer); empty for a person of the workspace's own. Both for a bot of another
-/// organization.
+/// organization. Where the words leave the name less than [`NAME_FLOOR`] cells they become the
+/// one-cell marks [`APP_MARK`] and [`EXT_MARK`], then only the app mark stays; a bot keeps it
+/// even past the floor, its name cut to its first character, while a person's tag goes
+/// ([`fit_tags`]).
 fn tags(app: &App, pane: &Pane, m: &Shown, room: usize) -> String {
     let user = app.model.user(pane.target.workspace(), &m.user);
     let bot = user.is_some_and(|u| u.bot) || m.user.as_str().contains('~');
