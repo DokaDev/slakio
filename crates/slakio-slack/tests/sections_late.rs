@@ -114,3 +114,35 @@ fn sections_an_older_boot_reads_late_are_let_go_after_a_newer_boot() {
         assert_eq!(fake.methods().iter().filter(|m| *m == SECTIONS).count(), 2, "both boots asked");
     });
 }
+
+/// Two boots asked one after the other, the older answered last (Slack slow to start it): the
+/// newer placed the sidebar, so the sections the older reads late are let go, though it
+/// finished last (the newer's sections, refused here, stay unknown and nothing follows).
+#[test]
+fn sections_of_an_older_boot_that_finishes_last_are_let_go() {
+    rt().block_on(async {
+        let fake = FakeSlack::start(World::new(7)).await.unwrap();
+        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
+        let client = Client::new(Credentials::new("t", "c"), Endpoints::local(fake.addr()).unwrap(), governor);
+        let (slow, late) = (Duration::from_secs(3), Duration::from_secs(5));
+        fake.fail_next("client.userBoot", Fault::Late(slow));
+        // The newer boot asks for the sections first (the older waits on its start).
+        fake.fail_next(SECTIONS, Fault::Status { status: 500, retry_after: None });
+        fake.fail_next(SECTIONS, Fault::Late(late));
+        let mut handle = slakio_slack::serve(client);
+        let asked = Instant::now();
+        handle.send(Request { id: Generation(1), workspace: None, command: Command::Boot }).unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        handle.send(Request { id: Generation(2), workspace: None, command: Command::Boot }).unwrap();
+        for id in [2, 1] {
+            let booted = next(&mut handle, Duration::from_secs(20)).await.expect("the boot answer");
+            assert_eq!(booted.generation, Generation(id), "the newer answers first");
+            let Event::Booted(s) = booted.event else { panic!("{booted:?}") };
+            assert!(s.sections_unknown, "boot {id}: the sections are not known yet");
+        }
+        // Past the older boot's late answer, and then some: nothing came.
+        let wait = (slow + late + Duration::from_secs(3)).saturating_sub(asked.elapsed());
+        assert!(next(&mut handle, wait).await.is_none(), "the older boot's sections are let go");
+        assert_eq!(fake.methods().iter().filter(|m| *m == SECTIONS).count(), 2, "both boots asked");
+    });
+}

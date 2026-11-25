@@ -73,10 +73,13 @@ pub(crate) fn spawn(
         crate::adapter::answer(&tx, id, booted).await;
         let Some(Pending { boot: number, listed }) = pending else { return };
         let listed = listed.await.ok().flatten();
-        // Let go when a newer boot placed the sidebar meanwhile.
-        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        // Room for the update first: told whether the sidebar is still this boot's and sent at
+        // once, under the lock a newer boot places it under, so it never follows the newer's
+        // answer. Let go when a newer boot placed the sidebar meanwhile.
+        let Ok(room) = tx.reserve().await else { return };
+        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(update) = (placing.boot == number).then(|| placing.update(listed, client.diag())).flatten() {
-            let _ = crate::live::push(&tx, update).await;
+            room.send(Envelope { generation: Generation::PUSHED, event: Event::Live(Box::new(update)) });
         }
     });
 }
@@ -89,6 +92,9 @@ pub(crate) async fn boot(
     session: &crate::adapter::Session,
 ) -> Result<(Event, Option<Pending>), SlackError> {
     let (me, people) = (&session.me, &session.people);
+    // This boot's number, taken when it was asked: a boot asked later places the sidebar,
+    // whichever ends last, and sections read late follow only while the sidebar is still its.
+    let number = BOOTS.fetch_add(1, Ordering::Relaxed) + 1;
     let boot: wire::UserBoot = client.call(&crate::login::user_boot(), Priority::User).await?;
     let (Some(team), Some(self_)) = (boot.team.as_ref(), boot.me.as_ref()) else {
         return Err(SlackError::Network { detail: "the start answer has no team or user".to_string() });
@@ -154,8 +160,6 @@ pub(crate) async fn boot(
         Ok(listed) => (listed.ok().flatten(), None),
         Err(_) => (None, Some(sections)),
     };
-    // This boot's number: sections read late follow only while the sidebar is still its.
-    let number = BOOTS.fetch_add(1, Ordering::Relaxed) + 1;
     let pending = pending.map(|listed| Pending { boot: number, listed });
     let unknown = listed.is_none();
     let sidebar = crate::sidebar::Sidebar::new(&team.id, listed, client.diag());
@@ -163,8 +167,11 @@ pub(crate) async fn boot(
     let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
     snapshot.sections = sidebar.sections;
     snapshot.sections_unknown = unknown;
-    *session.placing.lock().unwrap_or_else(PoisonError::into_inner) =
-        crate::sidebar::Placing { team: team_id, facts, boot: number };
+    let mut placing = session.placing.lock().unwrap_or_else(PoisonError::into_inner);
+    if placing.boot < number {
+        *placing = crate::sidebar::Placing { team: team_id, facts, boot: number };
+    }
+    drop(placing);
     Ok((Event::Booted(Box::new(snapshot)), pending))
 }
 
