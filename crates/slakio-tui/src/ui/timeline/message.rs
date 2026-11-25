@@ -48,7 +48,7 @@ const AUTHOR_WIDTH: usize = 14;
 /// to their marks first, then to the more important one, then out ([`tags`]).
 const NAME_FLOOR: usize = 6;
 /// The mark of `app` where its word leaves the name too little room (the help tells it).
-pub const APP_MARK: &str = "\u{25A3}";
+pub const APP_MARK: &str = "\u{229E}";
 /// The mark of `ext` where its word leaves the name too little room (the help tells it).
 pub const EXT_MARK: &str = "\u{21C4}";
 /// The time column (`10:02` and a space before it, compact).
@@ -553,6 +553,16 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    /// The marks are one cell wide on every terminal, also where East Asian ambiguous width is
+    /// drawn wide (common with Korean), so a sender's row never shifts.
+    #[test]
+    fn the_marks_are_one_cell_wide_on_ambiguous_wide_terminals_too() {
+        use unicode_width::UnicodeWidthStr;
+        for mark in [APP_MARK, EXT_MARK] {
+            assert_eq!((mark.width(), mark.width_cjk()), (1, 1), "{mark}");
         }
     }
 

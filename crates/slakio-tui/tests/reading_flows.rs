@@ -255,7 +255,7 @@ fn compact_sender(theme: slakio_tui::theme::Theme, w: u16, name: &str, bot: bool
 
 /// In the compact column (14 cells, however wide the pane: 90 is the narrowest terminal that
 /// leaves the pane its columns) a name is cut to leave its tags room
-/// down to six cells; below that the words become marks (`▣` app, `⇄` ext), then only `▣` stays
+/// down to six cells; below that the words become marks (`⊞` app, `⇄` ext), then only `⊞` stays
 /// (a bot's name may pass for a person's). The tags are faint and italic, a style no name is
 /// drawn in (also without color).
 #[test]
@@ -265,10 +265,10 @@ fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
         ("Bo", true, false, "Bo app        Shipped"),
         ("Bo", false, true, "Bo ext        Shipped"),
         ("Bo", true, true, "Bo app ext    Shipped"),
-        ("Hanbit", true, true, "Hanbit ▣ ⇄    Shipped"),
+        ("Hanbit", true, true, "Hanbit ⊞ ⇄    Shipped"),
         (long, true, false, "Partner… app  Shipped"),
         (long, false, true, "Partner… ext  Shipped"),
-        (long, true, true, "Partner… ▣ ⇄  Shipped"),
+        (long, true, true, "Partner… ⊞ ⇄  Shipped"),
     ];
     for theme in [slakio_tui::theme::Theme::terminal(), slakio_tui::theme::Theme::no_color()] {
         for ((name, bot, ext, want), w) in cases.into_iter().flat_map(|c| [(c, 120), (c, 90)]) {
@@ -286,23 +286,23 @@ fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
 
 /// A stacked sender's row (a pane narrower than its columns) keeps the name six cells the same
 /// way, at the narrowest terminal (50: an 18-cell pane) and where the pane starts stacking;
-/// where even that leaves no room, a bot's name gives way to its `▣`, an `ext` goes.
+/// where even that leaves no room, a bot's name gives way to its `⊞`, an `ext` goes.
 #[test]
 fn stacked_tags_leave_the_name_six_cells() {
     let long = "Partner Release Notifier Bot";
     let cases = [
-        (50, "Bo", true, false, "B  Bo ▣ · "),
+        (50, "Bo", true, false, "B  Bo ⊞ · "),
         (50, "Bo", false, true, "B  Bo ⇄ · "),
-        (50, "Bo", true, true, "B  Bo ▣ · "),
-        (50, "Hanbit", true, true, "H  Ha… ▣ · "),
+        (50, "Bo", true, true, "B  Bo ⊞ · "),
+        (50, "Hanbit", true, true, "H  Ha… ⊞ · "),
         (50, "Hanbit", false, true, "H  Hanb… · "),
-        (50, long, true, true, "PB Pa… ▣ · "),
+        (50, long, true, true, "PB Pa… ⊞ · "),
         (50, long, false, true, "PB Part… · "),
         (56, "Bo", true, true, "B  Bo app ext · "),
-        (56, "Hanbit", true, true, "H  Hanbit ▣ ⇄ · "),
+        (56, "Hanbit", true, true, "H  Hanbit ⊞ ⇄ · "),
         (56, long, true, false, "PB Partne… app · "),
         (56, long, false, true, "PB Partne… ext · "),
-        (56, long, true, true, "PB Partne… ▣ ⇄ · "),
+        (56, long, true, true, "PB Partne… ⊞ ⇄ · "),
     ];
     for (w, name, bot, ext, want) in cases {
         let (_, s) = compact_sender(slakio_tui::theme::Theme::terminal(), w, name, bot, ext);
@@ -313,7 +313,7 @@ fn stacked_tags_leave_the_name_six_cells() {
     }
 }
 
-/// A bot's `▣` is never dropped (its name and photo may pass for a person's): at the narrowest
+/// A bot's `⊞` is never dropped (its name and photo may pass for a person's): at the narrowest
 /// terminal (50: an 18-cell pane) a long name is cut to its first letter rather than lose it.
 #[test]
 fn a_bot_keeps_its_app_mark_at_the_narrowest_width() {

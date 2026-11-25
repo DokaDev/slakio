@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! ╭ Keys — List panel ─────────────────────────────────────────╮
-//! │ / Type / to search    ▣ app or bot · ⇄ another organization │
+//! │ / Type / to search    ⊞ app or bot · ⇄ another organization │
 //! │─────────────────────────────────────────────────────────────│
 //! │ ▾ List panel                                                │
 //! │   Next row                                         j / Down │
