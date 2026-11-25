@@ -1,7 +1,7 @@
 use super::*;
 use crate::images::cached::{run, start};
 use crate::images::{Job, Look, PHOTO, RETRY_AFTER};
-use slakio_core::backend::{FailKind, Request};
+use slakio_core::backend::{FailKind, Generation, Request};
 use slakio_core::diag::Diag;
 use slakio_core::images::AVATAR_HOSTS;
 use slakio_core::picture_cache::PictureCache;
@@ -211,7 +211,7 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
 
 #[test]
 fn a_refused_picture_pauses_photos_ahead() {
-    for kind in [FailKind::Busy, FailKind::CapReached, FailKind::Offline] {
+    for kind in [FailKind::Busy, FailKind::CapReached, FailKind::Offline, FailKind::RateLimited { retry_after: None }] {
         let mut t = T::new(&format!("pause-{kind:?}"));
         let screen = [shown(0)];
         let (looks, _) = t.frame(&screen, 0);
@@ -230,6 +230,56 @@ fn a_refused_picture_pauses_photos_ahead() {
         let asked = t.pump(&[], 3, 2);
         assert!(!asked.is_empty() && asked.iter().all(is_dm), "{kind:?}: again once the pause is over");
     }
+}
+
+/// A run with photo `0` of the screen failed for `kind` at its `now`, and three DM rows' photos
+/// looked for on disk and not there (waiting for the network).
+fn refused(name: &str, kind: &FailKind) -> T {
+    let mut t = T::new(name);
+    let screen = [shown(0)];
+    let (looks, _) = t.frame(&screen, 0);
+    t.look(looks);
+    let (_, asked) = t.frame(&screen, 0);
+    t.images.failed(asked[0].id, kind, t.now);
+    let (looks, _) = t.frame(&[], 3);
+    t.look(looks);
+    t
+}
+
+/// Nothing is asked ahead from `t.now` until `until`, and something is at `until`.
+fn paused_until(t: &mut T, until: Instant, what: &str) {
+    while t.now < until {
+        assert!(t.pump(&[], 3, 2).is_empty(), "{what}: paused");
+        t.now = (t.now + Duration::from_secs(5)).min(until);
+    }
+    assert!(!t.pump(&[], 3, 2).is_empty(), "{what}: again once the pause is over");
+}
+
+#[test]
+fn a_429_pauses_photos_ahead_as_long_as_it_says_and_a_shorter_pause_never_shortens_it() {
+    let long = Duration::from_secs(300);
+    let mut t = refused("429-long", &FailKind::RateLimited { retry_after: Some(long) });
+    let start = t.now;
+    // Busy a little later: a shorter pause, which leaves the longer one as it is.
+    t.now += Duration::from_secs(30);
+    t.images.failed(Generation(u64::MAX / 2), &FailKind::Busy, t.now);
+    paused_until(&mut t, start + long, "the 429's five minutes");
+    // A 429 asking for less than the pause slakio keeps waits that long all the same.
+    let mut t = refused("429-short", &FailKind::RateLimited { retry_after: Some(Duration::from_secs(1)) });
+    let start = t.now;
+    paused_until(&mut t, start + RETRY_AFTER, "at least a minute");
+}
+
+#[test]
+fn a_refusal_for_a_picture_no_longer_waited_for_still_pauses_photos_ahead() {
+    let mut t = T::new("pause-dropped");
+    let (looks, _) = t.frame(&[], 3);
+    t.look(looks);
+    // Busy for a request not waited for any more (forgotten when photos were turned off): the
+    // backend is busy all the same.
+    assert!(!t.images.failed(Generation(u64::MAX / 2), &FailKind::Busy, t.now));
+    let start = t.now;
+    paused_until(&mut t, start + RETRY_AFTER, "busy");
 }
 
 #[test]

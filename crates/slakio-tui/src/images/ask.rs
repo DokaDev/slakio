@@ -130,12 +130,11 @@ impl Images {
 
     /// Picture request `id` failed (`kind`) at `now`: `true` when it was one of these.
     pub fn failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
+        // Busy, offline, the budget spent or asked to slow down, for any picture (one no longer
+        // waited for too): nothing more is asked ahead a while.
+        self.pause_ahead(kind, now);
         let Some(key) = self.asked.remove(&id) else { return false };
         self.ahead.flying.remove(&key);
-        // Busy, offline or the budget spent, for any picture: nothing more is asked ahead a while.
-        if matches!(kind, FailKind::Busy | FailKind::Offline | FailKind::CapReached) {
-            self.ahead.paused_until = Some(now + RETRY_AFTER);
-        }
         let why = match kind {
             FailKind::TooLarge => Why::TooLarge,
             FailKind::Api { code } if code == "not_an_image" => Why::Unreadable,

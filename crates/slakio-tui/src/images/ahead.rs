@@ -10,7 +10,8 @@
 //!   them are asked ahead, so most of that share stays with what is on screen and the rest of
 //!   the budget with everything else;
 //! - an answer that the backend is busy or offline, or that the budget is spent, for any
-//!   picture, stops it for [`super::RETRY_AFTER`];
+//!   picture, stops it for [`RETRY_AFTER`]; one that Slack asks to slow down (429), for as long
+//!   as it says and at least that; a pause only ever lasts longer;
 //! - it needs a cache on disk ([`super::cached`]): a photo is looked for there first and asked
 //!   of the network only when it is not there, and every photo fetched is kept there, so a row
 //!   drawn later reads it at once. Without one (and in the demo) nothing is asked ahead.
@@ -20,9 +21,9 @@
 //! removing nothing; otherwise it is let go (the disk has it). Each is asked ahead once a run.
 //! Pictures or photos turned off, nothing waits to be asked ahead.
 
-use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, IN_FLIGHT_MAX, Images, Key, note};
+use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, IN_FLIGHT_MAX, Images, Key, RETRY_AFTER, note};
 use crate::app::requests::Requests;
-use slakio_core::backend::Command;
+use slakio_core::backend::{Command, FailKind};
 use slakio_core::diag::Stage;
 use slakio_core::images::{BYTES_MAX, Source};
 use slakio_core::model::WorkspaceId;
@@ -84,6 +85,19 @@ impl Images {
     pub(super) fn forget_ahead(&mut self) {
         let Ahead { sent, paused_until, .. } = std::mem::take(&mut self.ahead);
         self.ahead = Ahead { sent, paused_until, ..Ahead::default() };
+    }
+
+    /// A picture failed for `kind` at `now`: busy, offline or the budget spent, nothing is asked
+    /// of the network ahead for [`super::RETRY_AFTER`]; asked to slow down, for as long as it
+    /// said and at least that. A pause only ever lasts longer, never shorter.
+    pub(super) fn pause_ahead(&mut self, kind: &FailKind, now: Instant) {
+        let pause = match kind {
+            FailKind::Busy | FailKind::Offline | FailKind::CapReached => RETRY_AFTER,
+            FailKind::RateLimited { retry_after } => retry_after.unwrap_or(RETRY_AFTER).max(RETRY_AFTER),
+            _ => return,
+        };
+        let until = now + pause;
+        self.ahead.paused_until = Some(self.ahead.paused_until.map_or(until, |t| t.max(until)));
     }
 
     /// The photos asked for ahead still on their way.
