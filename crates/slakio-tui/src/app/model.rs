@@ -7,8 +7,8 @@
 use super::todos::Group;
 use slakio_core::backend::{Connection, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, SavedId, Section, SectionId, Target, Ts, User, UserId, Workspace, WorkspaceColor,
-    WorkspaceId,
+    Conversation, ConversationId, ConversationKind, SavedId, Section, SectionId, Target, Ts, User, UserId, Workspace,
+    WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
@@ -460,6 +460,18 @@ impl Model {
                     };
                     self.users.insert(key, i);
                 }
+            }
+        }
+    }
+
+    /// People of `ws` whose names changed: the DM with each is named by their display name
+    /// again (as the boot named it).
+    pub fn rename_dms(&mut self, ws: &WorkspaceId, users: &[User]) {
+        for c in self.snapshot.conversations.iter_mut().filter(|c| &c.workspace == ws) {
+            let ConversationKind::Dm { user } = &c.kind else { continue };
+            let name = users.iter().find(|u| &u.id == user).map(|u| &u.display_name);
+            if let Some(name) = name.filter(|n| !n.unsanitized().trim().is_empty() && **n != c.name) {
+                c.name = name.clone();
             }
         }
     }

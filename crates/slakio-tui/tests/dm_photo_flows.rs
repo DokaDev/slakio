@@ -983,3 +983,23 @@ fn a_person_shown_as_a_chip_is_drawn_in_the_timeline_with_no_fetch_of_their_own(
         assert!(matches!(look, Look::Ready { .. }), "{p:?}: drawn in the timeline from the chip's bytes: {look:?}");
     }
 }
+
+/// A display name changed live renames the person's DM row at once, not at the next boot.
+#[test]
+fn a_display_name_changed_live_renames_the_dm_row() {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.show_unfolded(View::Dms);
+    let m = &s.d.app.model;
+    let (at, peer) = (0..m.conversations().len())
+        .find_map(|i| match &m.conversation(i).kind {
+            ConversationKind::Dm { user } => Some((i, m.user(&m.conversation(i).workspace, user)?.clone())),
+            _ => None,
+        })
+        .expect("a DM with a known peer");
+    let before = m.conversation(at).name.unsanitized().to_string();
+    assert_ne!(before, "Alex M.");
+    profile_changed(&mut s, User { display_name: Remote::new("Alex M."), ..peer });
+    assert_eq!(s.d.app.model.conversation(at).name.unsanitized(), "Alex M.", "the DM row is renamed");
+    let screen = s.d.screen();
+    assert!(screen.contains("Alex M.") && !screen.contains(&before), "{screen}");
+}
