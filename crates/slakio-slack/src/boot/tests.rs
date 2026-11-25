@@ -199,9 +199,9 @@ fn conversations_go_to_the_sections_slack_lists_a_section_of_the_user_s_own_firs
     let names: Vec<&str> = s.sections.iter().map(|x| x.name.unsanitized()).collect();
     assert_eq!(names, ["Mine", "Channels", "DMs"], "in the chain's order, Slack's names else English ones");
     let section = |id| find(&s, id).section.as_str().to_string();
-    assert_eq!(section("C2"), "T1:L1");
+    assert_eq!(section("C2"), "T1:custom:L1");
     assert!(s.sections.iter().all(|x| x.kind != SectionKind::Favorites), "no Starred listed");
-    assert_eq!(section("D1"), "T1:L1", "a DM in a section of the user's own");
+    assert_eq!(section("D1"), "T1:custom:L1", "a DM in a section of the user's own");
     assert_eq!(section("C1"), "T1:channels");
 }
 
@@ -285,7 +285,7 @@ fn starred_shared_app_and_open_group_conversations_go_to_their_sections() {
         ("C3", "T1:external"),
         ("D4", "T1:external"),
         ("D5", "T1:external"),
-        ("C4", "T1:LC"),
+        ("C4", "T1:custom:LC"),
         ("C5", "T1:channels"),
         ("D1", "T1:dms"),
         ("G1", "T1:dms"),

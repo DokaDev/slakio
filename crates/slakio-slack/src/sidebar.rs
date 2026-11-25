@@ -12,6 +12,9 @@
 //! app), then Channels or Direct messages; each of Starred, External connections and Apps only
 //! when Slack lists it for the user.
 //!
+//! A section the user made has the id `{team}:custom:{Slack's id}` (never one of the built-in
+//! sections' ids), and is shown only when Slack's id is 1 to 32 ASCII letters and digits.
+//!
 //! A section the user made lists only the conversations of its first page of ids: no allowed
 //! method reads the others, which stay in their default section (the diagnostics tell the gap).
 
@@ -81,6 +84,14 @@ fn kind(t: &str) -> Option<(SectionKind, &'static str)> {
     })
 }
 
+/// The longest id of a section the user made that is taken.
+const ID_MAX: usize = 32;
+
+/// A section id of Slack's of a plain shape: 1 to [`ID_MAX`] ASCII letters and digits.
+fn plain_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= ID_MAX && id.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
 /// The sidebar of a workspace: its sections in order, and where a conversation goes.
 #[derive(Debug)]
 pub(crate) struct Sidebar {
@@ -122,7 +133,11 @@ impl Sidebar {
             let Some((kind, english)) = s.kind.as_deref().and_then(kind) else { continue };
             let name = s.name.as_deref().map(str::trim).filter(|t| !t.is_empty()).unwrap_or(english);
             let id = match kind {
-                SectionKind::Custom => s.channel_section_id.clone(),
+                // Slack's id, apart from the built-in ones' (`custom:`), and only of a plain
+                // shape: else the section is not shown and its conversations stay in their
+                // default sections.
+                SectionKind::Custom if plain_id(&s.channel_section_id) => format!("custom:{}", s.channel_section_id),
+                SectionKind::Custom => continue,
                 SectionKind::Favorites => "stars".to_string(),
                 SectionKind::External => "external".to_string(),
                 SectionKind::Channels => "channels".to_string(),

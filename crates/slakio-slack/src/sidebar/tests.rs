@@ -68,7 +68,7 @@ fn slack_s_types_map_to_kinds_and_the_others_are_not_shown() {
         kinds(&s),
         [
             (SectionKind::Favorites, "T1:stars", "Starred"),
-            (SectionKind::Custom, "T1:LC", "Team"),
+            (SectionKind::Custom, "T1:custom:LC", "Team"),
             (SectionKind::External, "T1:external", "Slack Connect"),
             (SectionKind::Channels, "T1:channels", "Rooms"),
             (SectionKind::DirectMessages, "T1:dms", "Direct messages"),
@@ -110,9 +110,9 @@ fn a_section_of_the_user_s_own_lists_its_first_page_and_the_gap_is_told() {
          "channel_ids_page": {"channel_ids": ["C2", "C3"], "count": 2}},
     ]));
     let s = Sidebar::new("T1", Some(list), &diag);
-    assert_eq!(s.place("C1", Facts::default()).as_str(), "T1:L1");
-    assert_eq!(s.place("C2", Facts::default()).as_str(), "T1:L1", "the first section in order");
-    assert_eq!(s.place("C3", Facts::default()).as_str(), "T1:L2");
+    assert_eq!(s.place("C1", Facts::default()).as_str(), "T1:custom:L1");
+    assert_eq!(s.place("C2", Facts::default()).as_str(), "T1:custom:L1", "the first section in order");
+    assert_eq!(s.place("C3", Facts::default()).as_str(), "T1:custom:L2");
     assert_eq!(s.place("C9", Facts::default()).as_str(), "T1:channels", "beyond the first page: its default section");
     diag.flush();
     let text = std::fs::read_to_string(&path).unwrap();
@@ -130,7 +130,7 @@ fn a_starred_conversation_goes_to_starred_unless_in_a_section_of_the_user_s_own(
     ]));
     let s = Sidebar::new("T1", Some(list), &Diag::default());
     let starred = Facts { starred: true, ..Facts::default() };
-    assert_eq!(s.place("C1", starred).as_str(), "T1:LC", "a section of the user's own first");
+    assert_eq!(s.place("C1", starred).as_str(), "T1:custom:LC", "a section of the user's own first");
     assert_eq!(s.place("C2", starred).as_str(), "T1:stars");
     assert_eq!(s.place("D2", Facts { dm: true, starred: true, ..Facts::default() }).as_str(), "T1:stars");
     assert_eq!(s.place("D3", Facts { dm: true, ..Facts::default() }).as_str(), "T1:dms");
@@ -150,7 +150,7 @@ fn a_conversation_goes_to_the_first_section_that_takes_it() {
     ]));
     let s = Sidebar::new("T1", Some(list), &Diag::default());
     let all = Facts { dm: true, starred: true, external: true, app: true };
-    assert_eq!(s.place("C1", all).as_str(), "T1:LC", "a section of the user's own first");
+    assert_eq!(s.place("C1", all).as_str(), "T1:custom:LC", "a section of the user's own first");
     assert_eq!(s.place("D1", all).as_str(), "T1:stars");
     assert_eq!(s.place("D1", Facts { starred: false, ..all }).as_str(), "T1:external");
     assert_eq!(s.place("D1", Facts { dm: true, app: true, ..Facts::default() }).as_str(), "T1:apps");
@@ -161,4 +161,30 @@ fn a_conversation_goes_to_the_first_section_that_takes_it() {
     let plain = Sidebar::new("T1", None, &Diag::default());
     assert_eq!(plain.place("D1", all).as_str(), "T1:dms");
     assert_eq!(plain.place("C1", Facts { dm: false, ..all }).as_str(), "T1:channels");
+}
+
+#[test]
+fn a_section_id_of_slack_s_never_takes_a_built_in_one_and_an_odd_one_is_not_shown() {
+    let list = listed(json!([
+        {"channel_section_id": "channels", "type": "standard", "name": "Mine", "next_channel_section_id": "dms",
+         "channel_ids_page": {"channel_ids": ["C1"], "count": 1}},
+        {"channel_section_id": "dms", "type": "standard", "name": "Also", "next_channel_section_id": "L:x",
+         "channel_ids_page": {"channel_ids": ["D1"], "count": 1}},
+        {"channel_section_id": "L:x", "type": "standard", "name": "Odd", "next_channel_section_id": "LONG",
+         "channel_ids_page": {"channel_ids": ["C2"], "count": 1}},
+        {"channel_section_id": "L0123456789012345678901234567890123", "type": "standard", "name": "Long",
+         "channel_ids_page": {"channel_ids": ["C3"], "count": 1}},
+        {"channel_section_id": "LH", "type": "channels", "next_channel_section_id": "LD"},
+        {"channel_section_id": "LD", "type": "direct_messages"},
+    ]));
+    let s = Sidebar::new("T1", Some(list), &Diag::default());
+    let ids: Vec<&str> = s.sections.iter().map(|x| x.id.as_str()).collect();
+    assert_eq!(ids, ["T1:custom:channels", "T1:custom:dms", "T1:channels", "T1:dms"]);
+    let unique: HashSet<&str> = ids.iter().copied().collect();
+    assert_eq!(unique.len(), ids.len(), "no two sections share an id");
+    assert_eq!(s.place("C1", Facts::default()).as_str(), "T1:custom:channels");
+    assert_eq!(s.place("D1", Facts { dm: true, ..Facts::default() }).as_str(), "T1:custom:dms");
+    assert_eq!(s.place("C2", Facts::default()).as_str(), "T1:channels", "an odd id: its default section");
+    assert_eq!(s.place("C3", Facts::default()).as_str(), "T1:channels", "a long id: its default section");
+    assert_eq!(s.place("C4", Facts::default()).as_str(), "T1:channels");
 }
