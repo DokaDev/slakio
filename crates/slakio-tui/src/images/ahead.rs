@@ -182,12 +182,12 @@ impl Images {
             if !self.free(&key, Some(now)) || self.ahead.done.contains(&key) {
                 continue;
             }
+            // Within the looks waiting at once, as any look (one made from bytes fetched too).
+            if self.looking() >= LOOKUPS_MAX && (!self.missed.contains(&key) || self.has_fetched(&key.0)) {
+                self.ahead.queue.push_front((ws, key));
+                return false;
+            }
             if !self.missed.contains(&key) {
-                // Within the looks waiting at once, as any look.
-                if self.looking() >= LOOKUPS_MAX {
-                    self.ahead.queue.push_front((ws, key));
-                    return false;
-                }
                 self.failed.retain(|k| *k != key);
                 self.look_up(key.clone());
                 self.ahead.flying.insert(key);

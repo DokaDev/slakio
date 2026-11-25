@@ -163,6 +163,7 @@ fn a_late_or_unknown_answer_changes_nothing() {
         shape: Shape::Preview,
         from_cache: false,
         empty: false,
+        stored: false,
         epoch: 0,
     };
     images.decoded(key(&stray), Ok(ready(&stray, 10)));

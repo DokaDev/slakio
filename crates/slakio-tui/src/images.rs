@@ -147,6 +147,8 @@ pub struct Job {
     pub from_cache: bool,
     /// No picture: every picture kept on disk is removed ([`Images::forget_kept`]).
     pub empty: bool,
+    /// Made from the bytes another job of its address keeps on disk: not written again.
+    pub stored: bool,
     /// The cache's count of emptyings when the job was made: emptied since, nothing is kept.
     pub epoch: u64,
 }

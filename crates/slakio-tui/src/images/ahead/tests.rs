@@ -574,3 +574,24 @@ fn a_photo_ahead_let_go_is_not_looked_for_again() {
     assert_eq!(looks, 1, "looked for once");
     assert_eq!(t.dm_held(), 0, "let go");
 }
+
+#[test]
+fn a_photo_ahead_made_from_fetched_bytes_waits_while_the_looks_are_at_their_most() {
+    let mut t = T::new("fetched-looks");
+    let screen: Vec<Key> = (0..LOOKUPS_MAX).map(shown).collect();
+    let (mut looks, _) = t.frame(&screen, 0);
+    assert_eq!(looks.len(), LOOKUPS_MAX);
+    // The first DM row's photo was fetched for the timeline, and its chip missed on disk.
+    t.images.fetched.push_back((dm(0), slakio_world::pictures::png(dm(0).address(), 64, 64)));
+    t.images.missed.insert((dm(0), CHIP_PHOTO));
+    for _ in 0..3 {
+        let (more, asked) = t.frame(&screen, 1);
+        assert!(more.is_empty(), "no job past {LOOKUPS_MAX} looks waiting: {}", more.len());
+        assert!(!asked.iter().any(is_dm), "nor asked of the network: {asked:?}");
+    }
+    // One ends: the chip is made from the bytes fetched, nothing asked.
+    t.look(vec![looks.remove(0)]);
+    let (more, asked) = t.frame(&screen, 1);
+    assert!(!asked.iter().any(is_dm), "{asked:?}");
+    assert_eq!(more.iter().map(|j| (&j.source, j.from_cache)).collect::<Vec<_>>(), [(&dm(0), false)]);
+}

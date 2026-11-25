@@ -487,3 +487,38 @@ fn a_failed_picture_tries_the_disk_before_the_network_again() {
     assert_eq!(images.failures(), 0, "no longer a failure");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_photo_made_from_the_bytes_fetched_for_its_other_place_is_not_written_again() {
+    let dir = scratch("made-again");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    let mut requests = Requests::default();
+    // The chip's: missed on disk, then fetched; its job not run yet.
+    images.look_as(&ws(), &photo, CHIP_PHOTO);
+    images.ask(&mut requests, Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    images.decoded((look.source.clone(), look.request), run(&look, Some((9, 18)), images.cache.as_ref(), &diag));
+    images.look_as(&ws(), &photo, CHIP_PHOTO);
+    images.ask(&mut requests, Instant::now());
+    let r = requests.take().pop().expect("asked");
+    let chip = images.answered(r.id, slakio_world::pictures::png(photo.address(), 64, 64)).expect("a job");
+    // The slot's: missed on disk too (nothing written yet), then made from the chip's bytes.
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, Instant::now());
+    let look = images.take_lookups().pop().expect("looked for first");
+    images.decoded((look.source.clone(), look.request), run(&look, Some((9, 18)), images.cache.as_ref(), &diag));
+    images.look(&ws(), &photo);
+    images.ask(&mut requests, Instant::now());
+    assert!(requests.take().is_empty());
+    let slot = images.take_lookups().pop().expect("the slot's job");
+    assert_eq!((slot.from_cache, slot.bytes == chip.bytes), (false, true));
+    // The chip's job keeps the file; the slot's, shown all the same, leaves it as it is.
+    assert!(run(&chip, Some((9, 18)), images.cache.as_ref(), &diag).is_ok());
+    let file = std::fs::read_dir(&dir).unwrap().next().unwrap().unwrap().path();
+    std::fs::write(&file, b"as kept").unwrap();
+    assert!(run(&slot, Some((9, 18)), images.cache.as_ref(), &diag).is_ok());
+    assert!(std::fs::read(&file).unwrap() == b"as kept", "not written again");
+    let _ = std::fs::remove_dir_all(&dir);
+}

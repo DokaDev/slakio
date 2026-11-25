@@ -132,6 +132,11 @@ impl Images {
         self.entries.iter().any(|(k, e)| k.0 == *source && matches!(e, Entry::Asked(_) | Entry::Decoding(_)))
     }
 
+    /// The bytes fetched for `source` are kept.
+    pub(super) fn has_fetched(&self, source: &Source) -> bool {
+        self.fetched.iter().any(|f| f.0 == *source)
+    }
+
     /// `key` is made ready from the bytes fetched for its address in its other place, when they
     /// are kept: a job of its own (as a look on disk is), nothing asked. `true` when it was.
     pub(super) fn made_from_fetched(&mut self, key: &Key) -> bool {
@@ -143,7 +148,17 @@ impl Images {
         self.failed.retain(|k| k != key);
         let (source, shape) = key.clone();
         let epoch = self.cache.as_ref().map_or(0, PictureCache::epoch);
-        self.lookups.push(Job { source, request, id, bytes, shape, from_cache: false, empty: false, epoch });
+        self.lookups.push(Job {
+            source,
+            request,
+            id,
+            bytes,
+            shape,
+            from_cache: false,
+            empty: false,
+            stored: true,
+            epoch,
+        });
         true
     }
 
@@ -169,7 +184,17 @@ impl Images {
         self.entries.insert(key.clone(), Entry::Decoding(id));
         let (source, shape) = key;
         let (picture, epoch) = (self.next_id(), self.cache.as_ref().map_or(0, PictureCache::epoch));
-        Some(Job { source, request: id, id: picture, bytes, shape, from_cache: false, empty: false, epoch })
+        Some(Job {
+            source,
+            request: id,
+            id: picture,
+            bytes,
+            shape,
+            from_cache: false,
+            empty: false,
+            stored: false,
+            epoch,
+        })
     }
 
     /// Picture request `id` failed (`kind`) at `now`: `true` when it was one of these.

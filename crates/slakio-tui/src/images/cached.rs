@@ -67,6 +67,9 @@ pub fn run_then_keep(
         Err(refused) => return send(Err(refused)),
     };
     send(Ok(super::made(job, &d)));
+    if job.stored {
+        return;
+    }
     let key = (job.source.clone(), job.shape);
     // Kept as it came (with all its frames, when it moves), decoded again within the same bounds
     // when read, for whatever cells want it then.
@@ -171,7 +174,17 @@ impl Images {
         self.entries.insert(key.clone(), Entry::Looking(request));
         let (source, shape) = key;
         let epoch = self.cache.as_ref().map_or(0, PictureCache::epoch);
-        self.lookups.push(Job { source, request, id, bytes: Vec::new(), shape, from_cache: true, empty: false, epoch });
+        self.lookups.push(Job {
+            source,
+            request,
+            id,
+            bytes: Vec::new(),
+            shape,
+            from_cache: true,
+            empty: false,
+            stored: false,
+            epoch,
+        });
     }
 
     /// Someone else signed in to a workspace: the pictures kept on disk go (off the loop's
@@ -192,6 +205,7 @@ impl Images {
             shape,
             from_cache: true,
             empty: true,
+            stored: false,
             epoch: 0,
         });
     }
