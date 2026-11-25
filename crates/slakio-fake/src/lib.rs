@@ -61,6 +61,20 @@ impl Logged {
         }
     }
 
+    /// What kind of picture it asks for: `thumb` (a file's smaller copy), `avatar` (a profile
+    /// photo) or `emoji`; `None` when it is not a picture.
+    pub fn picture_kind(&self) -> Option<&'static str> {
+        if self.path.starts_with("/files-tmb/") {
+            Some("thumb")
+        } else if slakio_world::emoji::is_path(&self.path) {
+            Some("emoji")
+        } else if slakio_world::pictures::is_avatar_path(&self.path) {
+            Some("avatar")
+        } else {
+            None
+        }
+    }
+
     /// The form body's fields, in order (values left encoded).
     pub fn fields(&self) -> Vec<(&str, &str)> {
         self.body.split('&').filter_map(|kv| kv.split_once('=')).collect()
@@ -279,6 +293,12 @@ impl FakeSlack {
         s.sockets.retain(|t| t.send(push.clone()).is_ok());
     }
 
+    /// Answer the next picture of `kind` ([`Logged::picture_kind`]) with `fault`, before any
+    /// fault queued for every picture ([`PICTURES`]).
+    pub fn fail_next_picture(&self, kind: &str, fault: Fault) {
+        self.fail_next(&format!("{PICTURES}:{kind}"), fault);
+    }
+
     /// Answer the next request for `method` with `fault` (faults queue up per method).
     pub fn fail_next(&self, method: &str, fault: Fault) {
         let mut s = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
@@ -298,7 +318,10 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
         s.log.push(logged.clone());
         let revoked = s.revoked(&logged).then(|| Fault::Api("invalid_auth".to_string()));
-        let fault = revoked.or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front));
+        let kind = logged.picture_kind().map(|k| format!("{PICTURES}:{k}"));
+        let fault = revoked
+            .or_else(|| kind.and_then(|k| s.faults.get_mut(&k).and_then(VecDeque::pop_front)))
+            .or_else(|| s.faults.get_mut(logged.method()).and_then(VecDeque::pop_front));
         (fault, s.delay, s.no_own_photo, s.sections_paged)
     };
     if !delay.is_zero() {

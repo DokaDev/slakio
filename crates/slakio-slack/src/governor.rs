@@ -18,12 +18,14 @@
 //!   up, lookups) takes at most [`Limits::lane_background_per_minute`] and
 //!   [`Limits::lane_background_per_hour`] of them, so one that keeps reconnecting leaves the
 //!   others room;
-//! * a **share for pictures** inside the background shares: the photos, emoji and file thumbnails
-//!   read for the screen take at most [`Limits::lane_picture_per_minute`] and
+//! * a **share for pictures** inside the background shares: the file previews (smaller copies
+//!   on the file host, asked with the session's cookie) read for the screen take at most [`Limits::lane_picture_per_minute`] and
 //!   [`Limits::lane_picture_per_hour`] of a workspace's part, and [`Limits::picture_per_minute`]
 //!   and [`Limits::picture_per_hour`] of the process's, so a screen full of pictures never leaves
 //!   the socket's opening, its catching up or a lookup without room; the list's photos take at
 //!   most two thirds of each ([`Governor::list_picture_if`]), the rest is the timeline's;
+//!   profile photos and emoji, asked of the picture hosts with nothing of the session, keep to a
+//!   budget of their own instead ([`cdn`], [`Governor::cdn`]) and never count here;
 //! * a **pause per method** when Slack asks to slow down (HTTP 429 or `ratelimited`): that
 //!   method is not sent again until its `Retry-After` has passed ([`DEFAULT_PAUSE`] without
 //!   one); the others go on;
@@ -526,7 +528,7 @@ impl Governor {
         self.count(Priority::User, None, None)
     }
 
-    /// A picture (a file's smaller copy, a profile photo) may be fetched now: the network is
+    /// A file's smaller copy (a preview) may be fetched now: the network is
     /// on and the caps have room. It counts as one background request of `lane` (pictures are
     /// read for the screen, not asked for): the user's own requests keep their share. Pictures
     /// keep to their own part of the background shares ([`Limits::lane_picture_per_minute`] and

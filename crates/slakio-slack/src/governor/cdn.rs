@@ -117,6 +117,11 @@ impl Governor {
         Ok(())
     }
 
+    /// Asks of the picture hosts let through so far.
+    pub fn cdn_sent(&self) -> u64 {
+        self.counts.lock().unwrap_or_else(std::sync::PoisonError::into_inner).cdn.total
+    }
+
     /// `true` the first time it is asked after the run alarm went off ([`CDN_RUN_REACHED`]):
     /// what is told once only.
     pub fn cdn_alarm_first(&self) -> bool {

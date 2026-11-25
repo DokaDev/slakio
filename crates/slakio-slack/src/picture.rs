@@ -15,8 +15,10 @@
 //!   session (when Gravatar sends a photo to any other host, the Slack default avatar its
 //!   address already named as its fallback, checked the same way, is asked as the next hop
 //!   instead: nothing is asked of a host not on the list); an emoji (at most [`EMOJI_REDIRECTS`]) only to another address on the emoji host,
-//!   asked the same bare way. Each ask, and each hop, passes the kill switch and counts as one background
-//!   request of the workspace.
+//!   asked the same bare way. Each ask, and each hop, passes the kill switch; a copy's counts as
+//!   one background request of the workspace, a photo's or an emoji's in the picture hosts'
+//!   budget ([`crate::governor::Governor::cdn`]), each of which holds one of those hosts' places
+//!   over all its hops. A host that answers 429 is not asked again for its `Retry-After`.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
 //!   a larger one, said or counted, is refused; all of it within [`DEADLINE`].
 
@@ -81,8 +83,15 @@ pub(crate) async fn picture(client: &Client, source: &Source, max: u64, list: bo
         Ok(read) => read,
         Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
     };
-    if let Err(e) = &read {
-        note.failed(e);
+    match &read {
+        // The picture hosts' run alarm is told once, not for every picture it refuses.
+        Err(SlackError::CapReached { why: crate::governor::CDN_RUN_REACHED }) => {
+            if client.governor().cdn_alarm_first() {
+                note.failed(&SlackError::CapReached { why: crate::governor::CDN_RUN_REACHED });
+            }
+        }
+        Err(e) => note.failed(e),
+        Ok(_) => {}
     }
     read
 }
@@ -175,6 +184,11 @@ async fn read(
     note: &Note<'_>,
 ) -> Result<Vec<u8>, SlackError> {
     let mut url = source.checked().ok_or_else(|| api("not_a_picture_address"))?;
+    // A photo or an emoji holds one of the picture hosts' places over all its hops.
+    let _slot = match source {
+        Source::Thumb(_) => None,
+        Source::Avatar(_) | Source::Emoji(_) => Some(client.governor().cdn_slot().await?),
+    };
     let mut hops = 0;
     let mut answer = loop {
         note.asked(&url, hops);
@@ -209,9 +223,12 @@ async fn read(
             }
             301 | 302 | 303 | 307 | 308 => return Err(api("redirected_elsewhere")),
             429 => {
-                return Err(SlackError::RateLimited {
-                    retry_after: crate::response::retry_after(answer.retry_after.as_deref()),
-                });
+                let retry_after = crate::response::retry_after(answer.retry_after.as_deref());
+                // That host is not asked again for as long (its other pictures neither).
+                if let Some(host) = slakio_core::images::host_of(&url) {
+                    client.governor().pause_host(host, retry_after);
+                }
+                return Err(SlackError::RateLimited { retry_after });
             }
             401 | 403 | 404 | 410 => return Err(api("file_not_available")),
             status => return Err(SlackError::Network { detail: format!("the picture host answered {status}") }),

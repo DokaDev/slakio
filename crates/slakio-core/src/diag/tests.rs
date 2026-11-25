@@ -167,7 +167,7 @@ fn times_and_reasons_in_plain_words() {
 }
 
 /// The request governor's reasons, as it words them.
-const REASONS: [(&str, &str); 7] = [
+const REASONS: [(&str, &str); 10] = [
     ("the request cap of this run is reached", "run-cap"),
     ("the hourly request budget is reached", "hourly-budget"),
     ("the hourly background share is reached", "hourly-background"),
@@ -175,6 +175,9 @@ const REASONS: [(&str, &str); 7] = [
     ("the pictures' share is reached", "pictures"),
     ("this workspace's background share is reached", "lane-background"),
     ("this workspace's picture share is reached", "lane-picture"),
+    ("the picture hosts' budget is reached", "cdn-budget"),
+    ("the list's part of the picture hosts' budget is reached", "cdn-list"),
+    ("the picture hosts' run limit is reached", "cdn-run-limit"),
 ];
 
 #[test]

@@ -427,6 +427,9 @@ pub fn slug(why: &str) -> String {
         ("pictures' share", "pictures"),
         ("workspace's background share", "lane-background"),
         ("workspace's picture share", "lane-picture"),
+        ("picture hosts' run limit", "cdn-run-limit"),
+        ("list's part of the picture hosts' budget", "cdn-list"),
+        ("picture hosts' budget", "cdn-budget"),
     ];
     words.iter().find(|(says, _)| why.contains(says)).map_or("other", |(_, word)| word).to_string()
 }

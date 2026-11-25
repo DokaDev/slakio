@@ -165,9 +165,10 @@ impl Client {
 
     /// Ask for picture `url` (a file's smaller copy on the file host, with the session's cookie
     /// as for a file; or a profile photo on an avatar host, or an emoji on the emoji host, with
-    /// no cookie and no token): past
-    /// the kill switch and the cap (each ask counts as one background request of this workspace,
-    /// one for the `list` in its part of the pictures' share).
+    /// no cookie and no token): past the kill switch, a pause of its host (it answered 429), and
+    /// the budget its host keeps to. A copy counts as one background request of this workspace
+    /// (one for the `list` in its part of the pictures' share); a photo or an emoji counts in the
+    /// picture hosts' budget only ([`Governor::cdn`]), never against the API's.
     /// Switching the network off while it is asked ends it.
     pub(crate) async fn fetch_picture(
         &self,
@@ -176,7 +177,17 @@ impl Client {
         list: bool,
     ) -> Result<crate::http::Fetched, SlackError> {
         self.still_signed_in()?;
-        self.governor.list_picture_if(&self.lane, list)?;
+        let host = slakio_core::images::host_of(url)
+            .ok_or_else(|| SlackError::Api { code: "not_a_picture_address".to_string() })?;
+        if let Some(left) = self.governor.host_paused(host) {
+            return Err(SlackError::RateLimited { retry_after: Some(left) });
+        }
+        match source {
+            slakio_core::images::Source::Thumb(_) => self.governor.list_picture_if(&self.lane, list)?,
+            slakio_core::images::Source::Avatar(_) | slakio_core::images::Source::Emoji(_) => {
+                self.governor.cdn(host, list)?;
+            }
+        }
         let headers = match source {
             slakio_core::images::Source::Thumb(_) => crate::picture::thumb_headers(&self.credentials, Os::current()),
             slakio_core::images::Source::Avatar(_) | slakio_core::images::Source::Emoji(_) => {

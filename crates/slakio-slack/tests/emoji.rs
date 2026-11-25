@@ -124,11 +124,12 @@ fn the_list_takes_the_background_share_and_the_switch_stops_it() {
         let limits = Limits { background_per_minute: 1, lane_background_per_minute: 1, ..Limits::default() };
         let mut r = Run::with(limits).await;
         let blob = r.blob();
-        assert!(r.picture(blob).await.is_ok(), "the share's one request");
+        assert!(r.emoji().await.is_ok(), "the share's one request");
         assert_eq!(r.emoji().await, Err(FailKind::CapReached), "the list is background too");
+        assert!(r.picture(blob).await.is_ok(), "a picture keeps to the picture hosts' budget");
         r.governor.stop();
         assert!(matches!(r.emoji().await, Err(FailKind::Offline)));
-        assert!(r.requests("emoji.list").is_empty());
+        assert_eq!(r.requests("emoji.list").len(), 1);
     });
 }
 
@@ -178,7 +179,8 @@ fn an_emoji_s_picture_goes_bare_to_the_emoji_host_and_each_ask_counts() {
             assert!(l.headers.iter().all(|(_, v)| !v.contains(TOKEN) && !v.contains("cookie-TEST")));
             assert!(l.body.is_empty(), "a GET");
         }
-        assert_eq!(r.governor.sent(), 4, "each ask and each hop counts");
+        assert_eq!(r.governor.cdn_sent(), 4, "each ask and each hop counts");
+        assert_eq!(r.governor.sent(), 0, "none of them in the API's budget");
         // A third hop is refused, though on the emoji host.
         for name in ["h1", "h2", "h3"] {
             r.fake.fail_next(PICTURES, redirect(&on(name)));
@@ -210,10 +212,10 @@ fn an_emoji_never_comes_from_elsewhere_nor_follows_a_redirect_there() {
             assert_eq!(r.picture(blob.clone()).await, Err(api("redirected_elsewhere")), "{bad}");
         }
         assert_eq!(r.requests(PICTURES).len(), 8, "only the emoji itself each time: nothing asked elsewhere");
-        assert_eq!(r.governor.sent(), 8);
+        assert_eq!(r.governor.cdn_sent(), 8);
         // An emoji's address passed off as a photo is refused: its kind is checked again.
         assert_eq!(r.picture(Source::Avatar(blob.address().to_string())).await, Err(api("not_a_picture_address")));
-        assert_eq!(r.governor.sent(), 8);
+        assert_eq!(r.governor.cdn_sent(), 8);
     });
 }
 

@@ -57,8 +57,9 @@ pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(
 pub const DOWNLOADS_MAX: usize = 2;
 
 /// The most pictures read at once by one workspace's backend (one more is answered
-/// `Failed(Busy)`).
-pub const PICTURES_MAX: usize = 4;
+/// `Failed(Busy)`): the UI keeps its previews to four at once, and the governor keeps the
+/// photos and emoji to the picture hosts' places ([`crate::governor::CdnLimits::in_flight`]).
+pub const PICTURES_MAX: usize = 16;
 
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };

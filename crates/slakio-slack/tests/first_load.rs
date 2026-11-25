@@ -1,14 +1,14 @@
 //! The first load's pictures against the fake Slack, on a fake clock: a screen of 20 people's
-//! photos and 40 of the workspace's own emoji, asked as the UI asks them (at most four at once).
-//! Each is fetched at once, with no wait of its own between asks, while the workspace's share of
-//! pictures has room; the rest wait for the share's minute, then come.
+//! photos and 40 of the workspace's own emoji, asked four at once. Each is fetched at once, with
+//! no wait of its own between asks, while the picture hosts' budget (here made as small as a
+//! workspace's old picture share, 30 a minute) has room; the rest wait for its minute, then come.
 
 use slakio_core::backend::{BackendHandle, Command, Envelope, Event, FailKind, Generation, Request};
 use slakio_core::images::{AVATAR_HOSTS, BYTES_MAX, Source};
 use slakio_core::secret::Credentials;
 use slakio_fake::{FakeSlack, PICTURES};
 use slakio_slack::Client;
-use slakio_slack::governor::{FakeClock, Governor, Limits};
+use slakio_slack::governor::{CdnLimits, FakeClock, Governor, Limits};
 use slakio_slack::request::Endpoints;
 use slakio_world::World;
 use std::sync::Arc;
@@ -48,8 +48,8 @@ fn twenty_photos_and_forty_emoji_come_at_once_within_the_picture_share_and_the_r
         let team = world.snapshot().workspaces[0].id.as_str().to_string();
         let fake = FakeSlack::start(World::demo()).await.unwrap();
         let clock = FakeClock::default();
-        let limits = Limits::default();
-        let governor = Governor::new(limits, Box::new(clock.clone()), true);
+        let cdn = CdnLimits { per_minute: 30, ..CdnLimits::default() };
+        let governor = Governor::with_cdn(Limits::default(), cdn, Box::new(clock.clone()), true);
         let client = Client::new(
             Credentials::new(concat!("xo", "xc-TEST"), "cookie-TEST"),
             Endpoints::local(fake.addr()).unwrap(),
@@ -65,7 +65,7 @@ fn twenty_photos_and_forty_emoji_come_at_once_within_the_picture_share_and_the_r
         let mut id = 1;
         let started = std::time::Instant::now();
         let failed = ask_all(&mut handle, &mut id, &sources).await;
-        let share = usize::try_from(limits.lane_picture_per_minute).unwrap();
+        let share = usize::try_from(cdn.per_minute).unwrap();
         assert_eq!(sources.len() - failed.len(), share, "the share's worth at once: {failed:?}");
         assert!(failed.iter().all(|(_, k)| *k == FailKind::CapReached), "{failed:?}");
         assert!(started.elapsed() < Duration::from_secs(10), "no wait between asks: {:?}", started.elapsed());

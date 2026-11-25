@@ -5,10 +5,11 @@
 use serde_json::json;
 use slakio_core::backend::{BackendHandle, Command, Envelope, Event, Generation, Request};
 use slakio_core::diag::Diag;
+use slakio_core::model::FILE_HOST;
 use slakio_core::secret::Credentials;
 use slakio_fake::{FakeSlack, Fault};
 use slakio_slack::Client;
-use slakio_slack::governor::{FakeClock, Governor, Limits};
+use slakio_slack::governor::{CdnLimits, FakeClock, Governor, Limits};
 use slakio_slack::request::Endpoints;
 use slakio_world::World;
 use std::net::SocketAddr;
@@ -44,10 +45,14 @@ impl Run {
 
     /// [`Run::new`] with the governor's `limits`.
     async fn limited(name: &str, to: Option<SocketAddr>, limits: Limits) -> Self {
+        Self::with_cdn(name, to, limits, CdnLimits::default()).await
+    }
+
+    async fn with_cdn(name: &str, to: Option<SocketAddr>, limits: Limits, cdn: CdnLimits) -> Self {
         let path = scratch(name);
         let diag = Diag::to(path.clone());
         let fake = FakeSlack::start(World::demo()).await.unwrap();
-        let governor = Governor::new(limits, Box::new(FakeClock::default()), true);
+        let governor = Governor::with_cdn(limits, cdn, Box::new(FakeClock::default()), true);
         let endpoints = Endpoints::local(to.unwrap_or(fake.addr())).unwrap();
         let client = Client::new(Credentials::new(TOKEN, "cookie-TEST"), endpoints, Arc::clone(&governor))
             .with_diag(diag.clone());
@@ -284,7 +289,8 @@ fn a_failed_lookup_and_where_the_own_photo_came_from_are_told() {
 fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
     rt().block_on(async {
         let limits = Limits { lane_picture_per_minute: 0, ..Limits::default() };
-        let mut r = Run::limited("share", None, limits).await;
+        let cdn = CdnLimits { per_minute: 0, ..CdnLimits::default() };
+        let mut r = Run::with_cdn("share", None, limits, cdn).await;
         r.fake.set_own_photo(false);
         let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
         has(&r.text(), "self-photo source lookup host=");
@@ -295,8 +301,16 @@ fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
             list: false,
         };
         assert!(matches!(r.ask(image).await, Event::Failed { .. }));
+        let thumb = Command::Image {
+            source: slakio_core::images::Source::Thumb(format!("https://{FILE_HOST}/files-tmb/T-F1/shot_360.png")),
+            max: slakio_core::images::BYTES_MAX,
+            list: false,
+        };
+        assert!(matches!(r.ask(thumb).await, Event::Failed { .. }));
         let text = r.text();
-        has(&text, "avatar cap-reached lane-picture");
+        has(&text, "avatar cap-reached cdn-budget");
+        has(&text, "lane=process");
+        has(&text, "thumb cap-reached lane-picture");
         has(&text, "lane=workspace");
         assert!(!text.contains("[secret]"), "{text}");
     });

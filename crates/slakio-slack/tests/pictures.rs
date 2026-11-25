@@ -13,7 +13,7 @@ use slakio_core::model::{FILE_HOST, Target};
 use slakio_core::secret::Credentials;
 use slakio_fake::{FakeSlack, Fault, PICTURES};
 use slakio_slack::Client;
-use slakio_slack::governor::{FakeClock, Governor, Limits};
+use slakio_slack::governor::{CdnLimits, FakeClock, Governor, Limits};
 use slakio_slack::request::Endpoints;
 use slakio_world::World;
 use std::sync::Arc;
@@ -35,8 +35,12 @@ struct Run {
 
 impl Run {
     async fn with(limits: Limits) -> Self {
+        Self::with_cdn(limits, CdnLimits::default()).await
+    }
+
+    async fn with_cdn(limits: Limits, cdn: CdnLimits) -> Self {
         let fake = FakeSlack::start(World::demo()).await.unwrap();
-        let governor = Governor::new(limits, Box::new(FakeClock::default()), true);
+        let governor = Governor::with_cdn(limits, cdn, Box::new(FakeClock::default()), true);
         let client = Client::new(
             Credentials::new(TOKEN, "cookie-TEST"),
             Endpoints::local(fake.addr()).unwrap(),
@@ -124,7 +128,8 @@ fn a_copy_goes_with_the_cookie_a_photo_with_nothing_of_the_session() {
             assert!(l.headers.iter().all(|(_, v)| !v.contains(TOKEN)), "never the token");
             assert!(l.body.is_empty(), "a GET");
         }
-        assert_eq!(r.governor.sent(), 2, "each ask counts");
+        assert_eq!(r.governor.sent(), 1, "the copy counts in the API's budget");
+        assert_eq!(r.governor.cdn_sent(), 1, "the photo in the picture hosts'");
     });
 }
 
@@ -201,6 +206,7 @@ fn an_address_a_picture_may_not_come_from_is_never_asked() {
         }
         assert!(r.picture_requests().is_empty());
         assert_eq!(r.governor.sent(), 0);
+        assert_eq!(r.governor.cdn_sent(), 0);
     });
 }
 
@@ -210,11 +216,13 @@ fn pictures_are_background_requests_and_the_switch_stops_them() {
         let limits = Limits { background_per_minute: 1, lane_background_per_minute: 1, ..Limits::default() };
         let mut r = Run::with(limits).await;
         let (thumb, photo) = r.sources();
-        assert!(r.picture(thumb, BYTES_MAX).await.is_ok());
-        assert!(matches!(r.picture(photo.clone(), BYTES_MAX).await, Err(FailKind::CapReached)), "the background share");
+        assert!(r.picture(thumb.clone(), BYTES_MAX).await.is_ok());
+        assert!(matches!(r.picture(thumb.clone(), BYTES_MAX).await, Err(FailKind::CapReached)), "the background share");
+        assert!(r.picture(photo.clone(), BYTES_MAX).await.is_ok(), "a photo keeps to the picture hosts' budget");
         r.governor.stop();
         assert!(matches!(r.picture(photo, BYTES_MAX).await, Err(FailKind::Offline)));
-        assert_eq!(r.picture_requests().len(), 1);
+        assert!(matches!(r.picture(thumb, BYTES_MAX).await, Err(FailKind::Offline)));
+        assert_eq!(r.picture_requests().len(), 2);
     });
 }
 
@@ -331,14 +339,14 @@ fn a_photo_follows_at_most_two_redirects_to_avatar_hosts_each_counted_and_bare()
             assert!(l.headers.iter().all(|(_, v)| !v.contains(TOKEN) && !v.contains("cookie-TEST")));
             assert!(l.body.is_empty(), "a GET");
         }
-        assert_eq!(r.governor.sent(), 3, "each hop counts");
+        assert_eq!(r.governor.cdn_sent(), 3, "each hop counts");
         // A third hop is refused, though to an avatar host.
         for host in [AVATAR_HOSTS[2], AVATAR_HOSTS[0], AVATAR_HOSTS[2]] {
             r.fake.fail_next(PICTURES, redirect(&on(host, &photo)));
         }
         assert_eq!(r.picture(photo, BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 6, "the third hop never asked");
-        assert_eq!(r.governor.sent(), 6);
+        assert_eq!(r.governor.cdn_sent(), 6);
     });
 }
 
@@ -373,7 +381,7 @@ fn a_photo_never_follows_a_redirect_to_an_address_a_photo_may_not_come_from() {
         r.fake.fail_next(PICTURES, Fault::Raw { status: 302, headers: Vec::new(), body: Vec::new() });
         assert_eq!(r.picture(photo.clone(), BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 14, "only the photo itself each time: nothing asked elsewhere");
-        assert_eq!(r.governor.sent(), 14);
+        assert_eq!(r.governor.cdn_sent(), 14);
         // Gravatar sending to Slack's default avatar is followed.
         r.fake.fail_next(PICTURES, redirect(&format!("{gravatar}&d=https%3A%2F%2F{slack}%2Fimg%2Fava_0010-72.png")));
         assert!(r.picture(photo, BYTES_MAX).await.is_ok());
@@ -422,7 +430,7 @@ fn gravatar_sending_elsewhere_asks_the_slack_fallback_it_named_and_nothing_elsew
         assert_eq!(&bytes[..4], b"\x89PNG");
         let log = r.picture_requests();
         assert_eq!(log.len(), 2, "Gravatar, then the Slack default it named: {log:?}");
-        assert_eq!(r.governor.sent(), 2, "each hop counts");
+        assert_eq!(r.governor.cdn_sent(), 2, "each hop counts");
         assert_eq!(log[1].path, slack.split_once(".com").unwrap().1, "the fallback's own path");
         for l in &log {
             assert!(l.headers.iter().all(|(_, v)| !v.contains("wp.com")), "nothing of the CDN");
@@ -440,7 +448,7 @@ fn gravatar_sending_elsewhere_asks_the_slack_fallback_it_named_and_nothing_elsew
             assert_eq!(r.picture(source, BYTES_MAX).await, Err(api("redirected_elsewhere")), "{keyword}");
         }
         assert_eq!(r.picture_requests().len(), 6, "only Gravatar each time");
-        assert_eq!(r.governor.sent(), 6);
+        assert_eq!(r.governor.cdn_sent(), 6);
     });
 }
 
@@ -459,7 +467,7 @@ fn the_gravatar_fallback_stays_within_the_hop_cap() {
         r.fake.fail_next(PICTURES, redirect("https://i0.wp.com/x.png"));
         assert_eq!(r.picture(gravatar, BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 3);
-        assert_eq!(r.governor.sent(), 3);
+        assert_eq!(r.governor.cdn_sent(), 3);
     });
 }
 
@@ -540,7 +548,8 @@ fn a_dm_peer_s_photo_comes_with_the_boot_before_the_dm_is_opened() {
 #[test]
 fn photos_drawn_down_a_whole_sidebar_leave_the_next_timeline_its_photos() {
     rt().block_on(async {
-        let mut r = Run::new().await;
+        // The picture hosts' budget at a workspace's old picture share, 30 a minute.
+        let mut r = Run::with_cdn(Limits::default(), CdnLimits { per_minute: 30, ..CdnLimits::default() }).await;
         let mut photos: Vec<Source> = Vec::new();
         for a in r.world.snapshot().users.iter().filter_map(|u| u.avatar.clone()) {
             if !photos.contains(&Source::Avatar(a.clone())) {
@@ -557,7 +566,7 @@ fn photos_drawn_down_a_whole_sidebar_leave_the_next_timeline_its_photos() {
                 other => panic!("{other:?}"),
             }
         }
-        assert_eq!(refused, 10, "the list's photos keep to two thirds of the workspace's 30 a minute");
+        assert_eq!(refused, 10, "the list's photos keep to two thirds of the picture hosts' 30 a minute");
         // The channel opened next: each of its 8 people's photos comes at once, none waits.
         for photo in &photos[30..38] {
             assert_eq!(r.picture(photo.clone(), BYTES_MAX).await.map(|_| ()), Ok(()), "{photo:?}");
