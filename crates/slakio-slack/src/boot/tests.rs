@@ -6,7 +6,7 @@ use slakio_core::model::SectionKind;
 
 const NOW: u64 = 1_767_600_000;
 
-/// The snapshot with no sections listed (the two default ones).
+/// The snapshot with no sections listed (the default ones).
 fn snapshot(b: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>, now: u64) -> Snapshot {
     with_sidebar(b, counts, known, now, Sidebar::new("T1", None, &Diag::default()))
 }
@@ -316,10 +316,14 @@ fn starred_shared_app_and_open_group_conversations_go_to_their_sections() {
     assert!(find(&s, "G2").closed, "a group DM not open is closed");
     assert_eq!(section("G2"), "T1:dms");
     assert!(!find(&s, "G1").closed && !find(&s, "D1").closed);
-    // Without Slack's sections, the group DM still shows, in Direct messages.
+    // Without Slack's sections, the group DM still shows, in Direct messages, and Starred holds
+    // the conversations the boot says are starred.
     let plain = snapshot(placed(), None, known, NOW);
     assert_eq!(find(&plain, "G1").section.as_str(), "T1:dms");
-    assert_eq!(find(&plain, "C1").section.as_str(), "T1:channels", "no Starred listed: where it was");
+    for id in ["C1", "C2", "D2"] {
+        assert_eq!(find(&plain, id).section.as_str(), "T1:stars", "{id}: starred in the boot");
+    }
+    assert_eq!(find(&plain, "C5").section.as_str(), "T1:channels");
 }
 
 #[test]
@@ -441,6 +445,7 @@ fn a_conversation_s_newest_message_is_the_counts_latest_else_a_dm_s_update() {
     assert_eq!(
         kinds,
         [
+            (SectionKind::Favorites, Some(slakio_core::model::Sort::Alphabetical)),
             (SectionKind::Channels, Some(slakio_core::model::Sort::Alphabetical)),
             (SectionKind::DirectMessages, Some(slakio_core::model::Sort::Recent))
         ],

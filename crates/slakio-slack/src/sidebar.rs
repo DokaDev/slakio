@@ -149,8 +149,9 @@ impl Placing {
 }
 
 impl Sidebar {
-    /// The sidebar of workspace `team` from Slack's `listed` sections (`None`: unknown, the two
-    /// default sections alone); a section's ids beyond its first page are told to `diag`.
+    /// The sidebar of workspace `team` from Slack's `listed` sections (`None`: unknown, the
+    /// default sections alone: Starred, from the boot's own starred list, and the two defaults);
+    /// a section's ids beyond its first page are told to `diag`.
     pub(crate) fn new(team: &str, listed: Option<Vec<ChannelSection>>, diag: &Diag) -> Self {
         let ws = WorkspaceId::new(team);
         let section = |id: String, name: &str, kind| Section {
@@ -161,6 +162,9 @@ impl Sidebar {
             sort: Some(default_sort(kind)),
         };
         let (mut sections, mut custom) = (Vec::new(), HashMap::new());
+        if listed.is_none() {
+            sections.push(section("stars".to_string(), "", SectionKind::Favorites));
+        }
         for (n, s) in order(listed.unwrap_or_default()).into_iter().enumerate() {
             let Some(kind) = s.kind.as_deref().and_then(kind) else { continue };
             // The user's own name of a section they made; a built-in one is named by the UI, in

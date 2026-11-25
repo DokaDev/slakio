@@ -37,7 +37,8 @@ fn a_slow_sections_answer_does_not_hold_the_boot_and_follows_as_an_update() {
         let Event::Booted(s) = booted.event else { panic!("{booted:?}") };
         assert!(s.sections_unknown, "the sections are not known yet");
         let kinds: Vec<SectionKind> = s.sections.iter().map(|x| x.kind).collect();
-        assert_eq!(kinds, [SectionKind::Channels, SectionKind::DirectMessages], "the default sections");
+        let defaults = [SectionKind::Favorites, SectionKind::Channels, SectionKind::DirectMessages];
+        assert_eq!(kinds, defaults, "the default sections");
         // Slack's sections follow, pushed: every conversation placed in one of them.
         let update = next(&mut handle, Duration::from_secs(20)).await.expect("the sections update");
         assert_eq!(update.generation, Generation::PUSHED);
