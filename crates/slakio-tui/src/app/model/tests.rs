@@ -484,12 +484,12 @@ fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
     m.add_users(&w, &[bot(1, &other)]);
     assert!(m.take_gone_photos().is_empty(), "the other name still shows it");
     m.add_users(&w, &[bot(2, &other), bot(2, &other)]);
-    assert_eq!(m.take_gone_photos(), [icon.clone()], "once, now that no one shows it");
+    assert_eq!(m.take_gone_photos(), std::slice::from_ref(&icon), "once, now that no one shows it");
     let next = m.renewed(m.snapshot.clone());
     let mut fewer = m.snapshot.clone();
     fewer.users.retain(|u| u.avatar.as_ref() != Some(&other));
     let mut next2 = next.renewed(fewer);
-    assert_eq!(next2.take_gone_photos(), [other.clone()], "a whole new boot that shows it for no one");
+    assert_eq!(next2.take_gone_photos(), std::slice::from_ref(&other), "a whole new boot that shows it for no one");
     // A workspace's boot that gives its user a new photo.
     let (a, part_a) = part(0);
     let me = part_a.workspaces[0].me.clone();
