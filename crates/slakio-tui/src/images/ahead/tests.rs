@@ -1,6 +1,6 @@
 use super::*;
 use crate::images::cached::{run, start};
-use crate::images::{Job, Look, PHOTO, RETRY_AFTER};
+use crate::images::{Job, Look, PHOTO, RETRY_AFTER, graphics};
 use slakio_core::backend::{FailKind, Generation, Request};
 use slakio_core::diag::Diag;
 use slakio_core::images::AVATAR_HOSTS;
@@ -418,6 +418,31 @@ fn a_photo_ahead_never_takes_the_room_of_one_on_screen() {
     assert_eq!(ahead.len(), 1, "the second photo ahead fetched");
     assert!(!t.images.take_graphics().contains("a=d"), "nothing removed for a photo ahead");
     assert_eq!(t.dm_held(), 0);
+}
+
+#[test]
+fn a_photo_ahead_not_on_screen_is_the_first_to_leave_the_terminal() {
+    let mut t = T::new("oldest");
+    let screen: Vec<Key> = (0..ENTRIES_MAX - 2).map(shown).collect();
+    for _ in 0..40 {
+        t.pump(&screen, 0, 1);
+    }
+    assert_eq!(t.images.held().0, ENTRIES_MAX - 2);
+    // Ten seen and scrolled away, then a photo ahead: there is room for it.
+    let mut screen = screen[10..].to_vec();
+    t.pump(&screen, 0, 2);
+    assert_eq!(t.pump(&screen, 1, 3).len(), 1);
+    assert_eq!(t.dm_held(), 1);
+    let (_, id) = t.ids.iter().find(|(s, _)| *s == dm(0)).cloned().expect("the photo ahead");
+    t.images.take_graphics();
+    // Two more on screen: the terminal is full, so one picture goes, the photo ahead first.
+    screen.extend([shown(ENTRIES_MAX - 2), shown(ENTRIES_MAX - 1)]);
+    t.pump(&screen, 1, 4);
+    let sent = t.images.take_graphics();
+    assert_eq!(sent.matches("a=d,d=I").count(), 1, "one picture removed");
+    assert!(sent.contains(&graphics::delete(id)), "the photo ahead, before any picture seen");
+    assert_eq!(t.dm_held(), 0);
+    assert!(matches!(t.images.look_as(&ws(), &shown(0).0, PHOTO), Look::Ready { .. }), "the oldest seen stays");
 }
 
 #[test]

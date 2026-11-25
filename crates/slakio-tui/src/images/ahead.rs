@@ -20,7 +20,8 @@
 //!
 //! A photo that comes while its row is on screen is drawn as any other. One whose row is not
 //! goes to the terminal only when it fits beside what the terminal holds and what is on its way,
-//! removing nothing; otherwise it is let go (the disk has it). Each is asked ahead once a run,
+//! removing nothing, and as the least recently drawn (the first to go when room is needed);
+//! otherwise it is let go (the disk has it). Each is asked ahead once a run,
 //! or again once its wait is over when it failed only for a while.
 //! Pictures or photos turned off, nothing waits to be asked ahead.
 
@@ -186,13 +187,17 @@ impl Images {
         false
     }
 
+    /// `key` is on screen: the frame being drawn, the latest shown or the one before it looked at it.
+    pub(super) fn seen_now(&self, key: &Key) -> bool {
+        self.drawn.borrow().iter().any(|d| d.1 && d.0 == *key) || self.on_screen(key)
+    }
+
     /// A photo asked for ahead came, `bytes` large: `true` when it is let go, not sent to the
     /// terminal (its row is not on screen and it does not fit beside what is held and what is on
     /// its way, removing nothing).
     pub(super) fn let_go_ahead(&mut self, key: &Key, bytes: usize) -> bool {
         self.ahead.done.insert(key.clone());
-        let drawn = self.drawn.borrow().iter().any(|d| d.1 && d.0 == *key);
-        if drawn || self.on_screen(key) {
+        if self.seen_now(key) {
             return false;
         }
         // What else is on its way: the network's and the disk's, not this one.

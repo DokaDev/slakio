@@ -482,6 +482,8 @@ impl Images {
         if ahead && self.let_go_ahead(&key, p.bytes) {
             return;
         }
+        // A photo ahead not on screen is the least recently drawn: the first to go.
+        let unseen = ahead && !self.seen_now(&key);
         while self.held.len() >= ENTRIES_MAX || (self.bytes + p.bytes > BYTES_CAP && !self.held.is_empty()) {
             let off = self.held.iter().position(|k| !self.on_screen(k));
             let chip = || self.held.iter().position(|k| k.1 == CHIP_PHOTO);
@@ -503,7 +505,7 @@ impl Images {
         self.highest = self.highest.max(p.id);
         self.bytes += p.bytes;
         self.entries.insert(key.clone(), Entry::Ready { id: p.id, cols: p.cols, rows: p.rows, bytes: p.bytes });
-        self.held.push_back(key);
+        if unseen { self.held.push_front(key) } else { self.held.push_back(key) }
     }
 
     /// Each of `ended` ([`Images::decoded`]), in order.
