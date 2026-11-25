@@ -8,7 +8,20 @@ const NOW: u64 = 1_767_600_000;
 
 /// The snapshot with no sections listed (the two default ones).
 fn snapshot(b: wire::UserBoot, counts: Option<wire::Counts>, known: Vec<User>, now: u64) -> Snapshot {
-    super::snapshot(b, counts, known, now, Sidebar::new("T1", None, &Diag::default()))
+    with_sidebar(b, counts, known, now, Sidebar::new("T1", None, &Diag::default()))
+}
+
+/// The snapshot with the sections of `sidebar`.
+fn with_sidebar(
+    b: wire::UserBoot,
+    counts: Option<wire::Counts>,
+    known: Vec<User>,
+    now: u64,
+    sidebar: Sidebar,
+) -> Snapshot {
+    let (mut s, _) = super::snapshot(b, counts, known, now, &sidebar);
+    s.sections = sidebar.sections;
+    s
 }
 
 fn boot(prefs: serde_json::Value, dnd: serde_json::Value) -> wire::UserBoot {
@@ -195,7 +208,7 @@ fn conversations_go_to_the_sections_slack_lists_a_section_of_the_user_s_own_firs
     ]))
     .unwrap();
     let sidebar = Sidebar::new("T1", Some(listed), &Diag::default());
-    let s = super::snapshot(boot(json!({}), json!(null)), None, Vec::new(), NOW, sidebar);
+    let s = with_sidebar(boot(json!({}), json!(null)), None, Vec::new(), NOW, sidebar);
     let names: Vec<&str> = s.sections.iter().map(|x| x.name.unsanitized()).collect();
     assert_eq!(names, ["Mine", "Channels", "DMs"], "in the chain's order, Slack's names else English ones");
     let section = |id| find(&s, id).section.as_str().to_string();
@@ -214,7 +227,7 @@ fn the_conversations_slack_lists_as_starred_go_to_starred() {
         {"channel_section_id": "LH", "type": "channels", "next_channel_section_id": null},
     ]))
     .unwrap();
-    let s = super::snapshot(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
+    let s = with_sidebar(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
     assert_eq!(s.sections[0].name.unsanitized(), "Starred");
     assert_eq!(find(&s, "C1").section.as_str(), "T1:stars");
     assert_eq!(find(&s, "D1").section.as_str(), "T1:stars");
@@ -276,7 +289,7 @@ fn starred_shared_app_and_open_group_conversations_go_to_their_sections() {
     .unwrap();
     let known = vec![known_person("U1", "Ann", false), known_person("UB", "Robot", true)];
     let sidebar = Sidebar::new("T1", Some(listed), &Diag::default());
-    let s = super::snapshot(placed(), None, known.clone(), NOW, sidebar);
+    let s = with_sidebar(placed(), None, known.clone(), NOW, sidebar);
     let section = |id| find(&s, id).section.as_str().to_string();
     for (id, want) in [
         ("C1", "T1:stars"),

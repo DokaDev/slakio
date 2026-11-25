@@ -235,7 +235,7 @@ async fn recount(client: Arc<Client>, ws: WorkspaceId, out: mpsc::Sender<Out>) {
 }
 
 /// Push `live` to the UI; `Err` when it is gone.
-async fn push(tx: &mpsc::Sender<Envelope>, live: Live) -> Result<(), ()> {
+pub(crate) async fn push(tx: &mpsc::Sender<Envelope>, live: Live) -> Result<(), ()> {
     let envelope = Envelope { generation: Generation::PUSHED, event: Event::Live(Box::new(live)) };
     tx.send(envelope).await.map_err(|_| ())
 }

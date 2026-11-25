@@ -104,6 +104,8 @@ pub(crate) struct Session {
     pub(crate) booted: tokio::sync::Notify,
     /// The conversations the UI read this session: the live updates name new authors only there.
     pub(crate) opened: std::sync::Mutex<std::collections::HashSet<ConversationId>>,
+    /// What places the conversations of the last boot in the sidebar's sections.
+    pub(crate) placing: std::sync::Mutex<crate::sidebar::Placing>,
 }
 
 pub use crate::people::LOOKUP_BATCH;
@@ -243,6 +245,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
 }
 
 /// Start the workspace on a task of its own; a boot that succeeds is told to the live updates.
+/// The sidebar's sections, when they came after the answer, follow it as an update.
 fn spawn_boot(
     tasks: &mut JoinSet<()>,
     client: Arc<Client>,
@@ -250,11 +253,20 @@ fn spawn_boot(
     (tx, id): (mpsc::Sender<Envelope>, Generation),
 ) {
     tasks.spawn(async move {
-        let booted = boot(&client, &ctx.me, &ctx.people).await;
+        let (booted, pending) = match boot(&client, &ctx).await {
+            Ok((event, pending)) => (Ok(event), pending),
+            Err(e) => (Err(e), None),
+        };
         if booted.is_ok() {
             ctx.booted.notify_one();
         }
         answer(&tx, id, booted).await;
+        let Some(listed) = pending else { return };
+        let listed = listed.await.ok().flatten();
+        let placing = ctx.placing.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        if let Some(update) = placing.update(listed, client.diag()) {
+            let _ = crate::live::push(&tx, update).await;
+        }
     });
 }
 

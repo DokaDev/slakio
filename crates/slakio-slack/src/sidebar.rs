@@ -19,8 +19,9 @@
 //! method reads the others, which stay in their default section (the diagnostics tell the gap).
 
 use serde::Deserialize;
+use slakio_core::backend::Live;
 use slakio_core::diag::{Diag, Kind, Stage};
-use slakio_core::model::{Section, SectionId, SectionKind, WorkspaceId};
+use slakio_core::model::{ConversationId, Section, SectionId, SectionKind, WorkspaceId};
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
 
@@ -115,6 +116,23 @@ pub(crate) struct Facts {
     pub(crate) external: bool,
     /// A DM with an app.
     pub(crate) app: bool,
+}
+
+/// What places a booted workspace's conversations: its team, and what places each one (by id).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Placing {
+    pub(crate) team: String,
+    pub(crate) facts: Vec<(String, Facts)>,
+}
+
+impl Placing {
+    /// The update of the workspace's sidebar to Slack's `listed` sections; none when they are
+    /// unknown (the sidebar stays as it is).
+    pub(crate) fn update(&self, listed: Option<Vec<ChannelSection>>, diag: &Diag) -> Option<Live> {
+        let sidebar = Sidebar::new(&self.team, Some(listed?), diag);
+        let places = self.facts.iter().map(|(id, f)| (ConversationId::new(id), sidebar.place(id, *f))).collect();
+        Some(Live::Sections { workspace: WorkspaceId::new(&self.team), sections: sidebar.sections, places })
+    }
 }
 
 impl Sidebar {

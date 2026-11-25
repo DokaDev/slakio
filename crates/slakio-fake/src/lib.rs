@@ -83,6 +83,8 @@ pub enum Fault {
     Answer(serde_json::Value),
     /// The world's own answer: a place in the queue, so the fault after it is the next request's.
     Pass,
+    /// The world's own answer, after this long (one slow answer).
+    Late(std::time::Duration),
     /// This status, these headers (a `location`, a `content-type`, a `content-length` that may
     /// lie) and these bytes, as they are.
     Raw { status: u16, headers: Vec<(String, String)>, body: Vec<u8> },
@@ -302,6 +304,13 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
     }
+    let fault = match fault {
+        Some(Fault::Late(late)) => {
+            tokio::time::sleep(late).await;
+            None
+        }
+        other => other,
+    };
     if logged.method() == FILES {
         return serve_file(stream, &world, &logged, fault).await;
     }
@@ -325,7 +334,7 @@ async fn serve(mut stream: TcpStream, world: Arc<World>, team: usize, shared: Ar
         Some(Fault::Raw { status, headers, body }) => {
             return write_raw(stream, status, &headers, &body).await;
         }
-        None | Some(Fault::Pass) => {
+        None | Some(Fault::Pass | Fault::Late(_)) => {
             let mut answer = if paged && logged.method() == "users.channelSections.list" {
                 sidebar::paged(&world, team, &logged)
             } else {

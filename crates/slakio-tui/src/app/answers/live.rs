@@ -49,6 +49,18 @@ impl App {
                 !known.is_empty()
             }
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),
+            // The cursor stays on its row (a conversation, a header) when rows come and go
+            // around it, a header that is gone among them.
+            Live::Sections { workspace, sections, places } => {
+                let anchor = self.shell.anchor(&self.model);
+                if !self.model.resection(&workspace, sections, &places) {
+                    return false;
+                }
+                let h = self.list_height();
+                self.shell.clamp(&self.model, h);
+                self.shell.restore(anchor, &self.model, h);
+                true
+            }
         }
     }
 

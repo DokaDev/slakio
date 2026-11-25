@@ -18,7 +18,6 @@ use crate::client::Client;
 use crate::error::SlackError;
 use crate::governor::Priority;
 use crate::method::Method;
-use crate::people::People;
 use crate::request::Call;
 use crate::sidebar::Facts;
 use crate::wire;
@@ -38,8 +37,22 @@ pub(crate) type Me = std::sync::Arc<Mutex<Option<UserId>>>;
 /// How many people one `dnd.teamInfo` asks about.
 pub const DND_BATCH: usize = 80;
 
-/// The answer to a boot of `client`'s workspace.
-pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Event, SlackError> {
+/// How long the boot answer waits for the sidebar's sections once the rest of it is read: when
+/// they come later, the answer has the default sections and they follow as an update.
+pub const SECTIONS_GRACE: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The sidebar's sections still being read when the boot answered: the update to push once
+/// they come ([`crate::sidebar::Placing::update`]).
+pub(crate) type Pending = tokio::task::JoinHandle<Option<Vec<crate::sidebar::ChannelSection>>>;
+
+/// The answer to a boot of `client`'s workspace, and the sidebar's sections when they are still
+/// being read (`session`: the user's id, the people, and what places each conversation are
+/// kept there).
+pub(crate) async fn boot(
+    client: &std::sync::Arc<Client>,
+    session: &crate::adapter::Session,
+) -> Result<(Event, Option<Pending>), SlackError> {
+    let (me, people) = (&session.me, &session.people);
     let boot: wire::UserBoot = client.call(&crate::login::user_boot(), Priority::User).await?;
     let (Some(team), Some(self_)) = (boot.team.as_ref(), boot.me.as_ref()) else {
         return Err(SlackError::Network { detail: "the start answer has no team or user".to_string() });
@@ -48,8 +61,12 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
     people.set_team(&team.id);
     *me.lock().unwrap_or_else(PoisonError::into_inner) = Some(UserId::new(&self_.id));
     let counts = counts(client).await;
-    // The sidebar's sections: unknown when they cannot be read (the two default ones then).
-    let sidebar = crate::sidebar::Sidebar::new(&team.id, crate::sections::fetch(client).await, client.diag());
+    // The sidebar's sections, read alongside the rest: the answer never waits for them longer
+    // than [`SECTIONS_GRACE`].
+    let mut sections: Pending = {
+        let client = std::sync::Arc::clone(client);
+        tokio::spawn(async move { crate::sections::fetch(&client).await })
+    };
     // The DMs' people, by name (in batches); those not found show their id.
     let peers: Vec<String> = boot.ims.iter().flatten().filter_map(|im| im.user.clone()).collect();
     // The user too, when the start bundle has no photo of them; and the people of the group DMs
@@ -96,7 +113,19 @@ pub(crate) async fn boot(client: &Client, me: &Me, people: &People) -> Result<Ev
             u.presence = if on { Presence::Dnd } else { Presence::Unknown };
         }
     }
-    Ok(Event::Booted(Box::new(snapshot(boot, counts, known, now, sidebar))))
+    // Unknown when they cannot be read, or not yet: the two default sections then.
+    let (listed, pending) = match tokio::time::timeout(SECTIONS_GRACE, &mut sections).await {
+        Ok(listed) => (listed.ok().flatten(), None),
+        Err(_) => (None, Some(sections)),
+    };
+    let unknown = listed.is_none();
+    let sidebar = crate::sidebar::Sidebar::new(&team.id, listed, client.diag());
+    let team_id = team.id.clone();
+    let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
+    snapshot.sections = sidebar.sections;
+    snapshot.sections_unknown = unknown;
+    *session.placing.lock().unwrap_or_else(PoisonError::into_inner) = crate::sidebar::Placing { team: team_id, facts };
+    Ok((Event::Booted(Box::new(snapshot)), pending))
 }
 
 /// The unread counts (`client.counts`, in the background share); `None` when they could not be
@@ -142,15 +171,16 @@ pub(crate) fn unread_counts(counts: wire::Counts) -> HashMap<String, (u32, u32)>
 }
 
 /// The snapshot of `boot` (with a team and a user), its counts `counts` (`None`: unknown), the
-/// people `known`, at `now` (seconds), its conversations placed in the sections of `sidebar`.
+/// people `known`, at `now` (seconds), its conversations placed in the sections of `sidebar`
+/// (the sections themselves left out), and what placed each one.
 fn snapshot(
     boot: wire::UserBoot,
     counts: Option<wire::Counts>,
     known: Vec<User>,
     now: u64,
-    sidebar: crate::sidebar::Sidebar,
-) -> Snapshot {
-    let (Some(team), Some(me)) = (boot.team, boot.me) else { return Snapshot::default() };
+    sidebar: &crate::sidebar::Sidebar,
+) -> (Snapshot, Vec<(String, Facts)>) {
+    let (Some(team), Some(me)) = (boot.team, boot.me) else { return (Snapshot::default(), Vec::new()) };
     let ws = WorkspaceId::new(&team.id);
     let counts_failed = counts.is_none();
     let unread = counts.map(unread_counts).unwrap_or_default();
@@ -177,6 +207,7 @@ fn snapshot(
     let channels = boot.channels.unwrap_or_default();
     let own_teams: Vec<&str> = std::iter::once(team.id.as_str()).chain(team.enterprise_id.as_deref()).collect();
     let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), (&known, &own_teams), &me);
+    let facts: Vec<(String, Facts)> = listed.iter().map(|(id, _, _, f)| (id.clone(), *f)).collect();
     let conversations: Vec<Conversation> =
         listed.into_iter().map(|(id, name, kind, facts)| conversation(id, name, kind, facts)).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
@@ -188,7 +219,7 @@ fn snapshot(
         Some(true) => Presence::Dnd,
         _ => Presence::Unknown,
     };
-    Snapshot {
+    let snapshot = Snapshot {
         workspaces: vec![Workspace {
             id: ws.clone(),
             name: Remote::new(team.name.clone().unwrap_or_else(|| team.id.clone())),
@@ -208,13 +239,15 @@ fn snapshot(
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
         .collect(),
-        sections: sidebar.sections,
+        sections: Vec::new(),
         conversations,
         // Saved items are not read in this version: unknown, not none.
         saved: None,
         taken: Ts(now_micros()),
         counts_failed,
-    }
+        sections_unknown: false,
+    };
+    (snapshot, facts)
 }
 
 /// The conversations of the start bundle's `channels` (group DMs among them) and `ims`, the

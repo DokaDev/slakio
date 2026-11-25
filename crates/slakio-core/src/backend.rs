@@ -7,14 +7,15 @@
 //! late, or never). Only one wiring file of the UI names a concrete backend.
 
 use crate::model::{
-    Conversation, ConversationId, File, FileId, Message, SavedId, SavedItem, Section, Target, Ts, User, Workspace,
-    WorkspaceId,
+    Conversation, ConversationId, File, FileId, Message, SavedId, SavedItem, Section, SectionId, Target, Ts, User,
+    Workspace, WorkspaceId,
 };
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
 mod activity;
+mod sections;
 pub use activity::{ACTIVITY_PAGE, CURSOR_MAX, Feed, Notice, NoticeKind};
 
 /// Which request an event answers. The UI bumps it for every new request of the same kind and
@@ -216,6 +217,10 @@ pub struct Snapshot {
     /// The unread counts could not be read: every conversation's `unread` and `mentions` here
     /// are unknown, not zero (the UI keeps those it had, and says so).
     pub counts_failed: bool,
+    /// Slack's sidebar sections are not known (yet): `sections` are the default ones and each
+    /// conversation is in its default section. The sections known before stay, and so does
+    /// where each conversation known before was; [`Live::Sections`] may follow.
+    pub sections_unknown: bool,
 }
 
 impl Snapshot {
@@ -230,6 +235,7 @@ impl Snapshot {
             saved: self.saved.as_ref().map(|items| items.iter().filter(|s| &s.workspace == ws).cloned().collect()),
             taken: self.taken,
             counts_failed: self.counts_failed,
+            sections_unknown: self.sections_unknown,
         }
     }
 }
@@ -326,6 +332,10 @@ pub enum Live {
     /// came meanwhile in conversations not open is counted there): (conversation, unread,
     /// mentions) of each conversation Slack listed; one it did not list has none, as at a boot.
     Counts { workspace: WorkspaceId, counts: Vec<(ConversationId, u32, u32)> },
+    /// Slack's sidebar sections of `workspace`, read after its boot answered: they replace the
+    /// workspace's sections, and each conversation `places` names goes to its section (one it
+    /// does not name stays where it is).
+    Sections { workspace: WorkspaceId, sections: Vec<Section>, places: Vec<(ConversationId, SectionId)> },
     /// People of `workspace` whose profile changed (a new photo, none of their own any more, a
     /// new name): each replaces what the UI knows of them; one it does not know is left out.
     People { workspace: WorkspaceId, users: Vec<User> },

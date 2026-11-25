@@ -309,7 +309,7 @@ fn read(conn: &Connection, ws: &WorkspaceId) -> rusqlite::Result<Option<Snapshot
         "unknown" => None,
         _ => return Err(damaged("saved marker")),
     };
-    Ok(Some(Snapshot { workspaces, users, sections, conversations, saved, taken, counts_failed: false }))
+    Ok(Some(Snapshot { workspaces, users, sections, conversations, saved, taken, ..Snapshot::default() }))
 }
 
 impl Store {

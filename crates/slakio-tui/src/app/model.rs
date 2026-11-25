@@ -561,5 +561,6 @@ pub mod activity;
 mod forget;
 mod photos;
 mod saved;
+mod sections;
 #[cfg(test)]
 mod tests;

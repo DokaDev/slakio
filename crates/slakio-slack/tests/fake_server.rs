@@ -177,11 +177,14 @@ fn the_backend_boots_from_the_start_bundle_and_reads_a_conversation() {
         assert!(handle.capabilities.read_only && !handle.capabilities.demo);
         ask(&handle, 1, Command::Boot);
         let Event::Booted(snapshot) = next(&mut handle).await.event else { panic!("booted") };
-        assert_eq!(
-            fake.methods(),
-            ["client.userBoot", "client.counts", "users.channelSections.list", "users/info", "dnd.teamInfo"],
-            "the DMs' people by name, and whether they are in do not disturb"
-        );
+        // The sections are read alongside the DMs' people (by name) and whether they are in do
+        // not disturb: in either order.
+        let methods = fake.methods();
+        assert_eq!(methods[..2], ["client.userBoot", "client.counts"]);
+        let mut rest = methods[2..].to_vec();
+        rest.sort();
+        assert_eq!(rest, ["dnd.teamInfo", "users.channelSections.list", "users/info"]);
+        assert!(!snapshot.sections_unknown, "the sections came in time");
         assert_eq!(snapshot.workspaces[0].id, ws.id);
         assert_eq!(snapshot.saved, None, "saved items are unknown, not none");
         // Every conversation, the open group DMs too, named as the world names them, in the
