@@ -14,12 +14,12 @@ use std::time::Instant;
 
 impl Images {
     /// The pictures asked of the backend or being decoded from its answer (the network's share).
-    fn in_flight(&self) -> usize {
+    pub(super) fn in_flight(&self) -> usize {
         self.entries.values().filter(|e| matches!(e, Entry::Asked(_) | Entry::Decoding(_))).count()
     }
 
     /// The looks in the cache on disk not ended yet.
-    fn looking(&self) -> usize {
+    pub(super) fn looking(&self) -> usize {
         self.entries.values().filter(|e| matches!(e, Entry::Looking(_))).count()
     }
 
@@ -53,7 +53,8 @@ impl Images {
     /// asked of the backend (at most [`IN_FLIGHT_MAX`] at once, and none while the pictures on
     /// screen and those on their way fill the terminal's room; a failed one once its wait is
     /// over); what it only laid out is neither. A parked picture that would now fit may be
-    /// asked again. `true` when something was asked or looked for.
+    /// asked again. Then, everything wanted asked for, a photo ahead ([`super::ahead`]). `true`
+    /// when something was asked or looked for.
     pub fn ask(&mut self, requests: &mut Requests, now: Instant) -> bool {
         let mut screen = HashSet::new();
         for (key, _) in self.drawn.take().into_iter().filter(|d| d.1) {
@@ -71,12 +72,14 @@ impl Images {
         let mut wanted: Vec<_> = self.wanted.take().into_iter().filter(|w| w.2).collect();
         wanted.sort_by_key(|w| w.1.1 == CHIP_PHOTO);
         let mut asked = self.look_up_all(&wanted, now);
+        let mut all = true;
         for (ws, key, _) in wanted {
             let in_flight = self.in_flight();
             if in_flight >= IN_FLIGHT_MAX {
                 if self.diag.on() {
                     note::once(&self.diag, &key, Stage::Skipped, "in-flight", &[("in_flight", in_flight.to_string())]);
                 }
+                all = false;
                 break;
             }
             if self.full(&key, in_flight + self.looking()) {
@@ -105,6 +108,10 @@ impl Images {
             self.entries.insert(key, Entry::Asked(id));
             asked = true;
         }
+        // Photos ahead only once everything this frame wanted is asked for.
+        if all {
+            asked |= self.ask_ahead(requests, now);
+        }
         asked
     }
 
@@ -124,6 +131,11 @@ impl Images {
     /// Picture request `id` failed (`kind`) at `now`: `true` when it was one of these.
     pub fn failed(&mut self, id: Generation, kind: &FailKind, now: Instant) -> bool {
         let Some(key) = self.asked.remove(&id) else { return false };
+        self.ahead.flying.remove(&key);
+        // Busy, offline or the budget spent, for any picture: nothing more is asked ahead a while.
+        if matches!(kind, FailKind::Busy | FailKind::Offline | FailKind::CapReached) {
+            self.ahead.paused_until = Some(now + RETRY_AFTER);
+        }
         let why = match kind {
             FailKind::TooLarge => Why::TooLarge,
             FailKind::Api { code } if code == "not_an_image" => Why::Unreadable,

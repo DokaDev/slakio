@@ -32,6 +32,7 @@
 //! once and outside the network's [`IN_FLIGHT_MAX`] (a file's preview never is: it is never
 //! kept on disk). A GIF emoji or photo moves ([`frames`], [`animate`]).
 
+mod ahead;
 pub mod animate;
 mod ask;
 pub mod cached;
@@ -44,6 +45,7 @@ mod note;
 mod room;
 mod wake;
 
+pub use ahead::{AHEAD_MAX, AHEAD_PER_HOUR, AHEAD_PER_MINUTE, AHEAD_QUEUE_MAX};
 use decode::{Refused, Shape};
 use slakio_core::backend::Generation;
 use slakio_core::diag::{Diag, Stage};
@@ -246,6 +248,8 @@ pub struct Images {
     /// Looks there to hand to the binary ([`Images::take_lookups`]).
     lookups: Vec<Job>,
     anims: animate::Anims,
+    /// The DM peers' photos asked for ahead of their rows ([`ahead`]).
+    ahead: ahead::Ahead,
 }
 
 impl Images {
@@ -281,6 +285,7 @@ impl Images {
             // Looks not handed over yet are not run; the emptying of the disk always is.
             self.lookups.retain(|j| j.empty);
             self.missed.clear();
+            self.forget_ahead();
         }
         self.on = on;
     }
@@ -304,6 +309,7 @@ impl Images {
     /// or being decoded are not waited for.
     pub fn forget_photos(&mut self) {
         self.forget_where(|k| matches!(k.0, Source::Avatar(_)));
+        self.forget_ahead();
     }
 
     /// Workspace `ws` is signed in to as someone else: its own emoji go, the list and the
@@ -461,6 +467,7 @@ impl Images {
         let Some(key) = self.entries.iter().find(|(k, e)| k.0 == source && mine(e)).map(|(k, _)| k.clone()) else {
             return;
         };
+        let ahead = self.ahead.flying.remove(&key);
         let mut p = match result {
             Ok(p) => p,
             Err(Refused::NotCached) => return self.not_cached(key),
@@ -472,6 +479,9 @@ impl Images {
             }
         };
         note::decoded(&self.diag, &key, &p);
+        if ahead && self.let_go_ahead(&key, p.bytes) {
+            return;
+        }
         while self.held.len() >= ENTRIES_MAX || (self.bytes + p.bytes > BYTES_CAP && !self.held.is_empty()) {
             let off = self.held.iter().position(|k| !self.on_screen(k));
             let chip = || self.held.iter().position(|k| k.1 == CHIP_PHOTO);

@@ -18,6 +18,7 @@
 //! are never offered to open.
 
 use super::dialog::{Dialog, Question};
+use super::model::Row;
 use super::overlay::Layer;
 use super::picker::{LETTERS, hint_letters, list_rect};
 use super::status::{INFO_FOR, Level, Notice};
@@ -29,7 +30,8 @@ use ratatui::crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEventKi
 use ratatui::layout::{Position, Rect};
 use slakio_core::backend::{Command, FailKind, Generation};
 use slakio_core::i18n::{Label, Msg};
-use slakio_core::model::{File, FileId, WorkspaceId};
+use slakio_core::images::Source;
+use slakio_core::model::{ConversationKind, File, FileId, WorkspaceId};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -94,8 +96,9 @@ pub fn size_words(bytes: u64) -> String {
 impl App {
     /// After a frame: ask the backend for the pictures it would have shown and does not have
     /// ([`crate::images::Images::ask`]), and for the lists of the workspaces' own emoji it showed
-    /// a shortcode of, once booted ([`crate::images::custom::Customs::ask`]). `true` when something
-    /// was asked.
+    /// a shortcode of, once booted ([`crate::images::custom::Customs::ask`]), and then for the
+    /// photos of the DM rows out of view ([`crate::images::Images::offer_ahead`]). `true` when
+    /// something was asked.
     pub fn ask_images(&mut self, now: Instant) -> bool {
         let model = &self.model;
         self.images.customs.booted_only(|ws| model.is_fresh(ws));
@@ -103,10 +106,29 @@ impl App {
         // Under a popup that covers the messages, nothing moves.
         let covers = |l: &Layer| matches!(l, Layer::Dialog | Layer::Settings | Layer::Help | Layer::Files);
         self.images.cover(self.layers(None).iter().any(covers));
+        let photos = self.settings.photos && self.settings.avatars;
+        let dms = if photos { self.dm_photos() } else { Vec::new() };
+        self.images.offer_ahead(photos, dms);
         let asked = self.images.ask(&mut self.work.requests, now) | lists;
         // Looks in the cache on disk run off the loop's thread, as decodes do.
         self.effects.extend(self.images.take_lookups().into_iter().map(Effect::Decode));
         asked
+    }
+
+    /// The photo of each 1:1 DM's peer the list lists, top down, out of view too (to ask for
+    /// ahead, [`crate::images::Images::offer_ahead`]).
+    fn dm_photos(&self) -> Vec<(WorkspaceId, Source)> {
+        let rows = self.list_rows().into_iter().filter_map(|r| match r {
+            Row::Conversation(i) => Some(self.model.conversation(i)),
+            _ => None,
+        });
+        rows.filter_map(|c| match &c.kind {
+            ConversationKind::Dm { user } => {
+                Some((c.workspace.clone(), Source::Avatar(self.model.user(&c.workspace, user)?.avatar.clone()?)))
+            }
+            _ => None,
+        })
+        .collect()
     }
 
     /// `f`: download a file of the selected message (the one it has, or the one picked).
