@@ -536,3 +536,31 @@ fn the_photos_done_ahead_are_kept_within_a_bound() {
     }
     assert!(t.images.ahead.done.contains(&(dm(3 * crate::images::FAILED_MAX - 1), CHIP_PHOTO)), "the latest kept");
 }
+
+#[test]
+fn a_photo_ahead_let_go_is_not_looked_for_again() {
+    // A first run fetched a DM row's photo ahead and kept it.
+    let mut first = T::new("let-go");
+    first.pump(&[], 1, 4);
+    assert_eq!(first.dm_held(), 1);
+    let dir = std::mem::take(&mut first.dir);
+    drop(first);
+    // The next run's terminal is full of what is on screen.
+    let mut t = T::over(dir);
+    let screen: Vec<Key> = (0..ENTRIES_MAX).map(shown).collect();
+    for _ in 0..40 {
+        t.pump(&screen, 0, 1);
+    }
+    assert_eq!(t.images.held().0, ENTRIES_MAX);
+    // Read from the disk, it does not fit and is let go: then it is not looked for again.
+    let mut looks = 0;
+    for _ in 0..10 {
+        let (jobs, asked) = t.frame(&screen, 1);
+        assert!(asked.is_empty(), "nothing fetched: {asked:?}");
+        looks += jobs.iter().filter(|j| j.source == dm(0)).count();
+        t.look(jobs);
+        t.now += Duration::from_secs(61);
+    }
+    assert_eq!(looks, 1, "looked for once");
+    assert_eq!(t.dm_held(), 0, "let go");
+}
