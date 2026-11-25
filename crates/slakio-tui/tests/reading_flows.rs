@@ -285,7 +285,8 @@ fn compact_tags_leave_the_name_six_cells_and_read_apart_from_a_name() {
 }
 
 /// A stacked sender's row (a pane narrower than its columns) keeps the name six cells the same
-/// way, at the narrowest terminal (50: an 18-cell pane) and where the pane starts stacking.
+/// way, at the narrowest terminal (50: an 18-cell pane) and where the pane starts stacking;
+/// where even that leaves no room, a bot's name gives way to its `▣`, an `ext` goes.
 #[test]
 fn stacked_tags_leave_the_name_six_cells() {
     let long = "Partner Release Notifier Bot";
@@ -293,8 +294,10 @@ fn stacked_tags_leave_the_name_six_cells() {
         (50, "Bo", true, false, "B  Bo ▣ · "),
         (50, "Bo", false, true, "B  Bo ⇄ · "),
         (50, "Bo", true, true, "B  Bo ▣ · "),
-        (50, "Hanbit", true, true, "H  Hanb… · "),
-        (50, long, true, true, "PB Part… · "),
+        (50, "Hanbit", true, true, "H  Ha… ▣ · "),
+        (50, "Hanbit", false, true, "H  Hanb… · "),
+        (50, long, true, true, "PB Pa… ▣ · "),
+        (50, long, false, true, "PB Part… · "),
         (56, "Bo", true, true, "B  Bo app ext · "),
         (56, "Hanbit", true, true, "H  Hanbit ▣ ⇄ · "),
         (56, long, true, false, "PB Partne… app · "),
@@ -307,5 +310,21 @@ fn stacked_tags_leave_the_name_six_cells() {
         let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
         let header = screen.lines().nth(y - 1).unwrap();
         assert!(header.contains(&format!("││ {want}")), "{w} {name} {bot} {ext}: want {want:?} in {header:?}");
+    }
+}
+
+/// A bot's `▣` is never dropped (its name and photo may pass for a person's): at the narrowest
+/// terminal (50: an 18-cell pane) a long name is cut to its first letter rather than lose it.
+#[test]
+fn a_bot_keeps_its_app_mark_at_the_narrowest_width() {
+    use slakio_tui::ui::timeline::message::APP_MARK;
+    for name in ["Partner Release Notifier Bot", "Hanbit", "Bo"] {
+        for ext in [false, true] {
+            let (_, s) = compact_sender(slakio_tui::theme::Theme::terminal(), 50, name, true, ext);
+            let screen = s.d.screen();
+            let y = screen.lines().position(|l| l.contains("Shipped")).unwrap();
+            let header = screen.lines().nth(y - 1).unwrap();
+            assert!(header.contains(APP_MARK), "{name} {ext}: {header:?}");
+        }
     }
 }

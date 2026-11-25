@@ -40,6 +40,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::model::{Org, WorkspaceId};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The sender's column, at most (compact).
 const AUTHOR_WIDTH: usize = 14;
@@ -375,7 +376,9 @@ fn tags(app: &App, pane: &Pane, m: &Shown, room: usize) -> String {
 
 /// The tags of a sender named `name` in `room` cells shared with the name, which keeps
 /// [`NAME_FLOOR`] cells: the `words` while they leave it that, else the marks, else only the
-/// more important one, `app` (a bot's name and photo may pass for a person's), else none.
+/// more important one, `app`. A bot's `app` mark is never let go for the floor (its name and
+/// photo may pass for a person's): the name gives way, down to its first character and the
+/// ellipsis; `ext` goes. None for a person past the floor.
 fn fit_tags(name: &str, bot: bool, ext: bool, words: (&str, &str), room: usize) -> String {
     let both = |app: &str, ext_: &str| {
         let mut out = String::new();
@@ -389,9 +392,13 @@ fn fit_tags(name: &str, bot: bool, ext: bool, words: (&str, &str), room: usize) 
     };
     let one = if bot { format!(" {APP_MARK}") } else { both("", EXT_MARK) };
     let floor = width(name).min(NAME_FLOOR);
+    let first = name.graphemes(true).next().map_or(0, crate::text::grapheme_width);
+    let least = width(name).min(first + 1);
+    let fits = |tag: &String, left: usize| room.saturating_sub(width(tag)) >= left && width(tag) < room;
     [both(words.0, words.1), both(APP_MARK, EXT_MARK), one]
         .into_iter()
-        .find(|tag| room.saturating_sub(width(tag)) >= floor && width(tag) < room)
+        .find(|tag| fits(tag, floor))
+        .or_else(|| bot.then(|| format!(" {APP_MARK}")).filter(|tag| fits(tag, least)))
         .unwrap_or_default()
 }
 
@@ -524,16 +531,22 @@ mod tests {
     use ratatui::style::Style;
 
     #[test]
-    fn a_name_keeps_its_floor_while_a_tag_shows_and_app_goes_last() {
+    fn a_name_keeps_its_floor_while_a_tag_shows_and_app_goes_never() {
+        let app = format!(" {APP_MARK}");
         for name in ["B", "Bo", "Hanbit", "Partner Release Notifier Bot"] {
             for (bot, ext) in [(true, false), (false, true), (true, true)] {
                 for room in 0..30 {
                     let tag = fit_tags(name, bot, ext, ("app", "ext"), room);
+                    // A bot's mark stays while its name keeps a cell and the ellipsis.
+                    if bot && room >= width(&app) + width(name).min(2) {
+                        assert!(tag.contains("app") || tag.contains(APP_MARK), "{name} {ext} {room}: {tag:?}");
+                    }
                     if tag.is_empty() {
                         continue;
                     }
                     let left = room - width(&tag);
-                    assert!(left >= width(name).min(NAME_FLOOR) && left >= 1, "{name} {bot} {ext} {room}: {tag:?}");
+                    let floor = if tag == app { width(name).min(2) } else { width(name).min(NAME_FLOOR) };
+                    assert!(left >= floor && left >= 1, "{name} {bot} {ext} {room}: {tag:?}");
                     assert_eq!(tag.contains("app") || tag.contains(APP_MARK), bot, "{name} {room}: {tag:?}");
                     if ext && !(tag.contains("ext") || tag.contains(EXT_MARK)) {
                         assert_eq!(tag, format!(" {APP_MARK}"), "only ext goes: {name} {room}");
