@@ -57,7 +57,9 @@ impl App {
             sorting.sections.insert(s.id.clone(), next);
         });
         self.shell.sidebar_edits += 1;
-        self.info(Msg::SectionSortChanged { name: next.name().to_string() }, now);
+        // Said in the UI's language, as the settings name it.
+        let named = if next == Sort::Recent { Label::SettingsSortRecent } else { Label::SettingsSortAlphabetical };
+        self.info(Msg::SectionSortChanged { name: self.i18n.label(named).to_string() }, now);
     }
 
     /// Each workspace's sidebar to keep: the sections folded and those the user ordered, by

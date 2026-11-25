@@ -473,3 +473,23 @@ fn folded_and_ordered_sections_are_kept_with_the_layout_and_taken_again_at_the_n
     let restored = next.d.app.layout_to_save().unwrap();
     assert_eq!(restored.sidebar, back.sidebar, "kept as it was read");
 }
+
+/// In Korean, `:sort-section` says the order chosen in Korean, not by its config value.
+#[test]
+fn sort_section_says_the_order_in_the_ui_s_language() {
+    use slakio_core::i18n::{I18n, Label, Lang};
+    let ko = I18n::new(Lang::Ko);
+    let mut s = Scripted::booted(true, Some(ordered_world()));
+    s.d.app.i18n = I18n::new(Lang::Ko);
+    s.d.app.show_unfolded(View::Home);
+    for order in [Label::SettingsSortRecent, Label::SettingsSortAlphabetical] {
+        on_header(&mut s, SectionKind::Channels);
+        s.keys(":");
+        s.d.type_text("sort-section");
+        s.keys("enter");
+        let screen = s.d.screen();
+        let said = format!("\u{c139}\u{c158} \u{c21c}\u{c11c}: {}", ko.label(order));
+        assert!(screen.contains(&said), "{said} in {screen}");
+        assert!(!screen.contains("recent") && !screen.contains("alphabetical"), "{screen}");
+    }
+}
