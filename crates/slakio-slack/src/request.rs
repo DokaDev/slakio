@@ -194,6 +194,11 @@ impl Session {
         self.team.is_some()
     }
 
+    /// The team signed in to, once signed in.
+    pub(crate) fn team(&self) -> Option<&str> {
+        self.team.as_deref()
+    }
+
     /// Signed in to `team`: the requests after it carry the post-boot parameters.
     pub(crate) fn set_team(&mut self, team: &str) {
         if !team.is_empty() {

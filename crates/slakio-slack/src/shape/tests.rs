@@ -204,7 +204,7 @@ fn the_sidebar_preferences_and_the_counts_entries_tell_names_only() {
     let counts = json!({"ok": true, "channels": [{"id": "C0SECRET", "latest": "1767603600.000100", "has_unreads": true}],
         "ims": [{"id": "D0SECRET", "last_read": "1767603600.000100"}], "mpims": []});
     let raw = Raw { status: 200, retry_after: None, body: counts.to_string().into_bytes() };
-    answered(&d, Method::ClientCounts, &raw);
+    answered(&d, Method::ClientCounts, &raw, None);
     let t = text(&d, &path);
     for secret in ["SECRET", "Secret", "1767603600"] {
         assert!(!t.contains(secret), "{secret} in {t}");

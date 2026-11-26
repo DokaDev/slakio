@@ -61,6 +61,10 @@ pub enum Kind {
     Counts,
     /// The picture cache on disk as a whole (its sweep).
     PictureCache,
+    /// What the start bundle and the lookups say of the team and of other workspaces' people.
+    TeamShape,
+    /// What a page's reactions and rich-text emoji carry.
+    ReactionShape,
 }
 
 impl Kind {
@@ -75,6 +79,8 @@ impl Kind {
             Kind::BootShape => "boot-shape",
             Kind::Counts => "counts-shape",
             Kind::PictureCache => "picture-cache",
+            Kind::TeamShape => "team-shape",
+            Kind::ReactionShape => "reaction-shape",
         }
     }
 

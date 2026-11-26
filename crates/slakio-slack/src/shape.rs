@@ -13,6 +13,8 @@ use slakio_core::diag::{Diag, Kind, Stage, host, refusal, slug};
 use slakio_core::images::Source;
 use std::collections::BTreeMap;
 
+mod probe;
+
 /// The most entries of one list described (sections of a page, DMs of the start bundle).
 const ENTRIES_MAX: usize = 200;
 
@@ -122,8 +124,9 @@ pub(crate) fn sending(diag: &Diag, method: Method, signed_in: bool) {
 }
 
 /// An answer to `method` came off the wire: its status (and Slack's `ok` and error code) for
-/// `emoji.list`, the shape of `client.userBoot`.
-pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw) {
+/// `emoji.list`, the shape of `client.userBoot`, of the team and of other workspaces' people
+/// (`team`: the workspace signed in to, when known), of a page's reactions.
+pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw, team: Option<&str>) {
     if !diag.on() {
         return;
     }
@@ -142,13 +145,31 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw) {
             }
         }
         Method::EdgeUsersInfo => match serde_json::from_slice::<Value>(&raw.body) {
-            Ok(v) => lookup_shape(diag, &v),
+            Ok(v) => {
+                lookup_shape(diag, &v);
+                probe::people(diag, v.get("results").and_then(Value::as_array).into_iter().flatten(), team);
+            }
             Err(_) => diag.line(Kind::Avatar, Stage::Failed, "parse", &[("lookup", "users-info")]),
         },
         Method::ClientUserBoot => match serde_json::from_slice::<Value>(&raw.body) {
-            Ok(v) => boot_shape(diag, &v),
+            Ok(v) => {
+                boot_shape(diag, &v);
+                probe::team(diag, &v);
+            }
             Err(_) => diag.line(Kind::BootShape, Stage::Failed, "parse", &[]),
         },
+        Method::ConversationsHistory | Method::ConversationsReplies | Method::ConversationsView => {
+            let v: Value = serde_json::from_slice(&raw.body).unwrap_or_default();
+            let (page, messages) = match method {
+                Method::ConversationsHistory => ("history", v.get("messages")),
+                Method::ConversationsReplies => ("replies", v.get("messages")),
+                _ => ("view", v.get("history").and_then(|h| h.get("messages"))),
+            };
+            probe::reactions(diag, messages.and_then(Value::as_array).map_or(&[], Vec::as_slice), page);
+            if method == Method::ConversationsView {
+                probe::people(diag, v.get("users").and_then(Value::as_array).into_iter().flatten(), team);
+            }
+        }
         Method::ClientCounts => {
             let v: Value = serde_json::from_slice(&raw.body).unwrap_or_default();
             for (list, label) in [("channels", "channels_key"), ("mpims", "mpims_key"), ("ims", "ims_key")] {

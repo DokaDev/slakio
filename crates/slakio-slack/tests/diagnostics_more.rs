@@ -315,3 +315,74 @@ fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
         assert!(!text.contains("[secret]"), "{text}");
     });
 }
+
+#[test]
+fn the_team_and_reaction_probes_log_key_names_only() {
+    rt().block_on(async {
+        let mut r = Run::new("team-probe", None).await;
+        let world = World::demo();
+        let ws = &world.snapshot().workspaces[0];
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        // A person of the Slack Connect partner, as a lookup gives them (synthetic).
+        let partner = json!({"id": "UPARTNER1", "team_id": "TPARTNER", "name": "partner.person",
+            "is_stranger": true, "enterprise_user": {"id": "WPARTNER"},
+            "profile": {"display_name": "Partner Person", "team": "TPARTNER", "real_name": "Partner Person"}});
+        r.fake.fail_next("users/info", Fault::Answer(json!({"ok": true, "results": [partner]})));
+        // A message of theirs with another workspace's emoji (a synthetic Korean name).
+        let thanks = "\u{AC10}\u{C0AC}";
+        let url = format!("https://{}/TPARTNER/thanks/abc.png", slakio_core::images::EMOJI_HOSTS[0]);
+        let message = json!({"type": "message", "ts": "1700000100.000000", "user": "UPARTNER1", "text": "hi",
+            "reactions": [{"name": thanks, "count": 4, "users": ["UPARTNER1"], "url": url}],
+            "blocks": [{"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [
+                {"type": "emoji", "name": "wave", "url": url}, {"type": "emoji", "name": "smile"}]}]}]});
+        r.fake.fail_next("conversations.history", Fault::Answer(json!({"ok": true, "messages": [message]})));
+        let before = Some(slakio_core::model::Ts(1_800_000_000_000_000));
+        assert!(matches!(r.ask(Command::History { target: general(), before, limit: 28 }).await, Event::History(_)));
+        let text = r.text();
+        for line in [
+            "team-shape field team_key name=id entries=1",
+            "team-shape field team_key name=icon entries=1",
+            "team-shape field team_icon_key name=image_34 entries=1",
+            "team-shape field team_icon_key name=image_default entries=1",
+            "team-shape field boot_team_key name=team type=object count=-",
+            "team-shape field boot_team_key name=connected_teams type=array count=1",
+            "team-shape counted icon_fields where=team name=icon count=1",
+            "team-shape counted icon_fields where=team name=image_34 count=1",
+            "team-shape counted icon_fields where=connected_teams name=image_44 count=1",
+            "team-shape counted external_users count=1",
+            "team-shape field external_user_key name=team_id entries=1",
+            "team-shape field external_user_key name=is_stranger entries=1",
+            "team-shape field external_user_key name=enterprise_user entries=1",
+            "team-shape field external_profile_key name=team entries=1",
+            "reaction-shape field reaction_key name=url entries=1 page=history",
+            "reaction-shape field reaction_key name=name entries=1 page=history",
+            "reaction-shape field emoji_element_key name=url entries=1 page=history",
+            "reaction-shape field emoji_element_key name=name entries=2 page=history",
+            "reaction-shape counted url_on_reaction count=1 page=history",
+            "reaction-shape counted url_on_emoji_element count=1 page=history",
+        ] {
+            has(&text, line);
+        }
+        for secret in [
+            "Partner Co",
+            "TPARTNER",
+            "WPARTNER",
+            "UPARTNER1",
+            "Partner Person",
+            "partner.person",
+            ws.name.unsanitized(),
+            ws.id.as_str(),
+            "fake",
+            "https",
+            concat!("slack", "-edge"),
+            thanks,
+            "thanks",
+            "wave",
+        ] {
+            let lines: Vec<&str> =
+                text.lines().filter(|l| l.contains("team-shape") || l.contains("reaction-shape")).collect();
+            assert!(lines.iter().all(|l| !l.contains(secret)), "{secret:?} in\n{}", lines.join("\n"));
+        }
+        assert!(text.lines().all(|l| !l.contains("Partner Co") && !l.contains("Partner Person")), "{text}");
+    });
+}

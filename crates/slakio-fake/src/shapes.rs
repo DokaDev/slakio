@@ -3,6 +3,7 @@
 
 use crate::Logged;
 use serde_json::{Value, json};
+use slakio_core::images::AVATAR_HOSTS;
 use slakio_core::model::{ConversationId, ConversationKind, Message, Org, Presence, SectionKind, Ts};
 use slakio_world::World;
 
@@ -137,7 +138,11 @@ fn user_boot(world: &World, team: usize) -> Value {
     json!({
         "ok": true,
         "self": {"id": ws.me.as_str(), "name": me.map(|u| u.name.unsanitized()), "team_id": ws.id.as_str(), "profile": own},
-        "team": {"id": ws.id.as_str(), "name": ws.name.unsanitized(), "domain": "fake"},
+        // The team's picture and a Slack Connect partner, as the start bundle may name them.
+        "team": {"id": ws.id.as_str(), "name": ws.name.unsanitized(), "domain": "fake",
+            "icon": {"image_34": format!("https://{}/{}/team_34.png", AVATAR_HOSTS[0], ws.id), "image_default": true}},
+        "connected_teams": [{"id": "TPARTNER", "name": "Partner Co",
+            "icon": {"image_44": format!("https://{}/TPARTNER/team_44.png", AVATAR_HOSTS[0])}}],
         "starred": starred,
         "channels": channels,
         "ims": ims,

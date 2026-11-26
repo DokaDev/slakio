@@ -74,12 +74,13 @@ impl Client {
     pub async fn call<T: DeserializeOwned>(&self, call: &Call, priority: Priority) -> Result<T, SlackError> {
         self.still_signed_in()?;
         let _slot = self.governor.admit_in(&self.lane, call.method, priority).await?;
-        let prepared = {
+        let (prepared, team) = {
             let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             let (session, ids) = &mut *state;
             let ids: &mut dyn Ids = ids;
             crate::shape::sending(&self.diag, call.method, session.signed_in());
-            prepare(call, &self.credentials, session, &self.endpoints, now_ms(), ids, Os::current())?
+            let team = session.team().map(str::to_string);
+            (prepare(call, &self.credentials, session, &self.endpoints, now_ms(), ids, Os::current())?, team)
         };
         // The switch is looked at first: once it is off, nothing more of the request is written.
         let raw = tokio::select! {
@@ -87,7 +88,7 @@ impl Client {
             () = self.governor.stopped() => return Err(SlackError::Offline { why: "the network was switched off" }),
             raw = crate::http::send(&self.endpoints, &prepared) => raw?,
         };
-        crate::shape::answered(&self.diag, call.method, &raw);
+        crate::shape::answered(&self.diag, call.method, &raw, team.as_deref());
         let answer = decode(&raw);
         match &answer {
             Err(SlackError::RateLimited { retry_after }) => self.governor.pause(call.method, *retry_after),
