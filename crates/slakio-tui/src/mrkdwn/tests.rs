@@ -233,3 +233,22 @@ proptest! {
         prop_assert_eq!(letters(&flat(&parse(&text.join(" ")))), letters(&text.join(" ")));
     }
 }
+
+#[test]
+fn a_link_label_s_shortcode_is_its_emoji() {
+    assert_eq!(flat(&parse("<https://x.example|:rocket: launch>")), "\u{1F680} launch");
+    assert_eq!(
+        one("<https://x.example|go :tada:>"),
+        [Piece::Link { url: "https://x.example".into(), label: Some("go \u{1F389}".into()), marks: N }]
+    );
+}
+
+/// A guard: an emoji in the label is no way to hide where the link goes (before and after its
+/// shortcode is drawn).
+#[test]
+fn a_label_naming_another_address_still_shows_where_it_goes() {
+    for link in ["<https://evil.example|:rocket: bank.example>", "<https://evil.example|bank.example:lock:>"] {
+        let shown = flat(&parse(link));
+        assert!(shown.contains("bank.example") && shown.ends_with(" \u{2192} evil.example"), "{link}: {shown}");
+    }
+}

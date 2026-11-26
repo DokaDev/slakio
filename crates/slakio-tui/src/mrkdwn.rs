@@ -148,7 +148,7 @@ fn inline(s: &str, marks: Marks, out: &mut Vec<Piece>) {
                     flush(&mut text, out);
                     let p = match p {
                         Piece::Link { url, label, marks } => {
-                            let label = label.map(|l| unjoined(l, out)).filter(|l| !l.is_empty());
+                            let label = label.map(|l| unjoined(emoji::replace(&l), out)).filter(|l| !l.is_empty());
                             Piece::Link { url, label, marks }
                         }
                         Piece::Group(label) => Piece::Group(label.map(|l| unjoined(l, out))),
