@@ -16,7 +16,8 @@ use std::time::Instant;
 /// The pointer: where the last motion left it, and the last click (for a double click).
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Pointer {
-    /// Where the last move or drag was; `None` before one and once the focus is lost.
+    /// Where the last move or drag was; `None` before one, once the focus is lost and after a
+    /// resize.
     pub at: Option<Position>,
     /// The last click: when, and where.
     pub last_click: Option<(Instant, Position)>,

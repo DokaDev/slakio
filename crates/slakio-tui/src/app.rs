@@ -256,8 +256,11 @@ impl App {
         std::mem::take(&mut self.effects)
     }
 
+    /// The terminal's new size. Where the pointer was says nothing of what is there now: nothing
+    /// is hovered until the next motion.
     pub fn resize(&mut self, width: u16, height: u16) {
         self.size = Rect::new(0, 0, width, height);
+        self.pointer.at = None;
         self.shell.scroll(self.list_height());
     }
 

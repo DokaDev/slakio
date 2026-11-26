@@ -250,3 +250,22 @@ fn no_hover_is_drawn_behind_a_popup() {
     assert!(hovered_rows(&t, &d.buffer()).is_empty(), "the palette is up: nothing hovered under it");
     assert!(!moved(&mut d, a.x + 3, y), "a move under the palette draws nothing");
 }
+
+#[test]
+fn a_resize_clears_the_hover_until_the_next_motion() {
+    let t = resolve("dark", true, Background::Dark);
+    for size in SIZES {
+        let mut d = open(&t, size);
+        let a = area(&d);
+        let (_, y) = other(&d);
+        moved(&mut d, a.x + 2, y);
+        assert!(!hovered_rows(&t, &d.buffer()).is_empty(), "{size:?}");
+        assert!(d.app.handle_event(Event::Resize(100, 30), d.now), "{size:?}: a resize draws");
+        assert_eq!(d.app.hover_at(), None, "{size:?}: the old position says nothing of the new screen");
+        assert!(hovered_rows(&t, &d.buffer()).is_empty(), "{size:?}: nothing hovered after a resize");
+        let a = area(&d);
+        let (_, y) = other(&d);
+        assert!(moved(&mut d, a.x + 2, y), "{size:?}: the next move hovers again");
+        assert!(!hovered_rows(&t, &d.buffer()).is_empty(), "{size:?}");
+    }
+}
