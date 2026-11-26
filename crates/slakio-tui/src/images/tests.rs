@@ -900,3 +900,38 @@ fn the_other_shape_is_made_from_the_bytes_in_the_same_wake() {
     assert_eq!(made.len(), 1);
     assert_eq!((made[0].shape, made[0].bytes.as_slice()), (PHOTO, &[1u8, 2, 3][..]));
 }
+
+/// After a passing failure of one shape, both shapes wanted again ask once; the other shape is
+/// made from those bytes, nothing more asked.
+#[test]
+fn after_a_passing_failure_both_shapes_ask_once_and_share_the_bytes() {
+    let kinds = [
+        FailKind::RateLimited { retry_after: Some(Duration::from_secs(5)) },
+        FailKind::Network,
+        FailKind::Stalled,
+        FailKind::CapReached,
+    ];
+    for kind in kinds {
+        let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+        images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+        images.ask(&mut requests, now);
+        let r = requests.take().pop().expect("asked for the chip");
+        assert!(images.failed(r.id, &kind, now));
+        let later = now + Duration::from_secs(20);
+        images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+        images.look(&ws(), &photo(0));
+        images.ask(&mut requests, later);
+        let asked = requests.take();
+        assert_eq!(asked.len(), 1, "{kind:?}: one request for both shapes: {asked:?}");
+        let job = images.answered(asked[0].id, vec![1, 2, 3]).expect("a job");
+        images.decoded(key(&job), Ok(ready(&job, 10)));
+        images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+        images.look(&ws(), &photo(0));
+        assert!(images.ask(&mut requests, later), "{kind:?}: the other shape made from the bytes");
+        assert!(requests.take().is_empty(), "{kind:?}: nothing more asked of the network");
+        let made = images.take_lookups();
+        assert_eq!(made.len(), 1, "{kind:?}");
+        assert_eq!(made[0].bytes.as_slice(), &[1u8, 2, 3][..], "{kind:?}");
+        assert_ne!(made[0].shape, job.shape, "{kind:?}: the other shape");
+    }
+}
