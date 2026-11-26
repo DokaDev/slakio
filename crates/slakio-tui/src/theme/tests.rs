@@ -378,8 +378,7 @@ fn every_avatar_chip_keeps_its_initials_readable_and_quiet() {
 
 /// A reaction chip reads as a pill: its background stands apart from the background (on a dark
 /// theme lighter, never darker), its text (body text) reads on it at 4.5:1; the user's own is
-/// body text on a chip colour of its own, apart from the others', and the accent reads on the
-/// background at 3:1.
+/// body text on a chip colour of its own, apart from the others', and reads on it at 4.5:1 too.
 #[test]
 fn reaction_chips_stand_off_the_background_and_their_text_reads() {
     for t in truecolor() {
@@ -389,7 +388,8 @@ fn reaction_chips_stand_off_the_background_and_their_text_reads() {
             assert!(luminance(chip) > luminance(t.bg), "{n}: a dark theme's chip is lighter than its bg");
         }
         assert!(contrast(t.fg, chip) >= 4.5, "{n}: text on the chip {:.2}", contrast(t.fg, chip));
-        assert!(contrast(t.bg, t.accent) >= 3.0, "{n}: the user's own chip {:.2}", contrast(t.bg, t.accent));
+        let mine = t.reaction_mine;
+        assert!(contrast(t.fg, mine) >= 4.5, "{n}: text on the user's own chip {:.2}", contrast(t.fg, mine));
         assert_eq!(t.reaction().bg, Some(chip), "{n}");
         assert_eq!(t.reaction(), t.reaction_chip(false).body, "{n}");
         assert_eq!((t.reaction_mine().fg, t.reaction_mine().bg), (Some(t.fg), Some(t.reaction_mine)), "{n}");
