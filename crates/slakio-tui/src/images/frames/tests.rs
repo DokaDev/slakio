@@ -45,6 +45,7 @@ fn delays_at_or_under_ten_ms_are_a_hundred_and_longer_ones_kept_down_to_twenty()
     }
     assert_eq!(delay(0, 0), DELAY_DEFAULT);
     assert_eq!(delay(30, 2), DELAY_FLOOR, "15 ms, as a fraction");
+    assert_eq!(delay(21, 2), DELAY_FLOOR, "10.5 ms is over 10 ms");
 }
 
 #[test]

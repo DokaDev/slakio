@@ -55,8 +55,11 @@ struct Anim {
     shown: usize,
     /// When frame `at` ends on the timeline (not on the grid).
     ideal: Option<Instant>,
-    /// When the loop wakes for it (`ideal` up to the grid); `None` while it does not move.
+    /// When the loop wakes for it (`ideal` up to the grid, or sooner when the budget frees for
+    /// a skipped frame); `None` while it does not move.
     next: Option<Instant>,
+    /// Since when it waits for the budget (`None`: its last frame due was sent).
+    skipped: Option<Instant>,
 }
 
 /// The pictures that can move.
@@ -85,7 +88,7 @@ impl Anims {
     pub(super) fn add(&mut self, key: &Key, id: u32, frames: Vec<(String, Duration)>) {
         self.moving.retain(|k| k != key);
         if frames.len() > 1 {
-            self.list.insert(key.clone(), Anim { id, frames, at: 0, shown: 0, ideal: None, next: None });
+            self.list.insert(key.clone(), Anim { id, frames, at: 0, shown: 0, ideal: None, next: None, skipped: None });
         } else {
             self.list.remove(key);
         }
@@ -108,13 +111,13 @@ impl Anims {
         *self = Self { still: self.still, ..Self::default() };
     }
 
-    /// `at` moved up to the grid.
+    /// `at` moved up to the grid (never before `at`).
     fn on_grid(&mut self, at: Instant) -> Instant {
         let epoch = *self.epoch.get_or_insert(at);
         let since = at.saturating_duration_since(epoch).as_nanos();
         let step = GRID.as_nanos();
-        let steps = u64::try_from(since.div_ceil(step)).unwrap_or(u64::MAX);
-        epoch + GRID.saturating_mul(u32::try_from(steps).unwrap_or(u32::MAX))
+        let up = u64::try_from(since.div_ceil(step) * step).unwrap_or(u64::MAX);
+        epoch.checked_add(Duration::from_nanos(up)).filter(|t| *t >= at).unwrap_or(at)
     }
 }
 
@@ -132,7 +135,7 @@ impl Images {
         let seen = std::mem::take(&mut self.anims.seen);
         for key in &self.anims.moving {
             if let Some(a) = self.anims.list.get_mut(key).filter(|_| !seen.contains(key)) {
-                (a.ideal, a.next) = (None, None);
+                (a.ideal, a.next, a.skipped) = (None, None, None);
             }
         }
         for key in &seen {
@@ -160,9 +163,10 @@ impl Images {
         self.anims.moving.iter().filter_map(|k| self.anims.list.get(k)?.next).min()
     }
 
-    /// The loop woke at `now`: each moving picture whose next frame is due moves on its
-    /// timeline to the frame due now, and is sent it (written before the next frame is drawn)
-    /// when it fits the byte budget. `true` when one was sent.
+    /// The loop woke at `now`: each moving picture moves on its timeline to the frame due now,
+    /// and is sent it (written before the next frame is drawn) when it fits the byte budget.
+    /// Frames that wait for the budget go oldest first, so large ones are not passed over by
+    /// small ones. `true` when one was sent.
     pub fn advance(&mut self, now: Instant) -> bool {
         if !self.on || self.anims.still {
             return false;
@@ -171,24 +175,68 @@ impl Images {
         if let Some(i) = self.anims.last.as_ref().and_then(|l| order.iter().position(|k| k == l)) {
             order.rotate_left(i + 1);
         }
-        let mut sent = false;
-        for key in order {
-            let Some(a) = self.anims.list.get_mut(&key) else { continue };
-            let Some(ideal) = a.ideal.filter(|_| a.next.is_some_and(|at| at <= now)) else { continue };
-            if !held(&self.entries, &key, a.id) {
+        let mut waiting = Vec::new();
+        for (i, key) in order.iter().enumerate() {
+            let Some(a) = self.anims.list.get_mut(key) else { continue };
+            let Some(ideal) = a.ideal else { continue };
+            if !held(&self.entries, key, a.id) {
+                (a.ideal, a.next, a.skipped) = (None, None, None);
                 continue;
             }
-            let ideal = catch_up(a, ideal, now);
-            if a.at != a.shown && self.anims.spent.fits(now, a.frames[a.at].0.len()) {
-                self.graphics.push_str(&a.frames[a.at].0);
-                self.anims.spent.spend(now, a.frames[a.at].0.len());
-                a.shown = a.at;
-                self.anims.last = Some(key.clone());
-                sent = true;
+            if a.next.is_some_and(|at| at <= now) {
+                a.ideal = Some(catch_up(a, ideal, now));
             }
-            let due = self.anims.on_grid(ideal);
-            if let Some(a) = self.anims.list.get_mut(&key) {
-                (a.ideal, a.next) = (Some(ideal), Some(due));
+            // Its place in line is kept until a frame is sent, even while the timeline is back
+            // on the frame the terminal shows.
+            if a.at != a.shown {
+                a.skipped.get_or_insert(now);
+            }
+            if let Some(since) = a.skipped {
+                waiting.push((since, i));
+            }
+        }
+        waiting.sort_unstable();
+        let (mut sent, mut head, mut kept) = (false, None, 0usize);
+        for (_, i) in waiting {
+            let key = &order[i];
+            let Some(a) = self.anims.list.get_mut(key) else { continue };
+            if a.at == a.shown {
+                // Nothing to send yet: it keeps room for its next frame, so those behind it
+                // cannot use up every second (one larger than the budget leaves none).
+                kept = kept.saturating_add(a.frames[(a.at + 1) % a.frames.len()].0.len());
+                continue;
+            }
+            let n = a.frames[a.at].0.len();
+            let fits = if kept == 0 {
+                self.anims.spent.fits(now, n)
+            } else {
+                n.saturating_add(kept) <= self.anims.spent.room(now)
+            };
+            if head.is_some() || !fits {
+                head.get_or_insert(n);
+                continue;
+            }
+            self.graphics.push_str(&a.frames[a.at].0);
+            self.anims.spent.spend(now, n);
+            (a.shown, a.skipped) = (a.at, None);
+            self.anims.last = Some(key.clone());
+            sent = true;
+        }
+        for key in &order {
+            let Some((ideal, behind, n)) =
+                self.anims.list.get(key).and_then(|a| Some((a.ideal?, a.at != a.shown, a.frames[a.at].0.len())))
+            else {
+                continue;
+            };
+            let mut due = self.anims.on_grid(ideal);
+            if behind {
+                // Wake when the budget frees for it (after the first in line), not a cycle later.
+                let free = [n, head.unwrap_or(0)].map(|n| self.anims.spent.free_at(n).unwrap_or(now));
+                let wake = free[0].max(free[1]).max(now + Duration::from_nanos(1));
+                due = due.min(self.anims.on_grid(wake));
+            }
+            if let Some(a) = self.anims.list.get_mut(key) {
+                a.next = Some(due);
             }
         }
         sent
@@ -204,7 +252,7 @@ impl Images {
         self.anims.moving.clear();
         self.anims.seen.clear();
         for (key, a) in &mut self.anims.list {
-            (a.ideal, a.next) = (None, None);
+            (a.ideal, a.next, a.skipped) = (None, None, None);
             a.at = 0;
             if a.shown != 0 {
                 a.shown = 0;

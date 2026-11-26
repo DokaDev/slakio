@@ -65,9 +65,11 @@ impl Moving {
 /// A frame's delay of `numer` / `denom` milliseconds: [`DELAY_DEFAULT`] when that is
 /// [`DELAY_CLAMPED_AT`] or less, else at least [`DELAY_FLOOR`].
 pub fn delay(numer: u32, denom: u32) -> Duration {
-    let ms = if denom == 0 { 0 } else { u64::from(numer) / u64::from(denom) };
-    let said = Duration::from_millis(ms);
-    if said <= DELAY_CLAMPED_AT { DELAY_DEFAULT } else { said.max(DELAY_FLOOR) }
+    let clamped = u64::from(numer) <= DELAY_CLAMPED_AT.as_millis() as u64 * u64::from(denom);
+    if denom == 0 || clamped {
+        return DELAY_DEFAULT;
+    }
+    Duration::from_millis(u64::from(numer) / u64::from(denom)).max(DELAY_FLOOR)
 }
 
 /// The frames of `bytes` (a GIF, or an animated PNG), each made as `l` says, within the bounds.

@@ -32,7 +32,23 @@ impl Spent {
     /// A frame of `n` bytes fits at `now`: within the room, or the only one in the second (one
     /// larger than the whole budget still moves, slowly).
     pub(super) fn fits(&mut self, now: Instant, n: usize) -> bool {
-        n <= self.room(now) || self.sent.is_empty()
+        self.room(now);
+        fits(n, self.total)
+    }
+
+    /// When a frame of `n` bytes will fit if nothing more is sent; `None`: it fits now.
+    pub(super) fn free_at(&self, n: usize) -> Option<Instant> {
+        let mut total = self.total;
+        if fits(n, total) {
+            return None;
+        }
+        for &(at, k) in &self.sent {
+            total -= k;
+            if fits(n, total) {
+                return Some(at + WINDOW);
+            }
+        }
+        None
     }
 
     /// `n` bytes were sent at `now`.
@@ -40,4 +56,9 @@ impl Spent {
         self.sent.push_back((now, n));
         self.total += n;
     }
+}
+
+/// `n` bytes fit beside `total` sent in the second: within the budget, or alone.
+fn fits(n: usize, total: usize) -> bool {
+    total == 0 || n <= ANIM_BYTES_PER_SECOND.saturating_sub(total)
 }

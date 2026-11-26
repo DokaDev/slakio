@@ -86,6 +86,16 @@ struct Sending {
 /// As [`run`], each frame sent as a [`Sending`] (`t` from `start`), frames as [`sized`] made
 /// them for `delays` and `size`.
 fn log(images: &mut Images, start: Instant, span: Duration, delays: &[Duration], size: usize) -> Vec<Sending> {
+    log_by(images, start, span, &|id| sized(id, delays, size))
+}
+
+/// As [`log`], picture `id`'s frames as `frames_of(id)` made them.
+fn log_by(
+    images: &mut Images,
+    start: Instant,
+    span: Duration,
+    frames_of: &dyn Fn(u32) -> Vec<(String, Duration)>,
+) -> Vec<Sending> {
     let mut out = Vec::new();
     let mut t = start;
     while t <= start + span {
@@ -94,7 +104,7 @@ fn log(images: &mut Images, start: Instant, span: Duration, delays: &[Duration],
         let mut rest = images.take_graphics();
         while !rest.is_empty() {
             let id = rest.split("i=").nth(1).and_then(|r| r.split(',').next()).unwrap().parse().unwrap();
-            let all = sized(id, delays, size);
+            let all = frames_of(id);
             let frame = all.iter().position(|f| rest.starts_with(&f.0)).expect("a frame of its own");
             out.push(Sending { t: t - start, id, frame, bytes: all[frame].0.len() });
             rest = rest.split_off(all[frame].0.len());
@@ -336,4 +346,91 @@ fn under_the_budget_every_frame_is_sent() {
     let sent = log(&mut images, now, SECOND, &delays, size);
     assert!(sent.iter().all(|s| (2_900..=3_100).contains(&s.bytes)), "about 3 KB a frame");
     assert_eq!(sent.len(), 25);
+}
+
+/// Picture `id`'s frames made anew (before it is drawn).
+fn remake(images: &mut Images, id: u32, frames: Vec<(String, Duration)>) {
+    images.anims.list.values_mut().find(|a| a.id == id).expect("picture").frames = frames;
+}
+
+/// The bytes sent in the second up to each sending, the largest.
+fn busiest_second(sent: &[Sending], but: Option<u32>) -> usize {
+    let counted = |o: &&Sending| Some(o.id) != but;
+    sent.iter()
+        .map(|s| sent.iter().filter(counted).filter(|o| o.t <= s.t && o.t + SECOND > s.t).map(|o| o.bytes).sum())
+        .max()
+        .unwrap_or(0)
+}
+
+#[test]
+fn a_picture_with_large_frames_still_moves_beside_small_ones() {
+    let small = [ms(20); 10];
+    let (mut images, now) = held_by(8, &small, 8_000);
+    let big = [ms(70); 10];
+    remake(&mut images, 8, sized(8, &big, 120_000));
+    draw(&mut images, 0..8, now);
+    let frames_of = |id| if id == 8 { sized(8, &big, 120_000) } else { sized(id, &small, 8_000) };
+    let sent = log_by(&mut images, now, 10 * SECOND, &frames_of);
+    for id in 1..=8 {
+        let n = sent.iter().filter(|s| s.id == id).count();
+        assert!(n >= 8, "picture {id}: {n} frames in ten seconds");
+    }
+    assert!(busiest_second(&sent, None) <= super::budget::ANIM_BYTES_PER_SECOND);
+}
+
+#[test]
+fn a_frame_larger_than_the_budget_moves_beside_others() {
+    let small = [ms(20); 10];
+    let (mut images, now) = held_by(8, &small, 8_000);
+    let big = [ms(20); 3];
+    remake(&mut images, 8, sized(8, &big, 900_000));
+    draw(&mut images, 0..8, now);
+    let frames_of = |id| if id == 8 { sized(8, &big, 900_000) } else { sized(id, &small, 8_000) };
+    let sent = log_by(&mut images, now, 10 * SECOND, &frames_of);
+    let budget = super::budget::ANIM_BYTES_PER_SECOND;
+    assert!(sent.iter().any(|s| s.bytes > budget), "the frame is larger than the budget");
+    // It needs a second of its own, so it alternates with the others: each moves every two
+    // seconds or so, none is starved.
+    for id in 1..=8 {
+        let n = sent.iter().filter(|s| s.id == id).count();
+        assert!(n >= 4, "picture {id}: {n} frames in ten seconds");
+    }
+    for s in sent.iter().filter(|s| s.id == 8) {
+        let before: usize = sent.iter().filter(|o| o.t < s.t && o.t + SECOND > s.t).map(|o| o.bytes).sum();
+        assert_eq!(before, 0, "sent alone in its second at {:?}", s.t);
+    }
+    assert!(busiest_second(&sent, Some(8)) <= budget, "the others keep to the budget");
+}
+
+#[test]
+fn a_skipped_long_frame_is_shown_when_the_budget_frees() {
+    let delays = [ms(20), 5 * SECOND];
+    let (mut images, now) = held_by(1, &delays, 0);
+    draw(&mut images, [0], now);
+    images.anims.spent.spend(now, super::budget::ANIM_BYTES_PER_SECOND);
+    let sent = log(&mut images, now, 2 * SECOND, &delays, 0);
+    let first = sent.first().expect("frame 1 is sent");
+    assert_eq!(first.frame, 1);
+    assert!(first.t >= SECOND && first.t <= SECOND + GRID, "sent at {:?}, not a cycle later", first.t);
+}
+
+#[test]
+fn the_grid_never_rounds_back_in_time() {
+    let mut anims = Anims::default();
+    let e = Instant::now();
+    assert_eq!(anims.on_grid(e), e);
+    assert_eq!(anims.on_grid(e + ms(3)), e + GRID);
+    let far = e + Duration::from_secs(500 * 24 * 3600);
+    assert!(anims.on_grid(far) >= far, "500 days on");
+}
+
+#[test]
+fn a_picture_no_longer_held_never_wakes_the_loop() {
+    let (mut images, now) = held(1, 3, ms(100));
+    draw(&mut images, [0], now);
+    let at = images.frame_at().expect("a frame due");
+    images.forget_where(|k| matches!(k.0, Source::Emoji(_)));
+    images.take_graphics();
+    assert!(!images.advance(at));
+    assert!(images.frame_at().is_none_or(|t| t > at), "{:?}", images.frame_at());
 }
