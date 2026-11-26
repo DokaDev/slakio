@@ -193,12 +193,13 @@ impl Model {
     }
 
     /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of
-    /// (unless it says they have no photo of their own).
+    /// (unless it says they have no photo of their own), or only a guess of ([`User::photo_over`]).
     pub fn with_photos(&self, mut snapshot: Snapshot) -> Snapshot {
-        let photos: HashMap<(&WorkspaceId, &UserId), &String> =
-            (self.snapshot.users.iter()).filter_map(|u| Some(((&u.workspace, &u.id), u.avatar.as_ref()?))).collect();
-        for u in snapshot.users.iter_mut().filter(|u| u.avatar.is_none() && !u.no_photo) {
-            u.avatar = photos.get(&(&u.workspace, &u.id)).map(|a| (*a).clone());
+        let photos: HashMap<(&WorkspaceId, &UserId), (&String, bool)> = (self.snapshot.users.iter())
+            .filter_map(|u| Some(((&u.workspace, &u.id), (u.avatar.as_ref()?, u.avatar_guessed))))
+            .collect();
+        for u in &mut snapshot.users {
+            (u.avatar, u.avatar_guessed) = u.photo_over(photos.get(&(&u.workspace, &u.id)).copied());
         }
         snapshot
     }
@@ -220,23 +221,21 @@ impl Model {
             (_, None) => {}
         }
         // A photo shown before stays when the answer has none of that person (and does not say
-        // they have no photo of their own).
-        let photos: HashMap<UserId, String> = (s.users.iter())
+        // they have no photo of their own), or only a guess where the old one was given.
+        let photos: HashMap<UserId, (String, bool)> = (s.users.iter())
             .filter(|u| &u.workspace == ws)
-            .filter_map(|u| Some((u.id.clone(), u.avatar.clone()?)))
+            .filter_map(|u| Some((u.id.clone(), (u.avatar.clone()?, u.avatar_guessed))))
             .collect();
         s.users.retain(|u| &u.workspace != ws);
         // One the answer leaves out is no longer shown: their photo is gone.
         let answered: HashSet<&UserId> = new.users.iter().map(|u| &u.id).collect();
-        let left_out = photos.iter().filter(|(id, _)| !answered.contains(id)).map(|(_, a)| a.clone());
+        let left_out = photos.iter().filter(|(id, _)| !answered.contains(id)).map(|(_, (a, _))| a.clone());
         self.gone_photos.extend(left_out);
         let gone = &mut self.gone_photos;
         s.users.extend(new.users.into_iter().map(|mut u| {
-            let old = photos.get(&u.id);
-            if u.avatar.is_none() && !u.no_photo {
-                u.avatar = old.cloned();
-            }
-            gone.extend(old.filter(|o| u.avatar.as_ref() != Some(*o)).cloned());
+            let old = photos.get(&u.id).map(|(a, g)| (a, *g));
+            (u.avatar, u.avatar_guessed) = u.photo_over(old);
+            gone.extend(old.map(|(o, _)| o).filter(|o| u.avatar.as_ref() != Some(*o)).cloned());
             u
         }));
         s.sections.retain(|x| &x.workspace != ws);
@@ -433,10 +432,11 @@ impl Model {
                 Some(&i) => {
                     // A record without a photo does not say the photo is gone; one that says
                     // they have no photo of their own does.
+                    let was = &self.snapshot.users[i];
+                    let (avatar, avatar_guessed) = u.photo_over(was.avatar.as_ref().map(|a| (a, was.avatar_guessed)));
                     let old = self.snapshot.users[i].avatar.take();
-                    let avatar = u.avatar.clone().or_else(|| old.clone().filter(|_| !u.no_photo));
                     self.photo_changed(old, avatar.as_ref());
-                    self.snapshot.users[i] = User { avatar, ..u.clone() };
+                    self.snapshot.users[i] = User { avatar, avatar_guessed, ..u.clone() };
                 }
                 None => {
                     // A bot's author of one more name: past [`BOT_NAMES`] of that bot, it takes

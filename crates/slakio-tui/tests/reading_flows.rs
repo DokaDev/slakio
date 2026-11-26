@@ -203,6 +203,7 @@ fn thread_cut_at(w: u16, h: u16) {
         presence: Presence::Unknown,
         avatar: None,
         no_photo: false,
+        avatar_guessed: false,
     });
     s.b.push(e);
     s.pump();
@@ -246,6 +247,7 @@ fn compact_sender(theme: slakio_tui::theme::Theme, w: u16, name: &str, bot: bool
         presence: Presence::Unknown,
         avatar: None,
         no_photo: false,
+        avatar_guessed: false,
     });
     s.b.push(e);
     s.pump();

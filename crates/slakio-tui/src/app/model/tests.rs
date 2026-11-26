@@ -111,6 +111,7 @@ fn a_person_listed_by_two_workspaces_is_kept_as_each_one_sees_them() {
         presence: slakio_core::model::Presence::Unknown,
         avatar: None,
         no_photo: false,
+        avatar_guessed: false,
     };
     let mut m = Model::default();
     m.add_users(&a, &[peer(&a, Org::Own)]);
@@ -329,6 +330,7 @@ fn a_bot_s_names_kept_as_people_are_capped() {
         presence: slakio_core::model::Presence::Unknown,
         avatar: None,
         no_photo: false,
+        avatar_guessed: false,
     };
     for i in 0..1000 {
         m.add_users(&w, &[bot(i)]);
@@ -354,6 +356,7 @@ fn a_known_photo_is_never_replaced_by_no_photo_but_a_new_photo_replaces_it() {
         presence: slakio_core::model::Presence::Unknown,
         avatar: avatar.map(str::to_string),
         no_photo: false,
+        avatar_guessed: false,
     };
     let host = slakio_core::images::AVATAR_HOSTS[0];
     let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
@@ -394,6 +397,45 @@ fn a_boot_answer_without_a_photo_keeps_the_photo_shown() {
     }
     m.merge(&a, &without, false);
     assert_eq!(m.user(&a, &me).unwrap().avatar.as_deref(), Some(other.as_str()), "a real new photo replaces it");
+}
+
+/// A photo slakio made from the uploaded original (a guess) never replaces one Slack gave, as a
+/// page brings it, as a workspace's boot does and as a whole new boot does; a given one replaces
+/// a guess.
+#[test]
+fn a_guessed_photo_does_not_replace_a_given_one_but_a_given_one_replaces_a_guess() {
+    let (a, part_a) = part(0);
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (given, guess) = (format!("https://{host}/me-real_72.png"), format!("https://{host}/2026-01-05/T1-U1_72.png"));
+    let me = part_a.workspaces[0].me.clone();
+    let with = |avatar: &String, guessed: bool| {
+        let mut s = part_a.clone();
+        for u in s.users.iter_mut().filter(|u| u.id == me) {
+            (u.avatar, u.avatar_guessed) = (Some(avatar.clone()), guessed);
+        }
+        s
+    };
+    let photo = |m: &Model| m.user(&a, &me).unwrap().avatar.clone();
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &with(&given, false), false);
+    let page = User { avatar: Some(guess.clone()), avatar_guessed: true, ..m.user(&a, &me).unwrap().clone() };
+    m.add_users(&a, std::slice::from_ref(&page));
+    assert_eq!(photo(&m), Some(given.clone()), "a page's record");
+    m.merge(&a, &with(&guess, true), false);
+    assert_eq!(photo(&m), Some(given.clone()), "a workspace's boot");
+    let next = m.with_photos(with(&guess, true));
+    assert_eq!(next.users.iter().find(|u| u.id == me).unwrap().avatar, Some(given.clone()), "a whole new boot");
+    // Known only by a guess: a newer guess replaces it, a given photo too.
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &with(&guess, true), false);
+    let newer = format!("https://{host}/2026-02-01/T1-U1_72.png");
+    m.add_users(&a, &[User { avatar: Some(newer.clone()), ..page.clone() }]);
+    assert_eq!(photo(&m), Some(newer), "a guess replaces a guess");
+    m.add_users(&a, &[User { avatar: Some(given.clone()), avatar_guessed: false, ..page }]);
+    assert_eq!(photo(&m), Some(given));
+    assert!(!m.user(&a, &me).unwrap().avatar_guessed);
 }
 
 /// A record that says the person has no photo of their own drops the photo known, as a page
@@ -480,6 +522,7 @@ fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
         presence: slakio_core::model::Presence::Unknown,
         avatar: Some(avatar.to_string()),
         no_photo: false,
+        avatar_guessed: false,
     };
     m.add_users(&w, &[bot(1, &icon), bot(2, &icon)]);
     let _ = m.take_gone_photos();

@@ -296,6 +296,7 @@ fn snapshot(
             bot: false,
             presence,
             no_photo: avatar.is_none() && not_custom,
+            avatar_guessed: own_guessed(&me, &known),
             avatar,
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
@@ -415,6 +416,14 @@ fn own_photo(me: &wire::Me, known: &[User]) -> Option<String> {
         .as_ref()
         .and_then(wire::Profile::avatar)
         .or_else(|| known.iter().find(|u| u.id.as_str() == me.id).and_then(|u| u.avatar.clone()))
+}
+
+/// The user's own photo ([`own_photo`]) is slakio's guess ([`crate::people::guessed`]).
+fn own_guessed(me: &wire::Me, known: &[User]) -> bool {
+    match me.profile.as_ref().filter(|p| p.avatar().is_some()) {
+        Some(p) => crate::people::guessed(p),
+        None => known.iter().find(|u| u.id.as_str() == me.id).is_some_and(|u| u.avatar_guessed),
+    }
 }
 
 pub(crate) fn now_micros() -> u64 {

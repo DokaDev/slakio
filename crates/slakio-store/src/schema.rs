@@ -97,6 +97,9 @@ pub const MIGRATIONS: &[&str] = &[
     // as listed.
     "ALTER TABLE conversations ADD COLUMN latest INTEGER;
      ALTER TABLE sections ADD COLUMN sort INTEGER;",
+    // 8: whether a person's photo is slakio's guess at its 72-pixel copy (1) or an address Slack
+    // gave (0); kept before: a guess, the weakest.
+    "ALTER TABLE users ADD COLUMN avatar_guessed INTEGER NOT NULL DEFAULT 1;",
 ];
 
 /// Where a database stands against `migrations`.

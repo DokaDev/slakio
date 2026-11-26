@@ -158,3 +158,18 @@ fn a_message_and_a_person_kept_before_pictures_were_have_none() {
     let avatar: String = conn.query_row("SELECT avatar FROM users", [], |r| r.get(0)).unwrap();
     assert_eq!((thumbs.as_str(), avatar.as_str()), ("", ""));
 }
+
+#[test]
+fn a_photo_kept_before_guesses_were_told_apart_counts_as_a_guess() {
+    let mut conn = memory();
+    migrate(&mut conn, &MIGRATIONS[..7]).unwrap();
+    conn.execute(
+        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence, avatar)
+         VALUES ('T', 'U', 0, 'u', 'U', NULL, 0, 0, 'https://x.example/a_72.png')",
+        [],
+    )
+    .unwrap();
+    migrate(&mut conn, MIGRATIONS).unwrap();
+    let guessed: bool = conn.query_row("SELECT avatar_guessed FROM users", [], |r| r.get(0)).unwrap();
+    assert!(guessed, "unknown is the weakest");
+}

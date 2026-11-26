@@ -72,8 +72,17 @@ impl App {
                 let known: Vec<_> = (users.into_iter())
                     .filter_map(|u| {
                         let old = self.model.user(&workspace, &u.id)?;
-                        let User { id, workspace: ws, name, display_name, avatar, no_photo, .. } = u;
-                        Some(User { id, workspace: ws, name, display_name, avatar, no_photo, ..old.clone() })
+                        let User { id, workspace: ws, name, display_name, avatar, no_photo, avatar_guessed, .. } = u;
+                        Some(User {
+                            id,
+                            workspace: ws,
+                            name,
+                            display_name,
+                            avatar,
+                            no_photo,
+                            avatar_guessed,
+                            ..old.clone()
+                        })
                     })
                     .collect();
                 self.model.rename_dms(&workspace, &known);

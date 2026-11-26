@@ -183,6 +183,7 @@ fn a_link_s_real_host_is_a_span_of_its_own_and_ids_cannot_pass_for_people() {
         presence: slakio_core::model::Presence::Unknown,
         avatar: None,
         no_photo: false,
+        avatar_guessed: false,
     };
     s.d.app.model.add_users(&ws, &[app]);
     let screen = s.d.screen();

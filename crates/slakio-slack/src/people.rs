@@ -189,12 +189,18 @@ impl People {
 
 /// Keep `u`, replacing what was known of them: a new photo replaces the old one, and one Slack
 /// says they no longer have ([`User::no_photo`]) is gone; a photo known before stays when `u`
-/// says nothing of it (a record without a photo does not say the photo is gone).
+/// says nothing of it (a record without a photo does not say the photo is gone), or when `u`'s
+/// is only slakio's guess and the old one Slack gave ([`User::photo_over`]).
 fn keep(known: &mut HashMap<String, User>, id: &str, mut u: User) {
-    if u.avatar.is_none() && !u.no_photo {
-        u.avatar = known.get(id).and_then(|old| old.avatar.clone());
-    }
+    let old = known.get(id).and_then(|old| Some((old.avatar.as_ref()?, old.avatar_guessed)));
+    (u.avatar, u.avatar_guessed) = u.photo_over(old);
     known.insert(id.to_string(), u);
+}
+
+/// The photo `p` gives is slakio's guess at its 72-pixel copy, made from the uploaded original
+/// ([`wire::Taken::Sized`]), not an address Slack gave.
+pub(crate) fn guessed(p: &wire::Profile) -> bool {
+    p.photo().is_some_and(|(field, _)| p.candidates().iter().any(|(f, _, t)| *f == field && *t == wire::Taken::Sized))
 }
 
 /// `p` as the core's person of `team`; `None` when Slack gave no name to show.
@@ -215,6 +221,7 @@ fn user(p: &wire::Person, team: &str) -> Option<User> {
         presence: Presence::Unknown,
         avatar: p.profile.as_ref().and_then(wire::Profile::avatar),
         no_photo: p.profile.as_ref().is_some_and(wire::Profile::not_custom),
+        avatar_guessed: p.profile.as_ref().is_some_and(guessed),
     })
 }
 

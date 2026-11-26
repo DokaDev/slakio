@@ -96,7 +96,8 @@ fn state(n: i64) -> rusqlite::Result<SavedState> {
 }
 
 /// A person, as a page or the snapshot brings them; `ord` is their place in the snapshot. A photo
-/// kept before stays when `u` has none, unless `u` says it is gone ([`User::no_photo`]).
+/// kept before stays when `u` has none, unless `u` says it is gone ([`User::no_photo`]), and
+/// when `u`'s is only a guess and the one kept was given ([`User::photo_over`]).
 pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> rusqlite::Result<()> {
     let org = match &u.org {
         Org::Own => None,
@@ -104,10 +105,14 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
     };
     let ord = ord.map(|o| int(o as u64)).transpose()?;
     tx.execute(
-        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence, avatar)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "INSERT INTO users (workspace, id, ord, name, display_name, org, bot, presence, avatar, avatar_guessed)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?11)
          ON CONFLICT (workspace, id) DO UPDATE SET ord = COALESCE(?3, ord), name = ?4, display_name = ?5,
-             org = ?6, bot = ?7, presence = ?8, avatar = CASE WHEN ?9 = '' AND NOT ?10 THEN avatar ELSE ?9 END",
+             org = ?6, bot = ?7, presence = ?8,
+             avatar = CASE WHEN (?9 = '' OR (?11 AND NOT avatar_guessed AND avatar <> '')) AND NOT ?10
+                 THEN avatar ELSE ?9 END,
+             avatar_guessed = CASE WHEN (?9 = '' OR (?11 AND NOT avatar_guessed AND avatar <> '')) AND NOT ?10
+                 THEN avatar_guessed ELSE ?11 END",
         params![
             u.workspace.as_str(),
             u.id.as_str(),
@@ -118,7 +123,8 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
             u.bot,
             presence_code(u.presence),
             u.avatar.as_deref().unwrap_or_default(),
-            u.no_photo
+            u.no_photo,
+            u.avatar_guessed
         ],
     )?;
     Ok(())
@@ -139,6 +145,7 @@ pub(crate) fn user(r: &Row<'_>) -> rusqlite::Result<User> {
         // Kept as it came; checked again, as a backend's would be.
         avatar: slakio_core::images::avatar_address(&r.get::<_, String>("avatar")?),
         no_photo: false,
+        avatar_guessed: r.get("avatar_guessed")?,
     })
 }
 

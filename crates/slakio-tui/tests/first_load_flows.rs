@@ -60,6 +60,7 @@ fn busy() -> (Scripted, WorkspaceId, Vec<Request>) {
             presence: Presence::Unknown,
             avatar: Some(photo(&ws, i)),
             no_photo: false,
+            avatar_guessed: false,
         })
         .collect();
     page.messages = (0..PEOPLE)

@@ -188,6 +188,43 @@ fn a_photo_kept_goes_only_when_a_record_says_there_is_none_of_their_own() {
     assert_eq!(kept(&store), None, "no photo of their own: gone");
 }
 
+/// A photo slakio guessed (from the uploaded original) never replaces one Slack gave in the
+/// cache, and whether it is a guess comes back with it; a given photo replaces a guess.
+#[test]
+fn a_guessed_photo_never_replaces_a_given_one_kept() {
+    let world = World::new(5);
+    let mut store = writer("snap-guessed");
+    let s = world.snapshot();
+    let i = s.users.iter().position(|u| u.avatar.is_some()).expect("the world has photos");
+    store.put_snapshot(s).unwrap();
+    let t = target(&world, "general");
+    let kept = |store: &Store| {
+        let back = store.snapshot(&ids(s)).unwrap().unwrap();
+        let u = back.users.into_iter().find(|u| u.id == s.users[i].id).unwrap();
+        (u.avatar, u.avatar_guessed)
+    };
+    let put = |store: &mut Store, avatar: &String, avatar_guessed: bool| {
+        let mut p = page(&world, &t, None, 5);
+        p.users = vec![User { avatar: Some(avatar.clone()), avatar_guessed, ..s.users[i].clone() }];
+        store.put_page(&p, None, 100).unwrap();
+    };
+    let given = s.users[i].avatar.clone().unwrap();
+    let guess = given.replace("_72.png", "_72.jpg");
+    put(&mut store, &guess, true);
+    assert_eq!(kept(&store), (Some(given.clone()), false), "a guess never replaces a given photo");
+    let other = given.replace("_72", "_48");
+    put(&mut store, &other, false);
+    assert_eq!(kept(&store), (Some(other.clone()), false), "a given photo replaces one");
+    let mut store = writer("snap-guessed-2");
+    let mut guessed = s.clone();
+    guessed.users[i].avatar_guessed = true;
+    store.put_snapshot(&guessed).unwrap();
+    put(&mut store, &guess, true);
+    assert_eq!(kept(&store), (Some(guess), true), "a guess replaces a guess");
+    put(&mut store, &other, false);
+    assert_eq!(kept(&store), (Some(other), false), "a given photo replaces a guess");
+}
+
 #[test]
 fn every_section_kind_comes_back_and_an_older_version_does_not_read_them() {
     let mut store = writer("snap-kinds");

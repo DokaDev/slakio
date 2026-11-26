@@ -411,6 +411,7 @@ impl World {
         let user = |id: String, name: &str, display: &str, org: Org, bot: bool| User {
             avatar: crate::pictures::avatar(&ws, &id, bot),
             no_photo: false,
+            avatar_guessed: false,
             id: UserId::new(id),
             workspace: ws.clone(),
             name: name.into(),

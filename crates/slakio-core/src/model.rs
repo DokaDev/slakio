@@ -116,6 +116,26 @@ pub struct User {
     /// a photo known of them before is gone. `false` with no `avatar`: not said, so a photo known
     /// before stays.
     pub no_photo: bool,
+    /// `avatar` is slakio's guess at the photo's 72-pixel copy (made from the uploaded
+    /// original, [`crate::images::avatar_sized`]), not an address Slack gave for it; unknown
+    /// (a photo kept from before) counts as a guess.
+    pub avatar_guessed: bool,
+}
+
+impl User {
+    /// The photo a person has once this newer record of them replaces one whose photo was
+    /// `old` (its address, and whether it was guessed): this record's own, unless it says
+    /// nothing of one (a record without a photo does not say it is gone), or it is only a guess
+    /// and `old` is one Slack gave; none once it says they have no photo of their own.
+    pub fn photo_over(&self, old: Option<(&String, bool)>) -> (Option<String>, bool) {
+        let own = (self.avatar.clone(), self.avatar_guessed);
+        match (&self.avatar, old) {
+            _ if self.no_photo => own,
+            (None, Some((old, guessed))) => (Some(old.clone()), guessed),
+            (Some(_), Some((old, false))) if self.avatar_guessed => (Some(old.clone()), false),
+            _ => own,
+        }
+    }
 }
 
 /// What a sidebar section holds, which decides where new conversations land and how the

@@ -90,6 +90,32 @@ fn a_record_without_a_photo_keeps_the_photo_known_and_a_new_photo_replaces_it() 
 }
 
 #[test]
+fn a_lookup_with_only_the_original_keeps_a_given_image_72() {
+    let people = People::default();
+    people.set_team("T1");
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let given = format!("https://{host}/2026-01-05/real-name_72.jpg");
+    let original = format!("https://{host}/2026-01-05/T1-U1_original.png");
+    let guess = format!("https://{host}/2026-01-05/T1-U1_72.png");
+    let only_original = |id: &str| -> wire::Person {
+        serde_json::from_value(json!({"id": id, "team_id": "T1",
+            "profile": {"display_name": "Minsu", "image_original": original}}))
+        .unwrap()
+    };
+    people.learn(&[person("U1", Some(&given))]);
+    people.learn(&[only_original("U1")]);
+    assert_eq!(photo_of(&people, "U1").as_deref(), Some(given.as_str()), "a guess never replaces a given photo");
+    assert!(!people.known.lock().unwrap()["U1"].avatar_guessed);
+    // Known only by a guess: the guess is kept, and a given photo replaces it.
+    people.learn(&[only_original("U2")]);
+    assert_eq!(photo_of(&people, "U2").as_deref(), Some(guess.as_str()));
+    assert!(people.known.lock().unwrap()["U2"].avatar_guessed);
+    people.learn(&[person("U2", Some(&given))]);
+    assert_eq!(photo_of(&people, "U2").as_deref(), Some(given.as_str()));
+    assert!(!people.known.lock().unwrap()["U2"].avatar_guessed);
+}
+
+#[test]
 fn a_record_saying_no_photo_of_their_own_drops_the_photo_known() {
     let people = People::default();
     people.set_team("T1");
