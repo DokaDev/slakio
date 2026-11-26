@@ -121,7 +121,7 @@ fn blocks_are_one_blank_row_apart_and_reactions_never_touch_the_next_message() {
 }
 
 #[test]
-fn reactions_are_raised_emoji_chips_at_the_text_and_the_users_own_are_filled_with_the_accent() {
+fn reactions_are_quiet_emoji_chips_at_the_text_and_the_users_own_has_its_own_chip() {
     let d = open("general", 160, 50);
     let t = d.app.theme.clone();
     let pane = d.pane(PaneKind::Conversation).unwrap();
@@ -137,8 +137,11 @@ fn reactions_are_raised_emoji_chips_at_the_text_and_the_users_own_are_filled_wit
             let at: Vec<(u16, u16)> = (0..buf.area.height)
                 .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
                 .filter(|&(x, y)| {
+                    // A rounded cap (icons on) takes the pad's cell.
                     buf[(x, y)].symbol().starts_with(e)
-                        && text(&buf, x.saturating_sub(1), y, 6).contains(chip.trim_end())
+                        && text(&buf, x.saturating_sub(1), y, 6)
+                            .replace(['\u{E0B6}', '\u{E0B4}'], " ")
+                            .contains(chip.trim_end())
                 })
                 .collect();
             if at.is_empty() {
@@ -147,7 +150,9 @@ fn reactions_are_raised_emoji_chips_at_the_text_and_the_users_own_are_filled_wit
             seen += 1;
             let ok = at.iter().any(|&(x, y)| {
                 let c = &buf[(x, y)];
-                let pill = if r.mine { c.bg == t.accent } else { c.bg == t.raised() && c.bg != t.bg };
+                let look = t.reaction_chip(r.mine);
+                let own = if r.mine { t.reaction_mine } else { t.reaction };
+                let pill = c.bg == own && Some(c.bg) == look.body.bg && c.fg == look.body.fg.unwrap() && c.bg != t.bg;
                 // The first chip's pad sits in the gap: its emoji lines up with the text (the
                 // gutter, the picture's four cells and two blank ones).
                 let first = buf[(x - 2, y)].bg == t.bg && buf[(x - 3, y)].bg == t.bg;
@@ -156,7 +161,7 @@ fn reactions_are_raised_emoji_chips_at_the_text_and_the_users_own_are_filled_wit
             assert!(
                 ok,
                 "{chip}: {}",
-                if r.mine { "mine filled with the accent" } else { "a raised pill, at the text" }
+                if r.mine { "mine on its own chip colour, at the text" } else { "a quiet pill, at the text" }
             );
         }
     }
