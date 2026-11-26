@@ -205,9 +205,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect, now: Instant) {
     let mut place_text = app.backend.map(|_| {
         let place = match main {
             Some(c) if app.work.focused().is_some_and(|p| p.is_thread()) => {
-                format!("{} › ⤷ {}", breadcrumb(c), app.i18n.label(Label::PaneThread))
+                format!("{} › ⤷ {}", breadcrumb(&app.model, &app.i18n, c), app.i18n.label(Label::PaneThread))
             }
-            Some(c) => breadcrumb(c),
+            Some(c) => breadcrumb(&app.model, &app.i18n, c),
             None => return view.clone(),
         };
         if view_hidden { format!("{view} › {place}") } else { place }

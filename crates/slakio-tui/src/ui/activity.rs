@@ -160,7 +160,7 @@ pub(super) fn foot(f: &mut Frame, app: &App, area: Rect) {
 fn place(app: &App, ws: &WorkspaceId, n: &Notice) -> String {
     let target = Target::Conversation { workspace: ws.clone(), conversation: n.conversation.clone() };
     match app.model.target(&target) {
-        Some(c) => breadcrumb(c),
+        Some(c) => breadcrumb(&app.model, &app.i18n, c),
         None => Remote::new(n.conversation.as_str()).line().into_string(),
     }
 }

@@ -113,6 +113,7 @@
 "list.later_version" = "{view}은(는) 다음 버전에서 제공됩니다"
 "list.empty" = "비어 있습니다"
 "list.external" = "외부"
+"group.others" = "{names} 외 {count}명"
 "section.starred" = "별표"
 "section.channels" = "채널"
 "section.dms" = "다이렉트 메시지"

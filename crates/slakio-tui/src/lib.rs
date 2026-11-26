@@ -18,6 +18,7 @@
 //!   browser.
 //! * [`mrkdwn`] — Slack's message markup read into styled pieces.
 //! * [`text`] — display widths and wrapping; [`time`] — message dates and times.
+//! * [`group_name`] — a group DM named by two of its people and how many more.
 //!
 //! UI-independent logic lives in `slakio-core`.
 
@@ -27,6 +28,7 @@ pub mod avatar;
 pub mod demo;
 pub mod emoji;
 pub mod exchange;
+pub mod group_name;
 pub mod images;
 pub mod input;
 pub mod keymap;

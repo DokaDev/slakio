@@ -147,7 +147,7 @@ fn meta(f: &mut Frame, app: &App, i: usize, area: Rect) {
     let author =
         app.model.user(&s.workspace, &s.author).map(|u| u.display_name.line().into_string()).unwrap_or_default();
     let target = Target::Conversation { workspace: s.workspace.clone(), conversation: s.conversation.clone() };
-    let place = app.model.target(&target).map(breadcrumb).unwrap_or_default();
+    let place = app.model.target(&target).map(|c| breadcrumb(&app.model, &app.i18n, c)).unwrap_or_default();
     let date = crate::time::date(s.ts, &app.zone);
     // The year only when it is not this one.
     let date = match date.split_once('-') {

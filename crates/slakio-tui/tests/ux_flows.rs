@@ -97,11 +97,11 @@ fn no_selection_is_drawn_underlined() {
 
 #[test]
 fn a_long_name_is_clipped_with_an_ellipsis_apart_from_its_badge() {
-    // A group DM's names are the longest in the list.
+    // A group DM's names are the longest in the list: its first one is cut, the others said.
     let mut d = Demo::new(80, 40);
     d.keys("space d");
     let s = d.screen();
-    let row = s.lines().find(|l| l.contains("Jiho Park") && l.contains('…'));
+    let row = s.lines().find(|l| l.contains("Jiho") && l.contains('…'));
     let row = row.unwrap_or_else(|| panic!("a clipped name ends in …:\n{s}"));
     let after = row.split('…').nth(1).unwrap();
     assert!(after.starts_with(' '), "a space between the name and its badge: {row}");

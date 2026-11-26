@@ -6,6 +6,7 @@
 
 use super::todos::Group;
 use slakio_core::backend::{Connection, Snapshot};
+use slakio_core::i18n::I18n;
 use slakio_core::model::{
     Conversation, ConversationId, ConversationKind, Presence, SavedId, Section, SectionId, Target, Ts, User, UserId,
     Workspace, WorkspaceColor, WorkspaceId,
@@ -13,9 +14,10 @@ use slakio_core::model::{
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
 
-/// How a conversation is named in titles, tabs and the status line: `#backend`, `@Minsu`.
-pub fn breadcrumb(c: &Conversation) -> String {
-    let name = c.name.line();
+/// How a conversation is named in titles, tabs and the status line: `#backend`, `@Minsu`, a
+/// group DM in short (`@Ann, Bob and 6 others`, see [`crate::group_name`]).
+pub fn breadcrumb(model: &Model, i18n: &I18n, c: &Conversation) -> String {
+    let name = crate::group_name::name(model, i18n, c);
     if c.is_dm() { format!("@{name}") } else { format!("#{name}") }
 }
 

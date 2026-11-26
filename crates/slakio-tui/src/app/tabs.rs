@@ -182,7 +182,7 @@ impl App {
     /// What pane `p` is called on a tab: `#backend`, `@Minsu Kim`, `⤷ ` and its thread's first
     /// line (the conversation's name until the thread is loaded).
     fn pane_title(&self, p: &Pane) -> String {
-        let name = self.model.target(&p.target).map(breadcrumb).unwrap_or_default();
+        let name = self.model.target(&p.target).map(|c| breadcrumb(&self.model, &self.i18n, c)).unwrap_or_default();
         let Target::Thread { workspace, conversation, thread } = &p.target else { return name };
         // The thread's message: in the thread once its first page is loaded, else in its
         // conversation, when that is loaded.

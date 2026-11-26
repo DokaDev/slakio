@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/presence_flows.rs
-assertion_line: 78
 expression: mask_hangul(&d.screen())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭────────────────────────────────────────────────────────────────────────────────────────╮
@@ -23,7 +22,7 @@ expression: mask_hangul(&d.screen())
 │ CP● Chris Park             ││                                                                                        │
 │ ＊○ ＊＊＊              2  ││                         Enter    Open                                                  │
 │ ML◐ Mallory live           ││                         Space h  Home                                                  │
-│ 3   Jiho Park, ＊＊＊…  2  ││                         Space d  DMs                                                   │
+│ 3   Jiho… and 2 others  2  ││                         Space d  DMs                                                   │
 │                            ││                         Ctrl+O   Back to the last one                                  │
 │                            ││                         ?        Keyboard help                                         │
 │                            ││                         Ctrl+Q   Quit                                                  │

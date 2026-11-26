@@ -42,7 +42,7 @@ fn icon(app: &App, s: &System<Safe>) -> &'static str {
 fn words(app: &App, pane: &Pane, m: &Shown, s: &System<Safe>) -> String {
     let name = m.author.as_str().to_string();
     let conversation = app.model.target(&pane.target);
-    let channel = || conversation.map(crate::app::model::breadcrumb).unwrap_or_default();
+    let channel = || conversation.map(|c| crate::app::model::breadcrumb(&app.model, &app.i18n, c)).unwrap_or_default();
     let dm = conversation.is_some_and(|c| c.is_dm());
     let text = |t: &Safe| t.as_str().to_string();
     let markup = |t: &Safe| {

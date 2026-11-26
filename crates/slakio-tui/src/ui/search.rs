@@ -186,7 +186,7 @@ pub(super) fn short_time(app: &App, ts: slakio_core::model::Ts) -> String {
 fn place_of(app: &App, ws: Option<&WorkspaceId>, hit: &Hit) -> String {
     let c = app.model.conversations().iter().find(|c| Some(&c.workspace) == ws && c.id == hit.conversation);
     match c {
-        Some(c) => breadcrumb(c),
+        Some(c) => breadcrumb(&app.model, &app.i18n, c),
         None if !hit.name.is_empty() => format!("#{}", hit.name.line()),
         None => Remote::new(hit.conversation.as_str()).line().into_string(),
     }

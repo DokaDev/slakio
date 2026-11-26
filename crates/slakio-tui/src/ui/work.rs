@@ -28,7 +28,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
-use slakio_core::model::{ConversationKind, Presence, Target, Ts};
+use slakio_core::model::{Conversation, ConversationKind, Presence, Target, Ts};
 use std::time::Instant;
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)], now: Instant) {
@@ -127,7 +127,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     let focused = app.focus() == Focus::Pane(PaneHandle::of(layout.id));
     let thread = pane.is_thread();
     let conversation = app.model.target(&pane.target);
-    let name = conversation.map(breadcrumb).unwrap_or_default();
+    let name = conversation.map(|c| breadcrumb(&app.model, &app.i18n, c)).unwrap_or_default();
     let stripe = app
         .model
         .workspace(pane.target.workspace())
@@ -150,8 +150,10 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     let mut spans = vec![Span::raw(" "), stripe];
     let glyph_x = (shared.is_some() && app.settings.icons)
         .then(|| area.x + 1 + spans.iter().map(|s| s.width() as u16).sum::<u16>() + width(&lead) as u16);
-    // A DM's title starts with its peer's avatar chip: `MK @Minsu Kim`.
-    if let Some(chip) = peer.and_then(|u| avatar_chip(app, &u.workspace, &u.id, u.display_name.line().as_str())) {
+    // A DM's title starts with its peer's avatar chip (`MK @Minsu Kim`), a group DM's with how
+    // many people are in it, as its list row does (`8  @Ann, …`).
+    let chip = peer.and_then(|u| avatar_chip(app, &u.workspace, &u.id, u.display_name.line().as_str()));
+    if let Some(chip) = chip.or_else(|| conversation.filter(|_| !thread).and_then(|c| group_badge(app, c))) {
         spans.extend([chip, Span::raw(" ")]);
     }
     spans.push(Span::styled(text, t.title(focused)));
@@ -212,6 +214,13 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 }
 
 pub(super) use crate::app::model::breadcrumb;
+
+/// A group DM's count of people, two cells: the list's group chip with avatars, else muted.
+fn group_badge(app: &App, c: &Conversation) -> Option<Span<'static>> {
+    let ConversationKind::GroupDm { users } = &c.kind else { return None };
+    let style = if app.settings.avatars { app.theme.avatar_group() } else { app.theme.muted() };
+    Some(Span::styled(format!("{:<2}", crate::group_name::count(users.len())), style))
+}
 
 /// What a thread pane is called: `Thread`; beside another pane of the tab on a thread of the same
 /// conversation, its first message's author (`⤷ Ivy Moon · #long-threads`), or where that is the

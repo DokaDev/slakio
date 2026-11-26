@@ -39,6 +39,7 @@ use crate::app::model::Row;
 use crate::app::shell::{Region, View};
 use crate::app::{App, Focus};
 use crate::avatar;
+use crate::group_name;
 use crate::screen;
 use crate::text::{clip, width};
 use crate::theme::Selection;
@@ -286,17 +287,20 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                 _ => None,
             };
             let is_photo = photo.is_some();
+            let group = match &c.kind {
+                ConversationKind::GroupDm { users } => Some(group_name::count(users.len())),
+                _ => None,
+            };
             let chip = avatars_on(app, c).then(|| match &c.kind {
                 ConversationKind::Dm { .. } if is_photo => photo,
                 ConversationKind::Dm { user } => avatar_chip(app, &c.workspace, user, c.name.line().as_str()),
-                ConversationKind::GroupDm { users } => {
-                    let n = if users.len() > 9 { "9+".to_string() } else { format!("{:<2}", users.len()) };
-                    Some(Span::styled(n, t.avatar_group()))
+                ConversationKind::GroupDm { .. } => {
+                    group.as_ref().map(|n| Span::styled(format!("{n:<2}"), t.avatar_group()))
                 }
                 ConversationKind::Channel { .. } => None,
             });
-            let (mark_x, name_x) = match chip.flatten() {
-                Some(mut chip) => {
+            let (mark_x, name_x) = match (chip.flatten(), group) {
+                (Some(mut chip), _) => {
                     if c.muted && !is_photo {
                         chip.style = t.avatar_muted();
                     }
@@ -306,7 +310,12 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                     }
                     (x + 2, x + 4)
                 }
-                None => {
+                // Without avatars, a group DM starts with how many people are in it: `8  Ann, …`.
+                (None, Some(n)) => {
+                    put(f, area, x, 2, vec![Span::styled(n, prefix_style)]);
+                    (x, x + 3)
+                }
+                (None, None) => {
                     if prefix == ICON_PRIVATE || prefix == ICON_SHARED {
                         super::glyph_cell(f.buffer_mut(), area.x + x, area.y, prefix, prefix_style);
                     } else {
@@ -336,7 +345,11 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             // One blank cell at least between the name and what is right of it.
             let gap = if pill > 0 { pill + 2 } else { 1 };
             let room = area.width.saturating_sub(name_x + gap + tag_w);
-            let name = clip(c.name.line().as_str(), usize::from(room));
+            // A group DM named by its people: two of them and how many more, as the room allows.
+            let name = match group_name::people(&app.model, c) {
+                Some(names) => group_name::fit(&names, &app.i18n, usize::from(room)),
+                None => clip(c.name.line().as_str(), usize::from(room)),
+            };
             let name_w = width(&name) as u16;
             let mut spans = vec![Span::styled(name, name_style)];
             if !tag.is_empty() {

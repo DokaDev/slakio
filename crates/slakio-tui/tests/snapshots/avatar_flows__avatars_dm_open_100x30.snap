@@ -1,6 +1,5 @@
 ---
 source: crates/slakio-tui/tests/avatar_flows.rs
-assertion_line: 230
 expression: mask_hangul(&small.snap())
 ---
 ╭ ▌A company ▾ · B @9 ───────╮╭ ▌MK @Minsu Kim ● active ───────────────────────────────────────────╮
@@ -23,7 +22,7 @@ expression: mask_hangul(&small.snap())
 │ CP● Chris Park             ││ MK Minsu Kim     Done schema for please today deploy looks   05:26 │
 │ ＊○ ＊＊＊              2  ││                  fine timeout retry maybe looks                    │
 │ ML◐ Mallory live           ││                                                                    │
-│ 3   Jiho Park, ＊＊＊…  2  ││ MK Minsu Kim     For looks maybe rollback                    06:17 │
+│ 3   Jiho… and 2 others  2  ││ MK Minsu Kim     For looks maybe rollback                    06:17 │
 │                            ││                                                                    │
 │                            ││ M  Me            Metrics staging dashboard index design      07:27 │
 │                            ││                  today lunch review review migration again         │
