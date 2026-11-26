@@ -109,6 +109,28 @@ fn only_a_channel_shared_with_another_organization_is_slack_connect() {
 }
 
 #[test]
+fn an_org_shared_channel_is_not_external_an_ext_shared_one_is() {
+    let b: wire::UserBoot = serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team"},
+        "channels": [
+            {"id": "C1", "name": "org-only", "is_org_shared": true, "is_shared": true},
+            {"id": "C2", "name": "partners", "is_ext_shared": true, "is_shared": true},
+            {"id": "C3", "name": "both", "is_org_shared": true, "is_ext_shared": true},
+            {"id": "C4", "name": "plain"},
+            {"id": "C5", "name": "odd", "is_ext_shared": "yes"},
+            {"id": "C6", "name": "private-partners", "is_private": true, "is_ext_shared": true},
+        ],
+    }))
+    .unwrap();
+    let s = snapshot(b, None, Vec::new(), NOW);
+    let external: Vec<&str> = s.conversations.iter().filter(|c| c.external).map(|c| c.id.as_str()).collect();
+    assert_eq!(external, ["C2", "C3", "C6"]);
+    // A flag that is not a bool is unknown: the channel stays listed, not shared.
+    assert!(!find(&s, "C5").external);
+}
+
+#[test]
 fn the_user_s_do_not_disturb_is_read_from_the_start_bundle() {
     let me = |s: &Snapshot| s.users[0].presence;
     let on = json!({"dnd_enabled": true, "next_dnd_start_ts": NOW - 60, "next_dnd_end_ts": NOW + 60});

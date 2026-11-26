@@ -143,6 +143,9 @@ pub struct Channel {
     pub name: Option<String>,
     pub is_private: Option<bool>,
     pub is_mpim: Option<bool>,
+    /// Shared with another organization (Slack Connect); a value that is not a bool is unknown,
+    /// so not shared, and leaves the channel listed.
+    #[serde(default, deserialize_with = "loose")]
     pub is_ext_shared: Option<bool>,
     pub is_archived: Option<bool>,
     /// Shared with another workspace of the same organization (not Slack Connect).
