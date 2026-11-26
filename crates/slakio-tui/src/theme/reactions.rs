@@ -67,10 +67,12 @@ impl Theme {
         ChipLook { body, count, cap: cap(Some(chip)) }
     }
 
-    /// `c` is the background of a reaction chip (kept under a bar painted over its row).
+    /// `c` is the background of a reaction chip (kept under a bar painted over its row), and of
+    /// nothing else a bar paints over: a surface or a bar that happens to be a chip's colour is
+    /// still painted.
     pub(super) fn reaction_bg(&self, c: Color) -> bool {
-        c != Color::Reset
-            && c != self.bg
+        let bars = [self.surface, self.surface_alt, self.selection, self.cursor_line, self.range, self.hover];
+        ![Color::Reset, self.bg].into_iter().chain(bars).any(|b| b == c)
             && [false, true].into_iter().any(|mine| self.reaction_chip(mine).body.bg == Some(c))
     }
 

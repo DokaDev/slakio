@@ -273,4 +273,39 @@ mod tests {
             assert_eq!(buf, before, "{n}: a non-blank first cell");
         }
     }
+
+    /// A chip whose colour is a surface or a bar (a theme file's `reaction` or `reaction_mine`
+    /// set to one of them) keeps no row drawn on that colour: the selection and the hover paint
+    /// every cell of it, and a chip of the other kind is still kept.
+    #[test]
+    fn a_chip_the_colour_of_a_surface_or_a_bar_keeps_no_row_of_it() {
+        for base in BUILTINS.iter().filter(|t| t.kind == Kind::Truecolor) {
+            let bars = [base.surface, base.surface_alt, base.selection, base.cursor_line, base.range, base.hover];
+            for (mine, c) in [false, true].into_iter().flat_map(|m| bars.map(|c| (m, c))) {
+                let mut t = Theme::clone(base);
+                *(if mine { &mut t.reaction_mine } else { &mut t.reaction }) = c;
+                let n = format!("{} mine={mine} {c:?}", t.name);
+                let area = Rect::new(0, 0, 10, 1);
+                for (how, want) in [(Some(Selection::Focused), t.selection), (None, t.hover)] {
+                    let mut buf = Buffer::empty(area);
+                    buf.set_style(area, Style::new().fg(t.fg).bg(c));
+                    match how {
+                        Some(how) => t.paint_selection(&mut buf, area, how),
+                        None => t.paint_hover(&mut buf, area),
+                    }
+                    let painted = (0..10).filter(|x| buf[(*x, 0)].bg == want).count();
+                    assert_eq!(painted, 10, "{n} {how:?}: the row on the chip's colour is painted");
+                }
+                // The other kind of chip, its colour none of them, is still kept.
+                let other = t.reaction_chip(!mine).body;
+                let mut buf = Buffer::empty(area);
+                buf.set_style(area, t.base());
+                buf.set_string(2, 0, "ab", other);
+                let chip = buf[(2, 0)].clone();
+                t.paint_selection(&mut buf, area, Selection::Focused);
+                t.paint_hover(&mut buf, area);
+                assert_eq!(buf[(2, 0)], chip, "{n}: the other chip is kept");
+            }
+        }
+    }
 }
