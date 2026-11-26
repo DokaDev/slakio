@@ -7,8 +7,8 @@
 use super::todos::Group;
 use slakio_core::backend::{Connection, Snapshot};
 use slakio_core::model::{
-    Conversation, ConversationId, ConversationKind, SavedId, Section, SectionId, Target, Ts, User, UserId, Workspace,
-    WorkspaceColor, WorkspaceId,
+    Conversation, ConversationId, ConversationKind, Presence, SavedId, Section, SectionId, Target, Ts, User, UserId,
+    Workspace, WorkspaceColor, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::{HashMap, HashSet};
@@ -445,9 +445,15 @@ impl Model {
                     let was = &self.snapshot.users[i];
                     let was = was.avatar.as_ref().map(|a| (a, was.avatar_guessed));
                     let (avatar, avatar_guessed) = if fresh { u.changed_over(was) } else { u.photo_over(was) };
+                    // Nor does one that does not know whether they are around: a page of names
+                    // keeps the do not disturb the start told of them.
+                    let presence = match u.presence {
+                        Presence::Unknown => self.snapshot.users[i].presence,
+                        known => known,
+                    };
                     let old = self.snapshot.users[i].avatar.take();
                     self.photo_changed(old, avatar.as_ref());
-                    self.snapshot.users[i] = User { avatar, avatar_guessed, ..u.clone() };
+                    self.snapshot.users[i] = User { avatar, avatar_guessed, presence, ..u.clone() };
                 }
                 None => {
                     // A bot's author of one more name: past [`BOT_NAMES`] of that bot, it takes
