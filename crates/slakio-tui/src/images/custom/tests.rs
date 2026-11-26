@@ -23,8 +23,8 @@ fn each_workspace_s_list_is_asked_once_and_only_for_a_name_with_a_letter() {
     c.get(&ws("T1"), "party");
     assert!(!c.ask(&mut r, now), "on its way: not again");
     let blob = Custom::Picture("x".into());
-    assert!(c.answered(first[0].0, vec![("party".into(), blob.clone())]));
-    assert!(!c.answered(first[0].0, Vec::new()), "answered once");
+    assert!(c.answered(first[0].0, vec![("party".into(), blob.clone())], false));
+    assert!(!c.answered(first[0].0, Vec::new(), false), "answered once");
     assert_eq!(c.get(&ws("T1"), "party"), Some(&blob));
     assert_eq!(c.get(&ws("T1"), "other"), None);
     assert!(!c.ask(&mut r, now), "the list is here: a name it lacks asks nothing");
@@ -36,7 +36,7 @@ fn signed_in_again_the_list_is_read_again_when_next_wanted() {
     c.get(&ws("T1"), "party");
     c.ask(&mut r, now);
     let id = asked(&mut r)[0].0;
-    c.answered(id, vec![("party".into(), Custom::Standard("tada".into()))]);
+    c.answered(id, vec![("party".into(), Custom::Standard("tada".into()))], false);
     c.forget(&ws("T1"));
     assert_eq!(c.get(&ws("T1"), "party"), None);
     assert!(c.ask(&mut r, now));
@@ -64,7 +64,7 @@ fn a_failed_list_waits_by_its_kind() {
         let later = now + wait.unwrap_or(super::super::RETRY_AFTER * 100) + std::time::Duration::from_millis(1);
         assert_eq!(c.ask(&mut r, later), wait.is_some(), "{kind:?}");
         if let Some((id, _)) = asked(&mut r).first() {
-            c.answered(*id, Vec::new());
+            c.answered(*id, Vec::new(), false);
         }
     }
 }
@@ -107,7 +107,11 @@ fn with_the_diagnostics_on_the_list_says_wanted_asked_applied_and_failed_by_a_ha
     assert!(c.ask(&mut r, now));
     let ids = asked(&mut r);
     let blob = Custom::Picture("https://example.invalid/secret.png".into());
-    assert!(c.answered(ids[0].0, vec![("secret_party".into(), blob), ("yes".into(), Custom::Standard("+1".into()))]));
+    assert!(c.answered(
+        ids[0].0,
+        vec![("secret_party".into(), blob), ("yes".into(), Custom::Standard("+1".into()))],
+        false
+    ));
     assert!(c.failed(ids[1].0, &FailKind::Api { code: "internal_error".into() }, now));
     c.get(&ws("TSECRET2"), "secret_party");
     c.ask(&mut r, now);
@@ -160,7 +164,7 @@ fn slack_s_passing_errors_are_asked_again_a_few_times_and_a_refusal_never() {
     c.get(&ws("T1"), "party");
     assert!(c.ask(&mut r, at));
     let id = asked(&mut r)[0].0;
-    assert!(c.answered(id, Vec::new()));
+    assert!(c.answered(id, Vec::new(), false));
     assert_eq!(c.tries.get(&ws("T1")), None);
 }
 
@@ -216,7 +220,7 @@ fn a_name_the_list_has_not_is_told_once_a_workspace() {
     c.get(&ws("T1"), "party");
     c.ask(&mut r, now);
     let id = asked(&mut r)[0].0;
-    c.answered(id, vec![("party".into(), Custom::Standard("tada".into()))]);
+    c.answered(id, vec![("party".into(), Custom::Standard("tada".into()))], false);
     for name in ["gone", "other", "30"] {
         assert_eq!(c.get(&ws("T1"), name), None);
     }

@@ -118,7 +118,7 @@ fn until_drawn(s: &mut Scripted, ws: &WorkspaceId, want: &[(Source, Shape)], lis
         s.pump();
         if let Some(i) = s.b.held.iter().position(|r| r.command == Command::Emoji) {
             let r = s.b.held.remove(i);
-            s.b.push(Envelope { generation: r.id, event: Event::Emoji { emoji: list.to_vec() } });
+            s.b.push(Envelope { generation: r.id, event: Event::Emoji { emoji: list.to_vec(), truncated: false } });
             s.pump();
             continue;
         }

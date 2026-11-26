@@ -39,3 +39,19 @@ fn only_an_answer_that_is_not_slack_s_json_is_told_as_not_slack_json() {
     let other = SlackError::Network { detail: "proxy said: JSON gateway timeout".to_string() };
     assert_eq!(not_json(other.clone()), other);
 }
+
+#[test]
+fn a_list_past_the_names_cap_is_told_cut_and_both_forms_of_a_name_count_once() {
+    let body = |extra: usize| {
+        let (nfc, nfd) = ("\u{AC10}\u{C0AC}", "\u{1100}\u{1161}\u{11B7}\u{1109}\u{1161}");
+        let mut names = vec![format!("\"{nfd}\":\"alias:tada\""), format!("\"{nfc}\":\"alias:tada\"")];
+        names.extend((1..NAMES_MAX + extra).map(|k| format!("\"e{k}\":\"alias:tada\"")));
+        format!("{{\"ok\":true,\"emoji\":{{{}}}}}", names.join(","))
+    };
+    let whole: Listed = serde_json::from_str(&body(0)).expect("read");
+    assert_eq!(whole.emoji.0.len(), NAMES_MAX + 1, "both forms kept: one place");
+    assert!(!whole.emoji.2, "every name kept");
+    let cut: Listed = serde_json::from_str(&body(1)).expect("read");
+    assert_eq!(cut.emoji.0.len(), NAMES_MAX + 1);
+    assert!(cut.emoji.2, "one name past the cap: cut");
+}

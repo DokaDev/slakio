@@ -277,3 +277,14 @@ fn a_name_listed_in_nfd_jamo_resolves_as_its_syllables_and_the_nfc_one_wins() {
         assert_eq!(r.len(), 1);
     }
 }
+
+#[test]
+fn both_forms_of_one_name_take_one_of_the_names_cap() {
+    let (nfc, nfd) = ("\u{AC10}\u{C0AC}", "\u{1100}\u{1161}\u{11B7}\u{1109}\u{1161}");
+    let mut all = list(&[(nfd, &pic("uploaded")), (nfc, &pic("typed"))]);
+    all.extend((1..NAMES_MAX).map(|k| (format!("e{k}"), "alias:tada".to_string())));
+    let r = resolve(&all);
+    assert_eq!(r.len(), NAMES_MAX, "the two forms count once: the last name is kept");
+    assert_eq!(get(&r, &format!("e{}", NAMES_MAX - 1)), Some(Custom::Standard("tada".to_string())));
+    assert_eq!(get(&r, nfc), Some(Custom::Picture(pic("typed"))));
+}

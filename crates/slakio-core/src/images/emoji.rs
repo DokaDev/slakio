@@ -9,7 +9,8 @@
 //! * an alias that ends at a name the workspace has not (a standard emoji's, as `:+1:`) draws
 //!   that standard emoji, where the UI knows it.
 //!
-//! Only names a shortcode may have are read ([`shortcode`]), at most [`NAMES_MAX`] of them; a
+//! Only names a shortcode may have are read ([`shortcode`]), at most [`NAMES_MAX`] of them (both
+//! forms of one name counted once); a
 //! name (or an alias's target) written in decomposed Hangul jamo is read as its syllables
 //! ([`compose_hangul`]), and where both forms of one name are listed the syllables' one wins.
 
@@ -192,7 +193,11 @@ pub fn resolve(list: &[(String, String)]) -> Vec<(String, Custom)> {
     // replaces the same name written in syllables.
     let mut kept: HashMap<String, (String, bool)> = HashMap::new();
     let named = list.iter().map(|(name, value)| (compose_hangul(name), value)).filter(|(name, _)| shortcode(name));
-    for (name, value) in named.take(NAMES_MAX) {
+    for (name, value) in named {
+        // At most NAMES_MAX names, counted once both forms of one are merged.
+        if kept.len() >= NAMES_MAX && !kept.contains_key(name.as_ref()) {
+            continue;
+        }
         let value = match value.strip_prefix("alias:") {
             Some(next) => format!("alias:{}", compose_hangul(next)),
             None => value.clone(),

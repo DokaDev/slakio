@@ -61,7 +61,7 @@ impl Run {
 
     async fn emoji(&mut self) -> Result<Vec<(String, Custom)>, FailKind> {
         match self.ask(Command::Emoji).await {
-            Event::Emoji { emoji } => Ok(emoji),
+            Event::Emoji { emoji, .. } => Ok(emoji),
             Event::Failed { kind, .. } => Err(kind),
             other => panic!("{other:?}"),
         }

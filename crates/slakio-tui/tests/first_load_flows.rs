@@ -81,7 +81,7 @@ fn busy() -> (Scripted, WorkspaceId, Vec<Request>) {
     let asked = frame(&mut s);
     let list = asked.iter().find(|r| r.command == Command::Emoji).expect("the list asked");
     let set = (0..EMOJI).map(|i| (format!("e{i:02}"), Custom::Picture(emoji(&ws, i)))).collect();
-    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji: set } });
+    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji: set, truncated: false } });
     s.pump();
     (s, ws, asked.into_iter().filter(|r| r.command != Command::Emoji).collect())
 }

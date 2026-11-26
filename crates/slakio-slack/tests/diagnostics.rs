@@ -172,7 +172,7 @@ fn on_every_stage_has_its_line_and_the_file_holds_nothing_of_the_fixture() {
         r.until(SECTIONS, 1).await;
         let target = r.target("design-review");
         let Event::History(page) = r.ask(Command::History { target, before: None, limit: 20 }).await else { panic!() };
-        let Event::Emoji { emoji } = r.ask(Command::Emoji).await else { panic!() };
+        let Event::Emoji { emoji, .. } = r.ask(Command::Emoji).await else { panic!() };
         let emoji_picture = emoji.iter().find_map(|(_, c)| match c {
             Custom::Picture(a) => Some(a.clone()),
             Custom::Standard(_) => None,

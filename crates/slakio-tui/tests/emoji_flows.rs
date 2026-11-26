@@ -341,7 +341,7 @@ fn more_emoji_than_the_terminal_holds_ask_a_frame_s_share_once_each_and_the_rest
         let emoji = (walls.iter().chain(&chips))
             .map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n))))
             .collect();
-        s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji } });
+        s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji, truncated: false } });
         s.pump();
         let mut all: Vec<Source> = Vec::new();
         for _ in 0..20 {
@@ -377,7 +377,7 @@ fn emoji_of_a_message_only_measured_off_screen_leave_the_share_to_those_shown() 
     let named = (tops.iter().chain(&walls))
         .map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n))))
         .collect();
-    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji: named } });
+    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji: named, truncated: false } });
     s.pump();
     let bottom = frame(&mut s);
     assert!(!pictures(&bottom).is_empty(), "the wall's pictures, shown at the bottom");
@@ -560,7 +560,10 @@ fn a_korean_name_asks_for_the_list_and_is_drawn_in_the_text_and_the_chip() {
     assert_eq!(lists(&asked).len(), 1, "a frame showing only Korean names wants the list");
     let named = [(CLAP, "clap"), (MIXED, "mixed")]
         .map(|(n, p)| (n.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), p))));
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named.to_vec() } });
+    s.b.push(Envelope {
+        generation: lists(&asked)[0].id,
+        event: Event::Emoji { emoji: named.to_vec(), truncated: false },
+    });
     s.pump();
     for _ in 0..3 {
         for r in frame(&mut s) {
@@ -605,7 +608,7 @@ fn a_skin_tone_right_after_a_korean_name_is_left_out_in_the_text_and_the_chip() 
     let (mut s, ws) = shown(&[(text.as_str(), &[chip.as_str()])], 120, 40, true);
     let asked = frame(&mut s);
     let named = vec![(CLAP.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "clap")))];
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named, truncated: false } });
     s.pump();
     for _ in 0..3 {
         for r in frame(&mut s) {
@@ -632,7 +635,7 @@ fn an_nfd_korean_reaction_and_text_draw_the_nfc_list_picture() {
     let asked = frame(&mut s);
     assert_eq!(lists(&asked).len(), 1, "a frame showing only a name in jamo wants the list");
     let named = vec![(THANKS_NFC.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "thanks")))];
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named, truncated: false } });
     s.pump();
     for _ in 0..3 {
         for r in frame(&mut s) {
@@ -677,7 +680,7 @@ fn an_alias_of_a_standard_emoji_takes_the_skin_tone_after_it() {
     let (mut s, _) = shown(&[("ok :yes2::skin-tone-3: done", &["yes2::skin-tone-2"])], 120, 40, true);
     let asked = frame(&mut s);
     let list = vec![("yes2".to_string(), Custom::Standard("+1".into()))];
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: list } });
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: list, truncated: false } });
     s.pump();
     let screen = s.d.screen();
     assert!(!screen.contains("skin-tone") && !screen.contains("yes2"), "{screen}");
@@ -747,7 +750,7 @@ fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_twice() {
     let list = lists(&frame(&mut s))[0].clone();
     let emoji =
         walls.iter().map(|n| (n.clone(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), n)))).collect();
-    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji } });
+    s.b.push(Envelope { generation: list.id, event: Event::Emoji { emoji, truncated: false } });
     s.pump();
     let mut all: Vec<Source> = Vec::new();
     for _ in 0..30 {
@@ -793,7 +796,7 @@ fn a_shared_channel_reaction_of_another_workspace_draws_its_picture() {
     // Our list lacks both names.
     let named =
         vec![("party-blob".to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "party-blob")))];
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named, truncated: false } });
     s.pump();
     let mut sources = Vec::new();
     for _ in 0..3 {
@@ -822,7 +825,7 @@ fn our_own_list_wins_over_a_message_address_for_the_same_name() {
     let asked = frame(&mut s);
     let ours = slakio_world::emoji::picture(ws.as_str(), "party-blob");
     let named = vec![("party-blob".to_string(), Custom::Picture(ours.clone()))];
-    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named, truncated: false } });
     s.pump();
     let mut sources = Vec::new();
     for _ in 0..3 {
@@ -833,4 +836,29 @@ fn our_own_list_wins_over_a_message_address_for_the_same_name() {
     }
     assert_eq!(sources, [Source::Emoji(ours)], "only ours");
     assert_eq!(cells(&s).len(), 2);
+}
+
+/// Our list cut at its cap may lack one of our own names: a message's address for a name it
+/// lacks is never drawn then, the name stays `:name:`.
+#[test]
+fn a_list_cut_at_its_cap_never_draws_a_message_address() {
+    use slakio_core::images::emoji::Custom;
+    let given = |_: &WorkspaceId| vec![(Remote::new("partner-wave"), partner("partner-wave"))];
+    let (mut s, ws) = shown_giving(&[("hi :partner-wave: all", &[])], given);
+    let asked = frame(&mut s);
+    let named =
+        vec![("party-blob".to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "party-blob")))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named, truncated: true } });
+    s.pump();
+    let mut sources = Vec::new();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            sources.extend(pictures(std::slice::from_ref(&r)));
+            give_picture(&mut s, &r);
+        }
+    }
+    assert!(sources.is_empty(), "the partner's picture is never asked: {sources:?}");
+    let screen = s.d.screen();
+    assert!(screen.contains(":partner-wave:"), "{screen}");
+    assert!(cells(&s).is_empty(), "nothing drawn as a picture");
 }

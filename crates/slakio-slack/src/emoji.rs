@@ -24,11 +24,12 @@ struct Listed {
     emoji: Names,
 }
 
-/// The names of `emoji.list` kept as they are read: at most [`NAMES_MAX`], each a shortcode
-/// with a text value of at most [`ADDRESS_MAX`] bytes; the rest is read past, not kept (and how
-/// many names were read in all).
+/// The names of `emoji.list` kept as they are read: at most [`NAMES_MAX`] (a name and its
+/// decomposed Hangul form counted once, and at most twice that many as written), each a
+/// shortcode with a text value of at most [`ADDRESS_MAX`] bytes; the rest is read past, not kept
+/// (and how many names were read in all, and whether a shortcode was left out for the cap).
 #[derive(Default)]
-struct Names(Vec<(String, String)>, usize);
+struct Names(Vec<(String, String)>, usize, bool);
 
 impl<'de> Deserialize<'de> for Names {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -39,15 +40,24 @@ impl<'de> Deserialize<'de> for Names {
                 f.write_str("a map of emoji names")
             }
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Names, A::Error> {
-                let (mut kept, mut read) = (Vec::new(), 0);
+                let (mut kept, mut read, mut truncated) = (Vec::new(), 0, false);
+                let mut names = std::collections::HashSet::new();
                 while let Some(name) = map.next_key::<String>()? {
                     read += 1;
                     let Text(value) = map.next_value()?;
-                    if let Some(value) = value.filter(|_| kept.len() < NAMES_MAX && shortcode(&compose_hangul(&name))) {
-                        kept.push((name, value));
+                    let composed = compose_hangul(&name);
+                    let Some(value) = value.filter(|_| shortcode(&composed)) else { continue };
+                    let known = names.contains(composed.as_ref());
+                    if kept.len() >= 2 * NAMES_MAX || (!known && names.len() >= NAMES_MAX) {
+                        truncated = true;
+                        continue;
                     }
+                    if !known {
+                        names.insert(composed.into_owned());
+                    }
+                    kept.push((name, value));
                 }
-                Ok(Names(kept, read))
+                Ok(Names(kept, read, truncated))
             }
         }
         d.deserialize_map(Map)
@@ -111,7 +121,7 @@ pub(crate) async fn emoji(client: &Client) -> Result<Event, SlackError> {
     };
     let emoji = resolve(&listed.emoji.0);
     crate::shape::emoji_counts(client.diag(), listed.emoji.1, &listed.emoji.0, &emoji);
-    Ok(Event::Emoji { emoji })
+    Ok(Event::Emoji { emoji, truncated: listed.emoji.2 })
 }
 
 /// `e`, an answer that is not Slack's JSON as Slack's `not_slack_json`.

@@ -17,7 +17,7 @@ use slakio_core::diag::{Diag, Kind, Stage};
 use slakio_core::images::emoji::Custom;
 use slakio_core::model::WorkspaceId;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 /// Slack's error codes that pass (its own trouble, an answer that was not its JSON): asked again.
@@ -35,6 +35,8 @@ pub const BACKOFF_MAX: Duration = Duration::from_secs(15 * 60);
 pub struct Customs {
     /// What each name draws, by workspace (the list came).
     sets: HashMap<WorkspaceId, HashMap<String, Custom>>,
+    /// The workspaces whose list came cut at its cap: a name it lacks may still be theirs.
+    truncated: HashSet<WorkspaceId>,
     asked: HashMap<Generation, WorkspaceId>,
     /// The workspaces whose list failed, and when it may be asked for again (never: `None`).
     failed: HashMap<WorkspaceId, Option<Instant>>,
@@ -73,9 +75,10 @@ impl Customs {
         }
     }
 
-    /// Workspace `ws`'s list has come: a name it lacks is not one of its own.
+    /// Workspace `ws`'s whole list has come: a name it lacks is not one of its own (never so
+    /// for a list cut at its cap).
     pub fn listed(&self, ws: &WorkspaceId) -> bool {
-        self.sets.contains_key(ws)
+        self.sets.contains_key(ws) && !self.truncated.contains(ws)
     }
 
     /// Where what frames note stands now ([`super::Images::mark`]).
@@ -137,14 +140,20 @@ impl Customs {
         asked
     }
 
-    /// List request `id` came with `emoji`: `true` when it was one of these.
-    pub fn answered(&mut self, id: Generation, emoji: Vec<(String, Custom)>) -> bool {
+    /// List request `id` came with `emoji` (`truncated`: cut at its cap): `true` when it was one
+    /// of these.
+    pub fn answered(&mut self, id: Generation, emoji: Vec<(String, Custom)>, truncated: bool) -> bool {
         let Some(ws) = self.asked.remove(&id) else { return false };
         if self.diag.on() {
             let pictures = emoji.iter().filter(|(_, c)| matches!(c, Custom::Picture(_))).count().to_string();
             self.note(&ws, Stage::Applied, "ok", &[("names", &emoji.len().to_string()), ("pictures", &pictures)]);
         }
         self.tries.remove(&ws);
+        if truncated {
+            self.truncated.insert(ws.clone());
+        } else {
+            self.truncated.remove(&ws);
+        }
         self.sets.insert(ws, emoji.into_iter().collect());
         true
     }
@@ -195,6 +204,7 @@ impl Customs {
     /// for before is not waited for: its answer is the old sign-in's).
     pub fn forget(&mut self, ws: &WorkspaceId) {
         self.sets.remove(ws);
+        self.truncated.remove(ws);
         self.failed.remove(ws);
         self.tries.remove(ws);
         self.asked.retain(|_, w| w != ws);

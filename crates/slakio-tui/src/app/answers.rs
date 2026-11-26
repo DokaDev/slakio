@@ -223,7 +223,7 @@ impl App {
             // A download stopped answers for itself.
             Event::Cancelled { .. } => false,
             // A workspace's own emoji: its text is drawn again with them.
-            Event::Emoji { emoji } => self.images.customs.answered(id, emoji),
+            Event::Emoji { emoji, truncated } => self.images.customs.answered(id, emoji, truncated),
             Event::Image { bytes } => {
                 if let Some(job) = self.images.answered(id, bytes) {
                     self.effects.push(Effect::Decode(job));

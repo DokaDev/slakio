@@ -301,8 +301,11 @@ pub enum Event {
     },
     /// What each of the workspace's own emoji a [`Command::Emoji`] asked for draws, by name
     /// (aliases followed, [`crate::images::emoji::resolve`]); one that draws nothing is left out.
+    /// `truncated`: the list had more names than [`crate::images::emoji::NAMES_MAX`], so a name
+    /// it lacks may still be one of the workspace's own.
     Emoji {
         emoji: Vec<(String, crate::images::emoji::Custom)>,
+        truncated: bool,
     },
 }
 
