@@ -15,9 +15,11 @@ use ratatui::crossterm::event::{MouseButton, MouseEventKind};
 use scripted::Scripted;
 use slakio_core::backend::Event;
 use slakio_core::i18n::{I18n, Lang, Msg};
-use slakio_core::model::{Message, Reaction, System, ThreadSummary, Ts, UserId};
+use slakio_core::model::{Conversation, Message, Reaction, System, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Remote;
 use slakio_tui::app::PaneKind;
+use slakio_tui::app::model::Row;
+use slakio_tui::app::shell::View;
 use slakio_tui::theme::{Background, resolve};
 
 const SIZES: [(u16, u16); 2] = [(80, 24), (120, 40)];
@@ -57,6 +59,15 @@ fn message(secs: u64, user: &UserId, text: &str, system: Option<System>) -> Mess
 /// Read-only, booted, `deploys` open in the dark theme in `look`, its history the messages
 /// `make` gives for two of its people; the newest selected.
 fn shown(look: (Lang, (u16, u16), bool, bool), make: impl Fn(&UserId, &UserId) -> Vec<Message>) -> Scripted {
+    shown_in(look, |c| c.name == "deploys", make)
+}
+
+/// As [`shown`], in the first conversation of Home that `pick` takes.
+fn shown_in(
+    look: (Lang, (u16, u16), bool, bool),
+    pick: impl Fn(&Conversation) -> bool,
+    make: impl Fn(&UserId, &UserId) -> Vec<Message>,
+) -> Scripted {
     let (lang, (w, h), compact, icons) = look;
     let mut s = Scripted::booted(true, None);
     s.d.app.i18n = I18n::new(lang);
@@ -64,7 +75,9 @@ fn shown(look: (Lang, (u16, u16), bool, bool), make: impl Fn(&UserId, &UserId) -
     s.d.app.settings.compact = compact;
     s.d.app.settings.icons = icons;
     s.d.app.resize(w, h);
-    s.d.list_cursor_on("deploys");
+    s.d.app.show_unfolded(View::Home);
+    let at = conversation_row(&s, &pick).expect("the conversation");
+    s.d.app.focus_list_row(at);
     s.keys("enter");
     let mut e = s.b.reply(0);
     let Event::History(page) = &mut e.event else { panic!("a page") };
@@ -76,6 +89,12 @@ fn shown(look: (Lang, (u16, u16), bool, bool), make: impl Fn(&UserId, &UserId) -
     s.pump();
     s.keys("G");
     s
+}
+
+/// The row of Home's list of the first conversation `pick` takes.
+fn conversation_row(s: &Scripted, pick: &impl Fn(&Conversation) -> bool) -> Option<usize> {
+    let rows = s.d.app.list_rows();
+    rows.iter().position(|r| matches!(r, Row::Conversation(i) if pick(s.d.app.model.conversation(*i))))
 }
 
 fn what(look: (Lang, (u16, u16), bool, bool)) -> String {
@@ -307,4 +326,65 @@ fn the_demo_ends_ideas_with_a_join_a_leave_and_a_topic() {
     assert!(joined < left, "{screen}");
     assert_eq!(topic, left + 1, "the leave and the topic stack with no blank row\n{screen}");
     assert_harmless(&screen);
+}
+
+/// In a DM or a group DM a notice speaks of the conversation, never of a channel.
+#[test]
+fn a_notice_in_a_dm_speaks_of_the_conversation() {
+    for look in looks().into_iter().filter(|l| l.1 == (120, 40)) {
+        let at = what(look);
+        let kinds = [
+            System::Pinned,
+            System::Unpinned,
+            System::AppAdded,
+            System::AppRemoved,
+            System::Topic(Remote::new("Ship it")),
+            System::Purpose(Remote::new("Pairing notes")),
+        ];
+        let s = shown_in(look, Conversation::is_dm, |a, _| {
+            kinds.iter().enumerate().map(|(i, k)| message(60 * i as u64, a, "", Some(k.clone()))).collect()
+        });
+        for i in 0..kinds.len() {
+            let name = author(&s, i);
+            let msg = match i {
+                0 => Msg::SystemPinnedDm { name },
+                1 => Msg::SystemUnpinnedDm { name },
+                2 => Msg::SystemAppAddedDm { name },
+                3 => Msg::SystemAppRemovedDm { name },
+                4 => Msg::SystemTopicDm { name, text: "Ship it".to_string() },
+                _ => Msg::SystemPurposeDm { name, text: "Pairing notes".to_string() },
+            };
+            let words = s.d.app.i18n.msg(&msg).to_string();
+            let (ys, lines) = rows(&s, i);
+            assert_eq!(ys.len(), 1, "{at}: notice {i}");
+            let line = &lines[usize::from(ys[0])];
+            assert!(line.contains(&words), "{at}: notice {i} {line:?} says {words:?}");
+            assert!(!line.contains("channel"), "{at}: notice {i} {line:?}");
+        }
+    }
+}
+
+/// A topic is Slack markup: read as plain text, its people and channels named as the timeline
+/// names them, its escapes and marks gone.
+#[test]
+fn a_topic_reads_its_markup_with_people_and_channels_named() {
+    // Comfortable at 120 columns: room for the whole topic after the words.
+    for look in looks().into_iter().filter(|l| l.1 == (120, 40) && !l.2) {
+        let at = what(look);
+        let named = std::cell::RefCell::new(None);
+        let s = shown(look, |a, b| {
+            named.replace(Some(b.clone()));
+            let topic = format!("<@{}> in <#C0NOPE|ops>: Q&amp;A *now*", b.as_str());
+            vec![message(0, a, "", Some(System::Topic(Remote::new(topic))))]
+        });
+        let row = conversation_row(&s, &|c: &Conversation| c.name == "deploys").unwrap();
+        let Row::Conversation(c) = s.d.app.list_rows()[row] else { panic!("a conversation") };
+        let ws = s.d.app.model.conversation(c).workspace.clone();
+        let b = named.take().expect("a second person");
+        let b = s.d.app.model.user(&ws, &b).expect("known").display_name.line().into_string();
+        let (ys, lines) = rows(&s, 0);
+        let line = &lines[usize::from(ys[0])];
+        assert!(line.contains(&format!("@{b} in #ops: Q&A now")), "{at}: {line:?}");
+        assert!(!line.contains('<') && !line.contains("&amp;") && !line.contains("*now"), "{at}: {line:?}");
+    }
 }

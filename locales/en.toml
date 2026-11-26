@@ -182,6 +182,12 @@
 "system.unpinned" = "{name} unpinned a message from this channel."
 "system.app_added" = "{name} added an app to this channel."
 "system.app_removed" = "{name} removed an app from this channel."
+"system.topic_dm" = "{name} set the conversation topic: {text}"
+"system.purpose_dm" = "{name} set the conversation description: {text}"
+"system.pinned_dm" = "{name} pinned a message to this conversation."
+"system.unpinned_dm" = "{name} unpinned a message from this conversation."
+"system.app_added_dm" = "{name} added an app to this conversation."
+"system.app_removed_dm" = "{name} removed an app from this conversation."
 "system.private" = "{name} made {channel} private."
 "system.public" = "{name} made {channel} public."
 

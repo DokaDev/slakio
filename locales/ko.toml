@@ -159,6 +159,12 @@
 "system.unpinned" = "{name} 님이 이 채널에서 메시지 고정을 해제했습니다."
 "system.app_added" = "{name} 님이 이 채널에 앱을 추가했습니다."
 "system.app_removed" = "{name} 님이 이 채널에서 앱을 제거했습니다."
+"system.topic_dm" = "{name} 님이 대화 주제를 설정했습니다: {text}"
+"system.purpose_dm" = "{name} 님이 대화 설명을 설정했습니다: {text}"
+"system.pinned_dm" = "{name} 님이 이 대화에 메시지를 고정했습니다."
+"system.unpinned_dm" = "{name} 님이 이 대화에서 메시지 고정을 해제했습니다."
+"system.app_added_dm" = "{name} 님이 이 대화에 앱을 추가했습니다."
+"system.app_removed_dm" = "{name} 님이 이 대화에서 앱을 제거했습니다."
 "system.private" = "{name} 님이 {channel}을(를) 비공개로 전환했습니다."
 "system.public" = "{name} 님이 {channel}을(를) 공개로 전환했습니다."
 

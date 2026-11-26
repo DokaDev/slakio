@@ -13,6 +13,7 @@ use super::message::{Kind, Laid};
 use crate::app::App;
 use crate::app::pane::{Pane, Shown};
 use crate::app::timelines::Timeline;
+use crate::mrkdwn::{Piece, first_line, parse};
 use crate::text::{clip, width};
 use crate::time;
 use ratatui::text::{Line, Span};
@@ -35,22 +36,38 @@ fn icon(app: &App, s: &System<Safe>) -> &'static str {
     if app.settings.icons { glyph } else { mark }
 }
 
-/// What notice `s` of message `m` says: by its author, about the pane's conversation.
+/// What notice `s` of message `m` says: by its author, about the pane's conversation (a DM's or
+/// a group DM's in its own words). A topic or a description is Slack markup, read as plain text
+/// on one line with its people and channels named, as the timeline names them.
 fn words(app: &App, pane: &Pane, m: &Shown, s: &System<Safe>) -> String {
     let name = m.author.as_str().to_string();
-    let channel = || app.model.target(&pane.target).map(crate::app::model::breadcrumb).unwrap_or_default();
+    let conversation = app.model.target(&pane.target);
+    let channel = || conversation.map(crate::app::model::breadcrumb).unwrap_or_default();
+    let dm = conversation.is_some_and(|c| c.is_dm());
     let text = |t: &Safe| t.as_str().to_string();
+    let markup = |t: &Safe| {
+        let named = |p: &Piece| app.model.named(pane.target.workspace(), p);
+        let blocks = parse(t.as_str());
+        let lines = blocks.iter().filter_map(|b| first_line(std::slice::from_ref(b), &named));
+        lines.map(|l| l.trim().to_string()).collect::<Vec<_>>().join(" ")
+    };
     let msg = match s {
         System::Joined => Msg::SystemJoined { name, channel: channel() },
         System::Left => Msg::SystemLeft { name, channel: channel() },
-        System::Topic(t) => Msg::SystemTopic { name, text: text(t) },
-        System::Purpose(t) => Msg::SystemPurpose { name, text: text(t) },
+        System::Topic(t) if dm => Msg::SystemTopicDm { name, text: markup(t) },
+        System::Topic(t) => Msg::SystemTopic { name, text: markup(t) },
+        System::Purpose(t) if dm => Msg::SystemPurposeDm { name, text: markup(t) },
+        System::Purpose(t) => Msg::SystemPurpose { name, text: markup(t) },
         System::Renamed { old, new } => Msg::SystemRenamed { name, old: text(old), new: text(new) },
         System::Archived => Msg::SystemArchived { name, channel: channel() },
         System::Unarchived => Msg::SystemUnarchived { name, channel: channel() },
+        System::Pinned if dm => Msg::SystemPinnedDm { name },
         System::Pinned => Msg::SystemPinned { name },
+        System::Unpinned if dm => Msg::SystemUnpinnedDm { name },
         System::Unpinned => Msg::SystemUnpinned { name },
+        System::AppAdded if dm => Msg::SystemAppAddedDm { name },
         System::AppAdded => Msg::SystemAppAdded { name },
+        System::AppRemoved if dm => Msg::SystemAppRemovedDm { name },
         System::AppRemoved => Msg::SystemAppRemoved { name },
         System::MadePrivate => Msg::SystemPrivate { name, channel: channel() },
         System::MadePublic => Msg::SystemPublic { name, channel: channel() },
