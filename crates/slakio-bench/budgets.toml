@@ -16,7 +16,9 @@
 # and serde's derived readers into the binary (CI's x86_64 Linux build 8.97 MiB after them).
 # Raised from 9.5 for the pictures kept on disk between runs (CI's x86_64 Linux build 9.46 MiB
 # before them).
-binary_mib_max = 10.0
+# Raised from 10.0 for the picture hosts' budget, Hangul emoji names and the shape probes
+# (CI's x86_64 Linux build 10 501 368 bytes, 10.01 MiB, after them).
+binary_mib_max = 11.0
 
 [idle]
 # The release binary in tmux, nothing to do: the loop sleeps until input, a signal or a
