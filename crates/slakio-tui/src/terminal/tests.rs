@@ -37,6 +37,9 @@ const PASTE_OFF: &str = "\x1b[?2004l";
 /// Mouse capture off. On Windows crossterm turns mouse capture on and off in the console mode
 /// (WinAPI), never in the output, so there is nothing to find there.
 const MOUSE_OFF: Option<&str> = if cfg!(windows) { None } else { Some("\x1b[?1000l") };
+/// Focus reporting on and off; on Windows crossterm leaves them to the console, as the mouse.
+const FOCUS_ON: Option<&str> = if cfg!(windows) { None } else { Some("\x1b[?1004h") };
+const FOCUS_OFF: Option<&str> = if cfg!(windows) { None } else { Some("\x1b[?1004l") };
 
 thread_local! {
     /// How often raw mode was turned off on this thread.
@@ -70,6 +73,21 @@ fn restoring_pops_the_keys_and_gives_back_the_users_cursor_before_leaving() {
     state.enter(&mut Vec::new(), false).unwrap();
     state.restore(&mut out, || {}).unwrap();
     assert!(String::from_utf8(out).unwrap().starts_with(PASTE_OFF));
+}
+
+#[test]
+fn focus_reporting_goes_on_with_the_mouse_and_off_on_restore() {
+    let (Some(on), Some(off)) = (FOCUS_ON, FOCUS_OFF) else { return };
+    let state = TermState::new();
+    let mut entered = Vec::new();
+    state.enter(&mut entered, false).unwrap();
+    let entered = String::from_utf8(entered).unwrap();
+    let (mouse, focus) = (entered.find("\x1b[?1000h"), entered.find(on));
+    assert!(mouse.is_some() && focus.is_some() && mouse < focus, "with the mouse: {entered:?}");
+    let r = restore_sequence();
+    let at = |s: &str| r.find(s).unwrap_or_else(|| panic!("{s:?} missing from {r:?}"));
+    assert!(at(off) < at(LEAVE), "{r:?}");
+    assert_eq!(r.matches(off).count(), 1, "{r:?}");
 }
 
 #[test]
@@ -109,7 +127,7 @@ fn assert_restored_once(screen: &Screen, raw_before: usize, what: &str) {
     // (A setup that failed before the kitty flags were pushed pops nothing.)
     let tail = &r[kitty::pop_sequence().len()..];
     assert!(text.ends_with(tail), "{what}: ends with the restore: {text:?}");
-    for part in [Some(PASTE_OFF), MOUSE_OFF, Some(DEFAULT_SHAPE), Some(LEAVE)].into_iter().flatten() {
+    for part in [Some(PASTE_OFF), MOUSE_OFF, FOCUS_OFF, Some(DEFAULT_SHAPE), Some(LEAVE)].into_iter().flatten() {
         assert_eq!(text.matches(part).count(), 1, "{what}: {part:?} once: {text:?}");
     }
     assert_eq!(RAW_OFFS.with(Cell::get), raw_before + 1, "{what}: raw mode off once");

@@ -19,8 +19,19 @@ impl App {
     /// The mouse: a click on a view shows it, on the workspace chip opens the switcher, on a list row
     /// opens it, on the tab bar goes there ([`super::tabs`]), on a message selects it (twice: its
     /// thread), on a reply link opens the thread, on a composer writes in it; the wheel scrolls
-    /// what is under it. `true` when the screen changed.
+    /// what is under it. A move or a drag moves the pointer, and what is under it is drawn
+    /// apart ([`super::hover`]). `true` when the screen changed.
     pub(super) fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
+        let before = self.hover_key();
+        if matches!(m.kind, MouseEventKind::Moved | MouseEventKind::Drag(_)) {
+            self.pointer.at = Some(Position { x: m.column, y: m.row });
+        }
+        let routed = self.route(m, now);
+        routed || self.hover_key() != before
+    }
+
+    /// The mouse, to the popup that takes it or to the screen.
+    fn route(&mut self, m: MouseEvent, now: Instant) -> bool {
         match self.overlay() {
             // The settings screen takes keys only.
             Some(Overlay::Dialog(_) | Overlay::Settings) => return false,
@@ -87,8 +98,9 @@ impl App {
             MouseEventKind::Down(MouseButton::Left) => {
                 self.keys.clear();
                 self.guide = Guide::default();
-                let double = self.last_click.is_some_and(|(t, p)| p == at && now.duration_since(t) <= DOUBLE_CLICK);
-                self.last_click = Some((now, at));
+                let last = self.pointer.last_click;
+                let double = last.is_some_and(|(t, p)| p == at && now.duration_since(t) <= DOUBLE_CLICK);
+                self.pointer.last_click = Some((now, at));
                 if let Some(list) = a.list.filter(|l| l.contains(at)) {
                     let rows = screen::list_parts(list, self.nav_rows()).rows;
                     // Below the rows shown (Activity's end) is not a row.

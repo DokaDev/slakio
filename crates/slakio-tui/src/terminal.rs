@@ -1,5 +1,5 @@
-//! What the binary changes on the terminal and undoes: the alternate
-//! screen, mouse capture, bracketed paste, the kitty keyboard flags and the cursor's shape.
+//! What the binary changes on the terminal and undoes: the alternate screen, mouse capture with
+//! focus reporting, bracketed paste, the kitty keyboard flags and the cursor's shape.
 //! The escape sequences are written to any writer, so tests check them without a terminal.
 //!
 //! The cursor takes the shape of the mode ([`cursor_shape`]): a steady block in Normal mode, a
@@ -14,7 +14,10 @@
 use crate::app::App;
 use crate::kitty;
 use ratatui::crossterm::cursor::{SetCursorStyle, Show};
-use ratatui::crossterm::event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture};
+use ratatui::crossterm::event::{
+    DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste, EnableFocusChange,
+    EnableMouseCapture,
+};
 use ratatui::crossterm::queue;
 use ratatui::crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use std::cell::Cell;
@@ -110,13 +113,13 @@ impl TermState {
         self.raw.store(true, Ordering::SeqCst);
     }
 
-    /// Enter the alternate screen and turn on mouse capture and bracketed paste, and with
-    /// `enhanced` push the kitty keyboard flags (the main and alternate screens keep separate
-    /// flag stacks: pushed after entering, popped before leaving). Marked first, so a failure
-    /// part way is undone too.
+    /// Enter the alternate screen and turn on mouse capture, focus reporting (a lost focus takes
+    /// the pointer's hover away) and bracketed paste, and with `enhanced` push the kitty keyboard
+    /// flags (the main and alternate screens keep separate flag stacks: pushed after entering,
+    /// popped before leaving). Marked first, so a failure part way is undone too.
     pub fn enter(&self, out: &mut impl Write, enhanced: bool) -> io::Result<()> {
         self.entered.store(true, Ordering::SeqCst);
-        queue!(out, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
+        queue!(out, EnterAlternateScreen, EnableMouseCapture, EnableFocusChange, EnableBracketedPaste)?;
         out.flush()?;
         if enhanced {
             self.keys.store(true, Ordering::SeqCst);
@@ -127,9 +130,10 @@ impl TermState {
     }
 
     /// Undo what was turned on, once (later calls do nothing until it is turned on again):
-    /// `raw_off` for raw mode, then on `out` the pictures sent removed, the kitty flags popped, bracketed paste and mouse
-    /// capture off, the cursor shown in the user's default shape and the main screen. Every step is tried
-    /// even when one fails; the first failure comes back.
+    /// `raw_off` for raw mode, then on `out` the pictures sent removed, the kitty flags popped,
+    /// bracketed paste, focus reporting and mouse capture off, the cursor shown in the user's
+    /// default shape and the main screen. Every step is tried even when one fails; the first
+    /// failure comes back.
     pub fn restore(&self, out: &mut impl Write, raw_off: impl FnOnce()) -> io::Result<()> {
         if self.raw.swap(false, Ordering::SeqCst) {
             raw_off();
@@ -151,6 +155,7 @@ impl TermState {
         let rest = queue!(
             out,
             DisableBracketedPaste,
+            DisableFocusChange,
             DisableMouseCapture,
             Show,
             SetCursorStyle::DefaultUserShape,

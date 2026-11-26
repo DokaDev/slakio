@@ -162,6 +162,7 @@ fn assert_restored(text: &str, what: &str) {
     for (seq, part) in [
         ("\x1b[?2004l", "bracketed paste off"),
         ("\x1b[?1000l", "mouse capture off"),
+        ("\x1b[?1004l", "focus reporting off"),
         ("\x1b[?25h", "the cursor shown"),
         ("\x1b[0 q", "the user's cursor shape"),
         ("\x1b[?1049l", "the main screen"),

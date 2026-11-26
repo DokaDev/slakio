@@ -357,6 +357,39 @@ fn a_dialog_s_dim_keeps_every_picture_s_colour_its_id() {
     }
 }
 
+#[test]
+fn a_hovered_message_keeps_every_picture_s_colour_its_id() {
+    use ratatui::crossterm::event::MouseEventKind;
+    let mut s = kitty_shown();
+    s.d.app.set_theme("dark", s.d.now).unwrap();
+    let asked = frame(&mut s);
+    for (id, _) in &asked {
+        deliver(&mut s, *id, slakio_world::pictures::png("x", 360, 240));
+    }
+    let ws = s.d.app.model.workspaces()[0].id.clone();
+    let slakio_tui::images::Look::Ready { id, .. } =
+        s.d.app.images.look(&ws, &Source::Thumb(format!("https://{FILE_HOST}/{THUMB}")))
+    else {
+        panic!("the preview is held")
+    };
+    let want = slakio_tui::images::graphics::color(id);
+    let cells = |s: &Scripted| -> Vec<(ratatui::style::Color, ratatui::style::Color)> {
+        s.d.buffer().content().iter().filter(|c| is_placeholder(c.symbol())).map(|c| (c.fg, c.bg)).collect()
+    };
+    let before = cells(&s);
+    assert!(!before.is_empty() && before.iter().all(|c| c.0 == want));
+    assert_eq!(s.d.app.focused_pane().and_then(|p| p.selected()), None, "nothing selected");
+    // The pointer on a row of the picture: its message is hovered.
+    let buf = s.d.buffer();
+    let at = buf.content().iter().position(|c| is_placeholder(c.symbol())).unwrap();
+    let (x, y) = (at as u16 % buf.area.width, at as u16 / buf.area.width);
+    assert!(s.d.mouse(MouseEventKind::Moved, x, y));
+    let buf = s.d.buffer();
+    let hover = s.d.app.theme.hover;
+    assert!(buf.content().iter().any(|c| c.bg == hover && !is_placeholder(c.symbol())), "the message is hovered");
+    assert_eq!(cells(&s), before, "every picture cell is left as it is: its colour, its id");
+}
+
 /// Booted, `deploys` open at 120×40 with pictures on (kitty), its `n` messages each `lines` rows
 /// of text and a picture of its own (`shot<k>.png`).
 fn tall_shown(n: usize, lines: usize) -> Scripted {

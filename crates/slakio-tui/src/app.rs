@@ -36,6 +36,7 @@ mod effects;
 pub mod files;
 mod focus;
 pub mod help;
+mod hover;
 pub mod jump;
 mod layout;
 pub mod links;
@@ -76,7 +77,7 @@ use model::Model;
 pub(crate) use overlay::Layer;
 pub use query::{Focus, Overlay, PaneHandle, PaneKind, PaneRef};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::layout::{Position, Rect};
+use ratatui::layout::Rect;
 use shell::Shell;
 use slakio_core::backend::Capabilities;
 use slakio_core::i18n::{I18n, Label, Lang, Msg};
@@ -178,8 +179,8 @@ pub struct App {
     /// The last boot request of each workspace (older answers are dropped), and why it failed.
     boots: Vec<answers::Boot>,
     effects: Vec<Effect>,
-    /// The last click (for a double click): when, and where.
-    last_click: Option<(Instant, Position)>,
+    /// Where the mouse is, and the last click ([`hover`]).
+    pointer: hover::Pointer,
     /// The tab being dragged along the tab bar (its index now).
     tab_drag: Option<usize>,
     /// The seam between panes being dragged ([`splits`]).
@@ -231,7 +232,7 @@ impl App {
             sign_in: signin::Offer::default(),
             boots: Vec::new(),
             effects: Vec::new(),
-            last_click: None,
+            pointer: hover::Pointer::default(),
             tab_drag: None,
             seam_drag: None,
             restoring: None,
@@ -361,6 +362,7 @@ impl App {
                 true
             }
             Event::Mouse(m) => self.mouse(m, now),
+            Event::FocusLost => self.pointer_gone(),
             _ => false,
         }
     }

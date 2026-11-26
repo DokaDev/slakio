@@ -21,6 +21,7 @@ mod empty;
 mod files;
 mod guide;
 mod help;
+mod hover;
 mod list;
 mod navbar;
 mod palette;

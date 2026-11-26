@@ -226,6 +226,8 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
     let mut sel_last = None;
     // The message whose links are being picked shows its letters, not the selection.
     let picking = app.picking_in(pane);
+    // The rows a selection paints, with their message: the one under the mouse is drawn apart.
+    let mut paint_rows = Vec::new();
     for (i, rows) in shown {
         let selected = range.is_some_and(|(a, b)| (a..=b).contains(&i)) && picking != Some(tl.items[i].ts);
         let mut seen = std::collections::HashSet::new();
@@ -245,6 +247,9 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
             let row = Rect { y, height: 1, ..area };
             f.render_widget(Paragraph::new(line), text_area(row));
+            if matches!(kind, Kind::Content | Kind::Link) {
+                paint_rows.push((i, row));
+            }
             if selected && matches!(kind, Kind::Content | Kind::Link) {
                 highlight(f, app, row, how(i));
             }
@@ -264,6 +269,10 @@ pub(super) fn draw(f: &mut Frame, app: &App, pane: &Pane, area: Rect, focused: b
             }
             y += 1;
         }
+    }
+    if pane.visual.is_none() {
+        let in_range = |i: usize| range.is_some_and(|(a, b)| (a..=b).contains(&i));
+        super::hover::message(f, app, area, &hits, &paint_rows, in_range);
     }
     // Where the selection is, for a change that must not move it ([`Pane::held`]).
     let below = sel_last.map(|y| usize::from(area.bottom() - 1 - y));
