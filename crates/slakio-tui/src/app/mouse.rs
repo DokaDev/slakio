@@ -22,9 +22,16 @@ impl App {
     /// what is under it. A move or a drag moves the pointer, and what is under it is drawn
     /// apart ([`super::hover`]). `true` when the screen changed.
     pub(super) fn mouse(&mut self, m: MouseEvent, now: Instant) -> bool {
+        let at = Position { x: m.column, y: m.row };
+        let motion = matches!(m.kind, MouseEventKind::Moved | MouseEventKind::Drag(_));
+        // A terminal reports many motions within one cell: nothing new is under the pointer, so
+        // what is under it is not worked out again.
+        if motion && self.pointer.at == Some(at) {
+            return self.route(m, now);
+        }
         let before = self.hover_key();
-        if matches!(m.kind, MouseEventKind::Moved | MouseEventKind::Drag(_)) {
-            self.pointer.at = Some(Position { x: m.column, y: m.row });
+        if motion {
+            self.pointer.at = Some(at);
         }
         let routed = self.route(m, now);
         routed || self.hover_key() != before

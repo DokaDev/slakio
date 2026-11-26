@@ -184,6 +184,7 @@ fn a_move_within_one_message_draws_nothing_and_to_another_draws() {
         assert!(moved(&mut d, a.x + 2, y));
         d.screen();
         assert!(!moved(&mut d, a.x + 9, y), "{size:?}: along the same row");
+        assert!(!moved(&mut d, a.x + 9, y), "{size:?}: the same cell again");
         for r in rows_of(&d, i) {
             assert!(!moved(&mut d, a.x + 4, r), "{size:?}: another row of the same message");
         }
