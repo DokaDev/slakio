@@ -356,3 +356,23 @@ fn photos_waiting_for_a_place_leave_the_previews_theirs() {
         drop(held);
     });
 }
+
+/// An address a picture may not come from is refused at once, never after waiting for one of
+/// the picture hosts' places: with all of them taken it is still answered straight away.
+#[test]
+fn an_off_host_address_is_refused_at_once_with_every_place_taken() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let mut held = Vec::new();
+        for _ in 0..CdnLimits::default().in_flight {
+            held.push(r.governor.cdn_slot().await.expect("a place"));
+        }
+        let id = r.send(&Source::Avatar("https://elsewhere.example/U1_72.png".to_string()), false);
+        let e =
+            tokio::time::timeout(Duration::from_secs(2), r.handle.rx.recv()).await.expect("refused at once").unwrap();
+        assert_eq!(e.generation, id);
+        assert!(matches!(e.event, Event::Failed { .. }), "refused");
+        assert!(r.picture_requests().is_empty(), "nothing asked");
+        drop(held);
+    });
+}

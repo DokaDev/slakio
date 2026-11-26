@@ -90,7 +90,9 @@ pub(crate) async fn picture(client: &Client, source: &Source, max: u64, list: bo
     let note = Note::new(client.diag(), source);
     // A photo or an emoji holds one of the picture hosts' places over all its hops; the wait for
     // one is not part of its deadline (it ends when the network is switched off).
+    // An address this kind may not come from is refused before any wait for a place.
     let slot = match source {
+        _ if source.checked().is_none() => Err(api("not_a_picture_address")),
         Source::Thumb(_) => Ok(None),
         Source::Avatar(_) | Source::Emoji(_) => client.governor().cdn_slot().await.map(Some),
     };
