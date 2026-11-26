@@ -78,9 +78,10 @@ impl Theme {
 
     /// The chip colours a theme file leaves out, worked out from the colours it sets: body text
     /// [`REACTION_SHARE`] percent into the background where it sets `bg` or `fg`, and the least
-    /// share of the accent (from 10 percent) [`CHIP_APART`] from the background and
-    /// [`CHANNEL_APART`] from the selection, the hover colour and the other chip where it sets
-    /// `bg` or `accent`; neither ever code's tint. A colour that is not RGB keeps the base theme's chip.
+    /// share of the accent (from 10 percent) [`CHIP_APART`] from the background and from the
+    /// selection, body text 4.5:1 on it, and [`CHANNEL_APART`] from the selection, the hover
+    /// colour and the other chip where it sets `bg` or `accent` (or a `selection` the base's own
+    /// chip is not that far from); neither ever code's tint. A colour that is not RGB keeps the base theme's chip.
     pub(super) fn derive_reactions(&mut self, set: impl Fn(&str) -> bool) {
         // Never code's tint: a bar painted over a row keeps a chip, and tints code apart.
         let code = self.code_bg();
@@ -93,10 +94,16 @@ impl Theme {
         {
             self.reaction = c;
         }
-        if !set("reaction_mine") && (set("bg") || set("accent")) {
+        // The user's own chip is seen on a selected row too: as far from the selection as from
+        // the background.
+        let seen =
+            |c: Color| [self.bg, self.selection].into_iter().all(|on| contrast(c, on).is_some_and(|k| k >= CHIP_APART));
+        let lost = set("selection") && !seen(self.reaction_mine);
+        if !set("reaction_mine") && (set("bg") || set("accent") || lost) {
             let apart = |c: Color, from: Color| channel_gap(c, from).is_none_or(|d| d >= CHANNEL_APART);
-            let wash = (10..=40).filter_map(|p| mix(self.accent, self.bg, p)).find(|c| {
-                contrast(*c, self.bg).is_some_and(|k| k >= CHIP_APART)
+            let wash = (10..=60).filter_map(|p| mix(self.accent, self.bg, p)).find(|c| {
+                seen(*c)
+                    && contrast(self.fg, *c).is_some_and(|k| k >= 4.5)
                     && *c != code
                     && apart(*c, self.selection)
                     && apart(*c, self.reaction)

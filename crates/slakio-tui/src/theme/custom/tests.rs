@@ -276,3 +276,31 @@ fn a_file_that_changes_the_colours_gets_a_hover_of_its_own() {
     let ansi = Look { truecolor: false, ..DARK_TRUECOLOR };
     assert_eq!(theme("extends = \"terminal\"\n", ansi).hover, Color::Reset);
 }
+
+#[test]
+fn a_derived_own_chip_stands_off_the_selection_and_the_background() {
+    use super::super::code::contrast;
+    let light = Look { background: Background::Light, ..DARK_TRUECOLOR };
+    let seen = |t: &Theme, what: &str| {
+        for on in [t.bg, t.selection] {
+            let k = contrast(t.reaction_mine, on).unwrap();
+            assert!(k >= 1.15, "{what}: own chip {:?} on {on:?} {k:.2}", t.reaction_mine);
+        }
+        assert!(contrast(t.fg, t.reaction_mine).unwrap() >= 4.5, "{what}: text on the own chip");
+    };
+    // A background or an accent of the file's own, against the base's selection.
+    for file in
+        ["extends = \"light\"\n[colors]\nbg = \"#fcfcfd\"\n", "extends = \"light\"\n[colors]\naccent = \"#1060c0\"\n"]
+    {
+        seen(&theme(file, light), file);
+    }
+    // The file's selection: a base chip too near it is worked out again, one far enough stays.
+    let t = theme("extends = \"light\"\n[colors]\nselection = \"#b0d0d0\"\n", light);
+    assert_ne!(t.reaction_mine, crate::theme::LIGHT.reaction_mine);
+    seen(&t, "near selection");
+    let t = theme("extends = \"light\"\n[colors]\nselection = \"#d5e3f0\"\n", light);
+    assert_eq!(t.reaction_mine, crate::theme::LIGHT.reaction_mine);
+    // What the file sets stays.
+    let t = theme("extends = \"light\"\n[colors]\nselection = \"#b0d0d0\"\nreaction_mine = \"#b0d0d1\"\n", light);
+    assert_eq!(t.reaction_mine, rgb(0xB0D0D1));
+}
