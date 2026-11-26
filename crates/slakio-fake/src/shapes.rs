@@ -99,7 +99,7 @@ fn user_boot(world: &World, team: usize) -> Value {
                 channels.push(ch);
             }
             ConversationKind::Dm { user } => {
-                ims.push(json!({"id": c.id.as_str(), "user": user.as_str(), "is_im": true, "is_open": true}))
+                ims.push(json!({"id": c.id.as_str(), "user": user.as_str(), "is_im": true, "is_open": !c.closed}))
             }
             ConversationKind::GroupDm { users } => {
                 // Named by handle as Slack does, the user among its people, and open.

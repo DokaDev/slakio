@@ -16,9 +16,9 @@ expression: mask_hangul(&s)
 │ AM● Alex Morgan            ││                                                                                        │
 │ 3   Jiho… and 2 others  1  ││                                                                                        │
 │ M ● Me you 🎉              ││                                                                                        │
-│                            ││                                                                                        │
-│                            ││                         No conversation open                                           │
-│                            ││                         Pick one in the list and press Enter.                          │
+│ H ● Hana                   ││                                                                                        │
+│ ＊○ ＊＊＊                 ││                         No conversation open                                           │
+│ G ● Grafana app            ││                         Pick one in the list and press Enter.                          │
 │                            ││                                                                                        │
 │                            ││                         Enter    Open                                                  │
 │                            ││                         Space h  Home                                                  │

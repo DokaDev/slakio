@@ -105,3 +105,51 @@ fn listed_any(s: &Scripted, id: &str) -> bool {
     (s.d.app.list_rows().iter())
         .any(|r| matches!(r, Row::Conversation(i) if s.d.app.model.conversation(*i).id.as_str() == id))
 }
+
+/// The ids `d`'s list shows under each section kind, in order.
+fn demo_listed(d: &demo::Demo) -> Vec<(SectionKind, String)> {
+    let (mut kind, mut out) = (None, Vec::new());
+    for r in d.app.list_rows() {
+        match r {
+            Row::Section(i) => kind = Some(d.app.model.section(i).kind),
+            Row::Conversation(i) => out.push((kind.unwrap(), d.app.model.conversation(i).id.as_str().to_string())),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The demo's `B side` lists Starred first with its open starred DM (not the closed one) and
+/// Apps last with the DM with an app; the DMs view still lists the closed one.
+#[test]
+fn the_demo_shows_an_app_dm_in_apps_and_hides_a_closed_starred_dm() {
+    let mut d = demo::Demo::new(120, 40);
+    d.keys("space W j enter");
+    assert_eq!(d.app.workspace(), 1);
+    let rows = demo_listed(&d);
+    let ids = |kind: SectionKind| -> Vec<&str> {
+        rows.iter().filter(|(k, _)| *k == kind).map(|(_, id)| id.as_str()).collect()
+    };
+    assert_eq!(ids(SectionKind::Favorites), ["DDEMOBS001"], "the open starred DM only: {rows:?}");
+    assert_eq!(rows.first().map(|(k, _)| *k), Some(SectionKind::Favorites), "Starred first: {rows:?}");
+    assert_eq!(ids(SectionKind::Apps), ["DDEMOBP001"], "{rows:?}");
+    assert_eq!(rows.last().map(|(k, _)| *k), Some(SectionKind::Apps), "Apps last: {rows:?}");
+    assert!(!rows.iter().any(|(_, id)| id == "DDEMOBS002"), "the closed starred DM is not listed: {rows:?}");
+    let s = d.screen();
+    assert!(s.contains("Starred") && s.contains("Hana"), "{s}");
+    d.keys("G");
+    let s = d.screen();
+    assert!(s.contains("Apps") && s.contains("Grafana"), "{s}");
+    d.keys("space d");
+    let dms: Vec<String> = demo_listed_dms(&d);
+    assert!(dms.iter().any(|id| id == "DDEMOBS002"), "the DMs view lists the closed one: {dms:?}");
+}
+
+fn demo_listed_dms(d: &demo::Demo) -> Vec<String> {
+    (d.app.list_rows().into_iter())
+        .filter_map(|r| match r {
+            Row::Conversation(i) => Some(d.app.model.conversation(i).id.as_str().to_string()),
+            _ => None,
+        })
+        .collect()
+}

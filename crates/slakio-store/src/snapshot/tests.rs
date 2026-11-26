@@ -290,6 +290,8 @@ fn sections_slack_could_not_tell_keep_those_kept_before() {
 fn a_closed_dm_comes_back_closed() {
     let mut store = writer("snap-closed");
     let mut s = World::new(5).snapshot().clone();
+    // Only the one marked here is closed (the world has a closed DM of its own).
+    s.conversations.iter_mut().for_each(|c| c.closed = false);
     let at = s.conversations.iter().position(Conversation::is_dm).unwrap();
     s.conversations[at].closed = true;
     store.put_snapshot(&s).unwrap();

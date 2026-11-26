@@ -31,6 +31,7 @@ pub mod pictures;
 mod rng;
 mod saved;
 mod search;
+mod starred;
 mod text;
 
 pub use search::{Query, SearchHit, parse as parse_query};
@@ -216,6 +217,7 @@ impl World {
             w.add_workspace(n, spec);
         }
         own::add_dms(&mut w);
+        starred::add(&mut w);
         w.snapshot.saved = Some(saved::items(&w));
         w.snapshot.taken = saved::now(&w);
         w
