@@ -1,5 +1,5 @@
 //! What is under the mouse, drawn apart from the selection and quieter than it
-//! ([`crate::theme::Theme::paint_hover`]): a message of a pane. The selection
+//! ([`crate::theme::Theme::paint_hover`]): a message of a pane, a row of the list. The selection
 //! keeps its own look; a message selected, or one in a range being made, is not hovered.
 
 use crate::app::App;
@@ -26,4 +26,9 @@ pub(super) fn message(
     for (_, row) in rows.iter().filter(|(j, _)| *j == i) {
         app.theme.paint_hover(f.buffer_mut(), *row);
     }
+}
+
+/// Paint a row of the list under the pointer.
+pub(super) fn row(f: &mut Frame, app: &App, row: Rect) {
+    app.theme.paint_hover(f.buffer_mut(), row);
 }

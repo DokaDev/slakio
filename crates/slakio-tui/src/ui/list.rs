@@ -108,14 +108,20 @@ pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus() == Focus::List;
     // Activity keeps its last row for its end (`App::list_height`).
     let shown = if app.shell.view == View::Activity { app.list_height() } else { usize::from(inner.height) };
+    // The row under the mouse (an item with its second line), unless the cursor is on it.
+    let hovered = app.hovered_list_row().filter(|r| *r != app.shell.list_cursor);
     for (k, &row) in rows.iter().enumerate().skip(app.shell.list_top).take(shown) {
         let y = inner.y + (k - app.shell.list_top) as u16;
         let area = Rect { y, height: 1, ..inner };
         let mark = draw_row(f, app, row, area);
         // A to-do's second line is under the cursor with its first.
-        let on_item = matches!(row, Row::ItemMeta(_) | Row::NoticeMeta(_)) && k == app.shell.list_cursor + 1;
+        let item_meta = matches!(row, Row::ItemMeta(_) | Row::NoticeMeta(_));
+        let on_item = item_meta && k == app.shell.list_cursor + 1;
         if on_item {
             highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });
+        }
+        if hovered.is_some_and(|h| h == k || item_meta && h + 1 == k) {
+            super::hover::row(f, app, area);
         }
         if k == app.shell.list_cursor && row.is_selectable() {
             highlight(f, app, area, if focused { Selection::Focused } else { Selection::Unfocused });

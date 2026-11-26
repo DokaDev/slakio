@@ -131,7 +131,10 @@ images, and settings. This README only lists what works; it will grow with each 
     start of a conversation each show a row); `j` / `k` select messages, `g g` / `G` jump to
     the oldest loaded (asking for one more page) / newest (arrows, `PageUp` / `PageDown`, `Home` / `End` too; the
     mouse wheel scrolls the view three rows a notch and leaves the selection where it is,
-    until a key moves it back into view; up at the top it loads older messages too), `Enter` opens the selected message's thread in a panel on the right (another
+    until a key moves it back into view; up at the top it loads older messages too; the message
+    and the list row under the mouse are drawn with a quiet wash, a thin bar in the gutter
+    without colours, apart from the selection: the hover follows the pointer and is cleared
+    when it leaves the pane or the terminal loses focus), `Enter` opens the selected message's thread in a panel on the right (another
     thread replaces it; with no message selected it writes), `Ctrl+W` closes the panel, then
     the conversation; `Ctrl+O` / `Space [` and `Space ]` go back and forward between the
     conversations a pane showed;
