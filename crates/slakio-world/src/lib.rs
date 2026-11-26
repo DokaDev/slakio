@@ -18,12 +18,14 @@
 //!
 //! Saved messages and to-dos ([`saved`]) come with it, with a clock of the world's own (the
 //! snapshot's `taken`) so a reminder is overdue or upcoming the same way on every run; so does
-//! the user's Activity ([`activity`]).
+//! the user's Activity ([`activity`]). One channel ends with a few of Slack's notices
+//! (`notices`): someone joined, someone left, the topic was set.
 
 pub mod activity;
 pub mod emoji;
 pub mod files;
 mod hostile;
+mod notices;
 pub mod pictures;
 mod rng;
 mod saved;
@@ -266,6 +268,9 @@ impl World {
         let mut r = Rng::keyed(self.seed, conversation.as_str(), index as u64);
         let slot = plan.start + index as u64 * plan.step;
         let ts = Ts(slot * 1_000_000 + r.below(plan.step * 1_000_000));
+        if let Some(notice) = notices::message(plan, index, ts) {
+            return Some(notice);
+        }
         let user = r.pick(&plan.posters).clone();
         let text = match plan.history {
             History::Hostile => hostile::all().swap_remove(index).text.into(),
@@ -562,6 +567,7 @@ impl World {
             mentions,
             latest: None,
         });
+        let count = count + notices::count(&team, &plan_name);
         self.plans.insert(id, Plan { team, name: plan_name, count, history, posters, start, step });
     }
 }

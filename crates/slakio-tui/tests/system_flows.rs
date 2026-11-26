@@ -285,3 +285,26 @@ fn a_long_topic_is_clipped_and_keeps_its_time() {
         assert!(line.ends_with(&format!("\u{2026}  {}", hm(&s, 90))), "{at}: the time after it: {line:?}");
     }
 }
+
+/// The demo shows notices: `ideas` of `B side` ends with someone joining, someone leaving and
+/// the topic set, the last two on rows one after the other with no blank row between.
+#[test]
+fn the_demo_ends_ideas_with_a_join_a_leave_and_a_topic() {
+    let settings = slakio_tui::app::Settings { icons: false, ..slakio_tui::app::Settings::default() };
+    let mut d = demo::Demo::with(120, 40, Lang::En, settings);
+    d.keys("space W j enter");
+    d.open("ideas");
+    let screen = d.screen();
+    let lines: Vec<&str> = screen.lines().collect();
+    let row = |words: &str| {
+        let hits: Vec<usize> = (0..lines.len()).filter(|&y| lines[y].contains(words)).collect();
+        assert_eq!(hits.len(), 1, "{words:?} on one row\n{screen}");
+        hits[0]
+    };
+    let joined = row("\u{2502}     + Jiho Park joined #ideas.  23:12   ");
+    let left = row("\u{2502}     - \u{C774}\u{C11C}\u{C5F0} left #ideas.  00:31   ");
+    let topic = row("\u{2502}     * Minsu Kim set the channel topic: One idea per thread, please  01:01   ");
+    assert!(joined < left, "{screen}");
+    assert_eq!(topic, left + 1, "the leave and the topic stack with no blank row\n{screen}");
+    assert_harmless(&screen);
+}
