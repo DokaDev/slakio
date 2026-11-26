@@ -320,3 +320,39 @@ fn a_photo_waiting_for_a_place_is_not_failed_by_the_wait() {
         );
     });
 }
+
+/// Photos and emoji waiting for the picture hosts' places never take a preview's place: past
+/// `PICTURES_MAX - PREVIEWS_MAX` of them one more is answered busy, and with twelve photos
+/// waiting a preview is still fetched.
+#[test]
+fn photos_waiting_for_a_place_leave_the_previews_theirs() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        // Every one of the picture hosts' places is taken: the photos wait.
+        let mut held = Vec::new();
+        for _ in 0..CdnLimits::default().in_flight {
+            held.push(r.governor.cdn_slot().await.expect("a place"));
+        }
+        let waiting = slakio_slack::adapter::PICTURES_MAX - slakio_slack::adapter::PREVIEWS_MAX;
+        let photos: Vec<Generation> =
+            photos(slakio_slack::adapter::PICTURES_MAX).iter().map(|p| r.send(p, false)).collect();
+        let preview = r.send(&thumb(), false);
+        let mut busy = 0;
+        let e = loop {
+            let e = r.next().await;
+            if e.generation == preview {
+                break e;
+            }
+            assert!(photos[waiting..].contains(&e.generation), "only the photos past the cap are answered");
+            assert!(matches!(e.event, Event::Failed { kind: FailKind::Busy, .. }), "a photo past the cap is busy");
+            busy += 1;
+        };
+        assert!(matches!(e.event, Event::Image { .. }), "the preview is fetched, not answered busy");
+        assert_eq!(
+            busy,
+            slakio_slack::adapter::PICTURES_MAX - waiting,
+            "each photo past the cap answered busy at once"
+        );
+        drop(held);
+    });
+}

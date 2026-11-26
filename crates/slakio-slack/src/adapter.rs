@@ -58,7 +58,9 @@ pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(
 pub const DOWNLOADS_MAX: usize = 2;
 
 /// The most pictures read at once by one workspace's backend (one more is answered
-/// `Failed(Busy)`), of which at most [`PREVIEWS_MAX`] previews; the governor keeps the photos
+/// `Failed(Busy)`), of which at most [`PREVIEWS_MAX`] previews and at most
+/// `PICTURES_MAX - PREVIEWS_MAX` photos and emoji (so those waiting for a place never leave the
+/// previews none); the governor keeps the photos
 /// and emoji to the picture hosts' places ([`crate::governor::CdnLimits::in_flight`]).
 pub const PICTURES_MAX: usize = 16;
 
@@ -263,7 +265,10 @@ async fn picture(
     pictures.retain(|(p, _)| !p.task.is_finished());
     let preview = matches!(source, slakio_core::images::Source::Thumb(_));
     let previews = pictures.iter().filter(|(_, p)| *p).count();
-    if pictures.len() >= PICTURES_MAX || (preview && previews >= PREVIEWS_MAX) {
+    // Photos and emoji (which may wait for the picture hosts' places) never take a preview's.
+    let full =
+        if preview { previews >= PREVIEWS_MAX } else { pictures.len() - previews >= PICTURES_MAX - PREVIEWS_MAX };
+    if pictures.len() >= PICTURES_MAX || full {
         let (diag, kind) = (client.diag(), slakio_core::diag::Kind::of(&source));
         crate::shape::failed(diag, kind, &SlackError::Busy, &[("id", &diag.id(source.address()))]);
         let e = SlackError::Busy;
