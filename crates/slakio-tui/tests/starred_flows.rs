@@ -1,7 +1,8 @@
-//! Starred as Slack's desktop app shows it, from a start bundle read for real by the Slack
-//! backend against the fake Slack: a starred DM that Slack says is closed is not listed, and a
-//! starred DM with an app never is (with no Apps section listed it goes to Direct messages); a
-//! starred open DM with a person and a starred channel stay in Starred.
+//! Starred as Slack's desktop app shows it, from a start snapshot placed as the Slack backend
+//! places it (its placement is checked against the fake Slack in slakio-slack's tests): a
+//! starred DM that Slack says is closed is not listed, and a starred DM with an app never is
+//! (with no Apps section listed it is in Direct messages); a starred open DM with a person and a
+//! starred channel stay in Starred.
 
 #[path = "support/demo.rs"]
 mod demo;
@@ -10,60 +11,50 @@ mod demo;
 mod scripted;
 
 use scripted::Scripted;
-use serde_json::json;
-use slakio_core::backend::{Command, Envelope, Event, Generation, Request, Snapshot};
-use slakio_core::model::{ConversationKind, SectionKind};
-use slakio_core::secret::Credentials;
-use slakio_fake::{FakeSlack, Fault};
-use slakio_slack::governor::{FakeClock, Governor, Limits};
-use slakio_slack::request::Endpoints;
+use slakio_core::backend::Snapshot;
+use slakio_core::model::{ConversationId, ConversationKind, SectionKind};
 use slakio_tui::app::model::Row;
 use slakio_tui::app::shell::View;
 use slakio_world::World;
-use std::time::Duration;
 
-/// The start bundle with three starred DMs (open with a person, closed with a person, open with
-/// an app) and one starred channel, read by the backend from the fake; that snapshot.
-fn booted_from_slack() -> Snapshot {
-    let world = World::demo();
-    let s = world.snapshot();
-    let ws = &s.workspaces[0];
+/// The demo's first workspace with Starred holding one channel and two DMs (open with a
+/// person, closed with a person), and an open DM with an app in Direct messages, as the backend
+/// places a start bundle with those three starred.
+fn booted_snapshot() -> Snapshot {
+    let mut s = World::demo().snapshot().clone();
+    let ws = &s.workspaces[0].clone();
+    let section =
+        |kind: SectionKind| s.sections.iter().find(|x| x.workspace == ws.id && x.kind == kind).unwrap().id.clone();
+    let (favorites, dms) = (section(SectionKind::Favorites), section(SectionKind::DirectMessages));
     let of_ws = |bot: bool| s.users.iter().filter(move |u| u.workspace == ws.id && u.id != ws.me && u.bot == bot);
     let mut people = of_ws(false);
-    let (ann, bob) = (people.next().unwrap(), people.next().unwrap());
-    let app = of_ws(true).next().unwrap();
-    // A channel of the world's Favorites (none of the user's own sections lists it).
-    let favorites = s.sections.iter().find(|x| x.workspace == ws.id && x.kind == SectionKind::Favorites).unwrap();
-    let channel = s.conversations.iter().find(|c| c.section == favorites.id).unwrap();
-    let boot = json!({
-        "ok": true,
-        "self": {"id": ws.me.as_str(), "name": "me"},
-        "team": {"id": ws.id.as_str(), "name": "Team"},
-        "starred": [channel.id.as_str(), "DSTAROPEN", "DSTARSHUT", "DSTARAPP"],
-        "is_open": ["DSTAROPEN", "DSTARAPP"],
-        "channels": [{"id": channel.id.as_str(), "name": "starred-room", "is_channel": true}],
-        "ims": [
-            {"id": "DSTAROPEN", "user": ann.id.as_str(), "is_im": true, "is_open": true},
-            {"id": "DSTARSHUT", "user": bob.id.as_str(), "is_im": true, "is_open": false},
-            {"id": "DSTARAPP", "user": app.id.as_str(), "is_im": true, "is_open": true},
-        ],
-    });
-    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-    rt.block_on(async {
-        let fake = FakeSlack::start(World::demo()).await.unwrap();
-        fake.fail_next("client.userBoot", Fault::Answer(boot));
-        let governor = Governor::new(Limits::default(), Box::new(FakeClock::default()), true);
-        let creds = Credentials::new(concat!("xo", "xc-TEST"), "cookie-TEST");
-        let client = slakio_slack::Client::new(creds, Endpoints::local(fake.addr()).unwrap(), governor);
-        let mut handle = slakio_slack::serve(client);
-        handle.send(Request { id: Generation(1), workspace: None, command: Command::Boot }).unwrap();
-        let e: Envelope =
-            tokio::time::timeout(Duration::from_secs(20), handle.rx.recv()).await.expect("an answer").unwrap();
-        match e.event {
-            Event::Booted(s) => *s,
-            other => panic!("{other:?}"),
-        }
-    })
+    let (ann, bob) = (people.next().unwrap().id.clone(), people.next().unwrap().id.clone());
+    let app = of_ws(true).next().unwrap().id.clone();
+    // Starred keeps one channel only.
+    let channel = s
+        .conversations
+        .iter()
+        .position(|c| c.section == favorites && !matches!(c.kind, ConversationKind::Dm { .. }))
+        .unwrap();
+    let channel = s.conversations[channel].id.clone();
+    s.conversations.retain(|c| c.section != favorites || c.id == channel);
+    let template = s
+        .conversations
+        .iter()
+        .find(|c| c.workspace == ws.id && matches!(c.kind, ConversationKind::Dm { .. }))
+        .unwrap()
+        .clone();
+    for (id, user, section, closed) in
+        [("DSTAROPEN", ann, &favorites, false), ("DSTARSHUT", bob, &favorites, true), ("DSTARAPP", app, &dms, false)]
+    {
+        let mut c = template.clone();
+        c.id = ConversationId::new(id);
+        c.kind = ConversationKind::Dm { user };
+        c.section = section.clone();
+        c.closed = closed;
+        s.conversations.push(c);
+    }
+    s
 }
 
 /// The ids Home lists under each section kind, in order.
@@ -83,7 +74,7 @@ fn listed(s: &Scripted) -> Vec<(SectionKind, String)> {
 
 #[test]
 fn starred_lists_no_closed_dm_and_no_app_dm() {
-    let snapshot = booted_from_slack();
+    let snapshot = booted_snapshot();
     let app = snapshot.conversations.iter().find(|c| c.id.as_str() == "DSTARAPP").unwrap();
     assert!(matches!(app.kind, ConversationKind::Dm { .. }));
     let mut s = Scripted::booted(true, Some(snapshot));
