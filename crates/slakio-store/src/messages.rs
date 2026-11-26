@@ -166,7 +166,7 @@ impl Store {
         }
         // Only the target's workspace's people: a page never writes another workspace's part.
         for u in page.users.iter().filter(|u| u.workspace.as_str() == ws) {
-            put_user(&tx, u, None, false)?;
+            put_user(&tx, u, None)?;
         }
         tx.execute(
             "INSERT INTO seen (workspace, conversation, at) VALUES (?1, ?2, ?3)

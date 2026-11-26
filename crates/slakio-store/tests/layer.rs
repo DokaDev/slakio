@@ -666,3 +666,56 @@ async fn a_live_photo_change_outlasts_a_restart_over_an_older_given_photo() {
     assert_eq!((u.avatar.clone(), u.avatar_guessed), (Some(guess), true), "the change's photo, not the older one");
     r.no_faults();
 }
+
+/// A live profile change tells the names and the photo only: the presence, a bot and another
+/// organization kept from the boot stay through a restart, and a person the cache does not keep
+/// is not added.
+#[tokio::test]
+async fn a_live_profile_change_keeps_what_it_does_not_tell_and_adds_no_one() {
+    use slakio_core::backend::Live;
+    use slakio_core::model::{Org, Presence, User, UserId};
+    use slakio_core::sanitize::Remote;
+    let (dir, w) = (scratch("live-keeps"), world());
+    let mut s = snapshot(&w);
+    let ws = s.workspaces[0].id.clone();
+    assert!(s.users.len() >= 3, "the world has people enough");
+    s.users[0].presence = Presence::Away;
+    s.users[1].presence = Presence::Dnd;
+    s.users[2].org = Org::External(Remote::new("TPEER"));
+    s.users[2].bot = true;
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, Command::Boot);
+    let req = r.backend_next().await;
+    r.answer(req.id, Event::Booted(Box::new(s.clone()))).await;
+    assert!(matches!(r.ui_next().await.event, Event::Booted(_)));
+    // As the live updates make them: presence unknown, of the own organization, not a bot.
+    let changed = |u: &User| User {
+        display_name: Remote::new(format!("{} (new)", u.display_name.unsanitized())),
+        org: Org::Own,
+        bot: false,
+        presence: Presence::Unknown,
+        ..u.clone()
+    };
+    let stranger = User { id: UserId::new("UNOBODY"), ..changed(&s.users[0]) };
+    let users = vec![changed(&s.users[0]), changed(&s.users[1]), changed(&s.users[2]), stranger];
+    r.answer(Generation::PUSHED, Event::Live(Box::new(Live::People { workspace: ws.clone(), users }))).await;
+    r.ui_next().await;
+    r.settled().await;
+    r.no_faults();
+    drop(r);
+    let r = run(&dir, &ws, Caps::default(), false).await;
+    let back = r.cache.snapshot(vec![ws.clone()]).await.unwrap();
+    let kept = |i: usize| back.users.iter().find(|u| u.id == s.users[i].id).unwrap().clone();
+    assert_eq!(kept(0).presence, Presence::Away);
+    assert_eq!(kept(1).presence, Presence::Dnd);
+    assert_eq!((kept(2).org, kept(2).bot), (Org::External(Remote::new("TPEER")), true));
+    for i in 0..3 {
+        assert_eq!(kept(i).display_name, changed(&s.users[i]).display_name, "the change's name is kept");
+    }
+    assert_eq!(back.users.len(), s.users.len());
+    r.no_faults();
+    drop(r);
+    let db = rusqlite::Connection::open(dir.join(slakio_store::db::DIR).join(slakio_store::db::FILE)).unwrap();
+    let n: i64 = db.query_row("SELECT count(*) FROM users WHERE id = 'UNOBODY'", [], |row| row.get(0)).unwrap();
+    assert_eq!(n, 0, "a person not kept is not added");
+}
