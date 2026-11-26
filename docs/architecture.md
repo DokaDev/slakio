@@ -316,12 +316,20 @@ and each `d=`/`default=` fallback it names is a keyword or on Slack's avatar hos
 counted. The user's own photo comes from the start bundle's `self`
 profile, else from the edge `users/info` lookup the boot already makes for the DMs' people.
 A photo slakio makes from the uploaded original (`images::avatar_sized`, `User::avatar_guessed`)
-never replaces one Slack gave, in the model or the cache; refused (401, 403, 404, 410) before
+never replaces one Slack gave, in the model or the cache, except from a live profile change
+(`User::changed_over`: the photo kept is older than the change; the cache keeps the change too); refused (401, 403, 404, 410) before
 any redirect, it is asked at most `picture::AVATAR_FALLBACKS` (2) more times, at the same file's
 other names on the avatar host (`images::avatar_fallbacks`), each checked and counted. A
 preview's ask counts as a background request of the workspace's lane (`Governor::picture`), a
 photo's or an emoji's in the picture hosts' budget, holding one of its 12 places over all its
-hops; each within 25 s in all (`picture::DEADLINE`, however its bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
+hops; each within 25 s in all (`picture::DEADLINE`, however its bytes trickle). The wait for one
+of those places comes before that deadline and is not part of it: the places are handed out in
+the order asked (first in, first out), so a photo waits at most its place in the queue times
+25 s, and switching the network off ends the wait; an address its kind may not come from is
+refused before any wait. One workspace's backend reads at most 16 pictures at once
+(`adapter::PICTURES_MAX`; one more is answered busy), of which at most 4 previews
+(`adapter::PREVIEWS_MAX`, whatever the UI asks) and at most 12 photos and emoji
+(`PICTURES_MAX - PREVIEWS_MAX`), so photos waiting for a place never leave the previews none. Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
 bytes (said or counted). The UI decodes it on a blocking task, the size read
 from the header first and refused over `images::SIDE_MAX` a side or `images::PIXELS_MAX`
 pixels, makes it smaller and sends it to the terminal once as a kitty graphics virtual
@@ -348,8 +356,9 @@ reactions, the typed form winning where both are listed; only modern Hangul comp
 scripts' decomposed letters, archaic and leftover jamo stay refused). A reaction or a rich-text
 emoji that comes with its picture's address (another workspace's, in a shared channel) gives
 its message that address (`Message::emoji_pictures`, at most 16, on the emoji host only); it is
-drawn only once the workspace's own list is in and lacks the name, and is not kept in the
-cache. A link's label draws a standard emoji's shortcode as that emoji. An emoji's picture is `images::Source::Emoji`, asked for only when a frame draws
+drawn only once the workspace's own list is in and lacks the name, never when that list was cut
+at `images::emoji::NAMES_MAX` names (`Event::Emoji::truncated`: a name it lacks may still be the
+workspace's own; both forms of a Hangul name count once), and is not kept in the cache. A link's label draws a standard emoji's shortcode as that emoji. An emoji's picture is `images::Source::Emoji`, asked for only when a frame draws
 it, fetched like a photo (no cookie, no token, no `Origin`, no `Referer`), following at most 2
 redirects (`picture::EMOJI_REDIRECTS`) each only to the emoji host and counted; decoded whole
 into two cells of a row (`Shape::Emoji`, first frame of a GIF) and drawn as two placeholder
