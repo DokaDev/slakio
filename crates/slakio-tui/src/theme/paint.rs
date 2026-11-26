@@ -1,10 +1,24 @@
-//! Painting over a row already drawn: the selection bar. A few cells are never painted over
-//! ([`Theme::keeps`]): what they show is told by their own background or colour.
+//! Painting over a row already drawn: the selection bar, and the quieter wash of the row under
+//! the mouse. A few cells are never painted over ([`Theme::keeps`]): what they show is told by
+//! their own background or colour.
 
+use super::code::{contrast, mix};
+use super::reactions::{CHANNEL_APART, channel_gap};
 use super::{GUTTER, Kind, Selection, Theme};
 use ratatui::buffer::{Buffer, Cell};
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier};
+use ratatui::style::{Color, Modifier, Style};
+
+/// The gutter mark of the row under the mouse where the theme has no hover colour: thinner than
+/// a selection's ([`GUTTER`]).
+pub const HOVER_GUTTER: &str = "\u{258F}";
+
+/// The percent of the accent mixed into the background for the hover colour a theme file leaves
+/// out ([`Theme::derive_hover`]).
+pub const HOVER_SHARE: u16 = 9;
+
+/// The least contrast of the hover colour from the background: seen, quieter than the selection.
+pub const HOVER_APART: f64 = 1.10;
 
 impl Theme {
     /// `c` is the background of an avatar chip (kept under a selection bar), and of nothing
@@ -84,13 +98,72 @@ impl Theme {
     }
 }
 
+impl Theme {
+    /// Paint the row under the mouse, `row`, already drawn: its cells take the hover colour (code
+    /// its own tint on it), their text as it is; the cells the theme [keeps](Self::keeps) stay.
+    /// Without a hover colour (the 16-color theme, no colour at all) a thin bar in the gutter, the
+    /// row's first cell, marks it, and only where that cell is blank.
+    pub fn paint_hover(&self, buf: &mut Buffer, row: Rect) {
+        let row = row.intersection(buf.area);
+        if row.is_empty() {
+            return;
+        }
+        if self.kind == Kind::NoColor || self.hover == Color::Reset {
+            let cell = &mut buf[(row.x, row.y)];
+            if cell.symbol() == " " {
+                cell.set_symbol(HOVER_GUTTER);
+                if self.kind != Kind::NoColor {
+                    cell.set_style(Style::new().fg(self.fg_dim));
+                }
+            }
+            return;
+        }
+        let code = (self.kind == Kind::Truecolor).then(|| (self.code_bg(), self.code_on(self.hover)));
+        for x in row.left()..row.right() {
+            if self.keeps(&buf[(x, row.y)]) {
+                continue;
+            }
+            let cell = &mut buf[(x, row.y)];
+            cell.bg = match code {
+                Some((on_bg, on_hover)) if cell.bg == on_bg => on_hover,
+                _ => self.hover,
+            };
+        }
+    }
+
+    /// The hover colour a theme file leaves out, where it sets `bg` or `accent`: the least share
+    /// of the accent (from [`HOVER_SHARE`] percent) into the background [`HOVER_APART`] from it,
+    /// nearer it than the selection, body text 4.5:1 on it, and [`CHANNEL_APART`] from the bars,
+    /// the chips, the surface and code's tint. A colour that is not RGB keeps the base's.
+    pub(super) fn derive_hover(&mut self, set: impl Fn(&str) -> bool) {
+        if set("hover") || !(set("bg") || set("accent")) {
+            return;
+        }
+        let code = self.code_bg();
+        let others =
+            [self.selection, self.cursor_line, self.range, self.surface, self.reaction, self.reaction_mine, code];
+        let quiet = |c: Color| {
+            let apart = contrast(c, self.bg);
+            apart.is_some_and(|k| k >= HOVER_APART)
+                && contrast(self.selection, self.bg).is_none_or(|s| apart.is_some_and(|k| k < s))
+                && contrast(self.fg, c).is_some_and(|k| k >= 4.5)
+                && others.iter().all(|o| channel_gap(c, *o).is_none_or(|d| d >= CHANNEL_APART))
+        };
+        let wash = (HOVER_SHARE..=30).filter_map(|p| mix(self.accent, self.bg, p)).find(|c| quiet(*c));
+        if let Some(c) = wash.or_else(|| mix(self.accent, self.bg, HOVER_SHARE)) {
+            self.hover = c;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::HOVER_GUTTER;
     use crate::images::graphics;
-    use crate::theme::{BUILTINS, Kind, Selection};
+    use crate::theme::{BUILTINS, Background, GUTTER, Kind, Selection, Theme, resolve};
     use ratatui::buffer::Buffer;
     use ratatui::layout::Rect;
-    use ratatui::style::Style;
+    use ratatui::style::{Color, Style};
 
     /// A row of text, then a reaction chip of each kind (cap, emoji, count, cap) and a picture's
     /// cells: a bar painted over it takes the text and the caps' row, never the chips or the
@@ -128,6 +201,76 @@ mod tests {
                     assert_eq!((buf[(x, 0)].fg, buf[(x, 0)].bg), (chip, bar), "{n} {how:?}: cap {x} on the bar");
                 }
             }
+        }
+    }
+
+    /// A row of text, a pill, an avatar chip, a reaction chip, code and a picture's cells: the
+    /// hover takes exactly the text's cells and the blanks (code its own tint on the hover), their
+    /// text as it was, and leaves every other cell as it is.
+    #[test]
+    fn hover_paints_exact_cells_and_skips_pictures_pills_and_chips() {
+        for t in BUILTINS.iter().filter(|t| t.kind == Kind::Truecolor) {
+            let area = Rect::new(0, 0, 30, 1);
+            let mut buf = Buffer::empty(area);
+            buf.set_style(area, t.base());
+            buf.set_string(1, 0, "ok", t.text());
+            buf.set_string(4, 0, " 3 ", t.badge());
+            buf.set_string(8, 0, "AB", t.avatar(0));
+            buf.set_string(11, 0, " ab 2 ", t.reaction_chip(false).body);
+            buf.set_string(18, 0, "x=1", t.code());
+            let picture = Style::new().fg(graphics::color(0x0012_3456));
+            buf.set_string(23, 0, graphics::row(0, 2), picture);
+            let before = buf.clone();
+            t.paint_hover(&mut buf, area);
+            let n = &t.name;
+            let kept =
+                |x: u16| (4..7).contains(&x) || (8..10).contains(&x) || (11..17).contains(&x) || (23..25).contains(&x);
+            for x in 0..30 {
+                let (b, a) = (&before[(x, 0)], &buf[(x, 0)]);
+                if kept(x) {
+                    assert_eq!(a, b, "{n}: cell {x} is kept");
+                    continue;
+                }
+                let bg = if (18..21).contains(&x) { t.code_on(t.hover) } else { t.hover };
+                assert_eq!((a.symbol(), a.fg, a.bg, a.modifier), (b.symbol(), b.fg, bg, b.modifier), "{n}: cell {x}");
+            }
+            assert_ne!(t.code_on(t.hover), t.hover, "{n}: code apart from the hover");
+        }
+    }
+
+    /// Without a hover colour the row's blank gutter cell takes a thin bar (faint on 16 colours,
+    /// plain without colour), never a cell with something in it, and never the selection's bar;
+    /// nothing else of the row changes.
+    #[test]
+    fn hover_without_a_background_is_a_thin_gutter_apart_from_the_selection_bar() {
+        assert_ne!(HOVER_GUTTER, GUTTER);
+        for t in [resolve("terminal", false, Background::Dark), Theme::no_color()] {
+            let n = &t.name;
+            let area = Rect::new(0, 0, 8, 1);
+            let mut buf = Buffer::empty(area);
+            buf.set_string(1, 0, "ok", t.text());
+            let before = buf.clone();
+            t.paint_hover(&mut buf, area);
+            let gutter = &buf[(0, 0)];
+            assert_eq!(gutter.symbol(), HOVER_GUTTER, "{n}");
+            let fg = if t.kind == Kind::NoColor { Color::Reset } else { t.fg_dim };
+            assert_eq!((gutter.fg, gutter.bg, gutter.modifier), (fg, Color::Reset, before[(0, 0)].modifier), "{n}");
+            for x in 1..8 {
+                assert_eq!(buf[(x, 0)], before[(x, 0)], "{n}: cell {x}");
+            }
+            // The unfocused selection's bar is the wider mark, and stays under a hover.
+            let mut buf = Buffer::empty(area);
+            t.paint_selection(&mut buf, area, Selection::Unfocused);
+            assert_eq!(buf[(0, 0)].symbol(), GUTTER, "{n}");
+            let selected = buf.clone();
+            t.paint_hover(&mut buf, area);
+            assert_eq!(buf, selected, "{n}: no gutter over the selection's bar");
+            // A row whose first cell holds something: no gutter.
+            let mut buf = Buffer::empty(area);
+            buf.set_string(0, 0, "x", t.text());
+            let before = buf.clone();
+            t.paint_hover(&mut buf, area);
+            assert_eq!(buf, before, "{n}: a non-blank first cell");
         }
     }
 }

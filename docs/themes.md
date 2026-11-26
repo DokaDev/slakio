@@ -78,6 +78,7 @@ own). Names are taken in any case.
 | `range` | The background of a VISUAL range. |
 | `reaction` | The background of a reaction chip (24-bit themes). |
 | `reaction_mine` | The background of your own reaction (24-bit themes): a light wash of the accent. |
+| `hover` | The background of the row under the mouse (24-bit themes; others mark it in the gutter). |
 | `mode_normal` | The mode badge in NORMAL. |
 | `mode_insert` | The mode badge in INSERT. |
 | `mode_visual` | The mode badge in VISUAL. |
@@ -87,7 +88,11 @@ own). Names are taken in any case.
 A file that sets `bg` or `fg` but not `reaction` gets a chip of body text mixed 10% into the
 background; one that sets `bg` or `accent` but not `reaction_mine` gets the least share of the
 accent (from 10%) that sets the chip apart from the background (1.15:1) and from the selection
-and the other chip. Where a colour is not `#rrggbb`, the chip of the theme it extends stays.
+and the other chip. One that sets `bg` or `accent` but not `hover` gets the least share of the
+accent (from 9%) that sets the row apart from the background (1.10:1) yet nearer it than the
+selection, keeps body text readable (4.5:1), and stays apart from the bars, the chips, the
+surface and code's tint. Where a colour is not `#rrggbb`, the colour of the theme it extends
+stays.
 
 These four are slakio's own:
 
@@ -126,7 +131,9 @@ left out keeps exactly the look of the theme it extends.
 
 Pictures are drawn through cells whose colour says which picture they show, so a `selection`
 or `cursor_line` style never changes those cells: its `fg` and modifiers (also `reversed`)
-apply to text only, and the dimming behind a dialog leaves pictures as they are.
+apply to text only, and the dimming behind a dialog leaves pictures as they are. The `hover`
+colour leaves them as they are too, and also the counts, the initials chips and the reaction
+chips.
 
 ## Writing a theme file
 

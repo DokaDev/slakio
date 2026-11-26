@@ -35,6 +35,7 @@ fn colors(t: &Theme) -> Vec<Color> {
         t.range,
         t.reaction,
         t.reaction_mine,
+        t.hover,
         t.mode_normal,
         t.mode_insert,
         t.mode_visual,
@@ -511,4 +512,33 @@ fn code_is_tinted_apart_from_its_row_also_when_selected() {
             assert_eq!(buf[(1, 0)].bg, t.code_on(bar), "{n}: code keeps a tint of its own on the bar");
         }
     }
+}
+
+/// The row under the mouse is a faint wash, quieter than the selection: seen on the background
+/// (1.10:1), nearer it than the selection is, body text 4.5:1 and muted text 3:1 on it, and at
+/// least 8 apart on some channel from the bars, the chips, the surface and code's tint (a bar
+/// keeps the chips, and code takes a tint of its own on the hover). Without 24 bits: no colour.
+#[test]
+fn every_truecolor_theme_hover_is_quiet_readable_and_apart() {
+    for t in truecolor() {
+        let (n, h) = (&t.name, t.hover);
+        assert!(contrast(h, t.bg) >= 1.10, "{n}: hover {h:?} on bg {:.2}", contrast(h, t.bg));
+        assert!(contrast(h, t.bg) < contrast(t.selection, t.bg), "{n}: quieter than the selection");
+        assert!(contrast(t.fg, h) >= 4.5, "{n}: text on the hover {:.2}", contrast(t.fg, h));
+        assert!(contrast(t.fg_muted, h) >= 3.0, "{n}: muted on the hover {:.2}", contrast(t.fg_muted, h));
+        for (what, c) in [
+            ("reaction", t.reaction),
+            ("reaction_mine", t.reaction_mine),
+            ("selection", t.selection),
+            ("cursor_line", t.cursor_line),
+            ("range", t.range),
+            ("surface", t.surface),
+            ("code", t.code_bg()),
+        ] {
+            assert!(channel_gap(h, c) >= 8, "{n}: hover {h:?} and {what} {c:?}");
+        }
+        assert_ne!(t.code_on(h), h, "{n}: code keeps a tint on the hover");
+    }
+    assert_eq!(resolve("terminal", false, Background::Dark).hover, Color::Reset);
+    assert_eq!(Theme::no_color().hover, Color::Reset);
 }

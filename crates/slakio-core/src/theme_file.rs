@@ -66,6 +66,7 @@ pub const COLOR_TOKENS: &[&str] = &[
     "range",
     "reaction",
     "reaction_mine",
+    "hover",
     "mode_normal",
     "mode_insert",
     "mode_visual",

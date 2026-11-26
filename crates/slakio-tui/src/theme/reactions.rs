@@ -38,7 +38,7 @@ fn cap(bg: Option<Color>) -> Option<Style> {
 }
 
 /// The largest difference of two RGB colours on one channel (`None` for a terminal colour).
-fn channel_gap(a: Color, b: Color) -> Option<u8> {
+pub(super) fn channel_gap(a: Color, b: Color) -> Option<u8> {
     let (Color::Rgb(r, g, b1), Color::Rgb(r2, g2, b2)) = (a, b) else { return None };
     Some(r.abs_diff(r2).max(g.abs_diff(g2)).max(b1.abs_diff(b2)))
 }
@@ -77,8 +77,8 @@ impl Theme {
     /// The chip colours a theme file leaves out, worked out from the colours it sets: body text
     /// [`REACTION_SHARE`] percent into the background where it sets `bg` or `fg`, and the least
     /// share of the accent (from 10 percent) [`CHIP_APART`] from the background and
-    /// [`CHANNEL_APART`] from the selection and the other chip where it sets `bg` or `accent`;
-    /// neither ever code's tint. A colour that is not RGB keeps the base theme's chip.
+    /// [`CHANNEL_APART`] from the selection, the hover colour and the other chip where it sets
+    /// `bg` or `accent`; neither ever code's tint. A colour that is not RGB keeps the base theme's chip.
     pub(super) fn derive_reactions(&mut self, set: impl Fn(&str) -> bool) {
         // Never code's tint: a bar painted over a row keeps a chip, and tints code apart.
         let code = self.code_bg();
@@ -98,6 +98,7 @@ impl Theme {
                     && *c != code
                     && apart(*c, self.selection)
                     && apart(*c, self.reaction)
+                    && apart(*c, self.hover)
             });
             if let Some(c) = wash.or_else(|| mix(self.accent, self.bg, 40)) {
                 self.reaction_mine = c;

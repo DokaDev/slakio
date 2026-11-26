@@ -31,6 +31,7 @@ mod custom;
 mod tokens;
 pub use builtins::*;
 pub use custom::load;
+pub use paint::HOVER_GUTTER;
 pub use reactions::ChipLook;
 pub use tokens::Styles;
 
@@ -136,6 +137,9 @@ pub struct Theme {
     pub reaction: Color,
     /// The background of the user's own reaction: a light wash of the accent.
     pub reaction_mine: Color,
+    /// The background of the row under the mouse (24-bit themes; the others mark it in the
+    /// gutter): a faint wash of the accent, quieter than the selection.
+    pub hover: Color,
     /// Mode badges (with [`Self::mode_fg`] bold on them), each also naming its mode.
     pub mode_normal: Color,
     pub mode_insert: Color,
@@ -204,6 +208,7 @@ impl Theme {
             &mut self.range,
             &mut self.reaction,
             &mut self.reaction_mine,
+            &mut self.hover,
             &mut self.mode_normal,
             &mut self.mode_insert,
             &mut self.mode_visual,

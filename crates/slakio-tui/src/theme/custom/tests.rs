@@ -61,6 +61,7 @@ fn every_token_of_a_file_lands_where_it_is_drawn() {
         t.range,
         t.reaction,
         t.reaction_mine,
+        t.hover,
         t.mode_normal,
         t.mode_insert,
         t.mode_visual,
@@ -243,4 +244,35 @@ fn a_file_that_changes_the_colours_gets_reaction_chips_of_its_own() {
     let look = t.reaction_chip(false);
     assert_eq!((look.body, look.count), (t.reaction(), t.reaction()));
     assert_eq!(look.cap, Some(Style::new().fg(rgb(0x334455))));
+}
+
+#[test]
+fn a_file_that_changes_the_colours_gets_a_hover_of_its_own() {
+    use super::super::code::{contrast, mix};
+    let base = crate::theme::DARK;
+    // The least share of the accent from 9% into the background that is quiet, readable and
+    // apart from the rest.
+    let t = theme("extends = \"dark\"\n[colors]\nbg = \"#101820\"\naccent = \"#f0a030\"\n", DARK_TRUECOLOR);
+    assert_ne!(t.hover, base.hover, "follows the background and the accent");
+    assert!((9..=30).any(|p| mix(t.accent, t.bg, p) == Some(t.hover)), "{:?}", t.hover);
+    let k = contrast(t.hover, t.bg).unwrap();
+    assert!(k >= 1.10 && k < contrast(t.selection, t.bg).unwrap(), "{k:.2}");
+    assert!(contrast(t.fg, t.hover).unwrap() >= 4.5);
+    for c in [t.selection, t.cursor_line, t.range, t.surface, t.reaction, t.reaction_mine, t.code_bg()] {
+        assert!(super::super::reactions::channel_gap(t.hover, c).unwrap() >= 8, "{:?} {c:?}", t.hover);
+    }
+    // Only the accent set: the hover follows it too.
+    let t = theme("extends = \"dark\"\n[colors]\naccent = \"#f0a030\"\n", DARK_TRUECOLOR);
+    assert_ne!(t.hover, base.hover);
+    // What the file sets stays; a file that changes neither keeps the base's; a colour that is
+    // not RGB keeps the base's.
+    let t = theme("extends = \"dark\"\n[colors]\nbg = \"#101820\"\nhover = \"#203040\"\n", DARK_TRUECOLOR);
+    assert_eq!(t.hover, rgb(0x203040));
+    let t = theme("extends = \"dark\"\n[colors]\nfg = \"#e0e8f0\"\n", DARK_TRUECOLOR);
+    assert_eq!(t.hover, base.hover);
+    let t = theme("extends = \"dark\"\n[colors]\naccent = \"red\"\n", DARK_TRUECOLOR);
+    assert_eq!(t.hover, base.hover);
+    // The 16-colour theme has none: its rows under the mouse are marked in the gutter.
+    let ansi = Look { truecolor: false, ..DARK_TRUECOLOR };
+    assert_eq!(theme("extends = \"terminal\"\n", ansi).hover, Color::Reset);
 }

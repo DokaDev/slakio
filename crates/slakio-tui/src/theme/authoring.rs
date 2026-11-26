@@ -41,7 +41,7 @@ pub enum AuthorError {
     Changed(PathBuf),
 }
 
-/// What each colour token colours (the 22 single colours, then slakio's four), as
+/// What each colour token colours (the 23 single colours, then slakio's four), as
 /// `docs/themes.md` says it.
 pub const COLOR_ABOUT: &[(&str, &str)] = &[
     ("bg", "The app's background."),
@@ -61,6 +61,7 @@ pub const COLOR_ABOUT: &[(&str, &str)] = &[
     ("range", "The background of a VISUAL range."),
     ("reaction", "The background of a reaction chip (24-bit themes)."),
     ("reaction_mine", "The background of your own reaction (24-bit themes): a light wash of the accent."),
+    ("hover", "The background of the row under the mouse (24-bit themes; others mark it in the gutter)."),
     ("mode_normal", "The mode badge in NORMAL."),
     ("mode_insert", "The mode badge in INSERT."),
     ("mode_visual", "The mode badge in VISUAL."),
@@ -263,6 +264,7 @@ pub(super) fn color_value(th: &Theme, token: &str) -> Option<String> {
         "range" => th.range,
         "reaction" => th.reaction,
         "reaction_mine" => th.reaction_mine,
+        "hover" => th.hover,
         "mode_normal" => th.mode_normal,
         "mode_insert" => th.mode_insert,
         "mode_visual" => th.mode_visual,
