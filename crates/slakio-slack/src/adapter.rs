@@ -13,7 +13,8 @@
 //! [`DOWNLOADS_MAX`] at once (one more is answered `Failed(Busy)`): it tells how much has come
 //! as it comes, and is answered once, with the path it was saved as or why it was not. A
 //! `Cancel` tells it to stop (its own answer then says it was cancelled). A picture
-//! ([`crate::picture`]) is read on a task of its own too, at most [`PICTURES_MAX`] at once, and
+//! ([`crate::picture`]) is read on a task of its own too, at most [`PICTURES_MAX`] at once (of
+//! them at most [`PREVIEWS_MAX`] previews), and
 //! so is the workspace's own emoji list ([`crate::emoji`]).
 //!
 //! Opening a conversation (its newest page, `conversations.view`) waits [`OPEN_DEBOUNCE`]
@@ -57,9 +58,13 @@ pub const OPEN_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(
 pub const DOWNLOADS_MAX: usize = 2;
 
 /// The most pictures read at once by one workspace's backend (one more is answered
-/// `Failed(Busy)`): the UI keeps its previews to four at once, and the governor keeps the
-/// photos and emoji to the picture hosts' places ([`crate::governor::CdnLimits::in_flight`]).
+/// `Failed(Busy)`), of which at most [`PREVIEWS_MAX`] previews; the governor keeps the photos
+/// and emoji to the picture hosts' places ([`crate::governor::CdnLimits::in_flight`]).
 pub const PICTURES_MAX: usize = 16;
+
+/// The most previews (asked with the session's cookie) read at once by one workspace's backend,
+/// whatever the UI asks: one more is answered `Failed(Busy)`.
+pub const PREVIEWS_MAX: usize = 4;
 
 /// What the backend can do: read, never change.
 pub const CAPABILITIES: Capabilities = Capabilities { demo: false, read_only: true };
@@ -167,7 +172,7 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
     // The page of Activity on its way: a newer one supersedes it.
     let mut noticing: Option<InFlight> = None;
     // The downloads and the pictures on their way.
-    let (mut downloading, mut pictures): (Vec<Downloading>, Vec<InFlight>) = (Vec::new(), Vec::new());
+    let (mut downloading, mut pictures): (Vec<Downloading>, Vec<(InFlight, bool)>) = (Vec::new(), Vec::new());
     while let Some(request) = end.rx.recv().await {
         while tasks.try_join_next().is_some() {}
         if let Some(refused) = refuse_change(&request) {
@@ -250,13 +255,15 @@ async fn run(client: Arc<Client>, mut end: BackendEnd, session: Arc<Session>) {
 /// their way already (answered `Busy` then). `false` when the UI is gone.
 async fn picture(
     tasks: &mut JoinSet<()>,
-    pictures: &mut Vec<InFlight>,
+    pictures: &mut Vec<(InFlight, bool)>,
     (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
     id: Generation,
     (source, max, list): (slakio_core::images::Source, u64, bool),
 ) -> bool {
-    pictures.retain(|p| !p.task.is_finished());
-    if pictures.len() >= PICTURES_MAX {
+    pictures.retain(|(p, _)| !p.task.is_finished());
+    let preview = matches!(source, slakio_core::images::Source::Thumb(_));
+    let previews = pictures.iter().filter(|(_, p)| *p).count();
+    if pictures.len() >= PICTURES_MAX || (preview && previews >= PREVIEWS_MAX) {
         let (diag, kind) = (client.diag(), slakio_core::diag::Kind::of(&source));
         crate::shape::failed(diag, kind, &SlackError::Busy, &[("id", &diag.id(source.address()))]);
         let e = SlackError::Busy;
@@ -265,7 +272,7 @@ async fn picture(
     let max = max.min(slakio_core::images::BYTES_MAX);
     let work =
         async move { crate::picture::picture(&client, &source, max, list).await.map(|bytes| Event::Image { bytes }) };
-    pictures.push(spawn_once(tasks, tx, id, work));
+    pictures.push((spawn_once(tasks, tx, id, work), preview));
     true
 }
 
@@ -280,7 +287,7 @@ struct Downloading {
 /// the UI is gone.
 async fn downloads(
     tasks: &mut JoinSet<()>,
-    (downloading, pictures): (&mut Vec<Downloading>, &mut Vec<InFlight>),
+    (downloading, pictures): (&mut Vec<Downloading>, &mut Vec<(InFlight, bool)>),
     (client, tx): (Arc<Client>, mpsc::Sender<Envelope>),
     id: Generation,
     command: Command,

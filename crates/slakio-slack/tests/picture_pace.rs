@@ -249,3 +249,40 @@ fn the_cdn_run_alarm_logs_once() {
         let _ = std::fs::remove_dir_all(&dir);
     });
 }
+
+/// The previews (asked with the session's cookie) keep to four on their way at once in the
+/// backend too, whatever the UI asks: a fifth is answered busy at once, and a photo still goes.
+#[test]
+fn previews_keep_to_four_at_once_in_the_backend() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let host = slakio_core::model::FILE_HOST;
+        let thumbs: Vec<Source> =
+            (0..5).map(|i| Source::Thumb(format!("https://{host}/files-tmb/T1-F{i}/shot_360.png"))).collect();
+        // Four that never finish coming (until their deadline).
+        for _ in 0..4 {
+            r.fake.fail_next_picture("thumb", Fault::Partial { length: 1000, body: vec![0x89; 8] });
+        }
+        for t in &thumbs[..4] {
+            r.send(t, false);
+        }
+        let asked = |r: &Run| r.fake.log().iter().filter(|l| l.picture_kind() == Some("thumb")).count();
+        let start = std::time::Instant::now();
+        while asked(&r) < 4 {
+            assert!(start.elapsed() < Duration::from_secs(10), "the four never went");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let fifth = r.send(&thumbs[4], false);
+        let e = r.next().await;
+        assert_eq!(e.generation, fifth);
+        let busy = matches!(e.event, Event::Failed { kind: FailKind::Busy, .. });
+        assert!(
+            busy,
+            "the fifth preview is answered busy, not {}",
+            if matches!(e.event, Event::Image { .. }) { "fetched" } else { "failed otherwise" }
+        );
+        let photo = Source::Avatar(World::demo().snapshot().users.iter().find_map(|u| u.avatar.clone()).unwrap());
+        assert!(r.picture(&photo).await.is_ok(), "a photo is no preview");
+        assert_eq!(asked(&r), 4, "the fifth preview was never sent");
+    });
+}
