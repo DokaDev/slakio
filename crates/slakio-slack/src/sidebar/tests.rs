@@ -197,3 +197,35 @@ fn a_section_id_of_slack_s_never_takes_a_built_in_one_and_an_odd_one_is_not_show
     assert_eq!(s.place("C3", Facts::default()).as_str(), "T1:channels", "a long id: its default section");
     assert_eq!(s.place("C4", Facts::default()).as_str(), "T1:channels");
 }
+
+/// As in Slack's desktop app, a DM with an app is never in Starred: in Apps when Slack lists it,
+/// else in Direct messages; a starred DM with a person stays in Starred.
+#[test]
+fn a_starred_app_dm_goes_to_apps_and_without_apps_to_dms() {
+    let starred_app = Facts { dm: true, starred: true, app: true, ..Facts::default() };
+    let starred_person = Facts { dm: true, starred: true, ..Facts::default() };
+    let with_apps = Sidebar::new(
+        "T1",
+        Some(listed(json!([
+            {"channel_section_id": "LS", "type": "stars", "next_channel_section_id": "LX"},
+            {"channel_section_id": "LX", "type": "slack_connect", "next_channel_section_id": "LA"},
+            {"channel_section_id": "LA", "type": "recent_apps", "next_channel_section_id": null},
+        ]))),
+        &Diag::default(),
+    );
+    assert_eq!(with_apps.place("D1", starred_app).as_str(), "T1:apps");
+    let shared_app = Facts { external: true, ..starred_app };
+    assert_eq!(with_apps.place("D1", shared_app).as_str(), "T1:apps", "Apps before External connections");
+    assert_eq!(with_apps.place("D2", starred_person).as_str(), "T1:stars");
+    let without_apps = Sidebar::new(
+        "T1",
+        Some(listed(json!([{"channel_section_id": "LS", "type": "stars", "next_channel_section_id": null}]))),
+        &Diag::default(),
+    );
+    assert_eq!(without_apps.place("D1", starred_app).as_str(), "T1:dms", "never Starred");
+    assert_eq!(without_apps.place("D2", starred_person).as_str(), "T1:stars");
+    // Without Slack's sections (the default Starred alone) too.
+    let plain = Sidebar::new("T1", None, &Diag::default());
+    assert_eq!(plain.place("D1", starred_app).as_str(), "T1:dms");
+    assert_eq!(plain.place("D2", starred_person).as_str(), "T1:stars");
+}

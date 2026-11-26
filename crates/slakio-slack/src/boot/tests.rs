@@ -455,3 +455,24 @@ fn a_conversation_s_newest_message_is_the_counts_latest_else_a_dm_s_update() {
         "ordered as Slack's desktop app orders them by default"
     );
 }
+
+/// Unknown is not closed: with no `is_open` list in the start bundle, a group DM (starred or not)
+/// is not taken as closed, and a DM is closed only when it says so itself.
+#[test]
+fn without_an_is_open_list_no_group_dm_is_closed() {
+    let b: wire::UserBoot = serde_json::from_value(json!({
+        "self": {"id": "U0", "name": "me"},
+        "team": {"id": "T1", "name": "Team"},
+        "starred": ["G1"],
+        "channels": [
+            {"id": "G1", "name": "mpdm-me--ann-1", "is_mpim": true, "members": ["U0", "U1"]},
+            {"id": "G2", "name": "mpdm-me--bob-1", "is_mpim": true, "members": ["U0", "U2"]},
+        ],
+        "ims": [{"id": "D1", "user": "U1"}, {"id": "D2", "user": "U2", "is_open": false}],
+    }))
+    .unwrap();
+    let s = snapshot(b, None, Vec::new(), NOW);
+    let closed = |id| find(&s, id).closed;
+    assert!(!closed("G1") && !closed("G2") && !closed("D1"), "not said: open");
+    assert!(closed("D2"), "Slack says this DM is not open");
+}

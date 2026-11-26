@@ -7,10 +7,11 @@
 //! section the user made keeps theirs. Channels and Direct messages are always there (appended when Slack listed none), so every conversation has a
 //! place; with no list at all the sidebar is those two alone.
 //!
-//! A conversation goes to the first of: a section the user made that lists it, Starred (when
-//! starred), External connections (when shared with another organization), Apps (a DM with an
-//! app), then Channels or Direct messages; each of Starred, External connections and Apps only
-//! when Slack lists it for the user.
+//! A conversation goes to the first of: a section the user made that lists it, Apps (a DM with an
+//! app), Starred (when starred and not a DM with an app), External connections (when shared with
+//! another organization), then Channels or Direct messages; each of Apps, Starred and External
+//! connections only when Slack lists it for the user. As in Slack's desktop app, a DM with an app
+//! is never in Starred: without Apps it goes to Direct messages.
 //!
 //! A section the user made has the id `{team}:custom:{Slack's id}` (never one of the built-in
 //! sections' ids), and is shown only when Slack's id is 1 to 32 ASCII letters and digits.
@@ -125,7 +126,7 @@ pub(crate) struct Facts {
     pub(crate) starred: bool,
     /// Shared with another organization (Slack Connect).
     pub(crate) external: bool,
-    /// A DM with an app.
+    /// A DM with an app (its peer is a bot): in Apps when Slack lists it, never in Starred.
     pub(crate) app: bool,
 }
 
@@ -233,9 +234,9 @@ impl Sidebar {
         self.custom
             .get(id)
             .cloned()
-            .or_else(|| pick(f.starred, &self.starred))
-            .or_else(|| pick(f.external, &self.external))
             .or_else(|| pick(f.app && f.dm, &self.apps))
+            .or_else(|| pick(f.starred && !(f.app && f.dm), &self.starred))
+            .or_else(|| pick(f.external, &self.external))
             .unwrap_or_else(|| if f.dm { self.dms.clone() } else { self.channels.clone() })
     }
 }

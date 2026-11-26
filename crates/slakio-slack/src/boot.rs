@@ -12,8 +12,9 @@
 //! channel's mentions only, a muted DM's nothing. Slack Connect: a channel shared with another organization (`is_ext_shared`; one shared
 //! within the organization is not), and a DM or group DM Slack marks so or with a person of
 //! another team. A DM or group DM is closed when Slack says it is not open in the sidebar (`is_open`): the UI
-//! lists it in a section of the user's own and Starred only. A group DM's name never holds the
-//! user's own handle.
+//! lists it only in a section of the user's own (as in Slack's desktop app, not in Starred). When the
+//! start bundle has no `is_open` list at all, no group DM is taken as closed (unknown is not
+//! closed). A group DM's name never holds the user's own handle.
 
 use crate::client::Client;
 use crate::error::SlackError;
@@ -164,10 +165,10 @@ pub(crate) async fn boot(
     let unknown = listed.is_none();
     let sidebar = crate::sidebar::Sidebar::new(&team.id, listed, client.diag());
     let team_id = team.id.clone();
-    let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
     if client.diag().on() {
         crate::shape::starred(client.diag(), &boot, &known, &self_.id);
     }
+    let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
     snapshot.sections = sidebar.sections;
     snapshot.sections_unknown = unknown;
     let mut placing = session.placing.lock().unwrap_or_else(PoisonError::into_inner);
@@ -249,8 +250,9 @@ fn snapshot(
     let unread = counts.map(unread_counts).unwrap_or_default();
     let muted: HashSet<String> = boot.prefs.as_ref().map(wire::Prefs::muted).unwrap_or_default();
     let starred: HashSet<String> = boot.starred.unwrap_or_default().into_iter().collect();
-    let open_ids = boot.is_open.unwrap_or_default();
-    let open: HashSet<&str> = open_ids.iter().map(String::as_str).collect();
+    // `None`: the start bundle has no list of the open DMs (unknown, not empty).
+    let open_ids = boot.is_open;
+    let open: Option<HashSet<&str>> = open_ids.as_ref().map(|ids| ids.iter().map(String::as_str).collect());
     let conversation = |(id, name, kind, facts, closed): Listed| {
         let (unread, mentions) = unread.get(&id).copied().unwrap_or_default();
         let section = sidebar.place(&id, facts);
@@ -271,7 +273,7 @@ fn snapshot(
     };
     let channels = boot.channels.unwrap_or_default();
     let own_teams: Vec<&str> = std::iter::once(team.id.as_str()).chain(team.enterprise_id.as_deref()).collect();
-    let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, &open), (&known, &own_teams), &me);
+    let listed = listed(channels, boot.ims.unwrap_or_default(), (&starred, open.as_ref()), (&known, &own_teams), &me);
     let facts: Vec<(String, Facts)> = listed.iter().map(|(id, _, _, f, _)| (id.clone(), *f)).collect();
     let conversations: Vec<Conversation> = listed.into_iter().map(conversation).collect();
     let me_name = me.name.clone().unwrap_or_else(|| me.id.clone());
@@ -323,11 +325,11 @@ type Listed = (String, String, ConversationKind, Facts, bool);
 /// not archived: each one's id, name, kind, what places it (`starred`, `open`: the start
 /// bundle's lists; `known`: the people named; `own_teams`: the workspace's team and
 /// organization; `me`: the user), and whether it is closed (a DM Slack says is not open, a group
-/// DM not in `open`).
+/// DM not in `open`; with no `open` list, none is closed).
 fn listed(
     channels: Vec<wire::Channel>,
     ims: Vec<wire::Im>,
-    (starred, open): (&HashSet<String>, &HashSet<&str>),
+    (starred, open): (&HashSet<String>, Option<&HashSet<&str>>),
     (known, own_teams): (&[User], &[&str]),
     me: &wire::Me,
 ) -> Vec<Listed> {
@@ -344,8 +346,8 @@ fn listed(
             out.push((c.id.clone(), c.name.unwrap_or(c.id), kind, facts, false));
             continue;
         }
-        // A group DM: closed when not open in the sidebar.
-        let closed = !open_group(&c, open);
+        // A group DM: closed when not open in the sidebar; unknown (no list) is not closed.
+        let closed = open.is_some_and(|open| !open_group(&c, open));
         // Its people: its members but the user; without members, the people known by the
         // handles of its name (the user's left out).
         let users: Vec<UserId> = match &c.members {
@@ -378,7 +380,7 @@ fn listed(
             app: peer.is_some_and(|u| u.bot),
         };
         // Closed only when Slack says so: not open, and not in the start bundle's is_open.
-        let closed = im.is_open == Some(false) && !open.contains(im.id.as_str());
+        let closed = im.is_open == Some(false) && !open.is_some_and(|open| open.contains(im.id.as_str()));
         Some((im.id, name, ConversationKind::Dm { user: UserId::new(user) }, facts, closed))
     }));
     out

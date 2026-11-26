@@ -7,10 +7,10 @@ use super::{Model, Row};
 use slakio_core::model::{Conversation, Section, SectionId, SectionKind, Sort, WorkspaceId};
 use std::collections::{HashMap, HashSet};
 
-/// Section `s` lists `c`: it is in `s`, and, as in Slack's desktop app, a closed DM is listed only
-/// in a section of the user's own and Starred.
+/// Section `s` lists `c`: it is in `s`, and, as in Slack's desktop app, a closed DM or group DM is
+/// listed only in a section of the user's own (not in Starred).
 pub(super) fn lists(s: &Section, c: &Conversation) -> bool {
-    let keeps_closed = matches!(s.kind, SectionKind::Favorites | SectionKind::Custom);
+    let keeps_closed = matches!(s.kind, SectionKind::Custom);
     c.workspace == s.workspace && c.section == s.id && (keeps_closed || !c.closed)
 }
 
@@ -120,5 +120,45 @@ impl Model {
             // Not built yet: the list panel says so.
             View::Files => vec![],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use slakio_core::model::{ConversationId, ConversationKind, UserId};
+    use slakio_core::sanitize::Remote;
+
+    fn section(kind: SectionKind) -> Section {
+        let ws = WorkspaceId::new("T1");
+        Section { id: SectionId::new(format!("T1:{kind:?}")), workspace: ws, name: Remote::new(""), kind, sort: None }
+    }
+
+    fn dm_in(s: &Section, closed: bool) -> Conversation {
+        Conversation {
+            id: ConversationId::new("D1"),
+            workspace: s.workspace.clone(),
+            kind: ConversationKind::Dm { user: UserId::new("U1") },
+            name: Remote::new("Ann"),
+            section: s.id.clone(),
+            external: false,
+            closed,
+            muted: false,
+            unread: 0,
+            mentions: 0,
+            latest: None,
+        }
+    }
+
+    /// As in Slack's desktop app: a closed DM is listed only in a section of the user's own, not
+    /// in Starred (nor Direct messages); an open one is listed wherever it is.
+    #[test]
+    fn a_closed_starred_dm_is_hidden_and_a_closed_custom_one_stays() {
+        let (starred, custom) = (section(SectionKind::Favorites), section(SectionKind::Custom));
+        assert!(!lists(&starred, &dm_in(&starred, true)), "closed: not in Starred");
+        assert!(lists(&starred, &dm_in(&starred, false)), "open: in Starred");
+        assert!(lists(&custom, &dm_in(&custom, true)), "closed: kept in a section of the user's own");
+        let dms = section(SectionKind::DirectMessages);
+        assert!(!lists(&dms, &dm_in(&dms, true)));
     }
 }

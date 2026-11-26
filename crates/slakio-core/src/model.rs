@@ -218,9 +218,9 @@ pub struct Conversation {
     pub section: SectionId,
     /// Shared with another organization (Slack Connect).
     pub external: bool,
-    /// A DM or group DM closed in Slack's sidebar (Slack says it is not open): Direct messages,
-    /// Apps and External connections do not list it, a section of the user's own and Starred
-    /// do; it is still found by search, its links and the DMs view.
+    /// A DM or group DM closed in Slack's sidebar (Slack says it is not open): only a section of
+    /// the user's own lists it (Starred, Direct messages, Apps and External connections do not);
+    /// it is still found by search, its links and the DMs view.
     pub closed: bool,
     pub muted: bool,
     /// Unread messages.
