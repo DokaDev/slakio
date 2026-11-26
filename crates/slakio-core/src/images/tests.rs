@@ -280,3 +280,48 @@ fn an_original_photo_on_a_lookalike_host_or_an_odd_path_is_no_photo() {
         assert_eq!(avatar_sized(&bad), None, "{bad}");
     }
 }
+
+#[test]
+fn a_guessed_72_pixel_photo_falls_back_to_its_other_extension_then_the_original() {
+    let avatars = AVATAR_HOSTS[0];
+    assert_eq!(
+        avatar_fallbacks(&format!("https://{avatars}/2026-01-05/T1-U2_72.png")),
+        [
+            format!("https://{avatars}/2026-01-05/T1-U2_72.jpg"),
+            format!("https://{avatars}/2026-01-05/T1-U2_original.png")
+        ]
+    );
+    assert_eq!(
+        avatar_fallbacks(&format!("https://{avatars}/2026-01-05/T1-U2_72.jpg")),
+        [
+            format!("https://{avatars}/2026-01-05/T1-U2_72.png"),
+            format!("https://{avatars}/2026-01-05/T1-U2_original.jpg")
+        ]
+    );
+}
+
+/// A guard: a fallback is only ever another address on Slack's avatar host, of the same file.
+#[test]
+fn fallbacks_never_leave_the_avatar_host() {
+    let (avatars, gravatar, statics) = (AVATAR_HOSTS[0], AVATAR_HOSTS[1], AVATAR_HOSTS[2]);
+    for url in [
+        format!("https://{gravatar}/avatar/abc_72.png"),
+        format!("https://{statics}/2026-01-05/T1-U2_72.png"),
+        format!("https://{avatars}.evil.example/2026-01-05/T1-U2_72.png"),
+        format!("https://{avatars}:8443/2026-01-05/T1-U2_72.png"),
+        format!("https://user@{avatars}/2026-01-05/T1-U2_72.png"),
+        format!("http://{avatars}/2026-01-05/T1-U2_72.png"),
+        format!("https://{avatars}/2026-01-05/T1-U2_48.png"),
+        format!("https://{avatars}/2026-01-05/T1-U2_72.png?x=1"),
+        format!("https://{avatars}/2026-01-05/../T1-U2_72.png"),
+        format!("https://{avatars}/a/b/T1-U2_72.png"),
+        format!("https://{avatars}/2026-01-05/T1%2FU2_72.png"),
+        "https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2026-01-05/T1-U2_72.png".to_string(),
+    ] {
+        assert_eq!(avatar_fallbacks(&url), Vec::<String>::new(), "{url}");
+    }
+    for fallback in avatar_fallbacks(&format!("https://{avatars}/2026-01-05/T1-U2_72.png")) {
+        assert_eq!(avatar_address(&fallback).as_deref(), Some(fallback.as_str()));
+        assert_eq!(host_of(&fallback), Some(avatars));
+    }
+}

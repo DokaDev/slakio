@@ -152,7 +152,10 @@ fn only_an_image_is_read_and_never_more_than_asked() {
         };
         r.fake.fail_next(PICTURES, lying);
         assert_eq!(r.picture(photo.clone(), 4000).await, Err(FailKind::TooLarge), "counted too large");
-        r.fake.fail_next(PICTURES, Fault::Status { status: 404, retry_after: None });
+        // The world's photos have the shape slakio guesses: refused at each of its names.
+        for _ in 0..=slakio_slack::picture::AVATAR_FALLBACKS {
+            r.fake.fail_next(PICTURES, Fault::Status { status: 404, retry_after: None });
+        }
         assert_eq!(r.picture(photo.clone(), BYTES_MAX).await, Err(api("file_not_available")));
         r.fake.fail_next(PICTURES, Fault::Status { status: 429, retry_after: Some("7".to_string()) });
         assert_eq!(
@@ -572,5 +575,83 @@ fn photos_drawn_down_a_whole_sidebar_leave_the_next_timeline_its_photos() {
             assert_eq!(r.picture(photo.clone(), BYTES_MAX).await.map(|_| ()), Ok(()), "{photo:?}");
         }
         assert_eq!(r.picture_requests().len(), 28);
+    });
+}
+
+/// A person's photo as slakio guesses it from the uploaded original (the world's photos have
+/// that shape: `<date>/<file>_72.png` on the avatar host).
+fn guessed_photo(r: &Run) -> Source {
+    let (_, photo) = r.sources();
+    let Source::Avatar(url) = &photo else { unreachable!() };
+    assert!(!slakio_core::images::avatar_fallbacks(url).is_empty(), "{url}: of the guessed shape");
+    photo
+}
+
+fn not_there() -> Fault {
+    Fault::Status { status: 404, retry_after: None }
+}
+
+#[test]
+fn a_guessed_72_that_is_not_there_falls_back_to_the_original() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let photo = guessed_photo(&r);
+        r.fake.fail_next(PICTURES, not_there());
+        r.fake.fail_next(PICTURES, not_there());
+        let bytes = r.picture(photo, BYTES_MAX).await.expect("the original's bytes");
+        assert_eq!(&bytes[..4], b"\x89PNG");
+        let log = r.picture_requests();
+        let paths: Vec<&str> = log.iter().map(|l| l.path.as_str()).collect();
+        assert_eq!(paths.len(), 3, "{paths:?}");
+        assert!(paths[0].ends_with("_72.png") && paths[1].ends_with("_72.jpg"), "{paths:?}");
+        assert!(paths[2].ends_with("_original.png"), "{paths:?}");
+        assert!(paths.iter().all(|p| p.starts_with("/2026-01-05/")), "the same file's folder: {paths:?}");
+        for l in &log {
+            for name in ["cookie", "authorization", "origin", "referer"] {
+                assert!(header(l, name).is_none(), "{name} on {}", l.path);
+            }
+        }
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (3, 0), "each fallback a counted picture-host ask");
+    });
+}
+
+/// A guard: a photo of any other shape (a Gravatar address, a default avatar) that is refused
+/// asks nothing more.
+#[test]
+fn a_photo_of_another_shape_that_is_refused_asks_nothing_more() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let other = Source::Avatar(format!("https://{}/avatars/T1/U9_72.png", AVATAR_HOSTS[0]));
+        r.fake.fail_next(PICTURES, not_there());
+        assert_eq!(r.picture(other, BYTES_MAX).await, Err(api("file_not_available")));
+        assert_eq!(r.picture_requests().len(), 1);
+    });
+}
+
+/// A guard: a 72-pixel photo of the guessed shape that is gone costs at most two more asks.
+#[test]
+fn a_real_image_72_that_404s_costs_at_most_two_more_asks() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let photo = guessed_photo(&r);
+        for _ in 0..4 {
+            r.fake.fail_next(PICTURES, not_there());
+        }
+        assert_eq!(r.picture(photo, BYTES_MAX).await, Err(api("file_not_available")));
+        let asked = r.picture_requests().len();
+        assert!((1..=3).contains(&asked), "{asked} asks");
+    });
+}
+
+/// A guard: a fallback that is too large is too large (the person keeps their initials).
+#[test]
+fn a_fallback_too_large_is_too_large() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        let photo = guessed_photo(&r);
+        r.fake.fail_next(PICTURES, not_there());
+        r.fake.fail_next(PICTURES, not_there());
+        assert_eq!(r.picture(photo, 100).await, Err(FailKind::TooLarge));
+        assert!(r.picture_requests().len() <= 3);
     });
 }

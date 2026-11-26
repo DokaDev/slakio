@@ -134,6 +134,25 @@ pub fn avatar_sized(url: &str) -> Option<String> {
     avatar_address(&format!("https://{}/{date}/{file}_72.{ext}", AVATAR_HOSTS[0]))
 }
 
+/// The addresses tried, in turn, when a photo `url` of the shape [`avatar_sized`] makes
+/// (`https://<avatar host>/<date>/<file>_72.<ext>`) is refused: its 72-pixel copy in the other
+/// usual extension (`jpg`, or `png` for a `jpg`), then the uploaded original on the same host
+/// (`<file>_original.<ext>`). Each passes [`avatar_address`] again; none for any other address.
+pub fn avatar_fallbacks(url: &str) -> Vec<String> {
+    let Some(path) = url.strip_prefix(&format!("https://{}/", AVATAR_HOSTS[0])) else { return Vec::new() };
+    let Some((stem, ext)) = path.rsplit_once('.') else { return Vec::new() };
+    let Some(file) = stem.strip_suffix("_72") else { return Vec::new() };
+    let original = format!("https://{}/{file}_original.{ext}", AVATAR_HOSTS[0]);
+    if avatar_sized(&original).as_deref() != Some(url) {
+        return Vec::new();
+    }
+    let other = if ext.eq_ignore_ascii_case("jpg") { "png" } else { "jpg" };
+    [format!("https://{}/{file}_72.{other}", AVATAR_HOSTS[0]), original]
+        .iter()
+        .filter_map(|a| avatar_address(a))
+        .collect()
+}
+
 /// `url` when a workspace's own emoji may be fetched from it: an address on one of
 /// [`EMOJI_HOSTS`]. Bytes outside ASCII (a name of another script in the path, as Slack may
 /// write it raw) are percent-encoded first, as a browser sends them; the host is matched as

@@ -19,6 +19,10 @@
 //!   one background request of the workspace, a photo's or an emoji's in the picture hosts'
 //!   budget ([`crate::governor::Governor::cdn`]), each of which holds one of those hosts' places
 //!   over all its hops. A host that answers 429 is not asked again for its `Retry-After`.
+//! * A photo of the shape slakio guesses from an uploaded original that the avatar host refuses
+//!   (401, 403, 404, 410) before any redirect is asked again at most [`AVATAR_FALLBACKS`] times,
+//!   at the same file's other names on that host ([`slakio_core::images::avatar_fallbacks`]),
+//!   each ask checked and counted as the first.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
 //!   a larger one, said or counted, is refused; all of it within [`DEADLINE`].
 
@@ -31,6 +35,10 @@ use std::time::Duration;
 
 /// The most redirects a profile photo follows (Gravatar to Slack's default avatar is one).
 pub const AVATAR_REDIRECTS: usize = 2;
+
+/// The most other addresses a refused photo of the shape slakio guesses is asked at
+/// ([`slakio_core::images::avatar_fallbacks`]).
+pub const AVATAR_FALLBACKS: usize = 2;
 
 /// The most redirects an emoji's picture follows, each only to another address on the emoji
 /// host.
@@ -177,6 +185,16 @@ impl<'a> Note<'a> {
     }
 }
 
+/// The addresses a photo `url` of `source` is asked at, in turn, once refused: a guessed
+/// 72-pixel photo may be there under another name; each is a counted ask like any other.
+fn fallbacks(source: &Source, url: &str) -> std::iter::Take<std::vec::IntoIter<String>> {
+    let all = match source {
+        Source::Avatar(_) => slakio_core::images::avatar_fallbacks(url),
+        _ => Vec::new(),
+    };
+    all.into_iter().take(AVATAR_FALLBACKS)
+}
+
 async fn read(
     client: &Client,
     (source, list): (&Source, bool),
@@ -189,6 +207,7 @@ async fn read(
         Source::Thumb(_) => None,
         Source::Avatar(_) | Source::Emoji(_) => Some(client.governor().cdn_slot().await?),
     };
+    let mut fallbacks = fallbacks(source, &url);
     let mut hops = 0;
     let mut answer = loop {
         note.asked(&url, hops);
@@ -230,7 +249,10 @@ async fn read(
                 }
                 return Err(SlackError::RateLimited { retry_after });
             }
-            401 | 403 | 404 | 410 => return Err(api("file_not_available")),
+            401 | 403 | 404 | 410 => match fallbacks.next().filter(|_| hops == 0) {
+                Some(next) => url = next,
+                None => return Err(api("file_not_available")),
+            },
             status => return Err(SlackError::Network { detail: format!("the picture host answered {status}") }),
         }
     };
