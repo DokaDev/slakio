@@ -342,14 +342,14 @@ fn a_photo_follows_at_most_two_redirects_to_avatar_hosts_each_counted_and_bare()
             assert!(l.headers.iter().all(|(_, v)| !v.contains(TOKEN) && !v.contains("cookie-TEST")));
             assert!(l.body.is_empty(), "a GET");
         }
-        assert_eq!(r.governor.cdn_sent(), 3, "each hop counts");
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (3, 0), "each hop counts");
         // A third hop is refused, though to an avatar host.
         for host in [AVATAR_HOSTS[2], AVATAR_HOSTS[0], AVATAR_HOSTS[2]] {
             r.fake.fail_next(PICTURES, redirect(&on(host, &photo)));
         }
         assert_eq!(r.picture(photo, BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 6, "the third hop never asked");
-        assert_eq!(r.governor.cdn_sent(), 6);
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (6, 0));
     });
 }
 
@@ -384,7 +384,7 @@ fn a_photo_never_follows_a_redirect_to_an_address_a_photo_may_not_come_from() {
         r.fake.fail_next(PICTURES, Fault::Raw { status: 302, headers: Vec::new(), body: Vec::new() });
         assert_eq!(r.picture(photo.clone(), BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 14, "only the photo itself each time: nothing asked elsewhere");
-        assert_eq!(r.governor.cdn_sent(), 14);
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (14, 0));
         // Gravatar sending to Slack's default avatar is followed.
         r.fake.fail_next(PICTURES, redirect(&format!("{gravatar}&d=https%3A%2F%2F{slack}%2Fimg%2Fava_0010-72.png")));
         assert!(r.picture(photo, BYTES_MAX).await.is_ok());
@@ -433,7 +433,7 @@ fn gravatar_sending_elsewhere_asks_the_slack_fallback_it_named_and_nothing_elsew
         assert_eq!(&bytes[..4], b"\x89PNG");
         let log = r.picture_requests();
         assert_eq!(log.len(), 2, "Gravatar, then the Slack default it named: {log:?}");
-        assert_eq!(r.governor.cdn_sent(), 2, "each hop counts");
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (2, 0), "each hop counts");
         assert_eq!(log[1].path, slack.split_once(".com").unwrap().1, "the fallback's own path");
         for l in &log {
             assert!(l.headers.iter().all(|(_, v)| !v.contains("wp.com")), "nothing of the CDN");
@@ -451,7 +451,7 @@ fn gravatar_sending_elsewhere_asks_the_slack_fallback_it_named_and_nothing_elsew
             assert_eq!(r.picture(source, BYTES_MAX).await, Err(api("redirected_elsewhere")), "{keyword}");
         }
         assert_eq!(r.picture_requests().len(), 6, "only Gravatar each time");
-        assert_eq!(r.governor.cdn_sent(), 6);
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (6, 0));
     });
 }
 
@@ -470,7 +470,7 @@ fn the_gravatar_fallback_stays_within_the_hop_cap() {
         r.fake.fail_next(PICTURES, redirect("https://i0.wp.com/x.png"));
         assert_eq!(r.picture(gravatar, BYTES_MAX).await, Err(api("redirected_elsewhere")));
         assert_eq!(r.picture_requests().len(), 3);
-        assert_eq!(r.governor.cdn_sent(), 3);
+        assert_eq!((r.governor.cdn_sent(), r.governor.sent()), (3, 0));
     });
 }
 

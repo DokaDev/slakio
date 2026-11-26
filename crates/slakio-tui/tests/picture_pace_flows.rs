@@ -111,6 +111,7 @@ fn all_ready(s: &Scripted, ws: &WorkspaceId, want: &[(Source, Shape)]) -> bool {
 fn until_drawn(s: &mut Scripted, ws: &WorkspaceId, want: &[(Source, Shape)], list: &[(String, Custom)]) -> Duration {
     let start = s.d.now;
     let mut asked: HashMap<Generation, Instant> = HashMap::new();
+    let mut sources: HashMap<Generation, Source> = HashMap::new();
     loop {
         s.d.screen();
         s.d.app.ask_images(s.d.now);
@@ -123,9 +124,17 @@ fn until_drawn(s: &mut Scripted, ws: &WorkspaceId, want: &[(Source, Shape)], lis
         }
         for r in s.b.held.iter().filter(|r| matches!(r.command, Command::Image { .. })) {
             asked.entry(r.id).or_insert(s.d.now);
+            if let Command::Image { source, .. } = &r.command {
+                sources.entry(r.id).or_insert_with(|| source.clone());
+            }
         }
         s.d.screen();
         if all_ready(s, ws, want) {
+            let mut each: Vec<&Source> = sources.values().collect();
+            each.sort_by_key(|s| s.address().to_string());
+            let before = each.len();
+            each.dedup();
+            assert_eq!(each.len(), before, "each picture asked once");
             return s.d.now - start;
         }
         assert!(s.d.now - start < Duration::from_secs(120), "never all drawn");

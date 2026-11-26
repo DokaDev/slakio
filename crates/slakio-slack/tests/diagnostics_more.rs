@@ -308,10 +308,14 @@ fn a_photo_looked_up_says_so_and_the_picture_share_says_which() {
         };
         assert!(matches!(r.ask(thumb).await, Event::Failed { .. }));
         let text = r.text();
-        has(&text, "avatar cap-reached cdn-budget");
-        has(&text, "lane=process");
-        has(&text, "thumb cap-reached lane-picture");
-        has(&text, "lane=workspace");
+        for (start, lane) in
+            [("avatar cap-reached cdn-budget", "lane=process"), ("thumb cap-reached lane-picture", "lane=workspace")]
+        {
+            assert!(
+                text.lines().any(|l| l.contains(start) && l.contains(lane)),
+                "no `{start} … {lane}` line in\n{text}"
+            );
+        }
         assert!(!text.contains("[secret]"), "{text}");
     });
 }

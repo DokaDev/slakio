@@ -206,7 +206,8 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
     let mut minutes = Vec::new();
     // Two hours, everything answered at once.
     while t.now < start + Duration::from_secs(2 * 3600) {
-        // More DM rows than the hour's share, a frame every second.
+        // More DM rows than the hour's share, sixty frames at the minute's start (the clock
+        // moves a minute between them, not within).
         let minute = t.pump(&[], 4 * AHEAD_PER_HOUR, 60).len();
         assert!(minute <= AHEAD_PER_MINUTE, "{minute} in a minute");
         minutes.push(minute);
@@ -637,9 +638,19 @@ fn photos_ahead_never_take_the_last_two_cdn_slots() {
     let (looks, _) = t.frame(&screen, 3);
     assert_eq!(looks.len(), 1);
     t.look(looks);
+    assert_eq!(
+        t.images.in_flight_cdn(),
+        CDN_IN_FLIGHT_MAX - 2,
+        "two places left, and the ahead share has room for one more"
+    );
     for _ in 0..3 {
         let (_, more) = t.frame(&screen, 3);
         assert!(more.is_empty(), "the last two places stay the screen's: {more:?}");
     }
+    assert_eq!(t.images.in_flight_cdn(), CDN_IN_FLIGHT_MAX - 2);
+    // One of the screen's ends: three places are free, and the photo ahead goes.
+    t.deliver(&slow[0]);
+    let (_, more) = t.frame(&screen, 3);
+    assert!(more.len() == 1 && is_dm(&more[0]), "{more:?}");
     assert_eq!(t.images.in_flight_cdn(), CDN_IN_FLIGHT_MAX - 2);
 }
