@@ -290,8 +290,11 @@ fetch their photos, and a photo shown in both places is fetched for each). Elsew
 until a picture has come, the text card and the initials show as before; a picture that cannot
 be shown says why on its card (too large, no preview, not loaded). A workspace's own emoji show as small pictures, two cells wide, in a
 message's text and in its reaction chips (a line never breaks inside one); a GIF or animated PNG
-emoji or profile photo moves (at most 8 on screen at once, at most 10 frames a second, 64 frames, from
-the bytes already fetched; `animate = "off"` or `:set animate=off` keeps the first frame), and a
+emoji or profile photo moves at its own speed (each frame as long as the picture says, at least
+20 ms; a frame that says 10 ms or less is shown 100 ms, as browsers do), at most 8 on screen at
+once, 64 frames, from the bytes already fetched. Moving pictures send the terminal at most 1 MiB of
+data a second: past it, frames are skipped and the timing is kept, never slowed (`animate = "off"`
+or `:set animate=off` keeps the first frame). A
 file's preview shows a GIF's first frame; where pictures are not drawn, until one has come, or when it cannot be fetched,
 `:name:` shows as before. Nothing of it ever blocks the screen: pictures are fetched in the
 background and decoded off the screen's thread.
