@@ -92,6 +92,8 @@ pub struct Shown {
     pub edited: bool,
     /// The files it shares (their names sanitised where drawn).
     pub files: Vec<slakio_core::model::File>,
+    /// The emoji addresses it gives, by name ([`Message::emoji_pictures`]).
+    pub emoji_pictures: Vec<(String, String)>,
 }
 
 impl Shown {
@@ -112,6 +114,7 @@ impl Shown {
                 .map(|r| ShownReaction { name: r.name.line(), count: r.count, mine: r.mine })
                 .collect(),
             edited: m.edited,
+            emoji_pictures: m.emoji_pictures.iter().map(|(n, a)| (n.line().as_str().to_string(), a.clone())).collect(),
             files: m.files.clone(),
         }
     }
@@ -421,6 +424,7 @@ pub fn echo(items: &mut Vec<Shown>, user: UserId, author: Safe, text: Safe) {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files: Vec::new(),
     });
 }

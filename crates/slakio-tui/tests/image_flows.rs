@@ -50,6 +50,7 @@ fn shown(w: u16, h: u16, on: bool) -> (Scripted, UserId) {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files: vec![picture_file()],
     }];
     page.complete = true;
@@ -376,6 +377,7 @@ fn tall_shown(n: usize, lines: usize) -> Scripted {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: vec![File {
                 id: FileId::new(format!("F{k}")),
                 name: Remote::new(format!("shot{k}.png")),

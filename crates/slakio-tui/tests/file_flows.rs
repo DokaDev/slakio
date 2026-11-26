@@ -68,6 +68,7 @@ fn shown_with(text: &str, files: Vec<File>, w: u16, h: u16, lang: Lang, dir: Opt
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files,
     }];
     page.complete = true;

@@ -17,8 +17,9 @@ use slakio_core::model::WorkspaceId;
 
 /// The runs `text` (in `style`) is drawn as in workspace `ws`: the text as it is, but for each
 /// `:name:` of the workspace's own emoji that can be drawn (as its picture, or the standard
-/// emoji it is an alias of).
-pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(String, Style)> {
+/// emoji it is an alias of), or, for a name the workspace's list lacks, of the picture its
+/// message gives an address for (`given`: name and address, as another workspace's emoji).
+pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style, given: &[(String, String)]) -> Vec<(String, Style)> {
     let mut out: Vec<(String, Style)> = Vec::new();
     let mut plain = String::new();
     let mut rest = text;
@@ -28,7 +29,7 @@ pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(Strin
         // A name written in decomposed Hangul jamo is looked up as its syllables.
         let written = after.find(':').map(|e| &after[..e]);
         let name = written.map(compose_hangul).filter(|n| shortcode(n));
-        match name.as_deref().and_then(|n| drawn(app, ws, n, style)) {
+        match name.as_deref().and_then(|n| drawn(app, ws, n, style, given)) {
             Some((mut run, picture)) => {
                 if !plain.is_empty() {
                     out.push((std::mem::take(&mut plain), style));
@@ -77,20 +78,31 @@ fn toned<'a>(app: &App, ws: &WorkspaceId, name: &str, rest: &'a str) -> Option<(
 }
 
 /// What `:name:` is drawn as in workspace `ws`, when it is one of the workspace's own emoji that
-/// can be drawn now (`true`: as its picture).
-fn drawn(app: &App, ws: &WorkspaceId, name: &str, style: Style) -> Option<((String, Style), bool)> {
+/// can be drawn now (`true`: as its picture), or one the list lacks whose message gives its
+/// address (`given`).
+fn drawn(
+    app: &App,
+    ws: &WorkspaceId,
+    name: &str,
+    style: Style,
+    given: &[(String, String)],
+) -> Option<((String, Style), bool)> {
     if emoji::get(name).is_some() {
         return None;
     }
-    match app.images.customs.get(ws, name)? {
-        Custom::Standard(standard) => emoji::get(standard).map(|e| ((e.to_string(), style), false)),
-        Custom::Picture(address) => match app.images.look_emoji(ws, address) {
-            Look::Ready { id, cols: 2, rows: 1 } => {
-                let mut cells = Style::default().fg(graphics::color(id));
-                cells.bg = style.bg;
-                Some(((graphics::row(0, 2), cells), true))
-            }
-            _ => None,
-        },
+    let address = match app.images.customs.get(ws, name) {
+        Some(Custom::Standard(standard)) => return emoji::get(standard).map(|e| ((e.to_string(), style), false)),
+        Some(Custom::Picture(address)) => address,
+        // Only once the list says the name is none of the workspace's own.
+        None if app.images.customs.listed(ws) => &given.iter().find(|(n, _)| n == name)?.1,
+        None => return None,
+    };
+    match app.images.look_emoji(ws, address) {
+        Look::Ready { id, cols: 2, rows: 1 } => {
+            let mut cells = Style::default().fg(graphics::color(id));
+            cells.bg = style.bg;
+            Some(((graphics::row(0, 2), cells), true))
+        }
+        _ => None,
     }
 }

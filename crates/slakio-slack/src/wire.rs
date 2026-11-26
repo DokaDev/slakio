@@ -457,6 +457,8 @@ pub struct Reaction {
     pub count: Option<u32>,
     #[serde(default, deserialize_with = "lenient")]
     pub users: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "loose")]
+    pub url: Option<String>,
 }
 
 /// `search.messages`: one page of the messages a query found.

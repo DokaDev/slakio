@@ -223,6 +223,7 @@ fn a_live_message_does_not_move_a_view_the_wheel_moved() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         };
         let live = Live::Message {
@@ -267,6 +268,7 @@ fn post(s: &mut Scripted, ts: u64) {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files: Vec::new(),
     };
     let live = Live::Message {

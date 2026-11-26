@@ -113,6 +113,7 @@ fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
         thread,
         reactions: unreactions(&r.get::<_, String>("reactions")?)?,
         edited: r.get("edited")?,
+        emoji_pictures: Vec::new(),
         files: unfiles(&r.get::<_, String>("files")?, &r.get::<_, String>("thumbs")?)?,
     })
 }

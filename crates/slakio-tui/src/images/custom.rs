@@ -73,6 +73,11 @@ impl Customs {
         }
     }
 
+    /// Workspace `ws`'s list has come: a name it lacks is not one of its own.
+    pub fn listed(&self, ws: &WorkspaceId) -> bool {
+        self.sets.contains_key(ws)
+    }
+
     /// Where what frames note stands now ([`super::Images::mark`]).
     pub fn mark(&self) -> usize {
         self.seen.borrow().len()

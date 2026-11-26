@@ -482,7 +482,7 @@ pub fn chips(app: &App, ws: &WorkspaceId, m: &Shown, w: usize) -> Vec<Vec<Span<'
         let style: Style = if r.mine { t.reaction_mine() } else { t.reaction() };
         let mut runs = match emoji::get(name) {
             Some(face) => vec![(face.to_string(), style)],
-            None => super::custom::runs(app, ws, &format!(":{name}:"), style),
+            None => super::custom::runs(app, ws, &format!(":{name}:"), style, &m.emoji_pictures),
         };
         runs.insert(0, (" ".to_string(), style));
         runs.push((format!(" {} ", r.count), style));

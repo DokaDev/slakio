@@ -16,6 +16,7 @@ fn messages(n: u64, text_len: usize) -> Vec<Message> {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         })
         .collect()

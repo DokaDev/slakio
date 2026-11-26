@@ -3,7 +3,7 @@
 
 use crate::wire;
 use slakio_core::model::{
-    File, FileId, Message, Org, Presence, Reaction, ThreadSummary, Ts, User, UserId, WorkspaceId,
+    EMOJI_PICTURES_MAX, File, FileId, Message, Org, Presence, Reaction, ThreadSummary, Ts, User, UserId, WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
@@ -99,9 +99,11 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
         (Some(replies), Some(last)) if replies > 0 => Some(ThreadSummary { replies, last_reply: Ts(last) }),
         _ => None,
     };
-    let reactions = m
-        .reactions
-        .unwrap_or_default()
+    let reactions = m.reactions.unwrap_or_default();
+    let given = reactions.iter().filter_map(|r| Some((r.name.clone(), r.url.clone()?)));
+    let blocks = crate::blocks::emoji_pictures(m.blocks.as_ref(), EMOJI_PICTURES_MAX);
+    let emoji_pictures = emoji_pictures(given.chain(blocks));
+    let reactions = reactions
         .into_iter()
         .map(|r| {
             let users = r.users.unwrap_or_default();
@@ -120,7 +122,24 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
         reactions,
         edited: m.edited.is_some(),
         files,
+        emoji_pictures,
     })
+}
+
+/// The emoji addresses a message gives, each kept only for a name a shortcode may have (its
+/// Hangul composed) at an address on the emoji host, once a name, at most
+/// [`EMOJI_PICTURES_MAX`].
+fn emoji_pictures(given: impl Iterator<Item = (String, String)>) -> Vec<(Remote, String)> {
+    use slakio_core::images::emoji::{compose_hangul, shortcode};
+    let mut out: Vec<(Remote, String)> = Vec::new();
+    for (name, url) in given {
+        let name = compose_hangul(&name).into_owned();
+        let Some(address) = slakio_core::images::emoji_address(&url).filter(|_| shortcode(&name)) else { continue };
+        if out.len() < EMOJI_PICTURES_MAX && !out.iter().any(|(n, _)| n.unsanitized() == name) {
+            out.push((Remote::new(name), address));
+        }
+    }
+    out
 }
 
 /// A file Slack lists with a message, when it has an id: named (its title when it has no

@@ -287,7 +287,15 @@ pub struct Message {
     pub edited: bool,
     /// The files shared with it, in their order.
     pub files: Vec<File>,
+    /// The emoji it names (in its text or its reactions) that come with the address of their
+    /// picture, as another workspace's emoji may: each name (a shortcode, its Hangul composed)
+    /// and its address on the emoji host, at most [`EMOJI_PICTURES_MAX`]. Drawn only for a name
+    /// the workspace's own list lacks.
+    pub emoji_pictures: Vec<(Remote, String)>,
 }
+
+/// The most emoji addresses one message carries ([`Message::emoji_pictures`]).
+pub const EMOJI_PICTURES_MAX: usize = 16;
 
 /// A file shared in a message, as the message lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]

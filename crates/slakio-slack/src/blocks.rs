@@ -38,6 +38,38 @@ pub fn text(text: &str, blocks: Option<&Value>, attachments: Option<&Value>) -> 
     parts.join("\n")
 }
 
+/// The emoji of rich text that carry the address of their picture (`{"type": "emoji", "name":
+/// …, "url": …}`, as an emoji of another workspace may), each name and address as written, at
+/// most `max` of them; nothing is checked here.
+pub fn emoji_pictures(blocks: Option<&Value>, max: usize) -> Vec<(String, String)> {
+    fn walk(v: &Value, depth: usize, max: usize, out: &mut Vec<(String, String)>) {
+        if depth > DEPTH || out.len() >= max {
+            return;
+        }
+        match v {
+            Value::Array(items) => items.iter().for_each(|i| walk(i, depth + 1, max, out)),
+            Value::Object(o) => {
+                if let (Some("emoji"), Some(name), Some(url)) = (
+                    o.get("type").and_then(Value::as_str),
+                    o.get("name").and_then(Value::as_str),
+                    o.get("url").and_then(Value::as_str),
+                ) {
+                    out.push((name.to_string(), url.to_string()));
+                }
+                if let Some(elements) = o.get("elements") {
+                    walk(elements, depth + 1, max, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    if let Some(blocks) = blocks {
+        walk(blocks, 0, max, &mut out);
+    }
+    out
+}
+
 fn kind(v: &Value) -> &str {
     v.get("type").and_then(Value::as_str).unwrap_or_default()
 }

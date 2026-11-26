@@ -35,6 +35,7 @@ fn shown(texts: &[String], w: u16, h: u16) -> Scripted {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         })
         .collect();

@@ -295,7 +295,7 @@ impl World {
         }
         let edited = r.chance(5);
         let files = files::of(self.seed, &plan.team, conversation.as_str(), &plan.name, index);
-        Some(Message { ts, user, text, thread, reactions, edited, files })
+        Some(Message { ts, user, text, thread, reactions, edited, files, emoji_pictures: Vec::new() })
     }
 
     /// The index of the message of `conversation` written at `ts`, if there is one.
@@ -395,6 +395,7 @@ impl World {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         })
     }

@@ -175,6 +175,7 @@ fn booted_reordered() -> (Scripted, usize) {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files: Vec::new(),
     };
     let (workspace, conversation) = (ws, next.id);
@@ -363,6 +364,7 @@ fn a_message_in_a_closed_dm_opens_it_again() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         };
         let live = Live::Message {

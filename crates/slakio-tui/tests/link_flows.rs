@@ -39,6 +39,7 @@ fn shown(texts: &[&str], w: u16, h: u16, lang: Lang) -> Scripted {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         })
         .collect();
@@ -413,6 +414,7 @@ fn the_thread_pane_picks_its_replies_links_too() {
             thread: None,
             reactions: Vec::new(),
             edited: false,
+            emoji_pictures: Vec::new(),
             files: Vec::new(),
         };
         page.messages = vec![message(1_767_603_600_000_000, "the root"), message(1_767_603_700_000_000, MIXED)];
@@ -602,6 +604,7 @@ fn edit(s: &mut Scripted, ts: Ts, text: &str) {
         thread: None,
         reactions: Vec::new(),
         edited: true,
+        emoji_pictures: Vec::new(),
         files: Vec::new(),
     };
     let live = Live::Message {

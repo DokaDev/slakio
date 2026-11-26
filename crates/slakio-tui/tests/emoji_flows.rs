@@ -38,14 +38,39 @@ fn shown(messages: &[(&str, &[&str])], w: u16, h: u16, on: bool) -> (Scripted, W
     (s, ws)
 }
 
+/// Booted with pictures on, 120×40, `deploys` open with `messages` each giving the emoji
+/// addresses `given` makes of the workspace's id; its workspace.
+fn shown_giving(
+    messages: &[(&str, &[&str])],
+    given: impl Fn(&WorkspaceId) -> Vec<(Remote, String)>,
+) -> (Scripted, WorkspaceId) {
+    let mut s = Scripted::booted(true, None);
+    s.d.app.images.env = slakio_tui::images::detect::Env { term: "xterm-kitty".into(), ..Default::default() };
+    (s.d.app.images.setting, s.d.app.images.tty) = ("auto".into(), true);
+    s.d.app.images.resolve();
+    s.d.app.resize(120, 40);
+    let ws = open_with(&mut s, messages, given);
+    (s, ws)
+}
+
 /// `deploys` opened with `messages` (text, reactions), oldest first; its workspace.
 fn open(s: &mut Scripted, messages: &[(&str, &[&str])]) -> WorkspaceId {
+    open_with(s, messages, |_| Vec::new())
+}
+
+/// [`open`], each message giving the emoji addresses `given` makes of the workspace's id.
+fn open_with(
+    s: &mut Scripted,
+    messages: &[(&str, &[&str])],
+    given: impl Fn(&WorkspaceId) -> Vec<(Remote, String)>,
+) -> WorkspaceId {
     s.d.list_cursor_on("deploys");
     s.keys("enter");
     let mut e = s.b.reply(0);
     let Event::History(page) = &mut e.event else { panic!("a page") };
     let ws = page.target.workspace().clone();
     let author = page.messages[0].user.clone();
+    let given = given(&ws);
     page.messages = (messages.iter().enumerate())
         .map(|(k, (text, reactions))| Message {
             ts: Ts(1_767_603_600_000_000 + k as u64 * 3_600_000_000),
@@ -54,6 +79,7 @@ fn open(s: &mut Scripted, messages: &[(&str, &[&str])]) -> WorkspaceId {
             thread: None,
             reactions: reactions.iter().map(|r| Reaction { name: Remote::new(*r), count: 2, mine: false }).collect(),
             edited: false,
+            emoji_pictures: given.clone(),
             files: Vec::new(),
         })
         .collect();
@@ -710,4 +736,63 @@ fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_once() {
     assert_eq!(distinct.len(), all.len(), "an emoji on screen was asked for again");
     assert!(all.len() <= EMOJI_PER_FRAME, "{} asked, more than a frame's share", all.len());
     assert!(frame(&mut s).is_empty(), "settled");
+}
+
+/// Another workspace's emoji (synthetic): a Korean "thanks" and a wave, of team `TPARTNER`.
+fn partner(name: &str) -> String {
+    slakio_world::emoji::picture("TPARTNER", name)
+}
+
+#[test]
+fn a_shared_channel_reaction_of_another_workspace_draws_its_picture() {
+    use slakio_core::images::emoji::Custom;
+    let given = |_: &WorkspaceId| {
+        vec![(Remote::new(THANKS_NFC), partner("thanks")), (Remote::new("partner-wave"), partner("partner-wave"))]
+    };
+    let (mut s, ws) = shown_giving(&[("hi :partner-wave: all", &[THANKS_NFC])], given);
+    let asked = frame(&mut s);
+    assert!(pictures(&asked).is_empty(), "no picture before the list says the names are none of ours");
+    // Our list lacks both names.
+    let named =
+        vec![("party-blob".to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "party-blob")))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.pump();
+    let mut sources = Vec::new();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            sources.extend(pictures(std::slice::from_ref(&r)));
+            give_picture(&mut s, &r);
+        }
+    }
+    let want = [Source::Emoji(partner("partner-wave")), Source::Emoji(partner("thanks"))];
+    for w in &want {
+        assert_eq!(sources.iter().filter(|s| *s == w).count(), 1, "{w:?} asked once: {sources:?}");
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains("partner-wave") && !screen.contains(THANKS_NFC), "{screen}");
+    let rows = cells(&s);
+    assert_eq!(rows.len(), 2, "one in the text, one in the chip: {rows:?}");
+}
+
+/// A guard: where the workspace's own list names the emoji, its picture is drawn, never the one
+/// the message gives an address for.
+#[test]
+fn our_own_list_wins_over_a_message_address_for_the_same_name() {
+    use slakio_core::images::emoji::Custom;
+    let given = |_: &WorkspaceId| vec![(Remote::new("party-blob"), partner("party-blob"))];
+    let (mut s, ws) = shown_giving(&[("ship :party-blob: now", &["party-blob"])], given);
+    let asked = frame(&mut s);
+    let ours = slakio_world::emoji::picture(ws.as_str(), "party-blob");
+    let named = vec![("party-blob".to_string(), Custom::Picture(ours.clone()))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.pump();
+    let mut sources = Vec::new();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            sources.extend(pictures(std::slice::from_ref(&r)));
+            give_picture(&mut s, &r);
+        }
+    }
+    assert_eq!(sources, [Source::Emoji(ours)], "only ours");
+    assert_eq!(cells(&s).len(), 2);
 }

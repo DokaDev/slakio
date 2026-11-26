@@ -56,7 +56,7 @@ pub fn rows(app: &App, ws: &WorkspaceId, m: &Shown, w: usize, max: usize, hints:
                 let (mut runs, mut tags) = (Vec::new(), Vec::new());
                 for p in pieces {
                     let of_link = matches!(p, Piece::Link { .. }).then_some(link);
-                    for r in runs_of(app, ws, p) {
+                    for r in runs_of(app, ws, p, &m.emoji_pictures) {
                         runs.push(r);
                         tags.push(of_link);
                     }
@@ -129,11 +129,11 @@ fn over(line: Vec<Span<'static>>, at: usize, text: &str, style: Style) -> Vec<Sp
 
 /// Piece `p` as text in its styles: most pieces one run; a link whose label hides where it
 /// goes, and an app named, a faint run after it.
-fn runs_of(app: &App, ws: &WorkspaceId, p: &Piece) -> Vec<(String, Style)> {
+fn runs_of(app: &App, ws: &WorkspaceId, p: &Piece, given: &[(String, String)]) -> Vec<(String, Style)> {
     let t = &app.theme;
     let text = plain(p, &|p| app.model.named(ws, p));
     match p {
-        Piece::Text(_, marks) => super::custom::runs(app, ws, &text, marked(t.text(), *marks)),
+        Piece::Text(_, marks) => super::custom::runs(app, ws, &text, marked(t.text(), *marks), given),
         Piece::Code(code) if t.code_marks() => vec![(format!("`{code}`"), t.code())],
         Piece::Code(_) => vec![(text, t.code())],
         Piece::User { id, marks, .. } => {

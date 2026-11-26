@@ -69,6 +69,7 @@ fn a_live_mention_is_listed_once_until_the_next_first_page() {
         thread: None,
         reactions: Vec::new(),
         edited: false,
+        emoji_pictures: Vec::new(),
         files: Vec::new(),
     };
     let c = ConversationId::new("C1");
