@@ -376,3 +376,63 @@ fn the_sidebar_probes_log_flags_and_counts_never_names_or_ids() {
         }
     });
 }
+
+/// The status probes tell flags and counts only: whether the start bundle's own profile has a
+/// status (and an end), and how many of a lookup's profiles carry one, say none or do not say;
+/// never an emoji, a text, a time, a name or an id.
+#[test]
+fn the_status_probes_log_flags_and_counts_never_an_emoji_or_a_text() {
+    rt().block_on(async {
+        let path = scratch("status-probes");
+        let diag = Diag::to(path.clone());
+        let mut r = Run::new(diag.clone()).await;
+        let s = r.world.snapshot().clone();
+        let ws = s.workspaces[0].clone();
+        // Two peers with a status in the world (a standard emoji and a custom one), one without.
+        let peers: Vec<&str> = (s.users.iter())
+            .filter(|u| u.workspace == ws.id && u.id != ws.me && !u.bot)
+            .take(3)
+            .map(|u| u.id.as_str())
+            .collect();
+        let boot = json!({
+            "ok": true,
+            "self": {"id": ws.me.as_str(), "name": "me", "profile": {
+                "status_emoji": ":secretemoji:", "status_text": "secret status text",
+                "status_expiration": 1_999_999_999u64}},
+            "team": {"id": ws.id.as_str(), "name": "Team"},
+            "channels": [],
+            "ims": peers.iter().enumerate()
+                .map(|(i, p)| json!({"id": format!("DSECRET0{i}"), "user": p, "is_open": true}))
+                .collect::<Vec<_>>(),
+        });
+        r.fake.fail_next("client.userBoot", Fault::Answer(boot));
+        let Event::Booted(snapshot) = r.ask(Command::Boot).await else { panic!("booted") };
+        let me = snapshot.users.iter().find(|u| u.id == ws.me).unwrap();
+        let own = me.status.as_ref().expect("the bundle's own status");
+        assert_eq!((own.emoji.unsanitized(), own.expires), ("secretemoji", Some(1_999_999_999)));
+        let shown: Vec<_> = peers
+            .iter()
+            .map(|p| snapshot.users.iter().find(|u| u.id.as_str() == *p).and_then(|u| u.status.clone()))
+            .collect();
+        assert_eq!(shown.iter().filter(|s| s.is_some()).count(), 2, "{shown:?}");
+        diag.flush();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let _ = std::fs::remove_dir_all(path.parent().unwrap().parent().unwrap());
+        for want in [
+            " boot-shape field self-status present=y set=y expires=y",
+            // The two peers, and the user (looked up for a photo the bundle lacks); one says none.
+            " people field status n=3 empty=1 absent=0 no_profile=0",
+        ] {
+            assert!(text.lines().any(|l| l.ends_with(want)), "{want} in\n{text}");
+        }
+        let mut secrets = vec!["secretemoji".to_string(), "secret status".to_string(), "1999999999".to_string()];
+        for u in s.users.iter().filter(|u| u.status.is_some()) {
+            let status = u.status.as_ref().unwrap();
+            secrets.extend([status.emoji.unsanitized().to_string(), status.text.unsanitized().to_string()]);
+        }
+        secrets.extend(peers.iter().map(|p| p.to_string()));
+        for secret in secrets {
+            assert!(!text.contains(&secret), "`{secret}` in\n{text}");
+        }
+    });
+}
