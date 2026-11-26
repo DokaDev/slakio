@@ -163,3 +163,28 @@ fn a_profile_change_carries_the_person_s_record_or_is_left_out() {
         assert_eq!(of(&v), Frame::Other, "{v}");
     }
 }
+
+#[test]
+fn a_live_notice_is_a_system_message_and_an_unknown_one_is_plain() {
+    use slakio_core::model::System;
+    let Frame::Message { message, .. } = of(&json!({
+        "type": "message", "subtype": "channel_topic", "channel": "C1", "user": "U2",
+        "text": "set the channel topic: Deploys", "topic": "Deploys", "ts": "1700000000.000100"
+    })) else {
+        panic!("a notice")
+    };
+    assert_eq!(message.system.as_deref(), Some(&System::Topic(slakio_core::sanitize::Remote::new("Deploys"))));
+    let Frame::Message { message, .. } = of(&json!({
+        "type": "message", "subtype": "group_join", "channel": "G1", "user": "U2", "ts": "1700000001.000000"
+    })) else {
+        panic!("a join")
+    };
+    assert_eq!(message.system.as_deref(), Some(&System::Joined));
+    let Frame::Message { message, .. } = of(&json!({
+        "type": "message", "subtype": "something_new", "channel": "C1", "user": "U2", "text": "hi",
+        "ts": "1700000002.000000"
+    })) else {
+        panic!("a message")
+    };
+    assert_eq!(message.system, None);
+}

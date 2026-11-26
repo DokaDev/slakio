@@ -218,3 +218,45 @@ fn a_thumbnail_kept_on_another_host_is_none_when_read() {
     let good = format!("https://{}/files-tmb/T-F1/x_360.png", slakio_core::model::FILE_HOST);
     assert_eq!(unfiles(one, &pack(std::slice::from_ref(&good))).unwrap()[0].thumb, Some(good));
 }
+
+#[test]
+fn a_system_message_round_trips_and_an_old_row_has_none() {
+    let world = World::new(9);
+    let mut store = writer("msg-system");
+    let t = target(&world, "general");
+    let mut p = page(&world, &t, None, 16);
+    let kinds = [
+        System::Joined,
+        System::Left,
+        System::Topic(Remote::new("4:odd:topic")),
+        System::Purpose(Remote::new("")),
+        System::Renamed { old: Remote::new("old\u{1f}name"), new: Remote::new("new") },
+        System::Archived,
+        System::Unarchived,
+        System::Pinned,
+        System::Unpinned,
+        System::AppAdded,
+        System::AppRemoved,
+        System::MadePrivate,
+        System::MadePublic,
+    ];
+    for (m, s) in p.messages.iter_mut().zip(kinds) {
+        m.system = Some(Box::new(s));
+    }
+    assert!(p.messages.last().unwrap().system.is_none(), "one written message stays one");
+    store.put_page(&p, None, 1_000).unwrap();
+    assert_eq!(store.newest_page(&t, 16).unwrap().unwrap().messages, p.messages);
+    // A row kept before notices were (its column empty) is a written message.
+    store.conn.execute("UPDATE messages SET system = ''", []).unwrap();
+    assert!(store.newest_page(&t, 16).unwrap().unwrap().messages.iter().all(|m| m.system.is_none()));
+}
+
+#[test]
+fn a_notice_of_an_unknown_kind_is_a_written_message_not_damage() {
+    assert_eq!(unsystem(""), None);
+    assert_eq!(unsystem(&pack(&["huddle"])), None, "a kind a newer version wrote");
+    assert_eq!(unsystem(&pack(&["topic"])), None, "its text missing");
+    assert_eq!(unsystem(&pack(&["join", "x"])), None, "more than it carries");
+    assert_eq!(unsystem("9:x"), None, "not packed");
+    assert_eq!(unsystem(&system(Some(&System::Pinned))), Some(System::Pinned));
+}

@@ -16,7 +16,7 @@ use crate::db::Store;
 use crate::snapshot::{put_user, user};
 use rusqlite::{Row, params};
 use slakio_core::backend::Page;
-use slakio_core::model::{File, FileId, Message, Reaction, Target, ThreadSummary, Ts, UserId};
+use slakio_core::model::{File, FileId, Message, Reaction, System, Target, ThreadSummary, Ts, UserId};
 use slakio_core::sanitize::Remote;
 
 fn reactions(rs: &[Reaction]) -> String {
@@ -101,6 +101,51 @@ fn unfiles(text: &str, thumbs: &str) -> rusqlite::Result<Vec<File>> {
         .collect()
 }
 
+/// What a message tells as Slack's notice: its kind's code, then the texts it carries; empty
+/// for a message someone wrote.
+fn system(s: Option<&System>) -> String {
+    let parts: Vec<&str> = match s {
+        None => return String::new(),
+        Some(System::Joined) => vec!["join"],
+        Some(System::Left) => vec!["leave"],
+        Some(System::Topic(t)) => vec!["topic", t.unsanitized()],
+        Some(System::Purpose(t)) => vec!["purpose", t.unsanitized()],
+        Some(System::Renamed { old, new }) => vec!["name", old.unsanitized(), new.unsanitized()],
+        Some(System::Archived) => vec!["archive"],
+        Some(System::Unarchived) => vec!["unarchive"],
+        Some(System::Pinned) => vec!["pin"],
+        Some(System::Unpinned) => vec!["unpin"],
+        Some(System::AppAdded) => vec!["app_add"],
+        Some(System::AppRemoved) => vec!["app_remove"],
+        Some(System::MadePrivate) => vec!["private"],
+        Some(System::MadePublic) => vec!["public"],
+    };
+    pack(&parts)
+}
+
+/// The notice `text` keeps ([`system`]); one whose kind a newer version wrote, or that cannot be
+/// read, is none: the message shows as written, as before notices were kept.
+fn unsystem(text: &str) -> Option<System> {
+    let parts = unpack(text)?;
+    let text = |i: usize| Remote::new(parts.get(i).cloned().unwrap_or_default());
+    Some(match (parts.first()?.as_str(), parts.len()) {
+        ("join", 1) => System::Joined,
+        ("leave", 1) => System::Left,
+        ("topic", 2) => System::Topic(text(1)),
+        ("purpose", 2) => System::Purpose(text(1)),
+        ("name", 3) => System::Renamed { old: text(1), new: text(2) },
+        ("archive", 1) => System::Archived,
+        ("unarchive", 1) => System::Unarchived,
+        ("pin", 1) => System::Pinned,
+        ("unpin", 1) => System::Unpinned,
+        ("app_add", 1) => System::AppAdded,
+        ("app_remove", 1) => System::AppRemoved,
+        ("private", 1) => System::MadePrivate,
+        ("public", 1) => System::MadePublic,
+        _ => return None,
+    })
+}
+
 fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
     let thread = match (r.get::<_, Option<i64>>("replies")?, r.get::<_, Option<i64>>("last_reply")?) {
         (Some(n), Some(last)) => Some(ThreadSummary { replies: count(n)?, last_reply: Ts(uint(last)?) }),
@@ -114,6 +159,7 @@ fn message(r: &Row<'_>) -> rusqlite::Result<Message> {
         reactions: unreactions(&r.get::<_, String>("reactions")?)?,
         edited: r.get("edited")?,
         emoji_pictures: Vec::new(),
+        system: unsystem(&r.get::<_, String>("system")?).map(Box::new),
         files: unfiles(&r.get::<_, String>("files")?, &r.get::<_, String>("thumbs")?)?,
     })
 }
@@ -147,8 +193,8 @@ impl Store {
         for m in &page.messages {
             tx.execute(
                 "INSERT OR REPLACE INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited,
-                     files, thumbs)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                     files, thumbs, system)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     ws,
                     conv,
@@ -160,7 +206,8 @@ impl Store {
                     reactions(&m.reactions),
                     m.edited,
                     files(&m.files),
-                    thumbs(&m.files)
+                    thumbs(&m.files),
+                    system(m.system.as_deref())
                 ],
             )?;
         }

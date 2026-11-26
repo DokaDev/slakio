@@ -3,7 +3,8 @@
 
 use crate::wire;
 use slakio_core::model::{
-    EMOJI_PICTURES_MAX, File, FileId, Message, Org, Presence, Reaction, ThreadSummary, Ts, User, UserId, WorkspaceId,
+    EMOJI_PICTURES_MAX, File, FileId, Message, Org, Presence, Reaction, System, ThreadSummary, Ts, User, UserId,
+    WorkspaceId,
 };
 use slakio_core::sanitize::Remote;
 use std::collections::HashMap;
@@ -95,6 +96,7 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
         return None;
     }
     let ts = Ts(wire::ts(&m.ts)?);
+    let system = system(&m).map(Box::new);
     let thread = match (m.reply_count, m.latest_reply.as_deref().and_then(wire::ts)) {
         (Some(replies), Some(last)) if replies > 0 => Some(ThreadSummary { replies, last_reply: Ts(last) }),
         _ => None,
@@ -123,6 +125,31 @@ fn message(m: wire::Message, me: Option<&UserId>) -> Option<Message> {
         edited: m.edited.is_some(),
         files,
         emoji_pictures,
+        system,
+    })
+}
+
+/// What a notice of Slack's about the conversation tells, by its subtype (a public channel's
+/// `channel_*` or a private one's `group_*`); `None` for anything else, which shows as written.
+fn system(m: &wire::Message) -> Option<System> {
+    let text = |t: &Option<String>| Remote::new(t.clone().unwrap_or_default());
+    let subtype = m.subtype.as_deref()?;
+    let change = subtype.strip_prefix("channel_").or_else(|| subtype.strip_prefix("group_"));
+    Some(match (subtype, change) {
+        (_, Some("join")) => System::Joined,
+        (_, Some("leave")) => System::Left,
+        (_, Some("topic")) => System::Topic(text(&m.topic)),
+        (_, Some("purpose")) => System::Purpose(text(&m.purpose)),
+        (_, Some("name")) => System::Renamed { old: text(&m.old_name), new: text(&m.name) },
+        (_, Some("archive")) => System::Archived,
+        (_, Some("unarchive")) => System::Unarchived,
+        ("pinned_item", _) => System::Pinned,
+        ("unpinned_item", _) => System::Unpinned,
+        ("bot_add", _) => System::AppAdded,
+        ("bot_remove", _) => System::AppRemoved,
+        ("channel_convert_to_private", _) => System::MadePrivate,
+        ("channel_convert_to_public", _) => System::MadePublic,
+        _ => return None,
     })
 }
 

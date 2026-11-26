@@ -583,3 +583,64 @@ fn a_bot_s_picture_comes_from_its_icons_through_the_photo_checks() {
         assert!(!r.fake.log().into_iter().any(|l| l.method() == "users/info" && l.body.contains("BPROF")));
     });
 }
+
+#[test]
+fn system_subtypes_become_system_messages() {
+    use slakio_core::model::System;
+    use slakio_core::sanitize::Remote;
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        r.boot().await;
+        let target = r.target("deploys");
+        let cases: Vec<(&str, serde_json::Value, Option<System>)> = vec![
+            ("channel_join", json!({}), Some(System::Joined)),
+            ("group_join", json!({}), Some(System::Joined)),
+            ("channel_leave", json!({}), Some(System::Left)),
+            ("group_leave", json!({}), Some(System::Left)),
+            ("channel_topic", json!({"topic": "Deploy days"}), Some(System::Topic(Remote::new("Deploy days")))),
+            ("group_topic", json!({"topic": 7}), Some(System::Topic(Remote::new("")))),
+            ("channel_purpose", json!({"purpose": "Ship it"}), Some(System::Purpose(Remote::new("Ship it")))),
+            ("group_purpose", json!({"purpose": "Quiet"}), Some(System::Purpose(Remote::new("Quiet")))),
+            (
+                "channel_name",
+                json!({"old_name": "deploy", "name": "deploys"}),
+                Some(System::Renamed { old: Remote::new("deploy"), new: Remote::new("deploys") }),
+            ),
+            (
+                "group_name",
+                json!({"name": "ops"}),
+                Some(System::Renamed { old: Remote::new(""), new: Remote::new("ops") }),
+            ),
+            ("channel_archive", json!({}), Some(System::Archived)),
+            ("group_archive", json!({}), Some(System::Archived)),
+            ("channel_unarchive", json!({}), Some(System::Unarchived)),
+            ("group_unarchive", json!({}), Some(System::Unarchived)),
+            ("pinned_item", json!({}), Some(System::Pinned)),
+            ("unpinned_item", json!({}), Some(System::Unpinned)),
+            ("bot_add", json!({}), Some(System::AppAdded)),
+            ("bot_remove", json!({}), Some(System::AppRemoved)),
+            ("channel_convert_to_private", json!({}), Some(System::MadePrivate)),
+            ("channel_convert_to_public", json!({}), Some(System::MadePublic)),
+            // Anything else shows as written.
+            ("channel_posting_permissions", json!({}), None),
+            ("thread_broadcast", json!({}), None),
+            ("bot_message", json!({}), None),
+        ];
+        let messages: Vec<serde_json::Value> = cases
+            .iter()
+            .enumerate()
+            .map(|(i, (subtype, extra, _))| {
+                let mut v = json!({"type": "message", "ts": format!("{}.000000", 1_700_000_900 - i),
+                    "user": "UDEMOA001", "text": format!("<@UDEMOA001> {subtype}"), "subtype": subtype});
+                v.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+                v
+            })
+            .collect();
+        r.fake.fail_next("conversations.history", Fault::Answer(json!({"ok": true, "messages": messages})));
+        let p = r.page(&target, Some(Ts(1_700_001_000_000_000))).await;
+        let got: Vec<Option<System>> = p.messages.iter().rev().map(|m| m.system.as_deref().cloned()).collect();
+        let want: Vec<Option<System>> = cases.into_iter().map(|(_, _, s)| s).collect();
+        assert_eq!(got, want);
+        assert!(p.messages.iter().all(|m| m.user.as_str() == "UDEMOA001"), "by the one who did it");
+    });
+}

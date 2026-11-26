@@ -390,42 +390,16 @@ pub struct Message {
     /// The picture a bot's message is posted with, when it is given for the message itself.
     #[serde(default, deserialize_with = "loose")]
     pub icons: Option<Icons>,
-}
-
-/// The bot that posted a message: its team and its picture.
-#[derive(Debug, Default, Deserialize)]
-pub struct BotProfile {
-    pub team_id: Option<String>,
+    /// What a notice of a conversation's change carries: the topic or description set, the
+    /// name it was given and the one it had.
     #[serde(default, deserialize_with = "loose")]
-    pub icons: Option<Icons>,
-}
-
-/// A bot's picture in its sizes (pixels square); each field that cannot be read is none.
-#[derive(Debug, Default, Deserialize)]
-pub struct Icons {
+    pub topic: Option<String>,
     #[serde(default, deserialize_with = "loose")]
-    pub image_72: Option<String>,
+    pub purpose: Option<String>,
     #[serde(default, deserialize_with = "loose")]
-    pub image_48: Option<String>,
+    pub name: Option<String>,
     #[serde(default, deserialize_with = "loose")]
-    pub image_132: Option<String>,
-    #[serde(default, deserialize_with = "loose")]
-    pub image_230: Option<String>,
-    #[serde(default, deserialize_with = "loose")]
-    pub image_64: Option<String>,
-    #[serde(default, deserialize_with = "loose")]
-    pub image_36: Option<String>,
-}
-
-impl Icons {
-    /// The picture, as a profile photo's ([`Profile::photo`]): the first of 72 and 48 pixels,
-    /// the larger ones, the smaller ones, on an avatar host
-    /// ([`slakio_core::images::avatar_address`]).
-    pub fn photo(&self) -> Option<String> {
-        [&self.image_72, &self.image_48, &self.image_132, &self.image_230, &self.image_64, &self.image_36]
-            .into_iter()
-            .find_map(|i| i.as_deref().and_then(slakio_core::images::avatar_address))
-    }
+    pub old_name: Option<String>,
 }
 
 /// A file shared with a message: what its card shows, and where it is downloaded from.
@@ -586,7 +560,9 @@ pub struct MessagesList {
     pub messages_data: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+mod icons;
 mod stamps;
+pub use icons::{BotProfile, Icons};
 pub use stamps::{ts, updated};
 
 #[cfg(test)]

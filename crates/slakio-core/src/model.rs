@@ -299,6 +299,51 @@ pub struct Message {
     /// and its address on the emoji host, at most [`EMOJI_PICTURES_MAX`]. Drawn only for a name
     /// the workspace's own list lacks.
     pub emoji_pictures: Vec<(Remote, String)>,
+    /// What it tells, when it is one of Slack's notices of what happened in the conversation
+    /// (someone joined, the topic was set) rather than something someone wrote. Boxed: most
+    /// messages are not one, and a message travels inside the backend's events.
+    pub system: Option<Box<System>>,
+}
+
+/// A notice of Slack's about the conversation, by the message's author; the texts it carries
+/// (a topic, a description, the names of a rename) as that author gave them (`T`: as they came,
+/// or as the screen has them once sanitised, [`System::map`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum System<T = Remote> {
+    Joined,
+    Left,
+    Topic(T),
+    Purpose(T),
+    Renamed { old: T, new: T },
+    Archived,
+    Unarchived,
+    Pinned,
+    Unpinned,
+    AppAdded,
+    AppRemoved,
+    MadePrivate,
+    MadePublic,
+}
+
+impl<T> System<T> {
+    /// The same notice with each text it carries made `f` of it.
+    pub fn map<U>(&self, f: impl Fn(&T) -> U) -> System<U> {
+        match self {
+            Self::Joined => System::Joined,
+            Self::Left => System::Left,
+            Self::Topic(t) => System::Topic(f(t)),
+            Self::Purpose(t) => System::Purpose(f(t)),
+            Self::Renamed { old, new } => System::Renamed { old: f(old), new: f(new) },
+            Self::Archived => System::Archived,
+            Self::Unarchived => System::Unarchived,
+            Self::Pinned => System::Pinned,
+            Self::Unpinned => System::Unpinned,
+            Self::AppAdded => System::AppAdded,
+            Self::AppRemoved => System::AppRemoved,
+            Self::MadePrivate => System::MadePrivate,
+            Self::MadePublic => System::MadePublic,
+        }
+    }
 }
 
 /// The most emoji addresses one message carries ([`Message::emoji_pictures`]).

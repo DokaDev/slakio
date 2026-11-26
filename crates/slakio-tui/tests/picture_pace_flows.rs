@@ -74,6 +74,7 @@ fn open(
             reactions: Vec::new(),
             edited: false,
             emoji_pictures: Vec::new(),
+            system: None,
             files: Vec::new(),
         })
         .collect();

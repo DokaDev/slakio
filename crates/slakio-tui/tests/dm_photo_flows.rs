@@ -573,6 +573,7 @@ fn crowded(w: u16, h: u16, extra: usize) -> (Scripted, Vec<slakio_core::model::U
             reactions: Vec::new(),
             edited: false,
             emoji_pictures: Vec::new(),
+            system: None,
             files: Vec::new(),
         })
         .collect();

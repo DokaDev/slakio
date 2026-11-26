@@ -100,6 +100,9 @@ pub const MIGRATIONS: &[&str] = &[
     // 8: whether a person's photo is slakio's guess at its 72-pixel copy (1) or an address Slack
     // gave (0); kept before: a guess, the weakest.
     "ALTER TABLE users ADD COLUMN avatar_guessed INTEGER NOT NULL DEFAULT 1;",
+    // 9: what a notice of Slack's about the conversation tells (packed: its kind's code, then
+    // the texts it carries; '' for a message someone wrote); kept before: written.
+    "ALTER TABLE messages ADD COLUMN system TEXT NOT NULL DEFAULT '';",
 ];
 
 /// Where a database stands against `migrations`.

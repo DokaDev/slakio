@@ -80,6 +80,7 @@ fn open_with(
             reactions: reactions.iter().map(|r| Reaction { name: Remote::new(*r), count: 2, mine: false }).collect(),
             edited: false,
             emoji_pictures: given.clone(),
+            system: None,
             files: Vec::new(),
         })
         .collect();

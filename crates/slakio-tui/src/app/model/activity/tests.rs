@@ -70,6 +70,7 @@ fn a_live_mention_is_listed_once_until_the_next_first_page() {
         reactions: Vec::new(),
         edited: false,
         emoji_pictures: Vec::new(),
+        system: None,
         files: Vec::new(),
     };
     let c = ConversationId::new("C1");

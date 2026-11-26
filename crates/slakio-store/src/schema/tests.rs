@@ -173,3 +173,18 @@ fn a_photo_kept_before_guesses_were_told_apart_counts_as_a_guess() {
     let guessed: bool = conn.query_row("SELECT avatar_guessed FROM users", [], |r| r.get(0)).unwrap();
     assert!(guessed, "unknown is the weakest");
 }
+
+#[test]
+fn a_message_kept_before_notices_were_is_a_written_one() {
+    let mut conn = memory();
+    migrate(&mut conn, &MIGRATIONS[..8]).unwrap();
+    conn.execute(
+        "INSERT INTO messages (workspace, conversation, ts, user, text, replies, last_reply, reactions, edited, files)
+         VALUES ('T', 'C', 1, 'U', 'old', NULL, NULL, '', 0, '')",
+        [],
+    )
+    .unwrap();
+    migrate(&mut conn, MIGRATIONS).unwrap();
+    let system: String = conn.query_row("SELECT system FROM messages", [], |r| r.get(0)).unwrap();
+    assert_eq!(system, "");
+}

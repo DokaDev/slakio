@@ -94,6 +94,9 @@ pub struct Shown {
     pub files: Vec<slakio_core::model::File>,
     /// The emoji addresses it gives, by name ([`Message::emoji_pictures`]).
     pub emoji_pictures: Vec<(String, String)>,
+    /// What it tells when it is Slack's notice about the conversation (its texts sanitised):
+    /// drawn as one quiet line ([`crate::ui::timeline::system`]).
+    pub system: Option<slakio_core::model::System<Safe>>,
 }
 
 impl Shown {
@@ -116,6 +119,7 @@ impl Shown {
             edited: m.edited,
             emoji_pictures: m.emoji_pictures.iter().map(|(n, a)| (n.line().as_str().to_string(), a.clone())).collect(),
             files: m.files.clone(),
+            system: m.system.as_deref().map(|s| s.map(slakio_core::sanitize::Remote::line)),
         }
     }
 }
@@ -425,6 +429,7 @@ pub fn echo(items: &mut Vec<Shown>, user: UserId, author: Safe, text: Safe) {
         reactions: Vec::new(),
         edited: false,
         emoji_pictures: Vec::new(),
+        system: None,
         files: Vec::new(),
     });
 }

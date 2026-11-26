@@ -277,6 +277,7 @@ fn the_picker_marks_a_slack_link_and_picking_it_opens_it_here() {
             reactions: Vec::new(),
             edited: false,
             emoji_pictures: Vec::new(),
+            system: None,
             files: Vec::new(),
         });
         s.b.push(e);

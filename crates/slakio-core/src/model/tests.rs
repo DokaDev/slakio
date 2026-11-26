@@ -50,3 +50,14 @@ fn muted_channels_badge_mentions_only_and_muted_dms_nothing() {
     assert_eq!(c(ConversationKind::GroupDm { users: vec![] }, true).badges(), (0, 0));
     assert_eq!(c(ConversationKind::Dm { user: UserId::new("U1") }, false).badges(), (5, 2));
 }
+
+#[test]
+fn a_notice_maps_only_the_texts_it_carries() {
+    use super::System;
+    let renamed: System = System::Renamed { old: Remote::new("a\u{1b}[2J"), new: Remote::new("b") };
+    let shown = renamed.map(Remote::line);
+    let old = Remote::new("a\u{1b}[2J").line().as_str().to_string();
+    assert!(!old.contains('\u{1b}'), "sanitised: {old:?}");
+    assert_eq!(shown.map(|s| s.as_str().to_string()), System::Renamed { old, new: "b".to_string() });
+    assert_eq!(System::<Remote>::Joined.map(Remote::line), System::Joined);
+}

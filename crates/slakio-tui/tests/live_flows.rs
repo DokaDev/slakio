@@ -34,6 +34,7 @@ fn message(ts: u64, user: &UserId, text: &str) -> Message {
         reactions: Vec::new(),
         edited: false,
         emoji_pictures: Vec::new(),
+        system: None,
         files: Vec::new(),
     }
 }
