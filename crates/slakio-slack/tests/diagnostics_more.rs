@@ -419,3 +419,37 @@ fn two_history_pages_give_the_page_probes_once() {
         assert!(text.matches("external_users count=0").count() <= 1, "none of another workspace told once:\n{text}");
     });
 }
+
+/// Every view page tells the people of another workspace it brings; its reactions only the
+/// first view page of the run.
+#[test]
+fn every_view_page_gives_the_people_probe_and_the_first_the_reactions() {
+    rt().block_on(async {
+        let mut r = Run::new("probes-view", None).await;
+        let Event::Booted(b) = r.ask(Command::Boot).await else { panic!("booted") };
+        let me = b.workspaces[0].me.as_str().to_string();
+        let view = json!({
+            "ok": true,
+            "history": {"messages": [{"type": "message", "user": me, "text": "hi", "ts": "1767603600.000100",
+                "reactions": [{"name": "wave", "count": 1, "users": [me]}]}], "has_more": false},
+            "users": [{"id": "UPARTNER1", "team_id": "TPARTNER", "name": "partner.person",
+                "profile": {"display_name": "Partner Person", "team": "TPARTNER"}}],
+        });
+        for _ in 0..2 {
+            r.fake.fail_next("conversations.view", Fault::Answer(view.clone()));
+            assert!(matches!(
+                r.ask(Command::History { target: general(), before: None, limit: 20 }).await,
+                Event::History(_)
+            ));
+        }
+        let text = r.text();
+        for line in ["team-shape counted external_users count=1", "team-shape field external_user_key name=team_id"] {
+            assert_eq!(text.matches(line).count(), 2, "`{line}` for each view page in\n{text}");
+        }
+        for line in
+            ["reaction-shape counted url_on_reaction count=0 page=view", "reaction-shape field reaction_key name=name"]
+        {
+            assert_eq!(text.matches(line).count(), 1, "`{line}` once in\n{text}");
+        }
+    });
+}

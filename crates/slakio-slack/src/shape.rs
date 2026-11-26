@@ -125,8 +125,8 @@ pub(crate) fn sending(diag: &Diag, method: Method, signed_in: bool) {
 
 /// An answer to `method` came off the wire: its status (and Slack's `ok` and error code) for
 /// `emoji.list`, the shape of `client.userBoot`, of the team and of other workspaces' people
-/// (`team`: the workspace signed in to, when known), of the reactions of the first page of each
-/// kind.
+/// (of every lookup and view page; `team`: the workspace signed in to, when known), of the
+/// reactions of the first page of each kind.
 pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw, team: Option<&str>) {
     if !diag.on() {
         return;
@@ -165,16 +165,19 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw, team: Option<&str
                 Method::ConversationsReplies => "replies",
                 _ => "view",
             };
-            // Told for the first page of each kind of the run only.
-            if !diag.first(Kind::ReactionShape, Stage::Counted, page) {
+            // The reactions are told for the first page of each kind of the run only.
+            let reactions = diag.first(Kind::ReactionShape, Stage::Counted, page);
+            if !reactions && method != Method::ConversationsView {
                 return;
             }
             let v: Value = serde_json::from_slice(&raw.body).unwrap_or_default();
-            let messages = match method {
-                Method::ConversationsView => v.get("history").and_then(|h| h.get("messages")),
-                _ => v.get("messages"),
-            };
-            probe::reactions(diag, messages.and_then(Value::as_array).map_or(&[], Vec::as_slice), page);
+            if reactions {
+                let messages = match method {
+                    Method::ConversationsView => v.get("history").and_then(|h| h.get("messages")),
+                    _ => v.get("messages"),
+                };
+                probe::reactions(diag, messages.and_then(Value::as_array).map_or(&[], Vec::as_slice), page);
+            }
             if method == Method::ConversationsView {
                 probe::people(diag, v.get("users").and_then(Value::as_array).into_iter().flatten(), team);
             }
