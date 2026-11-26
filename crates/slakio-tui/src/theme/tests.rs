@@ -460,6 +460,33 @@ fn reaction_chips_are_quiet_pills_with_readable_counts() {
     }
 }
 
+/// The user's own chip on a selected row, as drawn: its fill stands off the selection as well
+/// as the background ([`super::reactions::CHIP_APART`]), the emoji's body text reads 4.5:1 on
+/// it and the count 3:1.
+#[test]
+fn the_users_own_chip_stands_out_on_a_selected_row() {
+    for t in truecolor() {
+        let n = &t.name;
+        let area = Rect::new(0, 0, 8, 1);
+        let mut buf = Buffer::empty(area);
+        buf.set_style(area, t.base());
+        let look = t.reaction_chip(true);
+        buf.set_string(1, 0, "ab", look.body);
+        buf.set_string(3, 0, " 2", look.count);
+        t.paint_selection(&mut buf, area, Selection::Focused);
+        assert_eq!(buf[(0, 0)].bg, t.selection, "{n}: the row takes the bar");
+        let (body, count) = (&buf[(1, 0)], &buf[(4, 0)]);
+        let fill = body.bg;
+        assert_eq!(count.bg, fill, "{n}");
+        for (what, on) in [("the selection", t.selection), ("the background", t.bg)] {
+            let k = contrast(fill, on);
+            assert!(k >= 1.15, "{n}: own chip {fill:?} on {what} {on:?} {k:.2}");
+        }
+        assert!(contrast(body.fg, fill) >= 4.5, "{n}: text {:.2}", contrast(body.fg, fill));
+        assert!(contrast(count.fg, fill) >= 3.0, "{n}: count {:.2}", contrast(count.fg, fill));
+    }
+}
+
 /// In every theme, NO_COLOR too, markup reads apart: a link is underlined (a person named is
 /// bold, never underlined); code is in another color than a mention of the user (or keeps its
 /// backticks where nothing tints it); code's tint is not the background.
