@@ -124,14 +124,19 @@ pub fn list_parts(list: Rect, nav: u16) -> ListParts {
 /// The most lines a composer shows before it scrolls.
 pub const COMPOSER_MAX_LINES: u16 = 5;
 
-/// How the auto thread panel shares the work area with the conversation: two fifths, 34 to 60
-/// cells, while the conversation keeps [`MAIN_MIN`]; where both do not fit, the pane with the
-/// keyboard takes the whole area.
+/// How the auto thread panel first shares the work area with the conversation: two fifths, 34
+/// to 60 cells, while the conversation keeps [`MAIN_MIN`]; where both do not fit, the pane with
+/// the keyboard takes the whole area. Once the user resizes it, it takes [`THREAD_FREE`]'s
+/// bounds instead.
 pub const THREAD_SHARE: Share = Share { num: 2, den: 5, min: 34, max: 60, keep: MAIN_MIN };
 
 /// The least room a pane split off another keeps: its border, a few messages and its composer.
 pub const PANE_MIN_WIDTH: u16 = 24;
 pub const PANE_MIN_HEIGHT: u16 = 8;
+
+/// The bounds of a thread panel the user resized: no most, while the conversation keeps
+/// [`PANE_MIN_WIDTH`].
+pub const THREAD_FREE: Share = Share { num: 2, den: 5, min: 34, max: u16::MAX, keep: PANE_MIN_WIDTH };
 
 /// How the user's splits share their room: a split along `dir` whose sides hold `first` and
 /// `second` panes that way gives each pane the same room, never under the least a pane keeps;
@@ -143,10 +148,18 @@ pub fn split_share(dir: Dir, first: u16, second: u16) -> Share {
     Share { num: second, den: first.saturating_add(second), min, max: u16::MAX, keep }
 }
 
-/// A share a pane's auto thread panel has beside it (as [`THREAD_SHARE`] made it, however far it
-/// was resized since): it gives way where the two do not fit, and evening the room puts it back.
+/// A share a pane's auto thread panel has beside it (as [`THREAD_SHARE`] made it, or
+/// [`THREAD_FREE`] once resized, however far): it gives way where the two do not fit, and evening
+/// the room puts it back. A [`split_share`] is never one: its least sizes are multiples of
+/// [`PANE_MIN_WIDTH`] or [`PANE_MIN_HEIGHT`].
 pub fn is_thread_share(s: &Share) -> bool {
-    (s.min, s.max, s.keep) == (THREAD_SHARE.min, THREAD_SHARE.max, THREAD_SHARE.keep)
+    [THREAD_SHARE, THREAD_FREE].iter().any(|t| (s.min, s.max, s.keep) == (t.min, t.max, t.keep))
+}
+
+/// The bounds a split takes when the user resizes it: a thread panel's are freed
+/// ([`THREAD_FREE`]); any other split keeps its own.
+pub fn free_thread(s: &Share) -> Option<Share> {
+    is_thread_share(s).then_some(THREAD_FREE)
 }
 
 /// The least room a pane keeps along `dir`.

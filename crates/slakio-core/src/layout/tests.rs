@@ -83,6 +83,11 @@ fn never(_: &Share) -> bool {
     false
 }
 
+/// No split's least sizes or most are freed.
+fn fixed(_: &Share) -> Option<Share> {
+    None
+}
+
 #[test]
 fn fitted_shares_need_what_their_sides_hold() {
     // 1 | (2 | 3): the outer split's second side needs two panes' room.
@@ -138,20 +143,20 @@ fn seams_are_the_last_line_of_each_first_side() {
 fn a_seam_dragged_moves_within_the_least_sizes() {
     let t = three().fitted(&never, &least);
     let a = area(80, 20);
-    let moved = t.drag(a, None, PaneId(2), 7 + 59).expect("moves");
+    let moved = t.drag(a, None, PaneId(2), 7 + 59, &fixed).expect("moves");
     let w: Vec<u16> = moved.solve(a, None).iter().map(|(_, r)| r.width).collect();
     assert_eq!(w, vec![60, 20, 20]);
     assert_eq!(moved.seams(a, None)[0].at, 7 + 59);
     // As far as the right side keeps its least.
-    let far = t.drag(a, None, PaneId(2), 200).unwrap();
+    let far = t.drag(a, None, PaneId(2), 200, &fixed).unwrap();
     assert_eq!(far.solve(a, None)[0].1.width, 76);
-    let near = t.drag(a, None, PaneId(2), 0).unwrap();
+    let near = t.drag(a, None, PaneId(2), 0, &fixed).unwrap();
     assert_eq!(near.solve(a, None)[0].1.width, 4);
     // Rows the same way; a seam not laid out, or not moved, changes nothing.
-    let down = t.drag(a, None, PaneId(3), 3 + 4).unwrap();
+    let down = t.drag(a, None, PaneId(3), 3 + 4, &fixed).unwrap();
     assert_eq!(down.solve(a, None)[1].1.height, 5);
-    assert_eq!(t.drag(a, None, PaneId(9), 10), None);
-    assert_eq!(t.drag(a, None, PaneId(2), 7 + 39), None);
+    assert_eq!(t.drag(a, None, PaneId(9), 10, &fixed), None);
+    assert_eq!(t.drag(a, None, PaneId(2), 7 + 39, &fixed), None);
 }
 
 #[test]
@@ -160,17 +165,38 @@ fn a_pane_resized_takes_room_from_the_nearest_split_that_way() {
     let a = area(80, 20);
     let width = |n: &Node, id: u64| n.solve(a, None).into_iter().find(|(p, _)| p.0 == id).unwrap().1;
     // 2 is the second side: wider moves the seam left; 1 is the first: wider moves it right.
-    let got = t.resize(a, None, PaneId(2), Dir::Row, 4).unwrap();
+    let got = t.resize(a, None, PaneId(2), Dir::Row, 4, &fixed).unwrap();
     assert_eq!((width(&got, 1).width, width(&got, 2).width), (36, 44));
-    let got = t.resize(a, None, PaneId(1), Dir::Row, 4).unwrap();
+    let got = t.resize(a, None, PaneId(1), Dir::Row, 4, &fixed).unwrap();
     assert_eq!((width(&got, 1).width, width(&got, 2).width), (44, 36));
-    let got = t.resize(a, None, PaneId(2), Dir::Column, -2).unwrap();
+    let got = t.resize(a, None, PaneId(2), Dir::Column, -2, &fixed).unwrap();
     assert_eq!((width(&got, 2).height, width(&got, 3).height), (8, 12));
     // No split that way around it, or none that can give: nothing.
-    assert_eq!(t.resize(a, None, PaneId(1), Dir::Column, 2), None);
-    assert_eq!(t.resize(a, None, PaneId(1), Dir::Row, 500).map(|n| width(&n, 1).width), Some(76));
-    let full = t.resize(a, None, PaneId(1), Dir::Row, 500).unwrap();
-    assert_eq!(full.resize(a, None, PaneId(1), Dir::Row, 4), None);
+    assert_eq!(t.resize(a, None, PaneId(1), Dir::Column, 2, &fixed), None);
+    assert_eq!(t.resize(a, None, PaneId(1), Dir::Row, 500, &fixed).map(|n| width(&n, 1).width), Some(76));
+    let full = t.resize(a, None, PaneId(1), Dir::Row, 500, &fixed).unwrap();
+    assert_eq!(full.resize(a, None, PaneId(1), Dir::Row, 4, &fixed), None);
+}
+
+#[test]
+fn a_freed_share_grows_past_its_max_until_the_first_side_keeps_the_freed_keep() {
+    let freed = Share { max: u16::MAX, keep: 24, ..THREAD };
+    let free = |s: &Share| (*s == THREAD).then_some(freed);
+    let a = area(164, 30);
+    let got = beside().resize(a, None, PaneId(2), Dir::Row, 200, &free).unwrap();
+    let widths: Vec<u16> = got.solve(a, None).iter().map(|(_, r)| r.width).collect();
+    assert_eq!(widths, vec![24, 140]);
+    // The share keeps the freed bounds, so it grows (and shrinks) freely from then on.
+    let Node::Split { share, .. } = &got else { panic!("a split") };
+    assert_eq!((share.min, share.max, share.keep), (34, u16::MAX, 24));
+    let back = got.resize(a, None, PaneId(2), Dir::Row, -10, &fixed).unwrap();
+    assert_eq!(back.solve(a, None)[1].1.width, 130);
+    // Not freed: already at its max of 60, it grows no more.
+    assert_eq!(beside().solve(a, None)[1].1.width, 60);
+    assert_eq!(beside().resize(a, None, PaneId(2), Dir::Row, 200, &fixed), None);
+    // Dragging frees it the same way.
+    let dragged = beside().drag(a, None, PaneId(2), 7, &free).unwrap();
+    assert_eq!(dragged.solve(a, None)[0].1.width, 24);
 }
 
 proptest! {
@@ -184,9 +210,9 @@ proptest! {
         let leaves = t.leaves();
         let pane = leaves[pick % leaves.len()];
         let dir = if row { Dir::Row } else { Dir::Column };
-        let mut changed = vec![t.resize(a, None, pane, dir, by)];
+        let mut changed = vec![t.resize(a, None, pane, dir, by, &fixed)];
         if let Some(s) = t.seams(a, None).get(pick % 3) {
-            changed.push(t.drag(a, None, s.id, s.at.wrapping_add(by as u16)));
+            changed.push(t.drag(a, None, s.id, s.at.wrapping_add(by as u16), &fixed));
         }
         for n in changed.into_iter().flatten() {
             prop_assert_eq!(n.leaves(), t.leaves());

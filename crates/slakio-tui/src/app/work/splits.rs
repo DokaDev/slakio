@@ -98,16 +98,17 @@ impl Work {
     }
 
     /// The panes of the tab shown share its room evenly (a thread panel gets its first share
-    /// back beside its pane). `Some(false)` when there is nothing to even: one pane (with its
-    /// thread panel, or not); `None` with no tab.
+    /// back beside its pane). `Some(false)` when there is nothing to even: one pane, alone or
+    /// with a thread panel never resized; `None` with no tab.
     pub fn equalize(&mut self) -> Option<bool> {
         let panes = self.ids().into_iter().filter(|id| self.owner(*id).is_none()).count();
         let tab = self.tabs_mut().current_tab_mut()?;
-        if panes < 2 {
+        let panel = |s: &slakio_core::layout::Share| screen::is_thread_share(s).then_some(THREAD_SHARE);
+        let root = screen::fitted(&tab.root.equalized(&panel, &split_share));
+        if panes < 2 && root == tab.root {
             return Some(false);
         }
-        let panel = |s: &slakio_core::layout::Share| screen::is_thread_share(s).then_some(THREAD_SHARE);
-        tab.root = screen::fitted(&tab.root.equalized(&panel, &split_share));
+        tab.root = root;
         Some(true)
     }
 
@@ -127,7 +128,10 @@ impl Work {
     pub fn resize(&mut self, work: Rect, dir: Dir, by: i32) -> bool {
         let (Some(active), false) = (self.active(), self.zoomed()) else { return false };
         let Some(tab) = self.tabs_mut().current_tab_mut() else { return false };
-        let Some(root) = tab.root.resize(screen::work_area(work), Some(active), active, dir, by) else { return false };
+        let Some(root) = tab.root.resize(screen::work_area(work), Some(active), active, dir, by, &screen::free_thread)
+        else {
+            return false;
+        };
         tab.root = root;
         true
     }
@@ -146,7 +150,9 @@ impl Work {
             return false;
         }
         let Some(tab) = self.tabs_mut().current_tab_mut() else { return false };
-        let Some(root) = tab.root.drag(screen::work_area(work), active, id, at) else { return false };
+        let Some(root) = tab.root.drag(screen::work_area(work), active, id, at, &screen::free_thread) else {
+            return false;
+        };
         tab.root = root;
         true
     }

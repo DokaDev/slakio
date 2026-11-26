@@ -156,7 +156,9 @@ images, and settings. This README only lists what works; it will grow with each 
     or closing it shows every pane), `Space w >` / `<` / `+` / `-` make the pane wider,
     narrower, taller or shorter (`:resize >N`, `<N`, `+N`, `-N` by N cells), a border
     dragged with the mouse moves (pressed where two borders meet, the one that runs across
-    moves), `Space w =` (`:equalize`) evens the room, `Ctrl+W` closes the
+    moves); a thread panel opens at two fifths of the room (at most 60 columns) and, resized,
+    grows until the conversation beside it keeps 24; `Space w =` (`:equalize`) evens the room
+    (a thread panel back to its first width), `Ctrl+W` closes the
     pane (the keyboard goes to the pane that takes its room). Panes side by side share one
     border. Each pane keeps its own selection and history;
   - the tabs (their order, names and the one shown), each tab's splits and sizes, what each

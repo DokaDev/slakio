@@ -260,22 +260,24 @@ impl Node {
     }
 
     /// The tree with the split at `path` giving its second side `len` of `total` cells, kept
-    /// within its `min`, `max` and `keep`; `None` when that changes nothing.
-    fn with_len(&self, path: &[bool], total: u16, len: i32) -> Option<Node> {
+    /// within its `min`, `max` and `keep` (or those of the share `free` gives in its place, which
+    /// it keeps from then on); `None` when that changes nothing.
+    fn with_len(&self, path: &[bool], total: u16, len: i32, free: &impl Fn(&Share) -> Option<Share>) -> Option<Node> {
         let Self::Split { dir, share, first, second } = self else { return None };
         let Some((side, rest)) = path.split_first() else {
-            let top = i32::from(share.max.max(share.min)).min(i32::from(total) - i32::from(share.keep));
-            let len = len.min(top).max(i32::from(share.min));
+            let bounds = free(share).unwrap_or(*share);
+            let top = i32::from(bounds.max.max(bounds.min)).min(i32::from(total) - i32::from(bounds.keep));
+            let len = len.min(top).max(i32::from(bounds.min));
             let old = cut(*dir, share, Area { width: total, height: total, ..Area::default() });
             if total == 0 || len < 0 || old.is_some_and(|(_, b)| i32::from(along(*dir, b)) == len) {
                 return None;
             }
-            let share = Share { num: len as u16, den: total, ..*share };
+            let share = Share { num: len as u16, den: total, min: bounds.min, max: bounds.max, keep: bounds.keep };
             return Some(Self::Split { dir: *dir, share, first: first.clone(), second: second.clone() });
         };
         Some(match side {
-            false => Self::split(*dir, *share, first.with_len(rest, total, len)?, (**second).clone()),
-            true => Self::split(*dir, *share, (**first).clone(), second.with_len(rest, total, len)?),
+            false => Self::split(*dir, *share, first.with_len(rest, total, len, free)?, (**second).clone()),
+            true => Self::split(*dir, *share, (**first).clone(), second.with_len(rest, total, len, free)?),
         })
     }
 
@@ -307,8 +309,16 @@ impl Node {
     }
 
     /// The tree with seam `id` ([`Seam::id`]) moved to column (row) `at`, as far as the split's
-    /// least sizes let it; `None` when it does not move (or is not laid out in `area`).
-    pub fn drag(&self, area: Area, focused: Option<PaneId>, id: PaneId, at: u16) -> Option<Node> {
+    /// least sizes let it (those `free` gives a split in place of its own, as in
+    /// [`Node::resize`]); `None` when it does not move (or is not laid out in `area`).
+    pub fn drag(
+        &self,
+        area: Area,
+        focused: Option<PaneId>,
+        id: PaneId,
+        at: u16,
+        free: &impl Fn(&Share) -> Option<Share>,
+    ) -> Option<Node> {
         let (path, a, _) = self
             .laid_splits(area, focused)
             .into_iter()
@@ -319,13 +329,23 @@ impl Node {
             Dir::Column => (a.y, a.height),
         };
         let len = i32::from(start) + i32::from(total) - i32::from(at) - 1;
-        self.with_len(&path, total, len)
+        self.with_len(&path, total, len, free)
     }
 
     /// The tree with pane `pane` given `by` cells more along `dir` (fewer, below zero), laid out
     /// in `area`: of the splits that way around it with both sides shown, the nearest that can
-    /// give or take that room does, as far as its least sizes let it. `None` when none can.
-    pub fn resize(&self, area: Area, focused: Option<PaneId>, pane: PaneId, dir: Dir, by: i32) -> Option<Node> {
+    /// give or take that room does, as far as its least sizes let it. A split `free` gives a
+    /// share for takes that share's least sizes and most instead of its own, and keeps them.
+    /// `None` when none can.
+    pub fn resize(
+        &self,
+        area: Area,
+        focused: Option<PaneId>,
+        pane: PaneId,
+        dir: Dir,
+        by: i32,
+        free: &impl Fn(&Share) -> Option<Share>,
+    ) -> Option<Node> {
         let mut splits = self.laid_splits(area, focused);
         splits.reverse();
         splits.into_iter().find_map(|(path, a, len)| {
@@ -334,7 +354,7 @@ impl Node {
                 return None;
             }
             let by = if first.contains(pane) { -by } else { by };
-            self.with_len(&path, along(dir, a), i32::from(len) + by)
+            self.with_len(&path, along(dir, a), i32::from(len) + by, free)
         })
     }
 }
