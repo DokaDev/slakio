@@ -1,6 +1,6 @@
 use super::*;
 use crate::app::requests::Requests;
-use slakio_core::backend::{Command, FailKind};
+use slakio_core::backend::{Command, FailKind, Request};
 use slakio_core::images::BYTES_MAX;
 use slakio_core::model::FILE_HOST;
 
@@ -703,7 +703,7 @@ fn the_photos_bytes_kept_for_their_other_place_stay_within_a_few_mebibytes() {
 #[test]
 fn a_photo_that_failed_for_one_place_is_not_asked_again_for_the_other_until_its_wait_is_over() {
     let photo = Source::Avatar(format!("https://{}/x.png", slakio_core::images::AVATAR_HOSTS[0]));
-    for kind in [FailKind::Network, FailKind::RateLimited { retry_after: None }, FailKind::TooLarge] {
+    for kind in [FailKind::Api { code: "file_not_available".into() }, FailKind::TooLarge] {
         let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
         images.look_as(&ws(), &photo, CHIP_PHOTO);
         images.ask(&mut requests, now);
@@ -723,7 +723,7 @@ fn a_photo_that_failed_for_one_place_is_not_asked_again_for_the_other_until_its_
         images.look(&ws(), &photo);
         images.ask(&mut requests, now + RETRY_AFTER);
         let again = requests.take().len();
-        assert_eq!(again, usize::from(kind != FailKind::TooLarge), "{kind:?}");
+        assert_eq!(again, 0, "{kind:?}: it cannot be shown in either");
     }
 }
 
@@ -842,4 +842,61 @@ fn the_loop_wakes_for_a_two_second_retry() {
     assert!(ask_then_fail(&mut images, &mut requests, &photo(0), &FailKind::CapReached, now));
     assert_eq!(images.retry_at(), Some(now + Duration::from_secs(2)));
     assert!(images.woke(now + Duration::from_secs(2)));
+}
+
+/// Photo 0 asked as a DM row's chip while the slot waits for it, then the chip failed for
+/// `kind`: what the next frame asks.
+fn chip_failed_then(kind: &FailKind) -> (Images, Vec<Request>) {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+    images.ask(&mut requests, now);
+    let r = requests.take().pop().expect("asked for the chip");
+    images.look(&ws(), &photo(0));
+    images.ask(&mut requests, now);
+    assert!(requests.take().is_empty(), "the slot waits for the chip's fetch");
+    assert!(images.failed(r.id, kind, now));
+    images.look(&ws(), &photo(0));
+    images.ask(&mut requests, now);
+    (images, requests.take())
+}
+
+#[test]
+fn a_chip_rate_limited_leaves_the_slot_photo_to_be_asked() {
+    let (_, asked) = chip_failed_then(&FailKind::RateLimited { retry_after: Some(Duration::from_secs(5)) });
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(asked[0].command, Command::Image { source: photo(0), max: BYTES_MAX, list: false });
+}
+
+#[test]
+fn a_chip_that_timed_out_leaves_the_slot_photo_free() {
+    for kind in [FailKind::Network, FailKind::Stalled, FailKind::CapReached] {
+        let (_, asked) = chip_failed_then(&kind);
+        assert_eq!(asked.len(), 1, "{kind:?}: {asked:?}");
+    }
+}
+
+#[test]
+fn a_photo_gone_in_one_shape_is_gone_in_the_other() {
+    let (mut images, asked) = chip_failed_then(&FailKind::Api { code: "file_not_available".into() });
+    assert!(asked.is_empty());
+    assert_eq!(images.look(&ws(), &photo(0)), Look::Failed(Why::NotLoaded));
+    assert!(!images.ask(&mut Requests::default(), Instant::now() + RETRY_AFTER * 2));
+}
+
+#[test]
+fn the_other_shape_is_made_from_the_bytes_in_the_same_wake() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+    images.ask(&mut requests, now);
+    let r = requests.take().pop().expect("asked for the chip");
+    images.look(&ws(), &photo(0));
+    images.ask(&mut requests, now);
+    let job = images.answered(r.id, vec![1, 2, 3]).expect("a job");
+    images.decoded(key(&job), Ok(ready(&job, 10)));
+    images.look(&ws(), &photo(0));
+    assert!(images.ask(&mut requests, now), "made from the bytes");
+    assert!(requests.take().is_empty(), "nothing asked of the network");
+    let made = images.take_lookups();
+    assert_eq!(made.len(), 1);
+    assert_eq!((made[0].shape, made[0].bytes.as_slice()), (PHOTO, &[1u8, 2, 3][..]));
 }
