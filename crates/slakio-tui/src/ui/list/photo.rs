@@ -16,7 +16,7 @@ use slakio_core::model::{UserId, WorkspaceId};
 
 /// The placeholder cells of `user`'s photo (of workspace `ws`) for a DM row, when photos are on
 /// and the terminal holds it.
-pub(super) fn chip(app: &App, ws: &WorkspaceId, user: &UserId) -> Option<Span<'static>> {
+pub(in crate::ui) fn chip(app: &App, ws: &WorkspaceId, user: &UserId) -> Option<Span<'static>> {
     if !app.settings.photos {
         return None;
     }

@@ -28,7 +28,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use slakio_core::i18n::{Label, Msg};
 use slakio_core::layout::PaneId;
-use slakio_core::model::{Conversation, ConversationKind, Presence, Target, Ts};
+use slakio_core::model::{Conversation, ConversationKind, Presence, Target, Ts, User};
 use std::time::Instant;
 
 pub(super) fn draw(f: &mut Frame, app: &App, layout: &FrameLayout, views: &[(PaneId, View)], now: Instant) {
@@ -152,7 +152,7 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         .then(|| area.x + 1 + spans.iter().map(|s| s.width() as u16).sum::<u16>() + width(&lead) as u16);
     // A DM's title starts with its peer's avatar chip (`MK @Minsu Kim`), a group DM's with how
     // many people are in it, as its list row does (`8  @Ann, …`).
-    let chip = peer.and_then(|u| avatar_chip(app, &u.workspace, &u.id, u.display_name.line().as_str()));
+    let chip = peer.and_then(|u| dm_chip(app, u, area.width));
     if let Some(chip) = chip.or_else(|| conversation.filter(|_| !thread).and_then(|c| group_badge(app, c))) {
         spans.extend([chip, Span::raw(" ")]);
     }
@@ -214,6 +214,27 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
 }
 
 pub(super) use crate::app::model::breadcrumb;
+
+/// The narrowest pane whose title holds a DM peer's photo whole: [`fit`] never reaches its two
+/// cells after the border's corner, the blank and the workspace's stripe.
+const PHOTO_MIN_WIDTH: u16 = 12;
+
+/// A DM title's chip for its peer `u` in a pane `width` cells wide: with photos, the photo the
+/// list's row holds (the same picture, nothing more fetched), else the initials chip.
+fn dm_chip(app: &App, u: &User, width: u16) -> Option<Span<'static>> {
+    let photo = || app.settings.avatars.then(|| list::photo::chip(app, &u.workspace, &u.id)).flatten();
+    peer_chip(width, photo, || avatar_chip(app, &u.workspace, &u.id, u.display_name.line().as_str()))
+}
+
+/// A DM title's chip in a pane `width` cells wide: the peer's `photo` where the title holds it
+/// whole (it is not asked for otherwise), else the `initials`.
+fn peer_chip<'a>(
+    width: u16,
+    photo: impl FnOnce() -> Option<Span<'a>>,
+    initials: impl FnOnce() -> Option<Span<'a>>,
+) -> Option<Span<'a>> {
+    (width >= PHOTO_MIN_WIDTH).then(photo).flatten().or_else(initials)
+}
 
 /// A group DM's count of people, two cells: the list's group chip with avatars, else muted.
 fn group_badge(app: &App, c: &Conversation) -> Option<Span<'static>> {

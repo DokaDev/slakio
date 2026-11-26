@@ -33,7 +33,7 @@
 //! badged; nothing else marks them.
 
 mod decor;
-mod photo;
+pub(super) mod photo;
 
 use super::{avatar_chip, count_pill, frame, highlight, presence_mark};
 use crate::app::model::Row;
