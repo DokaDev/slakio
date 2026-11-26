@@ -169,6 +169,22 @@
 "message.more" = "… the rest of this message is not shown"
 "message.replies" = { one = "{count} reply · last {time}", other = "{count} replies · last {time}" }
 
+# A notice of Slack's about a conversation, as one line in its place among the messages
+# ({name}: who did it; {channel}: the conversation, as `#backend`).
+"system.joined" = "{name} joined {channel}."
+"system.left" = "{name} left {channel}."
+"system.topic" = "{name} set the channel topic: {text}"
+"system.purpose" = "{name} set the channel description: {text}"
+"system.renamed" = "{name} renamed the channel from {old} to {new}."
+"system.archived" = "{name} archived {channel}."
+"system.unarchived" = "{name} unarchived {channel}."
+"system.pinned" = "{name} pinned a message to this channel."
+"system.unpinned" = "{name} unpinned a message from this channel."
+"system.app_added" = "{name} added an app to this channel."
+"system.app_removed" = "{name} removed an app from this channel."
+"system.private" = "{name} made {channel} private."
+"system.public" = "{name} made {channel} public."
+
 # A pane's composer.
 "composer.message" = "Message {name}"
 "composer.reply" = "Reply"

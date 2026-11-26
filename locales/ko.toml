@@ -147,6 +147,21 @@
 "message.more" = "… 이 메시지의 나머지는 표시하지 않습니다"
 "message.replies" = "답글 {count}개 · 마지막 {time}"
 
+# A notice of Slack's about a conversation.
+"system.joined" = "{name} 님이 {channel}에 참여했습니다."
+"system.left" = "{name} 님이 {channel}에서 나갔습니다."
+"system.topic" = "{name} 님이 채널 주제를 설정했습니다: {text}"
+"system.purpose" = "{name} 님이 채널 설명을 설정했습니다: {text}"
+"system.renamed" = "{name} 님이 채널 이름을 {old}에서 {new}(으)로 변경했습니다."
+"system.archived" = "{name} 님이 {channel}을(를) 보관했습니다."
+"system.unarchived" = "{name} 님이 {channel}의 보관을 해제했습니다."
+"system.pinned" = "{name} 님이 이 채널에 메시지를 고정했습니다."
+"system.unpinned" = "{name} 님이 이 채널에서 메시지 고정을 해제했습니다."
+"system.app_added" = "{name} 님이 이 채널에 앱을 추가했습니다."
+"system.app_removed" = "{name} 님이 이 채널에서 앱을 제거했습니다."
+"system.private" = "{name} 님이 {channel}을(를) 비공개로 전환했습니다."
+"system.public" = "{name} 님이 {channel}을(를) 공개로 전환했습니다."
+
 "composer.message" = "{name}에 메시지 보내기"
 "composer.reply" = "답글"
 "composer.hint" = "{keys} 를 눌러 쓰기"

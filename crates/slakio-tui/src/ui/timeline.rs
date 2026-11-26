@@ -16,6 +16,7 @@ pub mod chips;
 pub mod custom;
 pub mod files;
 pub mod message;
+pub mod system;
 pub mod wheel;
 
 use super::highlight;

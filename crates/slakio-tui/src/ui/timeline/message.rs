@@ -88,6 +88,8 @@ pub fn grouped(pane: &Pane, tl: &Timeline, i: usize, zone: &crate::time::Zone) -
         && m.ts.0.saturating_sub(prev.ts.0) <= GROUP_SECS * 1_000_000
         && root != Some(i - 1)
         && prev.thread.is_none()
+        && prev.system.is_none()
+        && m.system.is_none()
 }
 
 /// The rows above message `i`: the blank between blocks (a new group, or after a message with
@@ -98,7 +100,9 @@ fn above(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid>
     let new_day = i == 0 || time::day(tl.items[i - 1].ts, &app.zone) != time::day(m.ts, &app.zone);
     let after_reactions = i > 0 && !tl.items[i - 1].reactions.is_empty();
     let after_divider = pane.root(tl) == Some(i.wrapping_sub(1));
-    if i > 0 && !after_divider && (new_day || after_reactions || !grouped(pane, tl, i, &app.zone)) {
+    // Notices in a row read as one list: no blank between them (unless reactions end the first).
+    let notices = i > 0 && m.system.is_some() && tl.items[i - 1].system.is_some();
+    if i > 0 && !after_divider && (new_day || after_reactions || !(notices || grouped(pane, tl, i, &app.zone))) {
         out.push((Line::raw(""), Kind::Gap, Vec::new()));
     }
     if new_day {
@@ -112,7 +116,9 @@ fn above(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize) -> Vec<Laid>
 pub fn rows(app: &App, pane: &Pane, tl: &Timeline, i: usize, w: usize, selected: bool) -> Vec<Laid> {
     let mut out = if i == 0 { start(app, pane, tl, w) } else { Vec::new() };
     out.extend(above(app, pane, tl, i, w));
-    if app.settings.compact {
+    if tl.items[i].system.is_some() {
+        out.extend(super::system::rows(app, pane, tl, i, w));
+    } else if app.settings.compact {
         out.extend(compact(app, pane, tl, i, w));
     } else {
         out.extend(comfortable(app, pane, tl, i, w, selected));
@@ -411,7 +417,7 @@ fn tag_style(app: &App) -> Style {
 }
 
 /// The text's column in the current density, for the rows under it.
-fn indent(app: &App, w: usize) -> usize {
+pub(super) fn indent(app: &App, w: usize) -> usize {
     if app.settings.compact {
         let chip_w = if app.settings.avatars { avatar::WIDTH + 1 } else { 0 };
         if w < STACKED_BELOW {
