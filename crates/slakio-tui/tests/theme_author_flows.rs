@@ -44,7 +44,8 @@ impl Drop for Scratch {
 fn booted(w: u16, h: u16, lang: Lang, cfg: Config) -> Demo {
     let mut d = Demo::with(w, h, lang, Settings::default());
     d.app.load_at_start(TRUECOLOR, &cfg, true, d.now);
-    d.app.prefs.download_env = None;
+    // The screens read the same whatever this process's environment says.
+    (d.app.prefs.download_env, d.app.prefs.network_env) = (None, None);
     d
 }
 
