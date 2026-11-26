@@ -254,10 +254,12 @@ impl Images {
             self.tries.remove(&key);
         }
         note::line(&self.diag, &key, Stage::Failed, &note::fail_word(kind), &[("retry", note::retry(again, now))]);
-        // Gone or too large: a photo's other place, waiting for it, takes the same answer (it
+        // Gone, too large or past the run's limit: a photo's other place, waiting for it, takes the same answer (it
         // would fail the same). A failure that passes (the budget, a busy backend, a 429, the
         // network) leaves the other free to be asked.
-        if matches!(key.0, Source::Avatar(_)) && matches!(kind, FailKind::TooLarge | FailKind::Api { .. }) {
+        if matches!(key.0, Source::Avatar(_))
+            && matches!(kind, FailKind::TooLarge | FailKind::Api { .. } | FailKind::RunLimit)
+        {
             let other = (key.0.clone(), if key.1 == CHIP_PHOTO { PHOTO } else { CHIP_PHOTO });
             if !self.entries.contains_key(&other) {
                 self.fail(other, why, again);

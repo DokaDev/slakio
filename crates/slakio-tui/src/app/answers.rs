@@ -400,7 +400,7 @@ pub(crate) fn failure(kind: &FailKind) -> Label {
         FailKind::Network => Label::FailNetwork,
         FailKind::Auth => Label::FailAuth,
         FailKind::RateLimited { .. } => Label::FailRateLimited,
-        FailKind::CapReached => Label::FailCapReached,
+        FailKind::CapReached | FailKind::RunLimit => Label::FailCapReached,
         FailKind::Offline => Label::FailOffline,
         FailKind::Busy => Label::FailBusy,
         FailKind::Api { .. } => Label::FailApi,

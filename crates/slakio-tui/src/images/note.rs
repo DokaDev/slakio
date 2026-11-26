@@ -52,6 +52,7 @@ pub(crate) fn fail_word(kind: &FailKind) -> String {
         FailKind::Api { code } => format!("api-{code}"),
         FailKind::RateLimited { .. } => "rate-limited".to_string(),
         FailKind::CapReached => "cap-reached".to_string(),
+        FailKind::RunLimit => "run-limit".to_string(),
         FailKind::TooLarge => "too-large".to_string(),
         FailKind::ReadOnly => "read-only".to_string(),
         k => format!("{k:?}").to_ascii_lowercase(),

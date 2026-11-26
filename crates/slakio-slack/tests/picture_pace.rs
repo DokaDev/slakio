@@ -237,7 +237,7 @@ fn the_cdn_run_alarm_logs_once() {
             r.picture(s).await.expect("within the run");
         }
         for s in &sources[3..10] {
-            assert_eq!(r.picture(s).await, Err(FailKind::CapReached));
+            assert_eq!(r.picture(s).await, Err(FailKind::RunLimit), "the run's limit, for the rest of the run");
         }
         assert!(r.governor.is_on(), "the network stays on");
         diag.flush();

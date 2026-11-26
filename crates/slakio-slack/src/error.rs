@@ -47,6 +47,7 @@ impl SlackError {
             SlackError::Network { .. } => FailKind::Network,
             SlackError::Offline { .. } => FailKind::Offline,
             SlackError::Busy | SlackError::Superseded => FailKind::Busy,
+            SlackError::CapReached { why: crate::governor::CDN_RUN_REACHED } => FailKind::RunLimit,
             SlackError::CapReached { .. } => FailKind::CapReached,
             SlackError::Api { code } => FailKind::Api { code: code.clone() },
             SlackError::TooLarge => FailKind::TooLarge,

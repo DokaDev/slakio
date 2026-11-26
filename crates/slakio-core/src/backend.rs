@@ -370,6 +370,7 @@ impl FailKind {
             FailKind::ReadOnly
             | FailKind::Auth
             | FailKind::CapReached
+            | FailKind::RunLimit
             | FailKind::Api { .. }
             | FailKind::TooLarge
             | FailKind::Unsaved
@@ -394,6 +395,9 @@ pub enum FailKind {
     },
     /// The backend's own limit of requests is reached.
     CapReached,
+    /// The run's own limit of a kind of request is reached (the picture hosts' run alarm):
+    /// nothing of that kind is asked again this run.
+    RunLimit,
     /// No connection, or the backend is gone.
     Offline,
     /// The backend has more requests waiting than it takes: nothing was sent; try again.

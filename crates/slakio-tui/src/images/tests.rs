@@ -958,3 +958,32 @@ fn past_the_most_tries_kept_only_the_oldest_is_forgotten() {
         assert!(images.tries.contains_key(&(photo(n), PHOTO)), "photo {n} keeps its tries");
     }
 }
+
+/// Past the picture hosts' run limit a photo or an emoji is never asked again this run (its
+/// initials or `:name:` stay), one failure line each, and nothing is asked ahead for an hour.
+#[test]
+fn past_the_run_limit_a_picture_is_never_asked_again() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    let emoji = Source::Emoji(format!("https://{}/T1/party/abc.png", slakio_core::images::EMOJI_HOSTS[0]));
+    images.look(&ws(), &photo(0));
+    images.look_emoji(&ws(), emoji.address());
+    images.ask(&mut requests, now);
+    let asked = requests.take();
+    assert_eq!(asked.len(), 2);
+    for r in &asked {
+        assert!(images.failed(r.id, &FailKind::RunLimit, now));
+    }
+    for later in [now + Duration::from_secs(16), now + Duration::from_secs(3600 * 5)] {
+        images.look(&ws(), &photo(0));
+        images.look_as(&ws(), &photo(0), CHIP_PHOTO);
+        images.look_emoji(&ws(), emoji.address());
+        images.ask(&mut requests, later);
+        assert!(requests.take().is_empty(), "never asked again");
+    }
+    assert_eq!(images.look(&ws(), &photo(0)), Look::Failed(Why::NotLoaded));
+    assert_eq!(images.retry_at(), None, "nothing to wake for");
+    assert!(
+        images.ahead.paused_until.is_some_and(|t| t >= now + Duration::from_secs(3600)),
+        "nothing ahead for an hour"
+    );
+}
