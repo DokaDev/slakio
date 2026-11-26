@@ -236,16 +236,20 @@ impl Images {
             _ => Why::NotLoaded,
         };
         // One more failure in a row: a photo's or an emoji's wait grows with it.
-        let tries = self.tries.get(&key).copied().unwrap_or(0).saturating_add(1);
+        let tries = self.tries.get(&key).map_or(0, |(t, _)| *t).saturating_add(1);
         let wait = backoff::wait(&key.0, kind, tries);
         // A photo asked ahead waits at least the pause of the photos ahead.
         let wait = if ahead { wait.map(|w| w.max(AHEAD_PAUSE)) } else { wait };
         let again = wait.and_then(|wait| now.checked_add(wait));
         if again.is_some() {
-            if self.tries.len() >= FAILED_MAX {
-                self.tries.clear();
+            // At most so many kept: the one that failed longest ago forgets its tries.
+            if self.tries.len() >= FAILED_MAX
+                && !self.tries.contains_key(&key)
+                && let Some(oldest) = self.tries.iter().min_by_key(|(_, (_, at))| *at).map(|(k, _)| k.clone())
+            {
+                self.tries.remove(&oldest);
             }
-            self.tries.insert(key.clone(), tries);
+            self.tries.insert(key.clone(), (tries, now));
         } else {
             self.tries.remove(&key);
         }

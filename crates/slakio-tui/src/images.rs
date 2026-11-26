@@ -266,8 +266,8 @@ pub struct Images {
     ahead: ahead::Ahead,
     /// The bytes of the last [`FETCHED_MAX`] photos fetched, the oldest first.
     fetched: VecDeque<(Source, Vec<u8>)>,
-    /// How many times in a row each picture failed for a while ([`backoff`]).
-    tries: HashMap<Key, u8>,
+    /// How many times in a row each picture failed for a while ([`backoff`]), and when last.
+    tries: HashMap<Key, (u8, Instant)>,
 }
 
 impl Images {

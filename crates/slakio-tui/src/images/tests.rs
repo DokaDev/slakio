@@ -935,3 +935,26 @@ fn after_a_passing_failure_both_shapes_ask_once_and_share_the_bytes() {
         assert_ne!(made[0].shape, job.shape, "{kind:?}: the other shape");
     }
 }
+
+/// Past [`FAILED_MAX`] photos waiting to be asked again, the one that failed longest ago forgets
+/// its tries, not every one: the others keep their longer waits.
+#[test]
+fn past_the_most_tries_kept_only_the_oldest_is_forgotten() {
+    let (mut images, mut requests, now) = (on(), Requests::default(), Instant::now());
+    let fail = |images: &mut Images, requests: &mut Requests, n: usize, at: Instant| {
+        images.look(&ws(), &photo(n));
+        images.ask(requests, at);
+        let r = requests.take().pop().expect("asked");
+        assert!(images.failed(r.id, &FailKind::CapReached, at));
+    };
+    for n in 0..FAILED_MAX {
+        fail(&mut images, &mut requests, n, now + Duration::from_millis(n as u64));
+    }
+    assert_eq!(images.tries.len(), FAILED_MAX);
+    fail(&mut images, &mut requests, FAILED_MAX, now + Duration::from_secs(5));
+    assert_eq!(images.tries.len(), FAILED_MAX, "still at most so many");
+    assert!(!images.tries.contains_key(&(photo(0), PHOTO)), "the oldest forgot its tries");
+    for n in 1..=FAILED_MAX {
+        assert!(images.tries.contains_key(&(photo(n), PHOTO)), "photo {n} keeps its tries");
+    }
+}
