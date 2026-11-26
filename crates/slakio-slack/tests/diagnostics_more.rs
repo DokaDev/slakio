@@ -416,7 +416,7 @@ fn two_history_pages_give_the_page_probes_once() {
         ] {
             assert_eq!(text.matches(line).count(), 1, "`{line}` once in\n{text}");
         }
-        assert!(text.matches("external_users count=0").count() <= 1, "none of another workspace told once:\n{text}");
+        assert_eq!(text.matches("external_users count=0").count(), 1, "none of another workspace told once:\n{text}");
     });
 }
 
