@@ -44,12 +44,12 @@ fn a_second_process_reads_the_cache_but_never_writes_it() {
     let mut second = Store::open(&dir).unwrap().store;
     assert!(second.read_only(), "the lock is held: read-only");
     let read = second.snapshot(&ids[..1]).unwrap();
-    assert_eq!(read, Some(world.snapshot().only(&ids[0])), "it reads what the first wrote");
+    assert_eq!(read, Some(crate::testutil::kept(&world.snapshot().only(&ids[0]))), "it reads what the first wrote");
     // Its writes are nothing.
     second.put_snapshot(World::new(4).snapshot()).unwrap();
     second.set_meta("k", "v").unwrap();
     assert!(second.rebuild().is_err());
-    assert_eq!(first.snapshot(&ids[..1]).unwrap(), Some(world.snapshot().only(&ids[0])));
+    assert_eq!(first.snapshot(&ids[..1]).unwrap(), Some(crate::testutil::kept(&world.snapshot().only(&ids[0]))));
     assert_eq!(first.meta("k").unwrap(), None);
     drop(second);
     drop(first);

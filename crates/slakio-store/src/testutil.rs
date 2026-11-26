@@ -15,6 +15,15 @@ pub fn scratch(tag: &str) -> PathBuf {
     dir
 }
 
+/// `s` as the cache keeps it: people's statuses are for the session only, never kept.
+pub fn kept(s: &slakio_core::backend::Snapshot) -> slakio_core::backend::Snapshot {
+    let mut s = s.clone();
+    for u in &mut s.users {
+        (u.status, u.no_status) = (None, false);
+    }
+    s
+}
+
 /// The cache in a new scratch directory, as its writer.
 pub fn writer(tag: &str) -> Store {
     let opened = Store::open(&scratch(tag).join("cache")).unwrap();

@@ -9,8 +9,8 @@ expression: mask_hangul(&d.screen())
 │ Files                      ││                                                                                        │
 │ To-dos                   6 ││                                                                                        │
 ├─▾──────────────────────────┤│                                                                                        │
-│ MK● Minsu Kim           3  ││                                                                                        │
-│ JP● Jiho Park              ││                                                                                        │
+│ MK● Minsu Kim 🌴        3  ││                                                                                        │
+│ JP● Jiho Park :party-blob: ││                                                                                        │
 │ ＊○ ＊＊＊                 ││                                                                                        │
 │ JL◐ Jiyoung Lee            ││                                                                                        │
 │ AM● Alex Morgan            ││                                                                                        │
@@ -23,7 +23,7 @@ expression: mask_hangul(&d.screen())
 │ ＊○ ＊＊＊              2  ││                         Enter    Open                                                  │
 │ ML◐ Mallory live           ││                         Space h  Home                                                  │
 │ 3   Jiho… and 2 others  2  ││                         Space d  DMs                                                   │
-│                            ││                         Ctrl+O   Back to the last one                                  │
+│ M ● Me you 🎉              ││                         Ctrl+O   Back to the last one                                  │
 │                            ││                         ?        Keyboard help                                         │
 │                            ││                         Ctrl+Q   Quit                                                  │
 │                            ││                                                                                        │

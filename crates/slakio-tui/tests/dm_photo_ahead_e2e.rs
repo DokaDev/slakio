@@ -81,14 +81,18 @@ impl Machine {
         run.wait_for("the list", |t| t.contains("# backend"));
         run.type_bytes(b"G");
         // A row's text without its blanks (a wide letter is followed by one on this screen); a
-        // DM's row is its name and at most a count after it (a group DM's goes on with a comma).
+        // DM's row is its name, then `you` on the user's own, its peer's status emoji and a count
+        // (a group DM's goes on with a comma).
         let rows = |t: &str| -> Vec<String> {
             t.lines().map(|l| l.split('\u{2502}').nth(1).unwrap_or("").split_whitespace().collect()).collect()
         };
         let at = |rows: &[String], name: &str| {
             let name: String = name.split_whitespace().collect();
             rows.iter().position(|r| {
-                r.split_once(name.as_str()).is_some_and(|(_, rest)| rest.chars().all(|c| c.is_ascii_digit()))
+                r.split_once(name.as_str()).is_some_and(|(_, rest)| {
+                    let rest = rest.strip_prefix("you").unwrap_or(rest);
+                    rest.chars().all(|c| c.is_ascii_digit() || !c.is_ascii())
+                })
             })
         };
         run.wait_for("every DM row", |t| dms.iter().all(|(n, _)| at(&rows(t), n).is_some()));

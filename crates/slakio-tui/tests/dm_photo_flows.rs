@@ -962,6 +962,8 @@ fn a_person_shown_as_a_chip_is_drawn_in_the_timeline_with_no_fetch_of_their_own(
             ConversationKind::Dm { user } => m.user(&ws, user),
             _ => None,
         })
+        // The user's own DM's peer is the user, who posts nowhere in the demo's `general`.
+        .filter(|u| m.me(&ws) != Some(&u.id))
         .filter(|u| screen.contains(u.display_name.line().as_str()))
         .filter_map(|u| u.avatar.clone().map(Source::Avatar))
         .filter(|a| chips.contains(a))

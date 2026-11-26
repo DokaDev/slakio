@@ -128,6 +128,8 @@
 "list.later_version" = "{view} comes in a later version"
 "list.empty" = "Nothing here"
 "list.external" = "ext"
+# After the name of the user's own DM, as Slack writes it.
+"list.you" = "you"
 # A group DM named by two of its people and how many more: "Ann, Bob and 6 others".
 "group.others" = { one = "{names} and {count} other", other = "{names} and {count} others" }
 # The sidebar's built-in sections, and a section of the user's own with no name.

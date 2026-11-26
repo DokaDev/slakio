@@ -1,5 +1,5 @@
 use super::*;
-use crate::testutil::{page, target, writer};
+use crate::testutil::{kept, page, target, writer};
 use slakio_world::World;
 
 fn ids(s: &Snapshot) -> Vec<WorkspaceId> {
@@ -9,7 +9,7 @@ fn ids(s: &Snapshot) -> Vec<WorkspaceId> {
 /// Each workspace's part comes back as that workspace's part of `s`.
 fn assert_parts(store: &Store, s: &Snapshot, what: &str) {
     for ws in ids(s) {
-        assert_eq!(store.snapshot(std::slice::from_ref(&ws)).unwrap(), Some(s.only(&ws)), "{what}: {ws}");
+        assert_eq!(store.snapshot(std::slice::from_ref(&ws)).unwrap(), Some(kept(&s.only(&ws))), "{what}: {ws}");
     }
 }
 
@@ -64,7 +64,7 @@ fn nothing_kept_or_another_sign_ins_snapshot_is_none() {
     with_other.push(WorkspaceId::new("TOTHER"));
     assert_eq!(store.snapshot(&with_other).unwrap(), None, "all asked for, or nothing");
     assert_eq!(store.snapshot(&[]).unwrap(), None);
-    assert_eq!(store.snapshot(&ids(s)[..1]).unwrap(), Some(s.only(&ids(s)[0])), "one workspace's part alone");
+    assert_eq!(store.snapshot(&ids(s)[..1]).unwrap(), Some(kept(&s.only(&ids(s)[0]))), "one workspace's part alone");
 }
 
 #[test]
@@ -79,8 +79,8 @@ fn a_workspaces_new_snapshot_replaces_its_own_part_and_never_another_s() {
     let mut b = world.snapshot().only(&second);
     b.conversations.pop();
     store.put_snapshot(&b).unwrap();
-    assert_eq!(store.snapshot(std::slice::from_ref(&second)).unwrap().as_ref(), Some(&b));
-    assert_eq!(store.snapshot(std::slice::from_ref(&first)).unwrap(), Some(world.snapshot().only(&first)));
+    assert_eq!(store.snapshot(std::slice::from_ref(&second)).unwrap(), Some(kept(&b)));
+    assert_eq!(store.snapshot(std::slice::from_ref(&first)).unwrap(), Some(kept(&world.snapshot().only(&first))));
     assert!(store.newest_page(&t, 10).unwrap().is_some(), "the other workspace keeps its messages");
     // Nothing of a workspace its snapshot does not list is removed by it.
     let kept: i64 = store
@@ -307,4 +307,17 @@ fn a_conversation_s_newest_message_and_a_section_s_order_come_back() {
     s.sections[1].sort = Some(Sort::Alphabetical);
     store.put_snapshot(&s).unwrap();
     assert_parts(&store, &s, "orders");
+}
+
+#[test]
+fn a_status_is_never_kept_and_comes_back_as_not_known() {
+    let world = World::demo();
+    let s = world.snapshot();
+    assert!(s.users.iter().any(|u| u.status.is_some()), "the demo has statuses");
+    let mut said_none = s.clone();
+    said_none.users[0].no_status = true;
+    let mut store = writer("snap-status");
+    store.put_snapshot(&said_none).unwrap();
+    let back = store.snapshot(&ids(s)).unwrap().unwrap();
+    assert!(back.users.iter().all(|u| u.status.is_none() && !u.no_status), "unknown, not none");
 }

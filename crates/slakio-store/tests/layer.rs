@@ -92,9 +92,13 @@ fn world() -> World {
     World::new(13)
 }
 
-/// The world's first workspace alone, as the Slack backend boots it.
+/// The world's first workspace alone, as the Slack backend boots it, without people's statuses
+/// (the cache never keeps them, so a cached boot compares equal).
 fn snapshot(world: &World) -> slakio_core::backend::Snapshot {
     let mut s = world.snapshot().clone();
+    for u in &mut s.users {
+        u.status = None;
+    }
     let ws = s.workspaces[0].id.clone();
     s.workspaces.truncate(1);
     s.users.retain(|u| u.workspace == ws);
@@ -414,8 +418,12 @@ async fn two_workspaces_share_one_cache_and_each_keeps_its_own_part() {
     r.no_faults();
     drop((r, ui_b, end_b));
     let store = open(&dir, false).await;
+    // As kept: without people's statuses.
+    smaller.users.iter_mut().for_each(|u| u.status = None);
+    let mut own_b = w.snapshot().only(&b);
+    own_b.users.iter_mut().for_each(|u| u.status = None);
     assert_eq!(store.snapshot(std::slice::from_ref(&a)).unwrap(), Some(smaller));
-    assert_eq!(store.snapshot(std::slice::from_ref(&b)).unwrap(), Some(w.snapshot().only(&b)), "B's own part");
+    assert_eq!(store.snapshot(std::slice::from_ref(&b)).unwrap(), Some(own_b), "B's own part");
 }
 
 #[tokio::test]

@@ -26,6 +26,7 @@ pub mod emoji;
 pub mod files;
 mod hostile;
 mod notices;
+mod own;
 pub mod pictures;
 mod rng;
 mod saved;
@@ -214,6 +215,7 @@ impl World {
         for (n, spec) in SPECS.iter().enumerate() {
             w.add_workspace(n, spec);
         }
+        own::add_dms(&mut w);
         w.snapshot.saved = Some(saved::items(&w));
         w.snapshot.taken = saved::now(&w);
         w
@@ -430,12 +432,14 @@ impl World {
             presence: Presence::Active,
         };
         let tag = &spec.id[5..];
-        let me = user(format!("UDEMO{tag}000"), "me", "Me", Org::Own, false);
+        let me = User { status: own::status_of(None), ..user(format!("UDEMO{tag}000"), "me", "Me", Org::Own, false) };
         self.me.insert(ws.clone(), me.id.clone());
         let mut people = vec![];
         for (i, (name, display)) in PEOPLE.iter().take(spec.people).enumerate() {
             let presence = presence_of(i);
-            people.push(User { presence, ..user(format!("UDEMO{tag}{:03}", i + 1), name, display, Org::Own, false) });
+            let status = own::status_of(Some(i));
+            let id = format!("UDEMO{tag}{:03}", i + 1);
+            people.push(User { presence, status, ..user(id, name, display, Org::Own, false) });
         }
         let bots: Vec<User> = BOTS
             .iter()

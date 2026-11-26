@@ -9,8 +9,8 @@ expression: mask_hangul(&narrow.snap())
 │ Files                      ││ M  Me · 04:08                                  │
 │ To-dos                   6 ││    Rolling back                                │
 ├─▾──────────────────────────┤│    🎉 3                                        │
-│▎MK● Minsu Kim           3  ││                                                │
-│ JP● Jiho Park              ││ MK Minsu Kim · 05:26                           │
+│▎MK● Minsu Kim 🌴        3  ││                                                │
+│ JP● Jiho Park :party-blob: ││ MK Minsu Kim · 05:26                           │
 │ ＊○ ＊＊＊                 ││    Done schema for please today deploy looks   │
 │ JL◐ Jiyoung Lee            ││    fine timeout retry maybe looks              │
 │ AM● Alex Morgan            ││                                                │
@@ -23,6 +23,6 @@ expression: mask_hangul(&narrow.snap())
 │ ＊○ ＊＊＊              2  ││    on branch                                   │
 │ ML◐ Mallory live           ││    👍 1                                        │
 │ 3   Jiho… and 2 others  2  │├─ Message @Minsu Kim ───────────────────────────┤
-│                            ││ › Press i to write                             │
+│ M ● Me you 🎉              ││ › Press i to write                             │
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯
  NORMAL  ▌A company › @Minsu Kim         │ i write · ? help · Space more │ demo

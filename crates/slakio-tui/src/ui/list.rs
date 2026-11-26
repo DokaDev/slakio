@@ -32,6 +32,7 @@
 //! Unread conversations are bold in body text, read ones muted, muted ones faint and never
 //! badged; nothing else marks them.
 
+mod decor;
 mod photo;
 
 use super::{avatar_chip, count_pill, frame, highlight, presence_mark};
@@ -346,16 +347,26 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             let gap = if pill > 0 { pill + 2 } else { 1 };
             let room = area.width.saturating_sub(name_x + gap + tag_w);
             // A group DM named by its people: two of them and how many more, as the room allows.
-            let name = match group_name::people(&app.model, c) {
-                Some(names) => group_name::fit(&names, &app.i18n, usize::from(room)),
-                None => clip(c.name.line().as_str(), usize::from(room)),
+            // A DM: `you` on the user's own, then the peer's status (after the tag), dropped
+            // first for room.
+            let ((mut spans, name_w), (status, status_w)) = match group_name::people(&app.model, c) {
+                Some(names) => {
+                    let name = group_name::fit(&names, &app.i18n, usize::from(room));
+                    let w = width(&name);
+                    ((vec![Span::styled(name, name_style)], w), (Vec::new(), 0))
+                }
+                None => {
+                    let words = if c.muted { t.faint() } else { t.muted() };
+                    let d = decor::of(app, c, words);
+                    decor::fit(c.name.line().as_str(), usize::from(room), d, name_style, words)
+                }
             };
-            let name_w = width(&name) as u16;
-            let mut spans = vec![Span::styled(name, name_style)];
+            let (name_w, status_w) = (name_w as u16, status_w as u16);
             if !tag.is_empty() {
                 spans.push(Span::styled(tag, t.faint()));
             }
-            put(f, area, name_x, name_w + tag_w, spans);
+            spans.extend(status);
+            put(f, area, name_x, name_w + tag_w + status_w, spans);
             if icons && external {
                 super::glyph_cell(f.buffer_mut(), area.x + name_x + name_w + 1, area.y, ICON_EXTERNAL, t.faint());
             }
