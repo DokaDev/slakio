@@ -255,6 +255,14 @@ pub struct Profile {
     /// `false`: the person has no photo of their own (only Slack's default): none is fetched.
     #[serde(default, deserialize_with = "loose")]
     pub is_custom_image: Option<bool>,
+    /// The status emoji (`:tada:`); empty when the person has no status.
+    #[serde(default, deserialize_with = "loose")]
+    pub status_emoji: Option<String>,
+    #[serde(default, deserialize_with = "loose")]
+    pub status_text: Option<String>,
+    /// When the status ends (seconds since the epoch); `0` when it has no end.
+    #[serde(default, deserialize_with = "loose")]
+    pub status_expiration: Option<u64>,
 }
 
 impl Profile {
@@ -305,6 +313,19 @@ impl Profile {
     /// of them before is gone. Not said (no such field) is not the same.
     pub fn not_custom(&self) -> bool {
         self.is_custom_image == Some(false)
+    }
+
+    /// The status the profile tells: `Some(None)` when it says the person has none (an empty
+    /// `status_emoji`), `None` when it does not say (no `status_emoji`, or one that cannot be
+    /// read: unknown, not none). A text that cannot be read is empty; an end that cannot be read,
+    /// or `0`, is none.
+    pub fn status(&self) -> Option<Option<slakio_core::model::Status>> {
+        let emoji = self.status_emoji.as_deref()?.trim().trim_matches(':');
+        Some((!emoji.is_empty()).then(|| slakio_core::model::Status {
+            emoji: slakio_core::sanitize::Remote::new(emoji),
+            text: slakio_core::sanitize::Remote::new(self.status_text.clone().unwrap_or_default()),
+            expires: self.status_expiration.filter(|&end| end > 0),
+        }))
     }
 }
 

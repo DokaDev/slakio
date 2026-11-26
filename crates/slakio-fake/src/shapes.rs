@@ -342,6 +342,11 @@ fn person(world: &World, id: &str) -> Option<Value> {
     if let Some(photo) = &u.avatar {
         profile["image_72"] = json!(photo);
     }
+    // Slack always writes the status fields: empty, and an end of 0, when there is none.
+    let status = u.status.as_ref();
+    profile["status_emoji"] = json!(status.map_or(String::new(), |s| format!(":{}:", s.emoji.unsanitized())));
+    profile["status_text"] = json!(status.map_or("", |s| s.text.unsanitized()));
+    profile["status_expiration"] = json!(status.and_then(|s| s.expires).unwrap_or(0));
     // The hostile person (`…666`) has a photo where no photo may come from: never fetched.
     if id.ends_with("666") {
         profile["image_72"] = json!("https://evil.example/avatar.png");

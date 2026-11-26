@@ -65,6 +65,8 @@ pub enum Kind {
     TeamShape,
     /// What a page's reactions and rich-text emoji carry.
     ReactionShape,
+    /// What the people lookups' profiles carry (their status fields).
+    People,
 }
 
 impl Kind {
@@ -81,6 +83,7 @@ impl Kind {
             Kind::PictureCache => "picture-cache",
             Kind::TeamShape => "team-shape",
             Kind::ReactionShape => "reaction-shape",
+            Kind::People => "people",
         }
     }
 

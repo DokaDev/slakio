@@ -146,6 +146,9 @@ pub(crate) fn user(r: &Row<'_>) -> rusqlite::Result<User> {
         avatar: slakio_core::images::avatar_address(&r.get::<_, String>("avatar")?),
         no_photo: false,
         avatar_guessed: r.get("avatar_guessed")?,
+        // A status is kept for the session only: none is stored, so none is known here.
+        status: None,
+        no_status: false,
     })
 }
 

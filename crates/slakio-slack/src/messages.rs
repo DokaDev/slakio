@@ -86,6 +86,8 @@ pub(crate) fn bot(ws: &str, id: String, b: Bot) -> User {
         avatar: b.icon,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     }
 }
 

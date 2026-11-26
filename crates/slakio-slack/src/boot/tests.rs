@@ -103,6 +103,8 @@ fn only_a_channel_shared_with_another_organization_is_slack_connect() {
         avatar: None,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     };
     let s = snapshot(boot(json!({}), json!(null)), None, vec![peer], NOW);
     assert!(find(&s, "D1").external);
@@ -162,6 +164,8 @@ fn person(id: &str, avatar: Option<&str>) -> User {
         avatar: avatar.map(str::to_string),
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     }
 }
 
@@ -272,6 +276,8 @@ fn known_person(id: &str, shown: &str, bot: bool) -> User {
         avatar: None,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     }
 }
 

@@ -195,7 +195,7 @@ impl Model {
     }
 
     /// `snapshot` (a whole new boot) with each photo shown now kept for a person it has none of
-    /// (unless it says they have no photo of their own), or only a guess of ([`User::photo_over`]).
+    /// (unless it says they have no photo of their own), or only a guess of ([`User::photo_over`]); each status known kept likewise.
     pub fn with_photos(&self, mut snapshot: Snapshot) -> Snapshot {
         let photos: HashMap<(&WorkspaceId, &UserId), (&String, bool)> = (self.snapshot.users.iter())
             .filter_map(|u| Some(((&u.workspace, &u.id), (u.avatar.as_ref()?, u.avatar_guessed))))
@@ -203,6 +203,7 @@ impl Model {
         for u in &mut snapshot.users {
             (u.avatar, u.avatar_guessed) = u.photo_over(photos.get(&(&u.workspace, &u.id)).copied());
         }
+        statuses::keep(&self.snapshot.users, &mut snapshot.users);
         snapshot
     }
 
@@ -211,6 +212,7 @@ impl Model {
     /// of another workspace is not taken. Its place and color stay those it was listed with.
     pub fn merge(&mut self, ws: &WorkspaceId, snapshot: &Snapshot, cached: bool) {
         let mut new = snapshot.only(ws);
+        statuses::keep(&self.snapshot.users, &mut new.users);
         if snapshot.sections_unknown {
             // Slack's sections could not be read (yet): those shown before stay.
             new.keep_sections(ws, &self.snapshot);
@@ -453,9 +455,12 @@ impl Model {
                         Presence::Unknown => self.snapshot.users[i].presence,
                         known => known,
                     };
+                    // Nor does one without the profile's status fields: a page's authors keep the
+                    // status a lookup told of them; a profile with an empty one clears it.
+                    let status = u.status_over(self.snapshot.users[i].status.as_ref());
                     let old = self.snapshot.users[i].avatar.take();
                     self.photo_changed(old, avatar.as_ref());
-                    self.snapshot.users[i] = User { avatar, avatar_guessed, presence, ..u.clone() };
+                    self.snapshot.users[i] = User { avatar, avatar_guessed, presence, status, ..u.clone() };
                 }
                 None => {
                     // A bot's author of one more name: past [`BOT_NAMES`] of that bot, it takes
@@ -587,5 +592,6 @@ mod rows;
 pub use rows::Sorting;
 mod saved;
 mod sections;
+mod statuses;
 #[cfg(test)]
 mod tests;

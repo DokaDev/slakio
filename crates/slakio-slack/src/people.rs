@@ -68,7 +68,8 @@ impl People {
         let mut u = user(p, &team)?;
         let mut known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(old) = known.get(&p.id) {
-            u = User { bot: old.bot, org: old.org.clone(), presence: old.presence, ..u };
+            let status = u.status_over(old.status.as_ref());
+            u = User { bot: old.bot, org: old.org.clone(), presence: old.presence, status, ..u };
             // The change's photo wins over the one known, a guess too: that one is older.
             let (avatar, avatar_guessed) = u.changed_over(old.avatar.as_ref().map(|a| (a, old.avatar_guessed)));
             known.insert(p.id.clone(), User { avatar, avatar_guessed, ..u.clone() });
@@ -149,6 +150,9 @@ impl People {
                 }
             };
             crate::shape::photos(client.diag(), found.results.as_deref().unwrap_or_default(), "lookup");
+            if client.diag().on() {
+                crate::shape::statuses(client.diag(), found.results.as_deref().unwrap_or_default());
+            }
             answer = answer.or(self.take(&team, batch, found, watched));
         }
         let known = self.known.lock().unwrap_or_else(PoisonError::into_inner);
@@ -193,10 +197,12 @@ impl People {
 /// Keep `u`, replacing what was known of them: a new photo replaces the old one, and one Slack
 /// says they no longer have ([`User::no_photo`]) is gone; a photo known before stays when `u`
 /// says nothing of it (a record without a photo does not say the photo is gone), or when `u`'s
-/// is only slakio's guess and the old one Slack gave ([`User::photo_over`]).
+/// is only slakio's guess and the old one Slack gave ([`User::photo_over`]). So does a status
+/// known before, unless `u` says what it is now ([`User::status_over`]).
 fn keep(known: &mut HashMap<String, User>, id: &str, mut u: User) {
     let old = known.get(id).and_then(|old| Some((old.avatar.as_ref()?, old.avatar_guessed)));
     (u.avatar, u.avatar_guessed) = u.photo_over(old);
+    u.status = u.status_over(known.get(id).and_then(|old| old.status.as_ref()));
     known.insert(id.to_string(), u);
 }
 
@@ -209,6 +215,7 @@ pub(crate) fn guessed(p: &wire::Profile) -> bool {
 /// `p` as the core's person of `team`; `None` when Slack gave no name to show.
 fn user(p: &wire::Person, team: &str) -> Option<User> {
     let shown = p.shown_name()?.to_string();
+    let status = p.profile.as_ref().and_then(wire::Profile::status);
     let org = match p.team_id.as_deref() {
         // An empty team is unknown, not another organization.
         Some(t) if !t.is_empty() && t != team => Org::External(Remote::new(t)),
@@ -225,6 +232,8 @@ fn user(p: &wire::Person, team: &str) -> Option<User> {
         avatar: p.profile.as_ref().and_then(wire::Profile::avatar),
         no_photo: p.profile.as_ref().is_some_and(wire::Profile::not_custom),
         avatar_guessed: p.profile.as_ref().is_some_and(guessed),
+        no_status: status == Some(None),
+        status: status.flatten(),
     })
 }
 

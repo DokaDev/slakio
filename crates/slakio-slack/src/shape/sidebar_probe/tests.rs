@@ -30,6 +30,8 @@ fn bot(id: &str) -> User {
         avatar: None,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     }
 }
 

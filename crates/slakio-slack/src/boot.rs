@@ -167,6 +167,7 @@ pub(crate) async fn boot(
     let team_id = team.id.clone();
     if client.diag().on() {
         crate::shape::starred(client.diag(), &boot, &known, &self_.id);
+        crate::shape::self_status(client.diag(), &boot);
     }
     let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
     snapshot.sections = sidebar.sections;
@@ -281,6 +282,7 @@ fn snapshot(
     // Slack said the user has no photo of their own: in the start bundle, or the lookup.
     let not_custom = me.profile.as_ref().is_some_and(wire::Profile::not_custom)
         || known.iter().any(|u| u.id.as_str() == me.id && u.no_photo);
+    let (no_status, status) = own_status(&me, &known);
     let presence = match boot.dnd.as_ref().and_then(|d| d.active(now)) {
         Some(true) => Presence::Dnd,
         _ => Presence::Unknown,
@@ -303,6 +305,8 @@ fn snapshot(
             no_photo: avatar.is_none() && not_custom,
             avatar_guessed: own_guessed(&me, &known),
             avatar,
+            status,
+            no_status,
         })
         .chain(known.into_iter().filter(|u| u.id.as_str() != me.id))
         .collect(),
@@ -421,6 +425,17 @@ fn own_photo(me: &wire::Me, known: &[User]) -> Option<String> {
         .as_ref()
         .and_then(wire::Profile::avatar)
         .or_else(|| known.iter().find(|u| u.id.as_str() == me.id).and_then(|u| u.avatar.clone()))
+}
+
+/// The user's own status: the one the start bundle's profile tells (or that it has none), else
+/// the one looked up or learned of them (`known`); whether it is said to be none, and it.
+fn own_status(me: &wire::Me, known: &[User]) -> (bool, Option<slakio_core::model::Status>) {
+    match me.profile.as_ref().and_then(wire::Profile::status) {
+        Some(said) => (said.is_none(), said),
+        None => {
+            known.iter().find(|u| u.id.as_str() == me.id).map(|u| (u.no_status, u.status.clone())).unwrap_or_default()
+        }
+    }
 }
 
 /// The user's own photo ([`own_photo`]) is slakio's guess ([`crate::people::guessed`]).

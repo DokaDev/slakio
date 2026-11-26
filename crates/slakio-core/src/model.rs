@@ -120,9 +120,40 @@ pub struct User {
     /// original, [`crate::images::avatar_sized`]), not an address Slack gave for it; unknown
     /// (a photo kept from before) counts as a guess.
     pub avatar_guessed: bool,
+    /// Their status emoji (and text) as Slack last told it; `None` when it told none, or none
+    /// is known. Kept for the session only, never stored.
+    pub status: Option<Status>,
+    /// Slack said they have no status (a profile with an empty `status_emoji`): a status known
+    /// before is gone. `false` with no `status`: not said (a record without the profile's status
+    /// fields), so a status known before stays.
+    pub no_status: bool,
+}
+
+/// A person's status: the emoji Slack shows after their name, and the text that goes with it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Status {
+    /// Its emoji code without colons (`tada`, or a custom emoji's name); never empty.
+    pub emoji: Remote,
+    pub text: Remote,
+    /// When it ends (seconds since the epoch); `None` when it has no end.
+    pub expires: Option<u64>,
+}
+
+impl Status {
+    /// Whether it still holds at `now` (seconds since the epoch): one past its end does not.
+    pub fn holds(&self, now: u64) -> bool {
+        self.expires.is_none_or(|end| end >= now)
+    }
 }
 
 impl User {
+    /// The status a person has once this newer record of them replaces one whose status was
+    /// `old`: this record's own, unless it says nothing of one (a record without the profile's
+    /// status fields does not say it is gone); none once it says they have none.
+    pub fn status_over(&self, old: Option<&Status>) -> Option<Status> {
+        if self.status.is_some() || self.no_status { self.status.clone() } else { old.cloned() }
+    }
+
     /// The photo a person has once this newer record of them replaces one whose photo was
     /// `old` (its address, and whether it was guessed): this record's own, unless it says
     /// nothing of one (a record without a photo does not say it is gone), or it is only a guess

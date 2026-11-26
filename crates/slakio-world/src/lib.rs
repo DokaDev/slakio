@@ -419,6 +419,8 @@ impl World {
             avatar: crate::pictures::avatar(&ws, &id, bot),
             no_photo: false,
             avatar_guessed: false,
+            status: None,
+            no_status: false,
             id: UserId::new(id),
             workspace: ws.clone(),
             name: name.into(),

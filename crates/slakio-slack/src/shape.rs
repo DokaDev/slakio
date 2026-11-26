@@ -15,8 +15,10 @@ use std::collections::BTreeMap;
 
 mod probe;
 mod sidebar_probe;
+mod status_probe;
 
 pub(crate) use sidebar_probe::starred;
+pub(crate) use status_probe::{self_status, statuses};
 
 /// The most entries of one list described (sections of a page, DMs of the start bundle).
 const ENTRIES_MAX: usize = 200;

@@ -118,3 +118,28 @@ fn a_wrongly_typed_field_of_a_profile_drops_neither_the_profile_nor_the_person()
     assert_eq!(people[1].shown_name(), Some("Jiwoo"));
     assert_eq!(people[2].profile.as_ref().unwrap().avatar(), None);
 }
+
+#[test]
+fn a_profile_status_is_set_empty_or_unsaid_and_an_unreadable_one_is_unsaid() {
+    use serde_json::json;
+    use slakio_core::model::Status;
+    let set = profile(json!({"status_emoji": ":tada:", "status_text": "Shipping", "status_expiration": 1_900_000_000}));
+    assert_eq!(
+        set.status(),
+        Some(Some(Status { emoji: "tada".into(), text: "Shipping".into(), expires: Some(1_900_000_000) })),
+        "present: the emoji without its colons, its text and end"
+    );
+    let no_end = profile(json!({"status_emoji": ":partyparrot:", "status_expiration": 0}));
+    assert_eq!(no_end.status(), Some(Some(Status { emoji: "partyparrot".into(), text: "".into(), expires: None })));
+    for empty in [json!({"status_emoji": "", "status_text": ""}), json!({"status_emoji": "", "status_text": "away"})] {
+        assert_eq!(profile(empty).status(), Some(None), "an empty emoji says there is none");
+    }
+    assert_eq!(profile(json!({"display_name": "Minsu"})).status(), None, "absent: not said");
+    for unreadable in [json!(7), json!(true), json!(null), json!({"x": 1}), json!([":tada:"])] {
+        let p = profile(json!({"status_emoji": unreadable, "display_name": "Minsu"}));
+        assert_eq!(p.status(), None, "a status emoji that is not text is not said");
+        assert_eq!(p.display_name.as_deref(), Some("Minsu"), "the rest of the profile stays");
+    }
+    let odd = profile(json!({"status_emoji": ":tada:", "status_text": 5, "status_expiration": "soon"}));
+    assert_eq!(odd.status(), Some(Some(Status { emoji: "tada".into(), text: "".into(), expires: None })));
+}

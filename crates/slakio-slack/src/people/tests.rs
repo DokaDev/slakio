@@ -421,3 +421,30 @@ fn a_looked_up_record_with_a_photo_is_pictured_and_one_without_is_named_unpictur
         assert_eq!(people.standing("UPLAIN"), "unpictured", "named all the same");
     });
 }
+
+#[test]
+fn a_record_without_the_status_fields_keeps_the_status_and_an_empty_one_clears_it() {
+    let people = People::default();
+    people.set_team("T1");
+    let with = |profile: serde_json::Value| -> wire::Person {
+        serde_json::from_value(json!({"id": "U1", "team_id": "T1", "profile": profile})).unwrap()
+    };
+    let status = |people: &People| people.known.lock().unwrap()["U1"].status.as_ref().map(|s| s.emoji.clone());
+    people.learn(&[with(json!({"display_name": "Minsu", "status_emoji": ":tada:"}))]);
+    assert_eq!(status(&people), Some("tada".into()));
+    // A page's author: a profile without the status fields does not say it is gone.
+    people.learn(&[with(json!({"display_name": "Minsu"}))]);
+    assert_eq!(status(&people), Some("tada".into()), "unsaid keeps the status known");
+    let no_profile: wire::Person =
+        serde_json::from_value(json!({"id": "U1", "team_id": "T1", "name": "minsu"})).unwrap();
+    people.learn(&[no_profile]);
+    assert_eq!(status(&people), Some("tada".into()), "no profile keeps it too");
+    // A live change that does not say keeps it; one with an empty emoji clears it.
+    assert_eq!(people.changed(&with(json!({"display_name": "Minsu K"}))).unwrap().status.unwrap().emoji, "tada");
+    assert_eq!(status(&people), Some("tada".into()));
+    assert!(people.changed(&with(json!({"display_name": "Minsu", "status_emoji": ""}))).unwrap().status.is_none());
+    assert_eq!(status(&people), None, "an empty status emoji clears it");
+    people.learn(&[with(json!({"display_name": "Minsu", "status_emoji": ":coffee:"}))]);
+    people.learn(&[with(json!({"display_name": "Minsu", "status_emoji": ""}))]);
+    assert_eq!(status(&people), None, "a lookup's empty one clears it as well");
+}

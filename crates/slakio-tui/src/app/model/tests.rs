@@ -112,6 +112,8 @@ fn a_person_listed_by_two_workspaces_is_kept_as_each_one_sees_them() {
         avatar: None,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     };
     let mut m = Model::default();
     m.add_users(&a, &[peer(&a, Org::Own)]);
@@ -331,6 +333,8 @@ fn a_bot_s_names_kept_as_people_are_capped() {
         avatar: None,
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     };
     for i in 0..1000 {
         m.add_users(&w, &[bot(i)]);
@@ -357,6 +361,8 @@ fn a_known_photo_is_never_replaced_by_no_photo_but_a_new_photo_replaces_it() {
         avatar: avatar.map(str::to_string),
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     };
     let host = slakio_core::images::AVATAR_HOSTS[0];
     let (one, two) = (format!("https://{host}/one_72.png"), format!("https://{host}/two_72.png"));
@@ -546,6 +552,8 @@ fn a_photo_no_one_shows_any_more_is_noted_as_gone() {
         avatar: Some(avatar.to_string()),
         no_photo: false,
         avatar_guessed: false,
+        status: None,
+        no_status: false,
     };
     m.add_users(&w, &[bot(1, &icon), bot(2, &icon)]);
     let _ = m.take_gone_photos();
@@ -778,4 +786,43 @@ fn a_folded_section_counts_no_closed_dm_it_does_not_list() {
     s.conversations[dm].section = mine_id;
     let moved = Model::new(s);
     assert_eq!(moved.section_counts(mine), (mine_before.0 + 1, mine_before.1 + 2), "listed in one's own");
+}
+
+/// A record that says nothing of a status (a page's authors, a cached boot) keeps the status
+/// known; one whose profile has an empty status emoji clears it; a new one replaces it.
+#[test]
+fn a_record_without_a_status_keeps_the_known_one_and_an_empty_one_clears_it() {
+    use slakio_core::model::Status;
+    let (a, part_a) = part(0);
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    let me = part_a.workspaces[0].me.clone();
+    let status = |emoji: &str| Some(Status { emoji: emoji.into(), text: "Out".into(), expires: None });
+    let mut with = part_a.clone();
+    for u in with.users.iter_mut().filter(|u| u.id == me) {
+        u.status = status("palm_tree");
+    }
+    m.merge(&a, &with, false);
+    let shown = |m: &Model| m.user(&a, &me).unwrap().status.as_ref().map(|s| s.emoji.unsanitized().to_string());
+    assert_eq!(shown(&m).as_deref(), Some("palm_tree"));
+    let unsaid = User { status: None, no_status: false, ..m.user(&a, &me).unwrap().clone() };
+    m.add_users(&a, std::slice::from_ref(&unsaid));
+    assert_eq!(shown(&m).as_deref(), Some("palm_tree"), "a page's author keeps it");
+    m.change_users(&a, std::slice::from_ref(&unsaid));
+    assert_eq!(shown(&m).as_deref(), Some("palm_tree"), "a live change that does not say keeps it");
+    let mut cached = part_a.clone();
+    for u in &mut cached.users {
+        (u.status, u.no_status) = (None, false);
+    }
+    m.merge(&a, &cached, true);
+    assert_eq!(shown(&m).as_deref(), Some("palm_tree"), "a boot that does not say keeps it");
+    let renewed = m.with_photos(cached.clone());
+    assert!(renewed.users.iter().any(|u| u.id == me && u.status == status("palm_tree")), "a whole new boot too");
+    m.add_users(&a, &[User { status: status("coffee"), ..unsaid.clone() }]);
+    assert_eq!(shown(&m).as_deref(), Some("coffee"), "a new one replaces it");
+    m.add_users(&a, &[User { no_status: true, ..unsaid.clone() }]);
+    assert_eq!(shown(&m), None, "an empty status emoji clears it");
+    m.add_users(&a, &[User { status: status("coffee"), ..unsaid.clone() }]);
+    m.change_users(&a, &[User { no_status: true, ..unsaid }]);
+    assert_eq!(shown(&m), None, "a live change with an empty one clears it too");
 }
