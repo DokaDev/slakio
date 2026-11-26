@@ -31,6 +31,7 @@ mod custom;
 mod tokens;
 pub use builtins::*;
 pub use custom::load;
+pub use reactions::ChipLook;
 pub use tokens::Styles;
 
 /// `c` with `keep` percent of its brightness (toward black).
@@ -106,7 +107,7 @@ pub struct Theme {
     pub bg: Color,
     /// The status line, popups.
     pub surface: Color,
-    /// Reaction pills.
+    /// The fallback background of a neutral avatar chip (a group DM's, a muted conversation's).
     pub surface_alt: Color,
     /// Borders of panels without the focus, dividers.
     pub border: Color,
@@ -130,6 +131,11 @@ pub struct Theme {
     pub cursor_line: Color,
     /// The background of a VISUAL range.
     pub range: Color,
+    /// The background of a reaction chip (24-bit themes): a quiet pill a little apart from the
+    /// background.
+    pub reaction: Color,
+    /// The background of the user's own reaction: a light wash of the accent.
+    pub reaction_mine: Color,
     /// Mode badges (with [`Self::mode_fg`] bold on them), each also naming its mode.
     pub mode_normal: Color,
     pub mode_insert: Color,
@@ -196,6 +202,8 @@ impl Theme {
             &mut self.selection,
             &mut self.cursor_line,
             &mut self.range,
+            &mut self.reaction,
+            &mut self.reaction_mine,
             &mut self.mode_normal,
             &mut self.mode_insert,
             &mut self.mode_visual,
@@ -390,24 +398,6 @@ impl Theme {
         self.mode(self.warning)
     }
 
-    /// A reaction chip: a pill on the raised background (the cursor line's color on a dark
-    /// theme, [`Self::raised`]), never darker than the background there; body text on it.
-    fn reaction_role(&self) -> Style {
-        match self.kind {
-            Kind::Truecolor => self.text().bg(self.raised()),
-            _ => self.muted(),
-        }
-    }
-
-    /// The user's own reaction: a pill filled with the accent (the background's color on it),
-    /// bold; without truecolor the accent on no background.
-    fn reaction_mine_role(&self) -> Style {
-        match self.kind {
-            Kind::Truecolor => Style::new().fg(self.bg).bg(self.accent).add_modifier(Modifier::BOLD),
-            _ => self.reaction_role().fg(self.accent).add_modifier(Modifier::BOLD),
-        }
-    }
-
     pub fn warning(&self) -> Style {
         Style::new().fg(self.warning).add_modifier(Modifier::BOLD)
     }
@@ -524,6 +514,7 @@ mod bars;
 mod chip;
 mod code;
 mod paint;
+mod reactions;
 mod workspace;
 
 #[cfg(test)]

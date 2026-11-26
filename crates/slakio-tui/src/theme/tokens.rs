@@ -109,14 +109,14 @@ impl Theme {
         over(self.styles.hint, || self.hint_role())
     }
 
-    /// A reaction chip.
+    /// A reaction chip: its pad and emoji ([`Self::reaction_chip`]).
     pub fn reaction(&self) -> Style {
-        over(self.styles.reaction, || self.reaction_role())
+        self.reaction_chip(false).body
     }
 
-    /// The user's own reaction.
+    /// The user's own reaction: its pad and emoji ([`Self::reaction_chip`]).
     pub fn reaction_mine(&self) -> Style {
-        over(self.styles.reaction_mine, || self.reaction_mine_role())
+        self.reaction_chip(true).body
     }
 
     /// The status line: its surface.

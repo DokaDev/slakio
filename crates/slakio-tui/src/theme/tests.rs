@@ -33,6 +33,8 @@ fn colors(t: &Theme) -> Vec<Color> {
         t.selection,
         t.cursor_line,
         t.range,
+        t.reaction,
+        t.reaction_mine,
         t.mode_normal,
         t.mode_insert,
         t.mode_visual,
@@ -388,6 +390,68 @@ fn reaction_chips_stand_off_the_background_and_their_text_reads() {
         assert!(contrast(t.bg, t.accent) >= 3.0, "{n}: the user's own chip {:.2}", contrast(t.bg, t.accent));
         assert_eq!(t.reaction().bg, Some(chip), "{n}");
         assert_eq!((t.reaction_mine().fg, t.reaction_mine().bg), (Some(t.bg), Some(t.accent)), "{n}");
+    }
+}
+
+/// The largest difference of two RGB colours on one channel.
+fn channel_gap(a: Color, b: Color) -> u8 {
+    let (Color::Rgb(r, g, b1), Color::Rgb(r2, g2, b2)) = (a, b) else { panic!("{a:?} {b:?} are not RGB") };
+    r.abs_diff(r2).max(g.abs_diff(g2)).max(b1.abs_diff(b2))
+}
+
+/// A reaction chip is a quiet pill, as in Slack's desktop app: a little apart from the
+/// background (lighter on a dark theme), body text 4.5:1 and the muted count 3:1 on it. The
+/// user's own is a wash of the accent, never the accent itself and nearer the background than
+/// the accent is, its count (the accent, or body text where the accent reads under 3:1) 3:1 on
+/// it. The two chips and the selection bar stay apart; each chip has a rounded cap in its colour.
+#[test]
+fn reaction_chips_are_quiet_pills_with_readable_counts() {
+    for t in truecolor() {
+        let n = &t.name;
+        for (what, chip) in [("others", t.reaction), ("mine", t.reaction_mine)] {
+            assert!(contrast(chip, t.bg) >= 1.15, "{n} {what}: chip {chip:?} on bg {:.2}", contrast(chip, t.bg));
+            if dark(t) {
+                assert!(luminance(chip) > luminance(t.bg), "{n} {what}: a dark theme's chip is lighter than its bg");
+            }
+            assert!(contrast(t.fg, chip) >= 4.5, "{n} {what}: text on the chip {:.2}", contrast(t.fg, chip));
+            // A bar keeps a chip's cells and tints code apart: the two never share a colour.
+            assert_ne!(chip, t.code_bg(), "{n} {what}: code's tint");
+        }
+        assert!(contrast(t.fg_muted, t.reaction) >= 3.0, "{n}: count {:.2}", contrast(t.fg_muted, t.reaction));
+        assert!(contrast(t.bg, t.accent) >= 3.0, "{n}: the accent {:.2}", contrast(t.bg, t.accent));
+        assert_ne!(t.reaction_mine, t.accent, "{n}: a wash, not the accent");
+        assert!(contrast(t.reaction_mine, t.bg) < contrast(t.accent, t.bg), "{n}: quieter than the accent");
+        for (a, b, what) in [
+            (t.reaction, t.reaction_mine, "the two chips"),
+            (t.reaction, t.selection, "a chip and the selection"),
+            (t.reaction_mine, t.selection, "the user's own chip and the selection"),
+        ] {
+            assert!(channel_gap(a, b) >= 8, "{n}: {what} {a:?} {b:?}");
+        }
+        let others = t.reaction_chip(false);
+        assert_eq!(others.body, t.text().bg(t.reaction), "{n}");
+        assert_eq!(others.count, t.muted().bg(t.reaction), "{n}");
+        assert_eq!(others.cap, Some(Style::new().fg(t.reaction)), "{n}");
+        assert_eq!(t.reaction(), others.body, "{n}");
+        let mine = t.reaction_chip(true);
+        assert_eq!(mine.body, t.text().bg(t.reaction_mine), "{n}");
+        assert_eq!(mine.cap, Some(Style::new().fg(t.reaction_mine)), "{n}");
+        assert_eq!(t.reaction_mine(), mine.body, "{n}");
+        let count = mine.count.fg.expect("a count colour");
+        assert!(contrast(count, t.reaction_mine) >= 3.0, "{n}: own count {:.2}", contrast(count, t.reaction_mine));
+        assert!(count == t.accent || count == t.fg, "{n}: {count:?}");
+        assert_eq!(count == t.fg, contrast(t.accent, t.reaction_mine) < 3.0, "{n}: the accent where it reads");
+        assert!(mine.count.add_modifier.contains(Modifier::BOLD), "{n}");
+        assert_eq!(mine.count.bg, Some(t.reaction_mine), "{n}");
+    }
+    // Without a chip colour: muted text, the user's own in the accent and bold, no cap.
+    for t in [TERMINAL, resolve("terminal", false, Background::Light), Theme::no_color()] {
+        for mine in [false, true] {
+            let look = t.reaction_chip(mine);
+            assert_eq!((look.cap, look.body.bg), (None, None), "{} {mine}", t.name);
+            assert_eq!(look.count, look.body, "{} {mine}", t.name);
+        }
+        assert_eq!(t.reaction_chip(true).body.fg, Some(t.accent), "{}", t.name);
     }
 }
 

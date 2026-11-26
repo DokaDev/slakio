@@ -40,6 +40,7 @@ pub fn from_spec(name: &str, spec: &ThemeSpec, look: Look) -> Theme {
             *slot = color(*c);
         }
     }
+    t.derive_reactions(|token| spec.colors.iter().any(|(t, _)| *t == token));
     if let Some(list) = &spec.workspaces {
         t.workspaces = Cow::Owned(list.iter().copied().map(color).collect());
     }
@@ -81,6 +82,8 @@ fn color_slot<'a>(t: &'a mut Theme, name: &str) -> Option<&'a mut Color> {
         "selection" => &mut t.selection,
         "cursor_line" => &mut t.cursor_line,
         "range" => &mut t.range,
+        "reaction" => &mut t.reaction,
+        "reaction_mine" => &mut t.reaction_mine,
         "mode_normal" => &mut t.mode_normal,
         "mode_insert" => &mut t.mode_insert,
         "mode_visual" => &mut t.mode_visual,

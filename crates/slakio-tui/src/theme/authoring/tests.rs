@@ -273,7 +273,7 @@ fn update_adds_only_what_the_file_does_not_list() {
     assert_eq!(update(&d.0, "old", LOOKS[0]), Ok(Updated::Complete { path }));
     // A short file gets the tables it lacks.
     d.put("short", "extends = \"dark\"\n");
-    assert!(matches!(update(&d.0, "short", LOOKS[0]), Ok(Updated::Added { count: 38, .. })));
+    assert!(matches!(update(&d.0, "short", LOOKS[0]), Ok(Updated::Added { count: 40, .. })));
     let short = d.text("short");
     assert!(
         short.starts_with("extends = \"dark\"\n") && short.contains("\n[colors]\n") && short.contains("\n[styles]\n")

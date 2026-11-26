@@ -862,3 +862,27 @@ fn a_list_cut_at_its_cap_never_draws_a_message_address() {
     assert!(screen.contains(":partner-wave:"), "{screen}");
     assert!(cells(&s).is_empty(), "nothing drawn as a picture");
 }
+
+/// A custom emoji in a reaction chip is drawn on the chip's colour, its cells in the colour that
+/// names the picture; selecting the message leaves both as they are.
+#[test]
+fn a_custom_emoji_reaction_keeps_its_picture_id() {
+    use slakio_tui::theme::{Background, resolve};
+    let (mut s, _) = shown(&[("hello", &["party-blob"])], 120, 40, true);
+    let t = resolve("dark", true, Background::Dark);
+    s.d.app.theme = t.clone();
+    drawn(&mut s);
+    let rows = cells(&s);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    let (y, xs) = rows[0].clone();
+    let picture = |s: &Scripted| {
+        let buf = s.d.buffer();
+        xs.iter().map(|&x| (buf[(x, y)].symbol().to_string(), buf[(x, y)].fg, buf[(x, y)].bg)).collect::<Vec<_>>()
+    };
+    let before = picture(&s);
+    let id = before[0].1;
+    assert!(before.iter().all(|(_, fg, bg)| *fg == id && *bg == t.reaction), "on the chip: {before:?}");
+    assert!(![t.fg, t.fg_muted, t.accent, t.reaction, t.reaction_mine].contains(&id), "the picture's id: {id:?}");
+    s.d.app.select_message(0);
+    assert_eq!(picture(&s), before, "selected, the picture's cells stay");
+}

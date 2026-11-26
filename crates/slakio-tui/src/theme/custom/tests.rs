@@ -59,6 +59,8 @@ fn every_token_of_a_file_lands_where_it_is_drawn() {
         t.selection,
         t.cursor_line,
         t.range,
+        t.reaction,
+        t.reaction_mine,
         t.mode_normal,
         t.mode_insert,
         t.mode_visual,
@@ -210,4 +212,35 @@ fn avatar_initials_stay_readable_at_every_tint() {
         let muted = t.avatar_muted();
         assert_ne!(muted.fg, muted.bg, "tint {tint}: a muted chip");
     }
+}
+
+#[test]
+fn a_file_that_changes_the_colours_gets_reaction_chips_of_its_own() {
+    let t = theme(
+        "extends = \"dark\"\n[colors]\nbg = \"#101820\"\nfg = \"#e0e8f0\"\naccent = \"#f0a030\"\n",
+        DARK_TRUECOLOR,
+    );
+    // Body text 10% into the background, and a wash of the accent apart from it.
+    assert_eq!(t.reaction, rgb(0x242C34));
+    assert_ne!(t.reaction_mine, crate::theme::DARK.reaction_mine, "follows the accent");
+    assert_ne!(t.reaction_mine, t.accent, "a wash, not the accent");
+    for chip in [t.reaction, t.reaction_mine] {
+        assert!(super::super::code::contrast(chip, t.bg).unwrap() >= 1.15, "{chip:?} apart from the background");
+        assert!(super::super::code::contrast(t.fg, chip).unwrap() >= 4.5, "{chip:?} under body text");
+        assert_ne!(chip, t.code_bg(), "never code's tint");
+    }
+    assert_eq!(t.reaction_chip(true).cap, Some(Style::new().fg(t.reaction_mine)));
+    // What the file sets stays; a colour that is not RGB keeps the base's chip.
+    let t = theme(
+        "extends = \"dark\"\n[colors]\nbg = \"#101820\"\nreaction = \"#202020\"\nreaction_mine = \"#203020\"\n",
+        DARK_TRUECOLOR,
+    );
+    assert_eq!((t.reaction, t.reaction_mine), (rgb(0x202020), rgb(0x203020)));
+    let t = theme("extends = \"dark\"\n[colors]\naccent = \"red\"\n", DARK_TRUECOLOR);
+    assert_eq!((t.reaction, t.reaction_mine), (crate::theme::DARK.reaction, crate::theme::DARK.reaction_mine));
+    // A `[styles]` override is the whole chip, its background the caps' colour.
+    let t = theme("extends = \"dark\"\n[styles]\nreaction = { fg = \"#ffffff\", bg = \"#334455\" }\n", DARK_TRUECOLOR);
+    let look = t.reaction_chip(false);
+    assert_eq!((look.body, look.count), (t.reaction(), t.reaction()));
+    assert_eq!(look.cap, Some(Style::new().fg(rgb(0x334455))));
 }

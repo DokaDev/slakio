@@ -63,7 +63,7 @@ own). Names are taken in any case.
 |---|---|
 | `bg` | The app's background. |
 | `surface` | The status line and popups. |
-| `surface_alt` | Reaction pills. |
+| `surface_alt` | The background of a neutral avatar chip where the theme has no tint. |
 | `border` | Borders of panels without the focus, dividers. |
 | `accent` | The focused panel's border, links, prompts, the current workspace, keys in popups. |
 | `accent_warm` | Key groups, a mention of you, words a search found. |
@@ -76,11 +76,18 @@ own). Names are taken in any case.
 | `selection` | The background of the selected row of the focused panel. |
 | `cursor_line` | The background of the selected row of a panel without the focus (24-bit themes). |
 | `range` | The background of a VISUAL range. |
+| `reaction` | The background of a reaction chip (24-bit themes). |
+| `reaction_mine` | The background of your own reaction (24-bit themes): a light wash of the accent. |
 | `mode_normal` | The mode badge in NORMAL. |
 | `mode_insert` | The mode badge in INSERT. |
 | `mode_visual` | The mode badge in VISUAL. |
 | `mode_command` | The mode badge while the command palette is open. |
 | `mode_fg` | The text of the mode badge and of the counts. |
+
+A file that sets `bg` or `fg` but not `reaction` gets a chip of body text mixed 10% into the
+background; one that sets `bg` or `accent` but not `reaction_mine` gets the least share of the
+accent (from 10%) that sets the chip apart from the background (1.15:1) and from the selection
+and the other chip. Where a colour is not `#rrggbb`, the chip of the theme it extends stays.
 
 These four are slakio's own:
 

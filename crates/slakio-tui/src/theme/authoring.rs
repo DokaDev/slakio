@@ -41,12 +41,12 @@ pub enum AuthorError {
     Changed(PathBuf),
 }
 
-/// What each colour token colours (the 20 single colours, then slakio's four), as
+/// What each colour token colours (the 22 single colours, then slakio's four), as
 /// `docs/themes.md` says it.
 pub const COLOR_ABOUT: &[(&str, &str)] = &[
     ("bg", "The app's background."),
     ("surface", "The status line and popups."),
-    ("surface_alt", "Reaction pills."),
+    ("surface_alt", "The background of a neutral avatar chip where the theme has no tint."),
     ("border", "Borders of panels without the focus, dividers."),
     ("accent", "The focused panel's border, links, prompts, the current workspace, keys in popups."),
     ("accent_warm", "Key groups, a mention of you, words a search found."),
@@ -59,6 +59,8 @@ pub const COLOR_ABOUT: &[(&str, &str)] = &[
     ("selection", "The background of the selected row of the focused panel."),
     ("cursor_line", "The background of the selected row of a panel without the focus (24-bit themes)."),
     ("range", "The background of a VISUAL range."),
+    ("reaction", "The background of a reaction chip (24-bit themes)."),
+    ("reaction_mine", "The background of your own reaction (24-bit themes): a light wash of the accent."),
     ("mode_normal", "The mode badge in NORMAL."),
     ("mode_insert", "The mode badge in INSERT."),
     ("mode_visual", "The mode badge in VISUAL."),
@@ -259,6 +261,8 @@ pub(super) fn color_value(th: &Theme, token: &str) -> Option<String> {
         "selection" => th.selection,
         "cursor_line" => th.cursor_line,
         "range" => th.range,
+        "reaction" => th.reaction,
+        "reaction_mine" => th.reaction_mine,
         "mode_normal" => th.mode_normal,
         "mode_insert" => th.mode_insert,
         "mode_visual" => th.mode_visual,
