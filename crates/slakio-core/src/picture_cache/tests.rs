@@ -437,7 +437,7 @@ fn a_photo_is_kept_as_it_came_whatever_its_format() {
 
 #[test]
 fn a_file_of_the_second_format_is_refused_on_a_read_and_removed_by_the_sweep() {
-    let (c, _) = cache("v2");
+    let (c, at) = cache("v2");
     let photo = Source::Avatar(AVATAR.into());
     // The second format: the same header under its own magic, a PNG made for some cells.
     assert!(matches!(c.store(&photo, "photo-4x2@9x18", &png(64)), Stored::Stored(_)));
@@ -446,10 +446,54 @@ fn a_file_of_the_second_format_is_refused_on_a_read_and_removed_by_the_sweep() {
     fs::write(c.path(&photo, "photo-4x2@9x18"), &v2).unwrap();
     assert_eq!(c.load(&photo, "photo-4x2@9x18"), Loaded::Refused("header"));
     assert!(!c.path(&photo, "photo-4x2@9x18").exists(), "removed");
-    // Left by an earlier run under a name no one asks for again: the sweep removes it.
+    // Left by an earlier run under a name no one asks for again: the sweep keeps it until its
+    // age runs out, then removes it.
     fs::write(c.path(&photo, "chip-2x1@9x18"), &v2).unwrap();
     assert!(matches!(c.store(&photo, "source", &png(64)), Stored::Stored(_)));
-    assert_eq!(c.sweep().unwrap(), Swept { removed: 1, kept: 1, bytes: (HEADER + 64) as u64 });
+    assert_eq!(c.sweep().unwrap(), Swept { removed: 0, kept: 2, bytes: 2 * (HEADER + 64) as u64 });
+    at.store(START + AVATAR_AGE.as_secs() + 1, Ordering::Relaxed);
+    assert_eq!(c.sweep().unwrap(), Swept { removed: 2, kept: 0, bytes: 0 });
     assert!(!c.path(&photo, "chip-2x1@9x18").exists());
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn a_0_0_25_file_is_read_as_the_second_format_for_its_own_tag() {
+    let (c, _) = cache("v2-legacy");
+    let photo = Source::Avatar(AVATAR.into());
+    assert!(matches!(c.store(&photo, "photo-4x2@9x18", &png(64)), Stored::Stored(_)));
+    assert_eq!(
+        c.load_legacy(&photo, "photo-4x2@9x18"),
+        Loaded::Refused("header"),
+        "a third-format file is no legacy one"
+    );
+    assert!(matches!(c.store(&photo, "photo-4x2@9x18", &png(64)), Stored::Stored(_)));
+    let mut v2 = fs::read(c.path(&photo, "photo-4x2@9x18")).unwrap();
+    v2[..8].copy_from_slice(MAGIC_V2);
+    fs::write(c.path(&photo, "photo-4x2@9x18"), &v2).unwrap();
+    assert_eq!(c.load_legacy(&photo, "photo-4x2@9x18"), Loaded::Hit(png(64)));
+    assert_eq!(c.load_legacy(&photo, "photo-4x2@18x36"), Loaded::Miss, "other cells: another file");
+    let mut other = v2.clone();
+    other[8] ^= 1;
+    fs::write(c.path(&photo, "photo-4x2@9x18"), &other).unwrap();
+    assert_eq!(c.load_legacy(&photo, "photo-4x2@9x18"), Loaded::Refused("key"));
+    let _ = fs::remove_dir_all(c.dir());
+}
+
+#[test]
+fn the_sweep_keeps_0_0_25_files_until_their_age() {
+    let (c, at) = cache("v2-sweep");
+    let photo = Source::Avatar(AVATAR.into());
+    let emoji = Source::Emoji(EMOJI.into());
+    for (source, tag) in [(&photo, "photo-4x2@9x18"), (&emoji, "emoji@9x18")] {
+        assert!(matches!(c.store(source, tag, &png(64)), Stored::Stored(_)));
+        let mut v2 = fs::read(c.path(source, tag)).unwrap();
+        v2[..8].copy_from_slice(MAGIC_V2);
+        fs::write(c.path(source, tag), &v2).unwrap();
+    }
+    assert_eq!(c.sweep().unwrap(), Swept { removed: 0, kept: 2, bytes: 2 * (HEADER + 64) as u64 });
+    at.store(START + AVATAR_AGE.as_secs() + 1, Ordering::Relaxed);
+    assert_eq!(c.sweep().unwrap().removed, 1, "the photo's age ran out, not the emoji's");
+    assert!(matches!(c.load_legacy(&emoji, "emoji@9x18"), Loaded::Hit(_)));
     let _ = fs::remove_dir_all(c.dir());
 }

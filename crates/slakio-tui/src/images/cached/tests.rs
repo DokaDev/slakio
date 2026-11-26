@@ -522,3 +522,49 @@ fn a_photo_made_from_the_bytes_fetched_for_its_other_place_is_not_written_again(
     assert!(std::fs::read(&file).unwrap() == b"as kept", "not written again");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// What 0.0.25 kept for `source` as `tag` (the cells it was made for): `png` under the second
+/// format's header, in the folder `dir`.
+fn kept_by_0_0_25(dir: &std::path::Path, source: &Source, tag: &str, png: &[u8]) {
+    let cache = PictureCache::new(dir.to_path_buf());
+    assert!(matches!(cache.store(source, tag, png), Stored::Stored(_)));
+    let path = cache.path(source, tag);
+    let mut bytes = std::fs::read(&path).unwrap();
+    bytes[..8].copy_from_slice(b"slkpic2\n");
+    std::fs::write(&path, bytes).unwrap();
+}
+
+#[test]
+fn a_0_0_25_file_is_read_for_its_own_shape_and_cells() {
+    let dir = scratch("v2-read");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    // 0.0.25 kept the PNG it made for the picture slot (4x2 cells of 9x18 pixels).
+    let fetched = slakio_world::pictures::png(photo.address(), 64, 64);
+    let made = decode::decode(&fetched, PHOTO, Some((9, 18))).unwrap().png;
+    kept_by_0_0_25(&dir, &photo, "photo-4x2@9x18", &made);
+    images.look_as(&ws(), &photo, PHOTO);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for");
+    let read = run(&look, Some((9, 18)), images.cache.as_ref(), &diag).expect("read from the 0.0.25 file");
+    assert_eq!((read.cols, read.rows), (4, 2));
+    assert_ne!((read.from.0, read.from.1), (64, 64), "the PNG 0.0.25 made for those cells, not the fetched one");
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "not kept again in the new format");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A guard: a 0.0.25 file made for other cells is no picture for these (a miss, then fetched).
+#[test]
+fn a_0_0_25_file_for_other_cells_is_a_miss() {
+    let dir = scratch("v2-other");
+    let diag = Diag::default();
+    let mut images = images(&dir, &diag);
+    let photo = photos()[0].clone();
+    kept_by_0_0_25(&dir, &photo, "photo-4x2@18x36", &slakio_world::pictures::png("x", 8, 8));
+    images.look_as(&ws(), &photo, PHOTO);
+    images.ask(&mut Requests::default(), Instant::now());
+    let look = images.take_lookups().pop().expect("looked for");
+    assert!(matches!(run(&look, Some((9, 18)), images.cache.as_ref(), &diag), Err(Refused::NotCached)));
+    let _ = std::fs::remove_dir_all(&dir);
+}

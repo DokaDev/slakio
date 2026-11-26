@@ -28,6 +28,20 @@ pub const DISK_LOADERS: usize = 4;
 /// The tag of every picture's key on disk: it is kept as fetched, whatever cells it fills.
 pub const KEPT_AS: &str = "source";
 
+/// The tag 0.0.25 kept a picture under: the cells it fills and a cell's size in pixels (what it
+/// was made for). Such a file is only read ([`PictureCache::load_legacy`]), for those cells.
+pub fn legacy_tag(shape: Shape, cell: Option<(u16, u16)>) -> String {
+    let shape = match shape {
+        Shape::Preview => "preview".to_string(),
+        Shape::Emoji => "emoji".to_string(),
+        Shape::Photo { cols, rows } => format!("photo-{cols}x{rows}"),
+    };
+    match cell {
+        Some((w, h)) => format!("{shape}@{w}x{h}"),
+        None => format!("{shape}@none"),
+    }
+}
+
 /// `job` made ready, for cells of `cell` pixels, as the binary runs it (a blocking task): with
 /// a cache, a look there ([`Refused::NotCached`] when nothing there can be shown), or the bytes
 /// fetched decoded and the picture made of them kept. Blocking work: never on the loop's thread.
@@ -90,18 +104,27 @@ pub fn panicked(job: &Job, cache: Option<&PictureCache>) {
     }
 }
 
-/// The picture of `job` read from `cache` and decoded for cells of `cell` pixels;
+/// The picture of `job` read from `cache` and decoded for cells of `cell` pixels: the one kept as
+/// fetched, else the one 0.0.25 made for these cells ([`legacy_tag`]);
 /// [`Refused::NotCached`] when nothing there can be shown (one that does not decode is removed).
 fn load(job: &Job, cell: Option<(u16, u16)>, cache: &PictureCache, diag: &Diag) -> Result<Prepared, Refused> {
     let key = (job.source.clone(), job.shape);
-    match cache.load(&job.source, KEPT_AS) {
+    let mut tag = KEPT_AS.to_string();
+    let mut loaded = cache.load(&job.source, KEPT_AS);
+    if loaded == Loaded::Miss {
+        let legacy = legacy_tag(job.shape, cell);
+        if let hit @ Loaded::Hit(_) = cache.load_legacy(&job.source, &legacy) {
+            (tag, loaded) = (legacy, hit);
+        }
+    }
+    match loaded {
         Loaded::Hit(picture) => match decode::decode(&picture, job.shape, cell) {
             Ok(d) => {
                 note::line(diag, &key, Stage::CacheHit, "ok", &[]);
                 Ok(super::made(job, &d))
             }
             Err(_) => {
-                cache.forget(&job.source, KEPT_AS);
+                cache.forget(&job.source, &tag);
                 note::line(diag, &key, Stage::CacheRefused, "decode", &[]);
                 Err(Refused::NotCached)
             }

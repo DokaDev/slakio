@@ -7,8 +7,10 @@
 //! * A file is named by [`key`] alone (its first 16 bytes in hex, then `.png`; the key is the
 //!   SHA-256 of the kind, the address and a tag the UI gives): never the address, a name or an
 //!   id. It holds a header ([`MAGIC`], all 32 bytes of the key, the time it was written, the
-//!   kind) and the picture, nothing else. A file of an earlier format (the second kept a PNG
-//!   per address and cells) is refused and removed, on a read and by the sweep.
+//!   kind) and the picture, nothing else. A file of the second format (0.0.25 kept a PNG per
+//!   address and cells, [`MAGIC_V2`]) is read for the cells it was made for
+//!   ([`PictureCache::load_legacy`]) and kept by the sweep until its age runs out; one of any
+//!   other format is refused and removed, on a read and by the sweep.
 //! * The folder is private (0700) and each file too (0600), written whole or not at all, never
 //!   through a link; a folder that is a link, or not the user's own, or one others may write in,
 //!   is neither read nor written. It is made once, when
@@ -52,6 +54,8 @@ pub const EMOJI_AGE: Duration = Duration::from_secs(30 * 24 * 3600);
 pub const THUMB_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 /// The first bytes of every file (the format's version is its last digit).
 pub const MAGIC: &[u8; 8] = b"slkpic3\n";
+/// The first bytes of a file 0.0.25 wrote: the same header, a PNG made for some cells.
+pub const MAGIC_V2: &[u8; 8] = b"slkpic2\n";
 /// The header: [`MAGIC`], the key (32 bytes), the time written (a little-endian `u64`), the
 /// kind.
 const HEADER: usize = 49;
@@ -268,6 +272,16 @@ impl PictureCache {
     /// The picture kept for `source` as `shape`, when there is one that may be read; a file that is
     /// too old or refused is removed. A hit counts as a use (its time is set to now).
     pub fn load(&self, source: &Source, shape: &str) -> Loaded {
+        self.load_as(MAGIC, source, shape)
+    }
+
+    /// The picture 0.0.25 kept for `source` as `shape` (its tag of the cells it was made for),
+    /// read as [`PictureCache::load`] reads one, under [`MAGIC_V2`]; never written again.
+    pub fn load_legacy(&self, source: &Source, shape: &str) -> Loaded {
+        self.load_as(MAGIC_V2, source, shape)
+    }
+
+    fn load_as(&self, magic: &[u8; 8], source: &Source, shape: &str) -> Loaded {
         if !self.dir_ok() {
             return Loaded::Miss;
         }
@@ -292,7 +306,7 @@ impl PictureCache {
         }
         let Ok(bytes) = crate::fsutil::read_plain(&path, FILE_MAX) else { return refused("unreadable") };
         let now = (self.now)();
-        match parse(&bytes, source, shape, now) {
+        match parse(&bytes, magic, source, shape, now) {
             Err(why) => refused(why),
             Ok(None) => {
                 remove(&path);
@@ -448,8 +462,14 @@ impl PictureCache {
 
 /// The picture of a file's `bytes` for `source` as `shape` (`None`: too old at `now`), or why
 /// the file is refused.
-fn parse(bytes: &[u8], source: &Source, shape: &str, now: SystemTime) -> Result<Option<Vec<u8>>, &'static str> {
-    let (age, written) = header(bytes).ok_or("header")?;
+fn parse(
+    bytes: &[u8],
+    magic: &[u8; 8],
+    source: &Source,
+    shape: &str,
+    now: SystemTime,
+) -> Result<Option<Vec<u8>>, &'static str> {
+    let (age, written) = header(bytes).filter(|_| &bytes[..8] == magic).ok_or("header")?;
     if bytes[8..40] != key(source, shape) || bytes[48] != kind_byte(source) {
         return Err("key");
     }
@@ -467,16 +487,16 @@ fn parse(bytes: &[u8], source: &Source, shape: &str, now: SystemTime) -> Result<
 }
 
 /// How long the file whose first bytes are `bytes` is kept and when it was written, when its
-/// header is one this writes.
+/// header is one this writes or 0.0.25 wrote.
 fn header(bytes: &[u8]) -> Option<(Duration, SystemTime)> {
-    if bytes.len() < HEADER || &bytes[..8] != MAGIC {
+    if bytes.len() < HEADER || (&bytes[..8] != MAGIC && &bytes[..8] != MAGIC_V2) {
         return None;
     }
     let secs = u64::from_le_bytes(bytes[40..48].try_into().ok()?);
     Some((age_of(bytes[48])?, UNIX_EPOCH.checked_add(Duration::from_secs(secs))?))
 }
 
-/// The file at `path` is too old at `now`, or its header is not one this writes.
+/// The file at `path` is too old at `now`, or its header is not one this writes or reads.
 fn stale(path: &Path, now: SystemTime) -> bool {
     let mut first = Vec::with_capacity(HEADER);
     let read = open_plain(path, false).and_then(|f| f.take(HEADER as u64).read_to_end(&mut first));
