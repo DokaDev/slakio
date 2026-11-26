@@ -118,7 +118,7 @@ pub struct Theme {
     pub accent_warm: Color,
     /// Body text.
     pub fg: Color,
-    /// Section headers, titles without the focus, hint labels.
+    /// Section headers, titles without the focus, hint labels, read conversations.
     pub fg_muted: Color,
     /// Times, date lines, muted conversations, placeholders.
     pub fg_dim: Color,
@@ -520,6 +520,7 @@ mod chip;
 mod code;
 mod paint;
 mod reactions;
+mod rows;
 mod workspace;
 
 #[cfg(test)]

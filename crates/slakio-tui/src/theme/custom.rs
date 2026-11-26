@@ -43,6 +43,7 @@ pub fn from_spec(name: &str, spec: &ThemeSpec, look: Look) -> Theme {
     let set = |token: &str| spec.colors.iter().any(|(t, _)| *t == token);
     t.derive_reactions(set);
     t.derive_hover(set);
+    t.derive_muted(set);
     if let Some(list) = &spec.workspaces {
         t.workspaces = Cow::Owned(list.iter().copied().map(color).collect());
     }

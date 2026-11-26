@@ -51,7 +51,7 @@ pub const COLOR_ABOUT: &[(&str, &str)] = &[
     ("accent", "The focused panel's border, links, prompts, the current workspace, keys in popups."),
     ("accent_warm", "Key groups, a mention of you, words a search found."),
     ("fg", "Body text."),
-    ("fg_muted", "Section headers, titles without the focus, hint labels."),
+    ("fg_muted", "Section headers, titles without the focus, hint labels, read conversations."),
     ("fg_dim", "Times, date lines, muted conversations, placeholders."),
     ("success", "Success, and the mark of someone active."),
     ("warning", "Warnings, the mark of do not disturb, the letters that pick a link."),

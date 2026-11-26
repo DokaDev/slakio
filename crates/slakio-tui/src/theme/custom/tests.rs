@@ -304,3 +304,39 @@ fn a_derived_own_chip_stands_off_the_selection_and_the_background() {
     let t = theme("extends = \"light\"\n[colors]\nselection = \"#b0d0d0\"\nreaction_mine = \"#b0d0d1\"\n", light);
     assert_eq!(t.reaction_mine, rgb(0xB0D0D1));
 }
+
+#[test]
+fn a_file_that_changes_the_body_text_keeps_read_rows_apart_from_unread_ones() {
+    use super::super::code::contrast;
+    use super::super::rows::{READ_APART, READ_ON_BG, READ_ON_HOVER};
+    let light = Look { background: Background::Light, ..DARK_TRUECOLOR };
+    let reads = |t: &Theme, what: &str| {
+        let (u, r) = (t.row_name(true).fg.unwrap(), t.row_name(false).fg.unwrap());
+        let k = contrast(u, r).unwrap();
+        assert!(k >= READ_APART, "{what}: unread from read {k:.2}");
+        let k = contrast(r, t.bg).unwrap();
+        assert!(k >= READ_ON_BG, "{what}: read on the background {k:.2}");
+        let k = contrast(r, t.hover).unwrap();
+        assert!(k >= READ_ON_HOVER, "{what}: read on the hover colour {k:.2}");
+    };
+    // Body text near the base's muted colour, and a dark background under a light base: the
+    // muted colour is worked out again.
+    for (text, look) in [
+        ("extends = \"dark\"\n[colors]\nfg = \"#9aa3b5\"\n", DARK_TRUECOLOR),
+        ("extends = \"light\"\n[colors]\nbg = \"#202020\"\nfg = \"#e8e8e8\"\n", light),
+    ] {
+        let t = theme(text, look);
+        reads(&t, text);
+    }
+    // A base muted colour that still reads stays; what the file sets stays; a colour that is not
+    // RGB keeps the base's.
+    let base = crate::theme::DARK;
+    assert_eq!(theme("extends = \"dark\"\n[colors]\nfg = \"#ffffff\"\n", DARK_TRUECOLOR).fg_muted, base.fg_muted);
+    let t = theme("extends = \"dark\"\n[colors]\nfg = \"#9aa3b5\"\nfg_muted = \"#9aa3b6\"\n", DARK_TRUECOLOR);
+    assert_eq!(t.fg_muted, rgb(0x9aa3b6));
+    assert_eq!(theme("extends = \"dark\"\n[colors]\nfg = \"white\"\n", DARK_TRUECOLOR).fg_muted, base.fg_muted);
+    // Whatever the colours, unread is bold and read is not.
+    let t = theme("extends = \"terminal\"\n[colors]\nfg_muted = \"default\"\n", Look { truecolor: false, ..light });
+    assert!(t.row_name(true).add_modifier.contains(Modifier::BOLD));
+    assert!(!t.row_name(false).add_modifier.contains(Modifier::BOLD));
+}

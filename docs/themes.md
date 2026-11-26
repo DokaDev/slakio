@@ -68,7 +68,7 @@ own). Names are taken in any case.
 | `accent` | The focused panel's border, links, prompts, the current workspace, keys in popups. |
 | `accent_warm` | Key groups, a mention of you, words a search found. |
 | `fg` | Body text. |
-| `fg_muted` | Section headers, titles without the focus, hint labels. |
+| `fg_muted` | Section headers, titles without the focus, hint labels, read conversations. |
 | `fg_dim` | Times, date lines, muted conversations, placeholders. |
 | `success` | Success, and the mark of someone active. |
 | `warning` | Warnings, the mark of do not disturb, the letters that pick a link. |
@@ -91,8 +91,10 @@ accent (from 10%) that sets the chip apart from the background (1.15:1) and from
 and the other chip. One that sets `bg` or `accent` but not `hover` gets the least share of the
 accent (from 9%) that sets the row apart from the background (1.10:1) yet nearer it than the
 selection, keeps body text readable (4.5:1), and stays apart from the bars, the chips, the
-surface and code's tint. Where a colour is not `#rrggbb`, the colour of the theme it extends
-stays.
+surface and code's tint. One that sets `bg` or `fg` but not `fg_muted`, where the muted colour
+it extends no longer reads as a read conversation (3.5:1 on the background, 3:1 on the hover
+colour, 1.5:1 from body text), gets the most of body text mixed into the background (from 85%
+down) that does. Where a colour is not `#rrggbb`, the colour of the theme it extends stays.
 
 These four are slakio's own:
 

@@ -29,7 +29,8 @@
 //! With `avatars = "off"` a DM starts with the presence mark alone (`● Minsu Kim`, `@` while
 //! unknown) and a group DM with `@`.
 //!
-//! Unread conversations are bold, muted ones faint and never badged; nothing else marks them.
+//! Unread conversations are bold in body text, read ones muted, muted ones faint and never
+//! badged; nothing else marks them.
 
 mod photo;
 
@@ -245,10 +246,8 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
             let unread = c.unread > 0 && !c.muted;
             let (name_style, mut prefix_style) = if c.muted {
                 (t.faint(), t.faint())
-            } else if unread {
-                (t.bold(), t.bold())
             } else {
-                (t.text(), t.muted())
+                (t.row_name(unread), if unread { t.bold() } else { t.muted() })
             };
             // A DM shows its peer's presence in place of `@`: the shape tells it, the color helps.
             let presence = match &c.kind {
