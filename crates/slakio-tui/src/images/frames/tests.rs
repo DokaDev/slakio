@@ -35,13 +35,16 @@ fn a_gif_emoji_keeps_its_frames_made_as_its_cells_show_them() {
 }
 
 #[test]
-fn a_short_delay_is_shown_a_tenth_of_a_second() {
-    for ms in [0, 10, 20, 90] {
+fn delays_at_or_under_ten_ms_are_a_hundred_and_longer_ones_kept_down_to_twenty() {
+    for (ms, shown) in [(0, 100), (10, 100), (20, 20), (50, 50), (90, 90)] {
         let d = decode(&gif(8, 8, 2, ms), Shape::Emoji, CELL).unwrap();
-        assert!(d.moving.frames.iter().all(|f| f.delay == DELAY_MIN), "{ms} ms");
+        assert!(d.moving.frames.iter().all(|f| f.delay == Duration::from_millis(shown)), "{ms} ms");
     }
-    assert_eq!(delay(0, 0), DELAY_MIN);
-    assert_eq!(delay(250, 1), Duration::from_millis(250));
+    for (ms, shown) in [(0, 100), (10, 100), (11, 20), (19, 20), (20, 20), (40, 40), (60, 60), (250, 250)] {
+        assert_eq!(delay(ms, 1), Duration::from_millis(shown), "{ms} ms");
+    }
+    assert_eq!(delay(0, 0), DELAY_DEFAULT);
+    assert_eq!(delay(30, 2), DELAY_FLOOR, "15 ms, as a fraction");
 }
 
 #[test]
@@ -132,4 +135,49 @@ fn frames_are_counted_from_the_blocks() {
     assert_eq!(count::apng(&apng(&gif(16, 16, 3, 100), 100)), Some(3));
     let d = decode(&gif(16, 16, 3, 100), Shape::Emoji, CELL).unwrap();
     assert_eq!(count::apng(&d.png), None, "one picture");
+}
+
+/// A GIF `side` square of `n` frames drawn as an emoji is (a disc on a plain ground that moves
+/// a little each frame), or of noise (`noise`: the worst case for PNG).
+fn emoji_gif(side: u32, n: usize, noise: bool) -> Vec<u8> {
+    let mut out = Vec::new();
+    {
+        let mut enc = GifEncoder::new(&mut out);
+        enc.set_repeat(Repeat::Infinite).unwrap();
+        let mut seed = 7u32;
+        for i in 0..n {
+            let img = RgbaImage::from_fn(side, side, |x, y| {
+                if noise {
+                    seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+                    let v = seed.to_be_bytes();
+                    return Rgba([v[0], v[1], v[2], 255]);
+                }
+                let (cx, cy) = (side / 2 + i as u32 % 4, side / 2);
+                let inside = (x.abs_diff(cx)).pow(2) + (y.abs_diff(cy)).pow(2) <= (side / 3).pow(2);
+                if inside { Rgba([250, 200, 40, 255]) } else { Rgba([0, 0, 0, 0]) }
+            });
+            enc.encode_frame(GifFrame::from_parts(img, 0, 0, Delay::from_numer_denom_ms(40, 1))).unwrap();
+        }
+    }
+    out
+}
+
+#[test]
+fn emoji_frame_commands_are_this_large() {
+    // A Retina cell (about 20 x 42 pixels); an emoji is two cells wide, one high.
+    const RETINA: Option<(u16, u16)> = Some((20, 42));
+    let largest = |noise: bool| {
+        let d = decode(&emoji_gif(64, 8, noise), Shape::Emoji, RETINA).unwrap();
+        assert!(d.moving.moves());
+        d.moving.frames.iter().map(|f| crate::images::graphics::transmit(1, 2, 1, &f.png).len()).max().unwrap()
+    };
+    let (plain, noise) = (largest(false), largest(true));
+    let budget = crate::images::animate::budget::ANIM_BYTES_PER_SECOND;
+    // Measured 1 487 and 8 100 bytes: eight plain emoji at 25 frames a second fit the budget
+    // (no frame skipped), eight of noise do not (frames skipped, at the right speed).
+    assert!((1_000..=2_500).contains(&plain), "{plain}");
+    assert!(8 * 25 * plain <= budget, "{plain}");
+    // Noise does not compress: about the frame's pixels (40 x 42 x 4) in base64.
+    assert!((6_000..=12_000).contains(&noise), "{noise}");
+    assert!(8 * 25 * noise > budget, "{noise}");
 }

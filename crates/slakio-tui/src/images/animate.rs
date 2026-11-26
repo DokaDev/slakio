@@ -6,21 +6,25 @@
 //! the protocol's own animation commands are never sent.
 //!
 //! Only what the latest shown frame showed moves, at most [`MOVING_MAX`] pictures (the first
-//! ones it drew); each frame is shown at least [`super::frames::DELAY_MIN`]. The times frames
-//! are due fall on a grid of [`GRID`], so pictures moving together wake the loop together. The
-//! loop wakes for a frame only while a picture moves ([`Images::frame_at`]). `animate = "off"`
+//! ones it drew); each frame is shown as long as [`super::frames::delay`] says. Each picture
+//! keeps its own timeline of when its frames end; the loop wakes on a grid of [`GRID`] (so
+//! pictures moving together wake it together), which sets wake-ups only and never moves the
+//! timeline. A late wake shows the frame due now. Frames sent keep to [`budget`]: one that does
+//! not fit is skipped, the timeline goes on. The loop wakes for a frame only while a picture
+//! moves ([`Images::frame_at`]). `animate = "off"`
 //! ([`Images::set_animate`]) puts every picture back on its first frame and nothing moves; with
 //! pictures off nothing is held, so nothing moves either.
 
 use super::frames::Moving;
 use super::{Entry, Images, Key, graphics};
+use budget::Spent;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 /// The most pictures moving at once.
 pub const MOVING_MAX: usize = 8;
 /// The times frames are due are whole steps of this from the first.
-pub const GRID: Duration = Duration::from_millis(50);
+pub const GRID: Duration = Duration::from_millis(10);
 
 /// A moving picture's frames as sent (the commands, how long each is shown), how many frames
 /// were read and why it stays still (none of them: it does not move).
@@ -45,9 +49,13 @@ pub(super) fn sent(id: u32, cols: u16, rows: u16, m: &Moving) -> Sent {
 struct Anim {
     id: u32,
     frames: Vec<(String, Duration)>,
-    /// The frame the terminal shows.
+    /// The frame due on the timeline.
     at: usize,
-    /// When the next is due; `None` while it does not move.
+    /// The frame the terminal shows (behind `at` when one was skipped).
+    shown: usize,
+    /// When frame `at` ends on the timeline (not on the grid).
+    ideal: Option<Instant>,
+    /// When the loop wakes for it (`ideal` up to the grid); `None` while it does not move.
     next: Option<Instant>,
 }
 
@@ -63,6 +71,10 @@ pub(super) struct Anims {
     moving: Vec<Key>,
     /// The start of the grid.
     epoch: Option<Instant>,
+    /// The frame bytes sent in the last second.
+    spent: Spent,
+    /// The picture sent a frame last: the next pass starts after it.
+    last: Option<Key>,
     /// A popup covers the messages (settings, the help, a question, the files to pick): what is
     /// drawn under it is not seen.
     covered: bool,
@@ -73,7 +85,7 @@ impl Anims {
     pub(super) fn add(&mut self, key: &Key, id: u32, frames: Vec<(String, Duration)>) {
         self.moving.retain(|k| k != key);
         if frames.len() > 1 {
-            self.list.insert(key.clone(), Anim { id, frames, at: 0, next: None });
+            self.list.insert(key.clone(), Anim { id, frames, at: 0, shown: 0, ideal: None, next: None });
         } else {
             self.list.remove(key);
         }
@@ -120,17 +132,21 @@ impl Images {
         let seen = std::mem::take(&mut self.anims.seen);
         for key in &self.anims.moving {
             if let Some(a) = self.anims.list.get_mut(key).filter(|_| !seen.contains(key)) {
-                a.next = None;
+                (a.ideal, a.next) = (None, None);
             }
         }
         for key in &seen {
-            let due = match self.anims.list.get(key) {
-                Some(a) if a.next.is_none() => now + a.frames[a.at].1,
+            // It starts again from the frame the terminal shows.
+            let ideal = match self.anims.list.get_mut(key) {
+                Some(a) if a.next.is_none() => {
+                    a.at = a.shown;
+                    now + a.frames[a.at].1
+                }
                 _ => continue,
             };
-            let due = self.anims.on_grid(due);
+            let due = self.anims.on_grid(ideal);
             if let Some(a) = self.anims.list.get_mut(key) {
-                a.next = Some(due);
+                (a.ideal, a.next) = (Some(ideal), Some(due));
             }
         }
         self.anims.moving = seen;
@@ -144,29 +160,36 @@ impl Images {
         self.anims.moving.iter().filter_map(|k| self.anims.list.get(k)?.next).min()
     }
 
-    /// The loop woke at `now`: each moving picture whose next frame is due is sent it (written
-    /// before the next frame is drawn). `true` when one was.
+    /// The loop woke at `now`: each moving picture whose next frame is due moves on its
+    /// timeline to the frame due now, and is sent it (written before the next frame is drawn)
+    /// when it fits the byte budget. `true` when one was sent.
     pub fn advance(&mut self, now: Instant) -> bool {
         if !self.on || self.anims.still {
             return false;
         }
+        let mut order = self.anims.moving.clone();
+        if let Some(i) = self.anims.last.as_ref().and_then(|l| order.iter().position(|k| k == l)) {
+            order.rotate_left(i + 1);
+        }
         let mut sent = false;
-        for key in self.anims.moving.clone() {
+        for key in order {
             let Some(a) = self.anims.list.get_mut(&key) else { continue };
-            let Some(was) = a.next.filter(|at| *at <= now) else { continue };
+            let Some(ideal) = a.ideal.filter(|_| a.next.is_some_and(|at| at <= now)) else { continue };
             if !held(&self.entries, &key, a.id) {
                 continue;
             }
-            a.at = (a.at + 1) % a.frames.len();
-            self.graphics.push_str(&a.frames[a.at].0);
-            // From when this one was due, not from a late wake (that would slow every frame);
-            // one already past is due at once.
-            let due = (was + a.frames[a.at].1).max(now);
-            let due = self.anims.on_grid(due);
-            if let Some(a) = self.anims.list.get_mut(&key) {
-                a.next = Some(due);
+            let ideal = catch_up(a, ideal, now);
+            if a.at != a.shown && self.anims.spent.fits(now, a.frames[a.at].0.len()) {
+                self.graphics.push_str(&a.frames[a.at].0);
+                self.anims.spent.spend(now, a.frames[a.at].0.len());
+                a.shown = a.at;
+                self.anims.last = Some(key.clone());
+                sent = true;
             }
-            sent = true;
+            let due = self.anims.on_grid(ideal);
+            if let Some(a) = self.anims.list.get_mut(&key) {
+                (a.ideal, a.next) = (Some(ideal), Some(due));
+            }
         }
         sent
     }
@@ -181,9 +204,10 @@ impl Images {
         self.anims.moving.clear();
         self.anims.seen.clear();
         for (key, a) in &mut self.anims.list {
-            a.next = None;
-            if a.at != 0 {
-                a.at = 0;
+            (a.ideal, a.next) = (None, None);
+            a.at = 0;
+            if a.shown != 0 {
+                a.shown = 0;
                 if self.on && held(&self.entries, key, a.id) {
                     self.graphics.push_str(&a.frames[0].0);
                 }
@@ -208,5 +232,25 @@ impl Images {
     }
 }
 
+/// `a` moved on its timeline (frame `a.at` ends at `ideal`) to the frame due at `now`: when
+/// that one ends. Whole cycles behind are dropped first, so it takes at most one step a frame.
+fn catch_up(a: &mut Anim, mut ideal: Instant, now: Instant) -> Instant {
+    let cycle: Duration = a.frames.iter().map(|f| f.1).sum();
+    let behind = now.saturating_duration_since(ideal);
+    if !cycle.is_zero() && behind >= cycle {
+        let laps = behind.as_nanos() / cycle.as_nanos();
+        ideal += cycle.saturating_mul(u32::try_from(laps).unwrap_or(u32::MAX));
+    }
+    for _ in 0..=a.frames.len() {
+        if ideal > now {
+            break;
+        }
+        a.at = (a.at + 1) % a.frames.len();
+        ideal += a.frames[a.at].1;
+    }
+    ideal
+}
+
+pub(crate) mod budget;
 #[cfg(test)]
 mod tests;

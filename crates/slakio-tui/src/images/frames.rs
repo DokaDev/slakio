@@ -6,8 +6,8 @@
 //! [`FRAME_BYTES_MAX`] in all, their pixels as they come at most [`SOURCE_PIXELS_MAX`] in all
 //! (checked before a frame is decoded); a picture past any, or one whose frames stop reading part way,
 //! stays still on its first frame (the diagnostics' `decoded` line says why). A frame is shown
-//! at least [`DELAY_MIN`] (a GIF that says 0 or 10 ms is shown at ten frames a second, as
-//! browsers do).
+//! as long as the picture says, at least [`DELAY_FLOOR`]; one that says [`DELAY_CLAMPED_AT`] or
+//! less is shown [`DELAY_DEFAULT`] (ten frames a second), as browsers do.
 
 use super::decode::{Layout, limits, png_of, render};
 use image::codecs::gif::GifDecoder;
@@ -23,8 +23,12 @@ pub const FRAME_BYTES_MAX: u64 = 8 * 1024 * 1024;
 /// The most pixels of a picture's frames as they come (width × height each, all frames): what
 /// decoding them costs, whatever size they are drawn at.
 pub const SOURCE_PIXELS_MAX: u64 = 8 * slakio_core::images::PIXELS_MAX;
-/// The shortest time a frame is shown: at most ten frames a second.
-pub const DELAY_MIN: Duration = Duration::from_millis(100);
+/// A frame that says this or less is shown [`DELAY_DEFAULT`] (the browsers' rule).
+pub const DELAY_CLAMPED_AT: Duration = Duration::from_millis(10);
+/// How long a frame that says [`DELAY_CLAMPED_AT`] or less is shown.
+pub const DELAY_DEFAULT: Duration = Duration::from_millis(100);
+/// The shortest time a frame is shown: at most fifty frames a second.
+pub const DELAY_FLOOR: Duration = Duration::from_millis(20);
 
 /// One frame as sent: a PNG of the cells, and how long it is shown.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,10 +62,12 @@ impl Moving {
     }
 }
 
-/// A frame's delay of `numer` / `denom` milliseconds, at least [`DELAY_MIN`].
+/// A frame's delay of `numer` / `denom` milliseconds: [`DELAY_DEFAULT`] when that is
+/// [`DELAY_CLAMPED_AT`] or less, else at least [`DELAY_FLOOR`].
 pub fn delay(numer: u32, denom: u32) -> Duration {
     let ms = if denom == 0 { 0 } else { u64::from(numer) / u64::from(denom) };
-    Duration::from_millis(ms).max(DELAY_MIN)
+    let said = Duration::from_millis(ms);
+    if said <= DELAY_CLAMPED_AT { DELAY_DEFAULT } else { said.max(DELAY_FLOOR) }
 }
 
 /// The frames of `bytes` (a GIF, or an animated PNG), each made as `l` says, within the bounds.
