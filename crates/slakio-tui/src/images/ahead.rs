@@ -2,18 +2,17 @@
 //! out of view too, so a row scrolled into view draws its photo at once. It is the pictures'
 //! lowest priority and never in the way of what is on screen:
 //! - it goes only once every picture the frame wanted is asked for or looked for, at most
-//!   [`AHEAD_MAX`] at once, and asks the network only for an idle one of the
-//!   [`IN_FLIGHT_MAX`] slots (so the network never has more than those, which is what the
-//!   backend lets through before it answers busy);
-//! - each request goes through the same request budget as any picture (the governor's share
-//!   for pictures), and at most [`AHEAD_PER_MINUTE`] a minute and [`AHEAD_PER_HOUR`] an hour of
-//!   them are asked ahead. The governor counts every hop of a photo (up to three, with its
-//!   redirects): at worst 12 of a workspace's 30 pictures a minute (120 of 350 an hour) go
-//!   ahead, so what is on screen keeps at least 18, and the rest of the budget stays with
-//!   everything else;
+//!   [`AHEAD_MAX`] at once, and asks the network only while two of the
+//!   [`CDN_IN_FLIGHT_MAX`] places for photos and emoji stay free for the screen (so the network
+//!   never has more than those, which is what the backend lets through to the picture hosts);
+//! - each request goes through the picture hosts' budget as any photo (the list's part of it,
+//!   two thirds), and at most [`AHEAD_PER_MINUTE`] a minute and [`AHEAD_PER_HOUR`] an hour of
+//!   them are asked ahead. Every hop of a photo counts (up to three, with its redirects): at
+//!   worst 60 of the list's 200 a minute (600 of 2000 an hour) go ahead, so the timeline keeps
+//!   at least 100 of the 300 a minute;
 //! - an answer that the backend is busy or offline, or that the budget is spent, for any
-//!   picture, stops it for [`RETRY_AFTER`]; one that Slack asks to slow down (429), for as long
-//!   as it says and at least that; a pause only ever lasts longer;
+//!   picture, stops it for [`AHEAD_PAUSE`]; one that a host asks to slow down (429), for as long
+//!   as it says and at least that, at most an hour; a pause only ever lasts longer;
 //! - it needs a cache on disk ([`super::cached`]): a photo is looked for there first and asked
 //!   of the network only when it is not there, and every photo fetched is kept there, so a row
 //!   drawn later reads it at once. Without one (and in the demo) nothing is asked ahead.
@@ -26,7 +25,7 @@
 //! Pictures or photos turned off, nothing waits to be asked ahead.
 
 use super::cached::LOOKUPS_MAX;
-use super::{BYTES_CAP, CHIP_PHOTO, ENTRIES_MAX, Entry, IN_FLIGHT_MAX, Images, Key, RETRY_AFTER, note};
+use super::{BYTES_CAP, CDN_IN_FLIGHT_MAX, CHIP_PHOTO, ENTRIES_MAX, Entry, Images, Key, note};
 use crate::app::requests::Requests;
 use slakio_core::backend::{Command, FailKind};
 use slakio_core::diag::Stage;
@@ -36,18 +35,20 @@ use std::collections::{HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 /// The most photos asked for ahead (or looked for on disk) at once.
-pub const AHEAD_MAX: usize = 1;
+pub const AHEAD_MAX: usize = 2;
 /// The most photos asked of the network ahead in any minute (each up to three of the
 /// governor's picture counts, with its redirects).
-pub const AHEAD_PER_MINUTE: usize = 4;
+pub const AHEAD_PER_MINUTE: usize = 20;
 /// The most photos asked of the network ahead in any hour.
-pub const AHEAD_PER_HOUR: usize = 40;
+pub const AHEAD_PER_HOUR: usize = 200;
 /// The most photos waiting to be asked for ahead.
 pub const AHEAD_QUEUE_MAX: usize = 128;
 
 /// How long nothing is asked ahead after a busy or offline backend or the budget spent, and the
 /// least a photo asked ahead that failed for a while waits to be asked again.
-pub(super) const AHEAD_PAUSE: Duration = RETRY_AFTER;
+pub const AHEAD_PAUSE: Duration = Duration::from_secs(15);
+/// The places for photos and emoji the photos ahead always leave to the screen.
+const SCREEN_KEEPS: usize = 2;
 
 const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(3600);
@@ -114,7 +115,7 @@ impl Images {
     }
 
     /// A picture failed for `kind` at `now`: busy, offline or the budget spent, nothing is asked
-    /// of the network ahead for [`super::RETRY_AFTER`]; asked to slow down, for as long as it
+    /// of the network ahead for [`AHEAD_PAUSE`]; asked to slow down, for as long as it
     /// said and at least that, at most an hour. A pause only ever lasts longer, never shorter.
     pub(super) fn pause_ahead(&mut self, kind: &FailKind, now: Instant) {
         let pause = match kind {
@@ -163,14 +164,14 @@ impl Images {
         self.ahead.flying.len()
     }
 
-    /// The network may be asked ahead at `now`: an idle slot, no pause, within the minute's and
-    /// the hour's share.
+    /// The network may be asked ahead at `now`: [`SCREEN_KEEPS`] places for photos and emoji
+    /// still free after it, no pause, within the minute's and the hour's share.
     fn may_fetch(&mut self, now: Instant) -> bool {
         while self.ahead.sent.front().is_some_and(|t| now.saturating_duration_since(*t) >= HOUR) {
             self.ahead.sent.pop_front();
         }
         let minute = self.ahead.sent.iter().filter(|t| now.saturating_duration_since(**t) < MINUTE).count();
-        self.in_flight() < IN_FLIGHT_MAX
+        self.in_flight_cdn() + SCREEN_KEEPS < CDN_IN_FLIGHT_MAX
             && self.ahead.paused_until.is_none_or(|t| now >= t)
             && minute < AHEAD_PER_MINUTE
             && self.ahead.sent.len() < AHEAD_PER_HOUR

@@ -1,6 +1,6 @@
 use super::*;
 use crate::images::cached::{LOOKUPS_MAX, run, start};
-use crate::images::{CDN_IN_FLIGHT_MAX, Job, Look, PHOTO, RETRY_AFTER, graphics};
+use crate::images::{CDN_IN_FLIGHT_MAX, Job, Look, PHOTO, graphics};
 use slakio_core::backend::{FailKind, Generation, Request};
 use slakio_core::diag::Diag;
 use slakio_core::images::AVATAR_HOSTS;
@@ -163,26 +163,35 @@ fn photos_ahead_fill_off_screen_dm_rows_over_time() {
 #[test]
 fn a_photo_ahead_only_takes_an_idle_slot() {
     let mut t = T::new("idle");
-    let screen: Vec<Key> = (0..4).map(shown).collect();
+    // The screen holds all but the two places the photos ahead leave it.
+    let screen: Vec<Key> = (0..CDN_IN_FLIGHT_MAX - 2).map(shown).collect();
     let (looks, _) = t.frame(&screen, 0);
     t.look(looks);
     let (_, slow) = t.frame(&screen, 0);
-    assert_eq!(slow.len(), IN_FLIGHT_MAX, "the network's slots all taken");
-    // Ahead: looked for on disk (not the network's), not there, then waits for a slot.
+    assert_eq!(slow.len(), CDN_IN_FLIGHT_MAX - 2, "the screen's photos all on their way");
+    // Ahead: looked for on disk (not the network's), not there, then waits for a place.
     let (looks, asked) = t.frame(&screen, 3);
     assert_eq!((looks.len(), asked.len()), (1, 0));
     t.look(looks);
     for _ in 0..3 {
         let (looks, asked) = t.frame(&screen, 3);
-        assert!(looks.is_empty() && asked.is_empty(), "no slot idle: {asked:?}");
+        assert!(looks.is_empty() && asked.is_empty(), "two places kept for the screen: {asked:?}");
     }
     t.deliver(&slow[0]);
     let (_, asked) = t.frame(&screen, 3);
     assert_eq!(asked.len(), 1);
-    assert!(is_dm(&asked[0]), "the idle slot");
-    assert_eq!(t.images.in_flight(), IN_FLIGHT_MAX, "never more than the network's slots");
-    // One ahead at once: another slot idle, still nothing more until it ends.
+    assert!(is_dm(&asked[0]), "the idle place");
+    assert_eq!(t.images.in_flight_cdn(), CDN_IN_FLIGHT_MAX - 2, "two places always left to the screen");
+    // A second ahead: looked for on disk, then it too waits for a place.
+    let (looks, more) = t.frame(&screen, 3);
+    assert_eq!((looks.len(), more.len()), (1, 0), "{AHEAD_MAX} ahead at once");
+    t.look(looks);
+    assert!(t.frame(&screen, 3).1.is_empty(), "two places kept for the screen");
     t.deliver(&slow[1]);
+    let (_, second) = t.frame(&screen, 3);
+    assert!(second.len() == 1 && is_dm(&second[0]), "{second:?}");
+    // Two ahead on their way: another place idle, nothing more until one ends.
+    t.deliver(&slow[2]);
     let (looks, more) = t.frame(&screen, 3);
     assert!(looks.is_empty() && more.is_empty(), "at most {AHEAD_MAX} ahead");
     t.deliver(&asked[0]);
@@ -195,9 +204,10 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
     let mut t = T::new("share");
     let start = t.now;
     let mut minutes = Vec::new();
-    // Two hours, a frame every few seconds, everything answered at once.
+    // Two hours, everything answered at once.
     while t.now < start + Duration::from_secs(2 * 3600) {
-        let minute = t.pump(&[], AHEAD_QUEUE_MAX, 30).len();
+        // More DM rows than the hour's share, a frame every second.
+        let minute = t.pump(&[], 4 * AHEAD_PER_HOUR, 60).len();
         assert!(minute <= AHEAD_PER_MINUTE, "{minute} in a minute");
         minutes.push(minute);
         t.now += Duration::from_secs(60);
@@ -218,14 +228,16 @@ fn photos_ahead_keep_to_their_minute_and_hour() {
 
 #[test]
 fn photos_ahead_leave_most_of_the_picture_share_even_when_each_is_redirected() {
-    // The backend's budget, as its own tests pin it (the UI does not name the Slack adapter): a
-    // workspace's picture share is 30 a minute and 350 an hour, and a photo follows at most two
-    // redirects, every hop counted.
-    let (share_minute, share_hour, hops) = (30, 350, 3);
+    // The backend's budget, as its own tests pin it (the UI does not name the Slack adapter):
+    // the picture hosts take 300 a minute and 3000 an hour, the list's photos two thirds of
+    // each, and a photo follows at most two redirects, every hop counted.
+    let (cdn_minute, cdn_hour, hops) = (300, 3000, 3);
+    let (list_minute, list_hour) = (cdn_minute - cdn_minute / 3, cdn_hour - cdn_hour / 3);
     let (minute, hour) = (AHEAD_PER_MINUTE * hops, AHEAD_PER_HOUR * hops);
-    // At most two fifths of a workspace's picture share, so what is on screen keeps the rest.
-    assert!(minute * 5 <= share_minute * 2, "{minute} hops a minute");
-    assert!(hour * 5 <= share_hour * 2, "{hour} hops an hour");
+    // At most three tenths of the list's part, and the timeline keeps at least a third of all.
+    assert!(minute * 10 <= list_minute * 3, "{minute} hops a minute");
+    assert!(hour * 10 <= list_hour * 3, "{hour} hops an hour");
+    assert!(cdn_minute - list_minute >= 100, "the timeline's part");
 }
 
 #[test]
@@ -258,11 +270,11 @@ fn a_refused_picture_pauses_photos_ahead() {
         let start = t.now;
         let (looks, _) = t.frame(&[], 3);
         t.look(looks);
-        while t.now < start + RETRY_AFTER {
+        while t.now < start + AHEAD_PAUSE {
             assert!(t.pump(&[], 3, 2).is_empty(), "{kind:?}: paused");
             t.now += Duration::from_secs(5);
         }
-        t.now = start + RETRY_AFTER;
+        t.now = start + AHEAD_PAUSE;
         let asked = t.pump(&[], 3, 2);
         assert!(!asked.is_empty() && asked.iter().all(is_dm), "{kind:?}: again once the pause is over");
     }
@@ -303,7 +315,7 @@ fn a_429_pauses_photos_ahead_as_long_as_it_says_and_a_shorter_pause_never_shorte
     // A 429 asking for less than the pause slakio keeps waits that long all the same.
     let mut t = refused("429-short", &FailKind::RateLimited { retry_after: Some(Duration::from_secs(1)) });
     let start = t.now;
-    paused_until(&mut t, start + RETRY_AFTER, "at least a minute");
+    paused_until(&mut t, start + AHEAD_PAUSE, "at least the pause");
 }
 
 #[test]
@@ -323,7 +335,7 @@ fn a_refusal_for_a_picture_no_longer_waited_for_still_pauses_photos_ahead() {
     // backend is busy all the same.
     assert!(!t.images.failed(Generation(u64::MAX / 2), &FailKind::Busy, t.now));
     let start = t.now;
-    paused_until(&mut t, start + RETRY_AFTER, "busy");
+    paused_until(&mut t, start + AHEAD_PAUSE, "busy");
 }
 
 /// A run whose only DM row's photo, asked for ahead, failed for `kind`; then two hours of a
@@ -359,8 +371,8 @@ fn a_photo_ahead_that_failed_for_a_while_is_asked_again_once_its_wait_is_over() 
     for kind in passing {
         let again = after_failing(&kind);
         assert_eq!(again.len(), 1, "{kind:?}: asked again, once");
-        // Its wait (or the pause) is the minute a failure for a while waits, at least.
-        assert!(again[0].1 >= RETRY_AFTER, "{kind:?}: asked again after {:?}", again[0].1);
+        // Its wait (or the pause) is the pause of the photos ahead, at least.
+        assert!(again[0].1 >= AHEAD_PAUSE, "{kind:?}: asked again after {:?}", again[0].1);
     }
 }
 
@@ -594,4 +606,40 @@ fn a_photo_ahead_made_from_fetched_bytes_waits_while_the_looks_are_at_their_most
     let (more, asked) = t.frame(&screen, 1);
     assert!(!asked.iter().any(is_dm), "{asked:?}");
     assert_eq!(more.iter().map(|j| (&j.source, j.from_cache)).collect::<Vec<_>>(), [(&dm(0), false)]);
+}
+
+#[test]
+fn photos_ahead_resume_fifteen_seconds_after_a_cap() {
+    assert_eq!(AHEAD_PAUSE, Duration::from_secs(15));
+    let mut t = refused("cap-fifteen", &FailKind::CapReached);
+    let start = t.now;
+    t.now += Duration::from_secs(14);
+    assert!(t.pump(&[], 3, 2).is_empty(), "still paused");
+    t.now = start + Duration::from_secs(15);
+    let asked = t.pump(&[], 3, 2);
+    assert!(!asked.is_empty() && asked.iter().all(is_dm), "fifteen seconds later");
+}
+
+#[test]
+fn photos_ahead_never_take_the_last_two_cdn_slots() {
+    let mut t = T::new("last-two");
+    let screen: Vec<Key> = (0..CDN_IN_FLIGHT_MAX - 3).map(shown).collect();
+    let (looks, _) = t.frame(&screen, 0);
+    t.look(looks);
+    let (_, slow) = t.frame(&screen, 0);
+    assert_eq!(slow.len(), CDN_IN_FLIGHT_MAX - 3, "the screen's photos all on their way at once");
+    // A DM row looked for on disk, not there, then asked of the network.
+    let (looks, _) = t.frame(&screen, 3);
+    t.look(looks);
+    let (_, ahead) = t.frame(&screen, 3);
+    assert!(ahead.len() == 1 && is_dm(&ahead[0]), "{ahead:?}");
+    // The next looked for on disk, not there: never asked while it would take the last two.
+    let (looks, _) = t.frame(&screen, 3);
+    assert_eq!(looks.len(), 1);
+    t.look(looks);
+    for _ in 0..3 {
+        let (_, more) = t.frame(&screen, 3);
+        assert!(more.is_empty(), "the last two places stay the screen's: {more:?}");
+    }
+    assert_eq!(t.images.in_flight_cdn(), CDN_IN_FLIGHT_MAX - 2);
 }

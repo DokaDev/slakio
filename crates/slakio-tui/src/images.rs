@@ -49,7 +49,7 @@ mod note;
 mod room;
 mod wake;
 
-pub use ahead::{AHEAD_MAX, AHEAD_PER_HOUR, AHEAD_PER_MINUTE, AHEAD_QUEUE_MAX};
+pub use ahead::{AHEAD_MAX, AHEAD_PAUSE, AHEAD_PER_HOUR, AHEAD_PER_MINUTE, AHEAD_QUEUE_MAX};
 use decode::{Refused, Shape};
 use slakio_core::backend::Generation;
 use slakio_core::diag::{Diag, Stage};
