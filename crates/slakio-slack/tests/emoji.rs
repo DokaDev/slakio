@@ -158,6 +158,24 @@ fn aliases_are_followed_to_the_cap_and_no_further_and_cycles_draw_nothing() {
 }
 
 #[test]
+fn a_name_uploaded_in_decomposed_hangul_is_listed_as_its_syllables() {
+    rt().block_on(async {
+        let mut r = Run::new().await;
+        // A synthetic Korean name, as a Mac writes it (jamo) and as it is typed (syllables).
+        let (nfd, nfc) = ("\u{1100}\u{1161}\u{11B7}\u{1109}\u{1161}", "\u{AC10}\u{C0AC}");
+        let pic = slakio_world::emoji::picture(&r.team, "thanks");
+        let mut list = serde_json::Map::new();
+        list.insert(nfd.into(), json!(pic));
+        list.insert("thanks2".into(), json!(format!("alias:{nfd}")));
+        r.fake.fail_next("emoji.list", Fault::Answer(json!({"ok": true, "emoji": list})));
+        let emoji = r.emoji().await.unwrap();
+        assert_eq!(get(&emoji, nfc), Some(Custom::Picture(pic.clone())));
+        assert_eq!(get(&emoji, "thanks2"), Some(Custom::Picture(pic)));
+        assert_eq!(get(&emoji, nfd), None);
+    });
+}
+
+#[test]
 fn an_emoji_s_picture_goes_bare_to_the_emoji_host_and_each_ask_counts() {
     rt().block_on(async {
         let mut r = Run::new().await;

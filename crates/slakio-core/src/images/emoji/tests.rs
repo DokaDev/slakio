@@ -261,3 +261,19 @@ fn decimal_digits_of_any_script_and_halfwidth_katakana_are_letters_of_a_shortcod
         assert!(!shortcode(name), "{name:?}");
     }
 }
+
+#[test]
+fn a_name_listed_in_nfd_jamo_resolves_as_its_syllables_and_the_nfc_one_wins() {
+    let (nfc, nfd) = ("\u{AC10}\u{C0AC}", "\u{1100}\u{1161}\u{11B7}\u{1109}\u{1161}");
+    let (typed, uploaded) = (pic("typed"), pic("uploaded"));
+    let r = resolve(&list(&[(nfd, &uploaded), ("thanks", &format!("alias:{nfd}"))]));
+    assert_eq!(get(&r, nfc), Some(Custom::Picture(uploaded.clone())));
+    assert_eq!(get(&r, "thanks"), Some(Custom::Picture(uploaded.clone())), "an alias written in jamo");
+    assert_eq!(get(&r, nfd), None, "never under the jamo");
+    for pairs in [[(nfc, typed.as_str()), (nfd, uploaded.as_str())], [(nfd, uploaded.as_str()), (nfc, typed.as_str())]]
+    {
+        let r = resolve(&list(&pairs));
+        assert_eq!(get(&r, nfc), Some(Custom::Picture(typed.clone())), "{pairs:?}");
+        assert_eq!(r.len(), 1);
+    }
+}

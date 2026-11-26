@@ -12,7 +12,7 @@ use crate::app::App;
 use crate::emoji;
 use crate::images::{Look, graphics};
 use ratatui::style::Style;
-use slakio_core::images::emoji::{Custom, shortcode};
+use slakio_core::images::emoji::{Custom, compose_hangul, shortcode};
 use slakio_core::model::WorkspaceId;
 
 /// The runs `text` (in `style`) is drawn as in workspace `ws`: the text as it is, but for each
@@ -25,16 +25,18 @@ pub fn runs(app: &App, ws: &WorkspaceId, text: &str, style: Style) -> Vec<(Strin
     while let Some(start) = rest.find(':') {
         plain.push_str(&rest[..start]);
         let after = &rest[start + 1..];
-        let name = after.find(':').map(|e| &after[..e]).filter(|n| shortcode(n));
-        match name.and_then(|n| drawn(app, ws, n, style)) {
+        // A name written in decomposed Hangul jamo is looked up as its syllables.
+        let written = after.find(':').map(|e| &after[..e]);
+        let name = written.map(compose_hangul).filter(|n| shortcode(n));
+        match name.as_deref().and_then(|n| drawn(app, ws, n, style)) {
             Some((mut run, picture)) => {
                 if !plain.is_empty() {
                     out.push((std::mem::take(&mut plain), style));
                 }
-                rest = &after[name.unwrap_or_default().len() + 1..];
+                rest = &after[written.unwrap_or_default().len() + 1..];
                 if picture {
                     rest = after_picture(rest);
-                } else if let Some((toned, past)) = toned(app, ws, name.unwrap_or_default(), rest) {
+                } else if let Some((toned, past)) = toned(app, ws, name.as_deref().unwrap_or_default(), rest) {
                     (run.0, rest) = (toned.to_string(), past);
                 }
                 out.push(run);

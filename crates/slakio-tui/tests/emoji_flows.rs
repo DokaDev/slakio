@@ -570,6 +570,37 @@ fn a_skin_tone_right_after_a_korean_name_is_left_out_in_the_text_and_the_chip() 
     assert!(rows.iter().all(|(_, xs)| xs.len() == 2), "{rows:?}");
 }
 
+/// A synthetic Korean name ("gamsahaeyong") as it is typed (syllables, NFC) and as a Mac writes
+/// it (conjoining jamo, NFD).
+const THANKS_NFC: &str = "\u{AC10}\u{C0AC}\u{D574}\u{C6A9}";
+const THANKS_NFD: &str = "\u{1100}\u{1161}\u{11B7}\u{1109}\u{1161}\u{1112}\u{1162}\u{110B}\u{116D}\u{11BC}";
+
+#[test]
+fn an_nfd_korean_reaction_and_text_draw_the_nfc_list_picture() {
+    use slakio_core::images::emoji::Custom;
+    let text = format!("great :{THANKS_NFD}: work");
+    let (mut s, ws) = shown(&[(text.as_str(), &[THANKS_NFD])], 120, 40, true);
+    let asked = frame(&mut s);
+    assert_eq!(lists(&asked).len(), 1, "a frame showing only a name in jamo wants the list");
+    let named = vec![(THANKS_NFC.to_string(), Custom::Picture(slakio_world::emoji::picture(ws.as_str(), "thanks")))];
+    s.b.push(Envelope { generation: lists(&asked)[0].id, event: Event::Emoji { emoji: named } });
+    s.pump();
+    for _ in 0..3 {
+        for r in frame(&mut s) {
+            give_picture(&mut s, &r);
+        }
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains(THANKS_NFD) && !screen.contains(THANKS_NFC), "{screen}");
+    let rows = cells(&s);
+    assert_eq!(rows.len(), 2, "one in the text, one in the chip: {rows:?}");
+    assert!(rows.iter().all(|(_, xs)| xs.len() == 2), "{rows:?}");
+    let buf = s.d.buffer();
+    let (y, xs) = &rows[0];
+    let next: String = (xs[1] + 2..xs[1] + 6).map(|x| buf[(x, *y)].symbol().to_string()).collect();
+    assert_eq!(next, "work", "the text past the name's jamo goes on after the picture");
+}
+
 #[test]
 fn prose_with_colons_stays_as_it_is_and_digits_only_ask_nothing() {
     // Korean prose (synthetic): "time: 3 o'clock: check", with and without spaces.

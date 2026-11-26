@@ -9,11 +9,17 @@
 //! * an alias that ends at a name the workspace has not (a standard emoji's, as `:+1:`) draws
 //!   that standard emoji, where the UI knows it.
 //!
-//! Only names a shortcode may have are read ([`shortcode`]), at most [`NAMES_MAX`] of them.
+//! Only names a shortcode may have are read ([`shortcode`]), at most [`NAMES_MAX`] of them; a
+//! name (or an alias's target) written in decomposed Hangul jamo is read as its syllables
+//! ([`compose_hangul`]), and where both forms of one name are listed the syllables' one wins.
 
 use super::emoji_address;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use unicode_segmentation::UnicodeSegmentation;
+
+mod hangul;
+pub use hangul::compose_hangul;
 
 /// The most aliases followed from one name.
 pub const ALIAS_DEPTH: usize = 4;
@@ -182,11 +188,21 @@ fn joins(c: char) -> bool {
 /// What each name of `list` (`emoji.list`'s `name → address or alias:other`) draws, by name; a
 /// name that draws nothing of its own is left out.
 pub fn resolve(list: &[(String, String)]) -> Vec<(String, Custom)> {
-    let names: HashMap<&str, &str> = (list.iter())
-        .filter(|(name, _)| shortcode(name))
-        .take(NAMES_MAX)
-        .map(|(name, value)| (name.as_str(), value.as_str()))
-        .collect();
+    // Each name with its value and whether it was written in jamo (`true`), which never
+    // replaces the same name written in syllables.
+    let mut kept: HashMap<String, (String, bool)> = HashMap::new();
+    let named = list.iter().map(|(name, value)| (compose_hangul(name), value)).filter(|(name, _)| shortcode(name));
+    for (name, value) in named.take(NAMES_MAX) {
+        let value = match value.strip_prefix("alias:") {
+            Some(next) => format!("alias:{}", compose_hangul(next)),
+            None => value.clone(),
+        };
+        let jamo = matches!(name, Cow::Owned(_));
+        if !jamo || kept.get(name.as_ref()).is_none_or(|(_, was)| *was) {
+            kept.insert(name.into_owned(), (value, jamo));
+        }
+    }
+    let names: HashMap<&str, &str> = kept.iter().map(|(name, (value, _))| (name.as_str(), value.as_str())).collect();
     let mut out: Vec<(String, Custom)> =
         names.keys().filter_map(|name| follow(&names, name).map(|c| (name.to_string(), c))).collect();
     out.sort();

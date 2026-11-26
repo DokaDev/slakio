@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde::de::{Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use slakio_core::backend::Event;
 use slakio_core::images::ADDRESS_MAX;
-use slakio_core::images::emoji::{NAMES_MAX, resolve, shortcode};
+use slakio_core::images::emoji::{NAMES_MAX, compose_hangul, resolve, shortcode};
 use std::fmt;
 
 /// `emoji.list`'s answer, as far as it is read: each name and its address or `alias:other`.
@@ -43,7 +43,7 @@ impl<'de> Deserialize<'de> for Names {
                 while let Some(name) = map.next_key::<String>()? {
                     read += 1;
                     let Text(value) = map.next_value()?;
-                    if let Some(value) = value.filter(|_| kept.len() < NAMES_MAX && shortcode(&name)) {
+                    if let Some(value) = value.filter(|_| kept.len() < NAMES_MAX && shortcode(&compose_hangul(&name))) {
                         kept.push((name, value));
                     }
                 }
