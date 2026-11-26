@@ -17,7 +17,7 @@ expression: d.snap()
 │ ▾ Ops   │   Animate          ‹ on                 ›  GIF/APNG pictures move                                │         │
 │   # depl│ Locale                                                                                           │         │
 │   # aler│   Language         ‹ auto               ›  applies on next launch                                │         │
-│   # part│ Files                                                                                            │         │
+│   ⌗ part│ Files                                                                                            │         │
 │   # host│   Download folder  ‹ ~/Downloads/slakio ›  Enter: type a folder                                  │         │
 │   # big-│   Download limit   ‹ 1024               ›  MB: largest file downloaded                           │         │
 │   # long│ Connection                                                                                       │         │

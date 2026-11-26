@@ -16,7 +16,7 @@ expression: "demo::mask_hangul(&s)"
 │ ▾ Ops                      ││     Check a customer should maybe                  │                                   │
 │   # deploys                ││                                                    │                                   │
 │   # alerts                 ││ MJ  Mia Jang  06:35                                │                                   │
-│   # partner-shared ext     ││     Budget metrics merge design rollback alert     │                                   │
+│   ⌗ partner-shared         ││     Budget metrics merge design rollback alert     │                                   │
 │   # hostile-strings        ││     alert should draft after alert on staging      │                                   │
 │   # big-history            ││     tomorrow                                       │                                   │
 │   # long-threads           ││                                                    │                                   │

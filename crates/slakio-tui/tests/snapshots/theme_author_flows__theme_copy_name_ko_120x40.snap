@@ -17,7 +17,7 @@ expression: d.snap()
 │ ▾ Ops   │ ＊＊                                                                                             │         │
 │   # depl│   ＊＊ ＊＊         ‹ auto               ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │
 │   # aler│ ＊＊                                                                                             │         │
-│   # part│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
+│   ⌗ part│   ＊＊＊＊ ＊＊     ‹ ~/Downloads/slakio ›  Enter: ＊＊ ＊＊                                     │         │
 │   # host│   ＊＊＊＊ ＊＊     ‹ 1024               ›  MB: ＊＊ ＊＊ ＊ ＊＊                                │         │
 │   # big-│ ＊＊                                                                                             │         │
 │   # long│   ＊＊＊＊          ‹ on                 ›  ＊＊ ＊＊＊＊ ＊＊                                   │         │

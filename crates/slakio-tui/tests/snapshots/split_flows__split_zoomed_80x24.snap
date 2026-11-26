@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││     Sprint a check for on branch invoice draft │
 │▎  # deploys                ││     production                                 │
 │   # alerts                 ││     ⤷ 7 replies · last 06:56                   │
-│   # partner-shared ext     ││                                                │
+│   ⌗ partner-shared         ││                                                │
 │   # hostile-strings        ││ AS  Ava Shin  07:37                            │
 │   # big-history            ││     The ticket merge                           │
 │   # long-threads           ││                                                │

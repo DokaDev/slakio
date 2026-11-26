@@ -16,7 +16,7 @@ expression: s.d.snap()
 │ ▾ Ops                      ││                                                                                        │
 │▎  # deploys                ││                                                                                        │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││                                                                                        │
+│   ⌗ partner-shared         ││                                                                                        │
 │   # hostile-strings        ││                                                                                        │
 │   # big-history            ││                                                                                        │
 │   # long-threads           ││                                                                                        │

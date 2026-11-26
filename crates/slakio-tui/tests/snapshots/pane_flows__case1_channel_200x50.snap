@@ -17,7 +17,7 @@ expression: mask_hangul(&s)
 │ ▾ Ops                            ││  JP   Jiho Park  05:51                                                                                                                                           │
 │   # deploys                      ││       Meeting for staging please someone someone on maybe timeout retry a we design can sprint production                                                        │
 │   # alerts                       ││                                                                                                                                                                  │
-│   # partner-shared ext           ││  JH   Jiwon Han  05:58                                                                                                                                           │
+│   ⌗ partner-shared               ││  JH   Jiwon Han  05:58                                                                                                                                           │
 │   # hostile-strings              ││       Rolling back                                                                                                                                               │
 │   # big-history                  ││                                                                                                                                                                  │
 │   # long-threads                 ││  HJ   Hyunwoo Jung  06:05                                                                                                                                        │

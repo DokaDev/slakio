@@ -16,7 +16,7 @@ expression: s
 │ ▾ Ops   │   A page down                                                                           PageDown │         │
 │   # depl│   A page up                                                                               PageUp │         │
 │   # aler│   Open the conversation, or fold the section                                               Enter │         │
-│   # part│   Open, staying in the list (or unfold)                                                l / Right │         │
+│   ⌗ part│   Open, staying in the list (or unfold)                                                l / Right │         │
 │   # host│   To the section header, fold it, then the view switcher                                h / Left │         │
 │   # big-│   Previous section                                                                             { │         │
 │   # long│   Next section                                                                                 } │         │

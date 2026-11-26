@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                           ││     Should after roadmap review        │                                         │                                        │
 │   # deploys                     ││     metrics after staging should maybe │                                         │                                        │
 │   # alerts                      ││     release production                 │                                         │                                        │
-│   # partner-shared ext          ││                                        │                                         │                                        │
+│   ⌗ partner-shared              ││                                        │                                         │                                        │
 │   # hostile-strings             ││ SR  Sam Rivera  11:44                  │                                         │                                        │
 │   # big-history                 ││     Ticket latency meeting tomorrow    │                                         │                                        │
 │▎  # long-threads                ││     schema timeout                     │                                         │                                        │

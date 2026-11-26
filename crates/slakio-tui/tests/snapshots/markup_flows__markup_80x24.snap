@@ -17,7 +17,7 @@ expression: s.d.snap()
 │ ▾ Ops                      ││                                                │
 │▎  # deploys                ││ KN  Kate Nam  09:20                            │
 │   # alerts                 ││     fn main() { println!("a very long line of… │
-│   # partner-shared ext     ││         *not bold*                             │
+│   ⌗ partner-shared         ││         *not bold*                             │
 │   # hostile-strings        ││                                                │
 │   # big-history            ││ KN  Kate Nam  09:30                            │
 │   # long-threads           ││     ▎ quoted line that is long enough to wrap  │

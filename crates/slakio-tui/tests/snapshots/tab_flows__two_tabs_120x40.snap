@@ -17,7 +17,7 @@ expression: d.snap()
 │ ▾ Ops                      ││       Review index we dashboard budget latency roadmap again please sprint cache fine  │
 │   # deploys                ││       metrics                                                                          │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││ ───────────────────────────────────── 2026-01-07 ───────────────────────────────────── │
+│   ⌗ partner-shared         ││ ───────────────────────────────────── 2026-01-07 ───────────────────────────────────── │
 │   # hostile-strings        ││  G    Grafana app  00:46                                                               │
 │   # big-history            ││       Suspect the DB pool 🎉                                                           │
 │   # long-threads           ││                                                                                        │

@@ -31,8 +31,8 @@ expression: screen_styled(&d)
     [ B 0..1] [ B 29..30] [ B 36..43]
 │   # alerts                 ││     Ctrl+O   Back to the last one              │
     [ B 0..1] [ B 29..30] [ B 36..42]
-│   # partner-shared ext     ││     ?        Keyboard help                     │
-    [ B 0..1] [ D 20..24] [ B 29..30] [ B 36..37]
+│   ⌗ partner-shared         ││     ?        Keyboard help                     │
+    [ B 0..1] [ B 29..30] [ B 36..37]
 │   # hostile-strings        ││     Ctrl+Q   Quit                              │
     [ B 0..1] [ B 4..5] [ B 6..21] [ B 29..30] [ B 36..42]
 │   # big-history            ││                                                │

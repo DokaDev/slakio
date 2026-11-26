@@ -1,7 +1,7 @@
 //! What a real workspace says about its conversations and people, drawn: a muted conversation is
 //! faint, a muted channel badged (and counted) for its mentions only, a muted DM never; the user in do not disturb has
-//! `◐` in the status line, a Slack Connect channel its `ext` and a sender of another organization
-//! `ext` after the name; counts Slack could not tell keep those shown before, and the status line
+//! `◐` in the status line, a Slack Connect channel its shared prefix `⌗` (no `ext` on the row) and
+//! a sender of another organization `ext` after the name; counts Slack could not tell keep those shown before, and the status line
 //! says so. At 120x40 and 80x24.
 
 #[path = "support/demo.rs"]
@@ -50,13 +50,17 @@ fn mute_do_not_disturb_and_slack_connect_are_drawn_at_120x40_and_80x24() {
         // Muted: its mentions of the user only, never its plain unread count.
         let alerts = row_of(&screen, "alerts");
         assert!(alerts.contains(" 4 ") && !alerts.contains('9'), "{at}");
-        assert!(row_of(&screen, "partner-shared").contains("ext"), "{at}");
+        let shared = screen.lines().find(|l| l.contains("\u{2317} partner-shared")).unwrap_or_else(|| panic!("{at}"));
+        let shared = shared.split("││").next().unwrap();
+        assert!(!shared.contains("ext") && !shared.contains('\u{F0339}'), "no link tag on the channel's row: {at}");
         assert!(s.d.status_line().contains('◐'), "the user is in do not disturb: {at}");
         if w >= 100 {
             assert!(s.d.status_line().contains("◐ do not disturb"), "{at}");
         }
-        // A partner's message: `ext` after the name.
-        let partner = screen.lines().any(|l| l.contains(" ext  ") && l.contains("││"));
+        // A partner's message: `ext` after the name, in the pane (right of the list's border).
+        let pane =
+            |l: &str| l.char_indices().skip(1).find(|&(_, c)| c == '│' || c == '┤').map(|(i, _)| l[i..].to_string());
+        let partner = screen.lines().filter_map(pane).any(|p| p.contains(" ext  "));
         assert!(partner, "a sender of another organization is marked: {at}");
         insta::assert_snapshot!(format!("reading_{w}x{h}"), s.d.snap());
     }

@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││     Check a customer should maybe         │     Maybe pager staging                    │
 │   # deploys                ││                                           │                                            │
 │   # alerts                 ││ MJ  Mia Jang  06:35                       │ OH  Owen Hwang  15:06                      │
-│   # partner-shared ext     ││     Budget metrics merge design rollback  │     Can someone review this?               │
+│   ⌗ partner-shared         ││     Budget metrics merge design rollback  │     Can someone review this?               │
 │   # hostile-strings        ││     alert alert should draft after alert  │                                            │
 │   # big-history            ││     on staging tomorrow                   │ LK  Leo Kang  15:35                        │
 │   # long-threads           ││                                           ├─ Message #incidents ───────────────────────┤

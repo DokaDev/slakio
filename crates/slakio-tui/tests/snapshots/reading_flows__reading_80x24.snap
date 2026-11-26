@@ -3,7 +3,7 @@ source: crates/slakio-tui/tests/reading_flows.rs
 assertion_line: 60
 expression: s.d.snap()
 ---
-╭ ▌A company ▾ · B @9 ───────╮╭ ▌#partner-shared ──────────────────────────────╮
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌⌗partner-shared ──────────────────────────────╮
 │▎Home                   @28 ││ JL  Jiyoung Lee  11:51                         │
 │ DMs                    ●11 ││     Tracing maybe is dashboard fine check      │
 │ Activity               @40 ││     dashboard customer pager looks metrics     │
@@ -17,7 +17,7 @@ expression: s.d.snap()
 │ ▾ Ops                      ││     On the the a done build merge alert        │
 │   # deploys                ││     latency                                    │
 │   # alerts              4  ││                                                │
-│▎  # partner-shared ext     ││ JP  Jiho Park  13:06                           │
+│▎  ⌗ partner-shared         ││ JP  Jiho Park  13:06                           │
 │   # hostile-strings        ││     Timeout today please budget merge invoice  │
 │   # big-history            ││     staging rollback tracing roadmap           │
 │   # long-threads           ││     production budget someone dashboard can    │

@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                       ├ ▌⤷ Thread · #inciden…──┤
 │   # deploys                ││ Kate Nam  07:05       │ ───── 2026-01-05 ───── │
 │   # alerts                 ││ Ticket review pager   │ Tom Ko  13:14          │
-│   # partner-shared ext     ││ pager production on   │ On can meeting today   │
+│   ⌗ partner-shared         ││ pager production on   │ On can meeting today   │
 │   # hostile-strings        ││ build alert the on    │ please we still design │
 │   # big-history            ││ draft                 │ review retry tomorrow  │
 │   # long-threads           ││                       │ a rollback             │

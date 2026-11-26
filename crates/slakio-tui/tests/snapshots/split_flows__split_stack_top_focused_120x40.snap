@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                                                                                        │
 │   # deploys                ││  KN   Kate Nam  07:05                                                                  │
 │   # alerts                 ││       Ticket review pager pager production on build alert the on draft                 │
-│   # partner-shared ext     ││                                                                                        │
+│   ⌗ partner-shared         ││                                                                                        │
 │   # hostile-strings        ││  SR   Sam Rivera  07:14                                                                │
 │   # big-history            ││       Meeting moved to 3pm                                                             │
 │   # long-threads           │├─ Message #backend ─────────────────────────────────────────────────────────────────────┤

@@ -16,7 +16,7 @@ expression: t.d.snap()
 │ ▾ Ops                      ││     Space h  Home                              │
 │   # deploys                ││     Space d  DMs                               │
 │   # alerts                 ││     Ctrl+O   Back to the last one              │
-│   # partner-shared ext     ││     ?        Keyboard help                     │
+│   ⌗ partner-shared         ││     ?        Keyboard help                     │
 │   # hostile-strings        ││     Ctrl+Q   Quit                              │
 │   # big-history            ││                                                │
 │   # long-threads           ││                                                │

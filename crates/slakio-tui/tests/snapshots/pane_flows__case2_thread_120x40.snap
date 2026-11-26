@@ -16,7 +16,7 @@ expression: mask_hangul(&s)
 │ ▾ Ops                      ││ OH  Owen Hwang  07:37                              │ TK  Tom Ko  03:19                 │
 │   # deploys                ││     Queue a after cache invoice on customer        │     Draft draft is is customer    │
 │   # alerts                 ││     metrics on maybe sprint                        │     can retry dashboard           │
-│   # partner-shared ext     ││     ⤷ 12 replies · last 07:49                      │                                   │
+│   ⌗ partner-shared         ││     ⤷ 12 replies · last 07:49                      │                                   │
 │   # hostile-strings        ││                                                    │ NS  Nina Seo  03:20               │
 │   # big-history            ││ LJ  Lily Jeon  07:41                               │     After ticket customer timeout │
 │▎  # long-threads           ││     Confirmed                                      │     queue again timeout check     │

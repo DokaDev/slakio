@@ -16,7 +16,7 @@ expression: mask_hangul(&s)
 │ ▾ Ops                      ││  JP   Jiho Park  14:04                                                                 │
 │   # deploys                ││       abc                                                                              │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││  JL   Jiyoung Lee  14:19                                                               │
+│   ⌗ partner-shared         ││  JL   Jiyoung Lee  14:19                                                               │
 │▎  # hostile-strings        ││       red blinking and truecolor                                                       │
 │   # big-history            ││                                                                                        │
 │   # long-threads           ││  H    Hana  14:48                                                                      │

@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      │├ ▌#incidents ───────────────────────────────────┤
 │   # deploys                ││                                                │
 │   # alerts                 ││ MK  Minsu Kim  02:52                           │
-│   # partner-shared ext     ││     After check fine check branch metrics      │
+│   ⌗ partner-shared         ││     After check fine check branch metrics      │
 │   # hostile-strings        ││     latency check                              │
 │   # big-history            ││                                                │
 │   # long-threads           ││ MJ  Mia Jang  03:33                            │

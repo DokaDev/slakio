@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      │├ ▌#deploys ────────────┼ ▌⤷ Thread · #inciden…──┤
 │▎  # deploys                ││ ⤷ 7 replies · last 0… │ ───── 2026-01-05 ───── │
 │   # alerts                 ││                       │ Tom Ko  13:14          │
-│   # partner-shared ext     ││ Ava Shin  07:37       │ On can meeting today   │
+│   ⌗ partner-shared         ││ Ava Shin  07:37       │ On can meeting today   │
 │   # hostile-strings        ││ The ticket merge      │ please we still design │
 │   # big-history            ││                       │ review retry tomorrow  │
 │   # long-threads           ││ Deploy Bot app  07:50 │ a rollback             │

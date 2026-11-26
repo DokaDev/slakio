@@ -16,7 +16,7 @@ expression: s
 │ ▾ Ops                      ││                                                                                        │
 │   # deploys                ││                                                                                        │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││                                                                                        │
+│   ⌗ partner-shared         ││                                                                                        │
 │   # hostile-strings        ││                         No conversation open                                           │
 │   # big-history            ││                         Pick one in the list and press Enter.                          │
 │   # long-threads           ││                                                                                        │

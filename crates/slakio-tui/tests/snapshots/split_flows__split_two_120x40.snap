@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││     Check a customer should maybe         │ G   Grafana app  00:46                     │
 │   # deploys                ││                                           │     Suspect the DB pool 🎉                 │
 │   # alerts                 ││ MJ  Mia Jang  06:35                       │                                            │
-│   # partner-shared ext     ││     Budget metrics merge design rollback  │ JL  Jordan Lee  00:51                      │
+│   ⌗ partner-shared         ││     Budget metrics merge design rollback  │ JL  Jordan Lee  00:51                      │
 │   # hostile-strings        ││     alert alert should draft after alert  │     Thanks! (edited)                       │
 │   # big-history            ││     on staging tomorrow                   │                                            │
 │   # long-threads           ││                                           │ RC  Robin Choi  01:49                      │

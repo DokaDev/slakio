@@ -28,55 +28,55 @@ expression: screen_styled(&d)
 │ ▾ Ops                      ││                                                                                        │
     [acc 0..1] [dim 2..3] [mut B 4..7] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # deploys                ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..13] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # alerts                 ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
-│   # partner-shared ext     ││                                                                                        │
-    [acc 0..1] [mut 4..5] [dim 20..24] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..12] [acc 29..30] [bdr 30..31] [bdr 119..120]
+│   ⌗ partner-shared         ││                                                                                        │
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # hostile-strings        ││                         No conversation open                                           │
     [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [ B 56..76] [bdr 119..120]
 │   # big-history            ││                         Pick one in the list and press Enter.                          │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..17] [acc 29..30] [bdr 30..31] [mut 56..93] [bdr 119..120]
 │   # long-threads           ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..18] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │                            ││                         Enter    Open                                                  │
     [acc 0..1] [acc 29..30] [bdr 30..31] [warm B 56..61] [bdr 119..120]
 │ ▾ Channels                 ││                         Space h  Home                                                  │
     [acc 0..1] [dim 2..3] [mut B 4..12] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
 │   # announcements          ││                         Space d  DMs                                                   │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..19] [acc 29..30] [bdr 30..31] [warm B 56..63] [bdr 119..120]
 │   # design-review          ││                         Ctrl+O   Back to the last one                                  │
     [acc 0..1] [dim 4..5] [dim 6..19] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
 │   # feed-alert-134         ││                         ?        Keyboard help                                         │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..57] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [warm B 56..57] [bdr 119..120]
 │   # feed-alert-8           ││                         Ctrl+Q   Quit                                                  │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..18] [acc 29..30] [bdr 30..31] [warm B 56..62] [bdr 119..120]
 │   # feed-budget-162        ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..21] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-budget-33         ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-build-50          ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..19] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-cache-119         ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-customer-161      ││                                                                                        │
     [acc 0..1] [dim 4..5] [dim 6..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-customer-167   1  ││                                                                                        │
     [acc 0..1] [dim 4..5] [dim 6..23] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-dashboard-22      ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-dashboard-41      ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..23] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-design-34         ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-design-83         ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-draft-142         ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-draft-58          ││                                                                                        │
     [acc 0..1] [ B 4..5] [ B 6..19] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-draft-84          ││                                                                                        │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 119..120]
+    [acc 0..1] [mut 4..5] [mut 6..19] [acc 29..30] [bdr 30..31] [bdr 119..120]
 │   # feed-index-199      2  ││                                                                                        │
     [acc 0..1] [ B 4..5] [ B 6..20] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 119..120]
 ╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯

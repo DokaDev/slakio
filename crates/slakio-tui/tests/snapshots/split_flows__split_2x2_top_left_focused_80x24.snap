@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      │├ ▌#long-threads ───────┼ ▌#incidents ───────────┤
 │   # deploys                ││ staging review branch │ branch metrics latency │
 │   # alerts                 ││ for waiting a draft   │ check                  │
-│   # partner-shared ext     ││  🙏 3                 │                        │
+│   ⌗ partner-shared         ││  🙏 3                 │                        │
 │   # hostile-strings        ││                       │ Mia Jang  03:33        │
 │   # big-history            ││ Ivy Moon  12:15       │ Budget invoice on is   │
 │▎  # long-threads           ││ We customer migration │ schema can on deploy   │

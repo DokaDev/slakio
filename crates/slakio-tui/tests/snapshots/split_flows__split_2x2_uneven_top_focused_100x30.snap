@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││     Meeting moved to 3pm        │     Again is after broken index  │
 │   # deploys                │├─ Message #backend ──────────────┼─ Message #deploys ───────────────┤
 │   # alerts                 ││ › Press i to write              │ › Press i to write               │
-│   # partner-shared ext     │├ ▌#incidents ────────────────┬ ▌#long-threads ──────────────────────┤
+│   ⌗ partner-shared         │├ ▌#incidents ────────────────┬ ▌#long-threads ──────────────────────┤
 │   # hostile-strings        ││ merge waiting               │     still after is on branch roadmap │
 │   # big-history            ││                             │     alert                            │
 │▎  # long-threads           ││ Minsu Kim  02:52            │                                      │

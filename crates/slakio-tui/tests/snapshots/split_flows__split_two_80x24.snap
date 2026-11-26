@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                       │ After check fine check │
 │   # deploys                ││ Kate Nam  07:05       │ branch metrics latency │
 │   # alerts                 ││ Ticket review pager   │ check                  │
-│   # partner-shared ext     ││ pager production on   │                        │
+│   ⌗ partner-shared         ││ pager production on   │                        │
 │   # hostile-strings        ││ build alert the on    │ Mia Jang  03:33        │
 │   # big-history            ││ draft                 │ Budget invoice on is   │
 │   # long-threads           ││                       │ schema can on deploy   │

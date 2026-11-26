@@ -16,7 +16,7 @@ expression: small.snap()
 │ ▾ Ops   │  high-contrast      White on black, strong marks         │         │
 │   # depl│  catppuccin         Latte or Mocha, by background        │         │
 │   # aler│  catppuccin-latte   Catppuccin Latte (light)             │         │
-│   # part│  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
+│   ⌗ part│  catppuccin-mocha   Catppuccin Mocha (dark)              │         │
 │   # host│  tokyo-night        Day or Night, by background          │         │
 │   # big-│  tokyo-night-day    Tokyo Night Day (light)              │         │
 │   # long│  tokyo-night-night  Tokyo Night (dark)                   │         │

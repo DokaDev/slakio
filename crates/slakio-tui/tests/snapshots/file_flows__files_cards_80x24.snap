@@ -16,7 +16,7 @@ expression: s.d.snap()
 │ ▾ Ops                      ││                                                │
 │▎  # deploys                ││                                                │
 │   # alerts                 ││                                                │
-│   # partner-shared ext     ││ ───────────────── 2026-01-05 ───────────────── │
+│   ⌗ partner-shared         ││ ───────────────── 2026-01-05 ───────────────── │
 │   # hostile-strings        ││ KN  Kate Nam  09:00                            │
 │   # big-history            ││     the files                                  │
 │   # long-threads           ││     ⇩ Q3-report.pdf  PDF · 1.2 MB              │

@@ -17,7 +17,7 @@ expression: mask_hangul(&s)
 │ ▾ Ops                      ││ ＊  ＊＊＊  06:59                              │
 │   # deploys                ││     Confirmed                                  │
 │   # alerts                 ││                                                │
-│   # partner-shared ext     ││ KN  Kate Nam  07:05                            │
+│   ⌗ partner-shared         ││ KN  Kate Nam  07:05                            │
 │   # hostile-strings        ││     Ticket review pager pager production on    │
 │   # big-history            ││     build alert the on draft                   │
 │   # long-threads           ││                                                │

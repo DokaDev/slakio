@@ -16,7 +16,7 @@ expression: mask_hangul(&s)
 │ ▾ Ops                            ││       Queue a after cache invoice on customer metrics on maybe sprint                                │  DC   Dan Cho  03:14                                      │
 │   # deploys                      ││       ⤷ 12 replies · last 07:49                                                                      │       Starting deploy                                     │
 │   # alerts                       ││                                                                                                      │                                                           │
-│   # partner-shared ext           ││  LJ   Lily Jeon  07:41                                                                               │  ＊   ＊＊＊  03:15                                       │
+│   ⌗ partner-shared               ││  LJ   Lily Jeon  07:41                                                                               │  ＊   ＊＊＊  03:15                                       │
 │   # hostile-strings              ││       Confirmed                                                                                      │       Rolling back                                        │
 │   # big-history                  ││                                                                                                      │                                                           │
 │▎  # long-threads                 ││  LJ   Lily Jeon  07:54                                                                               │  SR   Sam Rivera  03:16                                   │

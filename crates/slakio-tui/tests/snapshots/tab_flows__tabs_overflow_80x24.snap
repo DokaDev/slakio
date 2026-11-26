@@ -17,7 +17,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                                                │
 │   # deploys                ││ IM  Ivy Moon  12:53                            │
 │   # alerts                 ││     We rollback after                          │
-│   # partner-shared ext     ││                                                │
+│   ⌗ partner-shared         ││                                                │
 │   # hostile-strings        ││ JL  Jordan Lee  13:32                          │
 │▎  # big-history            ││     We on fine                                 │
 │   # long-threads           ││                                                │

@@ -3,7 +3,7 @@ source: crates/slakio-tui/tests/reading_flows.rs
 assertion_line: 60
 expression: s.d.snap()
 ---
-╭ ▌A company ▾ · B @9 ───────╮╭ ▌#partner-shared ──────────────────────────────────────────────────────────────────────╮
+╭ ▌A company ▾ · B @9 ───────╮╭ ▌⌗partner-shared ──────────────────────────────────────────────────────────────────────╮
 │▎Home                   @28 ││       Someone cache roadmap customer maybe meeting we still queue staging on someone   │
 │ DMs                    ●11 ││       we production should                                                             │
 │ Activity               @40 ││                                                                                        │
@@ -17,7 +17,7 @@ expression: s.d.snap()
 │ ▾ Ops                      ││  JP   Jiho Park  09:42                                                                 │
 │   # deploys                ││       Check design design broken again index queue production looks broken after       │
 │   # alerts              4  ││       tracing schema again the                                                         │
-│▎  # partner-shared ext     ││                                                                                        │
+│▎  ⌗ partner-shared         ││                                                                                        │
 │   # hostile-strings        ││  RD   Rae Diaz ext  10:28                                                              │
 │   # big-history            ││       Starting deploy                                                                  │
 │   # long-threads           ││       🎉 2   👀 1                                                                      │

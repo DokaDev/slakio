@@ -16,7 +16,7 @@ expression: d.snap()
 │ ▾ Ops                      ││                                                                                        │
 │▎  # deploys                ││  IM   Ivy Moon  03:13                                                                  │
 │   # alerts                 ││       Lunch lunch production review draft tracing                                      │
-│   # partner-shared ext     ││                                                                                        │
+│   ⌗ partner-shared         ││                                                                                        │
 │   # hostile-strings        ││  AM   Alex Morgan  03:30                                                               │
 │   # big-history            ││       Meeting moved to 3pm                                                             │
 │   # long-threads           ││                                                                                        │

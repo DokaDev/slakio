@@ -17,7 +17,7 @@ expression: mask_hangul(&d.screen())
 │ ▾ Ops                      ││ ＊  ＊＊＊  11:32                              │
 │▎  # deploys                ││     The is latency looks staging meeting build │
 │   # alerts                 ││     migration                                  │
-│   # partner-shared ext     ││                                                │
+│   ⌗ partner-shared         ││                                                │
 │   # hostile-strings        ││ MJ  Mia Jang  12:03                            │
 │   # big-history            ││     Done draft cache now index we for pager    │
 │   # long-threads           ││     latency tracing draft roadmap              │

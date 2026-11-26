@@ -20,7 +20,7 @@ expression: screen_styled(&d)
 │ ▾ Starred                  ││     No conversation open                       │
     [acc 0..1] [bdr 2..3] [mut B 4..11] [acc 29..30] [bdr 30..31] [ B 36..56] [bdr 79..80]
 │▎  # backend                ││     Pick one in the list and press Enter.      │
-    [acc 0..1] [mut 1..2] [mut 4..5] [acc 29..30] [bdr 30..31] [mut 36..73] [bdr 79..80]
+    [acc 0..1] [mut 1..2] [mut 4..5] [mut 6..13] [acc 29..30] [bdr 30..31] [mut 36..73] [bdr 79..80]
 │   # incidents           3  ││                                                │
     [acc 0..1] [ B 4..5] [ B 6..15] [on/err B 25..28] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │                            ││     Enter    Open                              │
@@ -28,23 +28,23 @@ expression: screen_styled(&d)
 │ ▾ Ops                      ││     Space h  Home                              │
     [acc 0..1] [bdr 2..3] [mut B 4..7] [acc 29..30] [bdr 30..31] [warm B 36..43] [bdr 79..80]
 │   # deploys                ││     Space d  DMs                               │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 36..43] [bdr 79..80]
+    [acc 0..1] [mut 4..5] [mut 6..13] [acc 29..30] [bdr 30..31] [warm B 36..43] [bdr 79..80]
 │   # alerts                 ││     Ctrl+O   Back to the last one              │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [warm B 36..42] [bdr 79..80]
-│   # partner-shared ext     ││     ?        Keyboard help                     │
-    [acc 0..1] [mut 4..5] [bdr 20..24] [acc 29..30] [bdr 30..31] [warm B 36..37] [bdr 79..80]
+    [acc 0..1] [mut 4..5] [mut 6..12] [acc 29..30] [bdr 30..31] [warm B 36..42] [bdr 79..80]
+│   ⌗ partner-shared         ││     ?        Keyboard help                     │
+    [acc 0..1] [mut 4..5] [mut 6..20] [acc 29..30] [bdr 30..31] [warm B 36..37] [bdr 79..80]
 │   # hostile-strings        ││     Ctrl+Q   Quit                              │
     [acc 0..1] [ B 4..5] [ B 6..21] [acc 29..30] [bdr 30..31] [warm B 36..42] [bdr 79..80]
 │   # big-history            ││                                                │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+    [acc 0..1] [mut 4..5] [mut 6..17] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │   # long-threads           ││                                                │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+    [acc 0..1] [mut 4..5] [mut 6..18] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │                            ││                                                │
     [acc 0..1] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │ ▾ Channels                 ││                                                │
     [acc 0..1] [bdr 2..3] [mut B 4..12] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │   # announcements          ││                                                │
-    [acc 0..1] [mut 4..5] [acc 29..30] [bdr 30..31] [bdr 79..80]
+    [acc 0..1] [mut 4..5] [mut 6..19] [acc 29..30] [bdr 30..31] [bdr 79..80]
 │   # design-review          ││                                                │
     [acc 0..1] [bdr 4..5] [bdr 6..19] [acc 29..30] [bdr 30..31] [bdr 79..80]
 ╰────────────────────────────╯╰────────────────────────────────────────────────╯

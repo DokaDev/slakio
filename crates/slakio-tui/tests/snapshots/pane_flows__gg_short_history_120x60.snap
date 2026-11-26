@@ -17,7 +17,7 @@ expression: mask_hangul(&d.screen())
 │ ▾ Ops                      ││ LJ Lily Jeon     Index a tomorrow build invoice still alert metrics on customer  11:03 │
 │   # deploys                ││                  budget                                                                │
 │   # alerts                 ││                                                                                        │
-│   # partner-shared ext     ││ NH Noah Han      Looking into it                                                 12:05 │
+│   ⌗ partner-shared         ││ NH Noah Han      Looking into it                                                 12:05 │
 │   # hostile-strings        ││                                                                                        │
 │   # big-history            ││ ＊ ＊＊＊        Lunch budget waiting branch migration check schema              12:22 │
 │   # long-threads           ││                  👍 2   🔥 5   ✅ 2                                                    │
