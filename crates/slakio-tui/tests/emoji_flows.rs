@@ -386,17 +386,40 @@ fn emoji_of_a_message_only_measured_off_screen_leave_the_share_to_those_shown() 
     }
     // Up from the wall: it is measured first (does the view still fit?), then left off screen.
     s.keys("k k");
-    let asked = pictures(&frame(&mut s));
+    let up = frame(&mut s);
+    let asked = pictures(&up);
     let screen = s.d.screen();
     assert!(screen.contains("oldest") && !screen.contains(":wall-"), "{screen}");
     let want: Vec<Source> = tops.iter().map(|n| emoji(&ws, n)).collect();
     // Every one it shows is asked for, first; the rest of the twelve places go to the wall's
-    // own, whose header is still on screen (a message counts as shown once any of it is).
-    assert!(asked.len() <= slakio_tui::images::CDN_IN_FLIGHT_MAX, "{asked:?}");
-    assert_eq!(asked[..want.len()], want[..], "the first frame up there asks for those it shows");
+    // own next two not drawn yet, whose header is still on screen (a message counts as shown once any of it
+    // is).
     let walls: Vec<Source> = walls.iter().map(|n| emoji(&ws, n)).collect();
-    assert!(asked[want.len()..].iter().all(|a| walls.contains(a)), "{asked:?}");
+    assert_eq!(asked.len(), slakio_tui::images::CDN_IN_FLIGHT_MAX, "{asked:?}");
+    assert_eq!(asked[..want.len()], want[..], "the first frame up there asks for those it shows");
+    let drawn_before = pictures(&bottom);
+    let next: Vec<Source> = walls.iter().filter(|w| !drawn_before.contains(w)).take(2).cloned().collect();
+    assert_eq!(asked[want.len()..], next[..], "then the wall's next two, in the order it draws them");
     assert!(screen.contains("13:00"), "the wall's header is on screen:\n{screen}");
+    // Those answered, and the pane made shorter until none of the wall is on screen: it is only
+    // measured now, and asks for nothing though every place is free.
+    for r in &up {
+        give_picture(&mut s, r);
+    }
+    // Each height a frame of its own, as the binary draws and asks: what a frame still shows of
+    // the wall is asked and answered.
+    for h in (10..20).rev() {
+        s.d.app.resize(100, h);
+        if !s.d.screen().contains("13:00") {
+            break;
+        }
+        for r in frame(&mut s) {
+            give_picture(&mut s, &r);
+        }
+    }
+    let screen = s.d.screen();
+    assert!(!screen.contains("13:00") && screen.contains("oldest"), "{screen}");
+    assert_eq!(pictures(&frame(&mut s)), Vec::<Source>::new(), "a message only measured asks nothing:\n{screen}");
 }
 
 /// Signed in again to `ws` as someone else, then booted and `deploys` opened again with
@@ -710,8 +733,12 @@ fn signed_in_again_as_someone_else_the_pictures_kept_on_disk_go() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A guard of the loop past the room (64 pictures, a frame's share of emoji): 200 distinct emoji
+/// on one screen, each first ask refused by the budget, a frame every two seconds (past the
+/// first wait of a photo or an emoji): each is asked twice at most, only a frame's share of them
+/// ever, and it settles.
 #[test]
-fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_once() {
+fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_twice() {
     use slakio_core::images::emoji::Custom;
     use slakio_tui::images::EMOJI_PER_FRAME;
     let walls: Vec<String> = (0..200).map(|k| format!("many-{k}")).collect();
@@ -724,18 +751,29 @@ fn two_hundred_emoji_with_two_second_retries_ask_each_at_most_once() {
     s.pump();
     let mut all: Vec<Source> = Vec::new();
     for _ in 0..30 {
-        // Every frame two seconds after the last: past any photo's or emoji's first wait.
         s.d.now += std::time::Duration::from_secs(2);
         s.d.app.images.woke(s.d.now);
         for r in frame(&mut s) {
-            all.extend(pictures(std::slice::from_ref(&r)));
-            give_picture(&mut s, &r);
+            let source = pictures(std::slice::from_ref(&r)).pop().expect("a picture");
+            let first = !all.contains(&source);
+            all.push(source);
+            if first {
+                s.b.push(Envelope::failed(r.id, FailKind::CapReached, "the picture hosts' budget is reached"));
+                s.pump();
+            } else {
+                give_picture(&mut s, &r);
+            }
         }
     }
-    let distinct: std::collections::HashSet<&Source> = all.iter().collect();
-    assert_eq!(distinct.len(), all.len(), "an emoji on screen was asked for again");
-    assert!(all.len() <= EMOJI_PER_FRAME, "{} asked, more than a frame's share", all.len());
+    let mut times: std::collections::HashMap<&Source, usize> = std::collections::HashMap::new();
+    for a in &all {
+        *times.entry(a).or_default() += 1;
+    }
+    assert_eq!(times.len(), EMOJI_PER_FRAME, "a frame's share of them, no more");
+    assert!(times.values().all(|n| *n == 2), "each asked twice: refused, then again: {times:?}");
+    assert_eq!(all.len(), 2 * EMOJI_PER_FRAME);
     assert!(frame(&mut s).is_empty(), "settled");
+    assert_eq!(cells(&s).iter().map(|(_, xs)| xs.len()).sum::<usize>(), 2 * EMOJI_PER_FRAME, "a frame's share drawn");
 }
 
 /// Another workspace's emoji (synthetic): a Korean "thanks" and a wave, of team `TPARTNER`.
