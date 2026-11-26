@@ -5,7 +5,7 @@
 use super::{Selection, Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 
 /// The style tokens a theme file may set, each `None` where the computed role stays. The names
 /// are [`slakio_core::theme_file::STYLE_TOKENS`].
@@ -147,13 +147,10 @@ impl Theme {
             return;
         };
         for x in row.left()..row.right() {
-            let cell = &mut buf[(x, row.y)];
-            if (cell.bg == self.error && self.error != Color::Reset)
-                || self.chip_bg(cell.bg)
-                || crate::images::graphics::is_placeholder(cell.symbol())
-            {
+            if self.keeps(&buf[(x, row.y)]) {
                 continue;
             }
+            let cell = &mut buf[(x, row.y)];
             if let Some(fg) = style.fg {
                 cell.fg = fg;
             }
