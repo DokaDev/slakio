@@ -286,3 +286,37 @@ fn previews_keep_to_four_at_once_in_the_backend() {
         assert_eq!(asked(&r), 4, "the fifth preview was never sent");
     });
 }
+
+/// A photo waiting for one of the picture hosts' places does not spend its own deadline
+/// waiting: once the place is free it is fetched, never failed as too slow for the wait. (Real
+/// time: the photo before it holds the only place until its deadline, about 25 seconds.)
+#[test]
+fn a_photo_waiting_for_a_place_is_not_failed_by_the_wait() {
+    rt().block_on(async {
+        let cdn = CdnLimits { in_flight: 1, ..CdnLimits::default() };
+        let mut r = Run::with(Some(cdn), Diag::default()).await;
+        let photos: Vec<Source> = World::demo()
+            .snapshot()
+            .users
+            .iter()
+            .filter_map(|u| u.avatar.clone())
+            .take(2)
+            .map(Source::Avatar)
+            .collect();
+        r.fake.fail_next_picture("avatar", Fault::Partial { length: 1000, body: vec![0x89; 8] });
+        let slow = r.send(&photos[0], false);
+        let waiting = r.send(&photos[1], false);
+        let mut got = HashMap::new();
+        for _ in 0..2 {
+            let e =
+                tokio::time::timeout(Duration::from_secs(60), r.handle.rx.recv()).await.expect("an answer").unwrap();
+            got.insert(e.generation, e.event);
+        }
+        assert!(matches!(got[&slow], Event::Failed { kind: FailKind::Network, .. }), "the first ran out of time");
+        assert!(
+            matches!(got[&waiting], Event::Image { .. }),
+            "the second came once the place was free: {:?}",
+            matches!(got[&waiting], Event::Failed { .. })
+        );
+    });
+}

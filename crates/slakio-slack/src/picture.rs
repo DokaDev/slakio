@@ -24,7 +24,8 @@
 //!   at the same file's other names on that host ([`slakio_core::images::avatar_fallbacks`]),
 //!   each ask checked and counted as the first.
 //! * Only an answer that says it is an image (`image/…`) is read, at most `max` bytes of it:
-//!   a larger one, said or counted, is refused; all of it within [`DEADLINE`].
+//!   a larger one, said or counted, is refused; all of it within [`DEADLINE`] (a photo or an
+//!   emoji once it holds its place: the wait for one is not part of it).
 
 use crate::client::Client;
 use crate::error::SlackError;
@@ -87,9 +88,18 @@ pub(crate) fn avatar_headers(os: Os) -> Vec<(&'static str, String)> {
 /// `list` keeps to its part of the pictures' share.
 pub(crate) async fn picture(client: &Client, source: &Source, max: u64, list: bool) -> Result<Vec<u8>, SlackError> {
     let note = Note::new(client.diag(), source);
-    let read = match tokio::time::timeout(DEADLINE, read(client, (source, list), max, &note)).await {
-        Ok(read) => read,
-        Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
+    // A photo or an emoji holds one of the picture hosts' places over all its hops; the wait for
+    // one is not part of its deadline (it ends when the network is switched off).
+    let slot = match source {
+        Source::Thumb(_) => Ok(None),
+        Source::Avatar(_) | Source::Emoji(_) => client.governor().cdn_slot().await.map(Some),
+    };
+    let read = match slot {
+        Err(e) => Err(e),
+        Ok(_slot) => match tokio::time::timeout(DEADLINE, read(client, (source, list), max, &note)).await {
+            Ok(read) => read,
+            Err(_) => Err(SlackError::Network { detail: "the picture took too long".to_string() }),
+        },
     };
     match &read {
         // The picture hosts' run alarm is told once, not for every picture it refuses.
@@ -202,11 +212,6 @@ async fn read(
     note: &Note<'_>,
 ) -> Result<Vec<u8>, SlackError> {
     let mut url = source.checked().ok_or_else(|| api("not_a_picture_address"))?;
-    // A photo or an emoji holds one of the picture hosts' places over all its hops.
-    let _slot = match source {
-        Source::Thumb(_) => None,
-        Source::Avatar(_) | Source::Emoji(_) => Some(client.governor().cdn_slot().await?),
-    };
     let mut fallbacks = fallbacks(source, &url);
     let mut hops = 0;
     let mut answer = loop {
