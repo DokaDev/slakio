@@ -315,3 +315,64 @@ fn the_older_paged_spelling_is_read_to_its_closed_chain() {
         assert!(text.contains("sections counted done pages=2 why=count-reached"), "{text}");
     });
 }
+
+/// The probes of Starred, of how channels are shared and of the group DMs' names tell flags and
+/// counts only: every line is `key=value` pairs of plain words, and no name or id of the start
+/// bundle is in the file.
+#[test]
+fn the_sidebar_probes_log_flags_and_counts_never_names_or_ids() {
+    rt().block_on(async {
+        let path = scratch("sidebar-probes");
+        let diag = Diag::to(path.clone());
+        let mut r = Run::new(diag.clone()).await;
+        let ws = r.world.snapshot().workspaces[0].clone();
+        let boot = json!({
+            "ok": true,
+            "self": {"id": ws.me.as_str(), "name": "me"},
+            "team": {"id": ws.id.as_str(), "name": "Team"},
+            "starred": ["CSECRET01", "DSECRET02", "GSECRET04"],
+            "is_open": ["DSECRET02"],
+            "channels": [
+                {"id": "CSECRET01", "name": "secret-partner", "is_ext_shared": true, "is_shared": true,
+                 "connected_team_ids": ["TSECRET05"], "shared_team_ids": ["TSECRET05", "TSECRET06"]},
+                {"id": "GSECRET04", "name": "mpdm-secret--partner-1", "is_mpim": true},
+            ],
+            "ims": [{"id": "DSECRET02", "user": "USECRET03", "is_open": true, "is_starred": true}],
+        });
+        r.fake.fail_next("client.userBoot", Fault::Answer(boot));
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        diag.flush();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let _ = std::fs::remove_dir_all(path.parent().unwrap().parent().unwrap());
+        let labels = ["starred", "starred-total", "channel-share", "mpim-name"];
+        let probes: Vec<&str> =
+            text.lines().filter(|l| labels.iter().any(|x| l.contains(&format!(" boot-shape field {x} ")))).collect();
+        for line in &probes {
+            let mut words = line.split(' ');
+            assert!(words.next().is_some_and(|t| !t.is_empty()), "{line}");
+            assert_eq!([words.next(), words.next()], [Some("boot-shape"), Some("field")], "{line}");
+            assert!(words.next().is_some_and(|x| labels.contains(&x)), "{line}");
+            let pairs: Vec<&str> = words.collect();
+            assert!(!pairs.is_empty(), "{line}");
+            for pair in pairs {
+                let (k, v) = pair.split_once('=').unwrap_or_else(|| panic!("{line}"));
+                assert!(!k.is_empty() && k.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'), "{line}");
+                let plain = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'+' || b == b'-';
+                assert!(!v.is_empty() && v.bytes().all(plain), "{line}");
+            }
+        }
+        for want in [
+            "boot-shape field starred kind=channel self=n open=- listed_open=n source=list n=1",
+            "boot-shape field starred kind=im self=n open=y listed_open=y source=both n=1",
+            "boot-shape field starred kind=mpim self=n open=- listed_open=n source=list n=1",
+            "boot-shape field starred-total count=3",
+            "boot-shape field channel-share ext=y org=- shared=y pending=- connected=1 shared_teams=2 n=1",
+            "boot-shape field mpim-name form=mpdm n=1",
+        ] {
+            assert!(probes.iter().any(|l| l.ends_with(want)), "{want} in {probes:#?}");
+        }
+        for secret in ["SECRET", "secret-partner", "CSECRET01", "DSECRET02", "USECRET03"] {
+            assert!(!text.contains(secret), "{secret} in the file");
+        }
+    });
+}

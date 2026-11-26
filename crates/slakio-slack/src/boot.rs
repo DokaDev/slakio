@@ -165,6 +165,9 @@ pub(crate) async fn boot(
     let sidebar = crate::sidebar::Sidebar::new(&team.id, listed, client.diag());
     let team_id = team.id.clone();
     let (mut snapshot, facts) = snapshot(boot, counts, known, now, &sidebar);
+    if client.diag().on() {
+        crate::shape::starred(client.diag(), &boot, &known, &self_.id);
+    }
     snapshot.sections = sidebar.sections;
     snapshot.sections_unknown = unknown;
     let mut placing = session.placing.lock().unwrap_or_else(PoisonError::into_inner);

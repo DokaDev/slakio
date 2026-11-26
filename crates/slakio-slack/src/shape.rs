@@ -14,6 +14,9 @@ use slakio_core::images::Source;
 use std::collections::BTreeMap;
 
 mod probe;
+mod sidebar_probe;
+
+pub(crate) use sidebar_probe::starred;
 
 /// The most entries of one list described (sections of a page, DMs of the start bundle).
 const ENTRIES_MAX: usize = 200;
@@ -193,7 +196,8 @@ pub(crate) fn answered(diag: &Diag, method: Method, raw: &Raw, team: Option<&str
 }
 
 /// The start bundle's shape: whether it carries `starred`, `is_open`, `channel_sections` (and
-/// how many entries), the field names of its DMs and of the user's own profile's pictures.
+/// how many entries), the field names of its DMs and of the user's own profile's pictures, how
+/// its channels are shared and the form of its group DMs' names.
 fn boot_shape(diag: &Diag, v: &Value) {
     if !v.is_object() {
         return diag.line(Kind::BootShape, Stage::Failed, "parse", &[]);
@@ -210,6 +214,7 @@ fn boot_shape(diag: &Diag, v: &Value) {
         key_lines(diag, Kind::BootShape, label, v.get(list).and_then(Value::as_array).into_iter().flatten(), "");
     }
     sidebar_prefs(diag, v.get("prefs"));
+    sidebar_probe::channel_share(diag, v.get("channels").and_then(Value::as_array).map_or(&[], Vec::as_slice));
     let profile = v.get("self").and_then(|s| s.get("profile"));
     diag.line(Kind::SelfPhoto, Stage::Parsed, "profile", &[("present", yn(profile.is_some_and(Value::is_object)))]);
     let images =
