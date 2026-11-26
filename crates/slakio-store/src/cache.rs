@@ -13,7 +13,7 @@ use crate::db::{Store, fault, is_corrupt};
 use crate::prune::{Caps, Pruned};
 use slakio_core::backend::{Page, Snapshot};
 use slakio_core::fault::Fault;
-use slakio_core::model::{Target, Ts, WorkspaceId};
+use slakio_core::model::{Target, Ts, User, WorkspaceId};
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 use tokio::sync::{mpsc, oneshot};
@@ -47,6 +47,7 @@ enum Job {
         before: Option<Ts>,
         writer: Writer,
     },
+    PutPeople(Vec<User>, Writer),
     Prune {
         protect: HashSet<Target>,
         reply: Option<oneshot::Sender<Pruned>>,
@@ -122,6 +123,11 @@ impl Cache {
     /// Keep `page`, asked for as the messages older than `before`.
     pub fn put_page(&self, page: Page, before: Option<Ts>) {
         let _ = self.tx.send(Job::PutPage { page: Box::new(page), before, writer: self.writer.clone() });
+    }
+
+    /// Keep `users` as a live profile change says they are now ([`Store::put_people`]).
+    pub fn put_people(&self, users: Vec<User>) {
+        let _ = self.tx.send(Job::PutPeople(users, self.writer.clone()));
     }
 
     /// Keep `target` from pruning for the life of the process (a pane may show it).
@@ -200,7 +206,8 @@ fn run(
                 let _ = reply.send(got);
             }
             // A replaced sign-in's late answer: its part is another's now.
-            Job::PutSnapshot(_, Some(w)) | Job::PutPage { writer: Some(w), .. } if !store.owned_by(&w.0, &w.1) => {}
+            Job::PutSnapshot(_, Some(w)) | Job::PutPage { writer: Some(w), .. } | Job::PutPeople(_, Some(w))
+                if !store.owned_by(&w.0, &w.1) => {}
             Job::PutSnapshot(s, _) => {
                 if let Err(e) = store.put_snapshot(&s) {
                     failed(&mut store, &e);
@@ -208,6 +215,11 @@ fn run(
             }
             Job::PutPage { page, before, .. } => {
                 if let Err(e) = store.put_page(&page, before, clock()) {
+                    failed(&mut store, &e);
+                }
+            }
+            Job::PutPeople(users, _) => {
+                if let Err(e) = store.put_people(&users) {
                     failed(&mut store, &e);
                 }
             }

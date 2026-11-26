@@ -426,6 +426,16 @@ impl Model {
     /// record has none, unless it says they have no photo of their own); one of another
     /// workspace is left out.
     pub fn add_users(&mut self, ws: &WorkspaceId, users: &[User]) {
+        self.merge_users(ws, users, false);
+    }
+
+    /// [`Model::add_users`] for a live profile change: the photo it gives replaces the one known,
+    /// a guess too ([`User::changed_over`]: the one known is older than the change).
+    pub fn change_users(&mut self, ws: &WorkspaceId, users: &[User]) {
+        self.merge_users(ws, users, true);
+    }
+
+    fn merge_users(&mut self, ws: &WorkspaceId, users: &[User], fresh: bool) {
         for u in users.iter().filter(|u| &u.workspace == ws) {
             let key = (u.workspace.clone(), u.id.clone());
             match self.users.get(&key) {
@@ -433,7 +443,8 @@ impl Model {
                     // A record without a photo does not say the photo is gone; one that says
                     // they have no photo of their own does.
                     let was = &self.snapshot.users[i];
-                    let (avatar, avatar_guessed) = u.photo_over(was.avatar.as_ref().map(|a| (a, was.avatar_guessed)));
+                    let was = was.avatar.as_ref().map(|a| (a, was.avatar_guessed));
+                    let (avatar, avatar_guessed) = if fresh { u.changed_over(was) } else { u.photo_over(was) };
                     let old = self.snapshot.users[i].avatar.take();
                     self.photo_changed(old, avatar.as_ref());
                     self.snapshot.users[i] = User { avatar, avatar_guessed, ..u.clone() };

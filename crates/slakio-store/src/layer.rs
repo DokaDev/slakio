@@ -132,16 +132,29 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                             cache.prune();
                         }
                     }
-                    (_, Event::Live(live)) => {
-                        if let (slakio_core::backend::Live::Sections { workspace, sections, places }, Some(s)) =
-                            (&**live, last.as_mut())
-                            && *workspace == front.workspace
+                    (_, Event::Live(live)) => match &**live {
+                        slakio_core::backend::Live::Sections { workspace, sections, places }
+                            if *workspace == front.workspace =>
                         {
-                            s.resection(workspace, sections.clone(), places);
-                            s.sections_unknown = false;
-                            cache.put_snapshot(s.clone());
+                            if let Some(s) = last.as_mut() {
+                                s.resection(workspace, sections.clone(), places);
+                                s.sections_unknown = false;
+                                cache.put_snapshot(s.clone());
+                            }
                         }
-                    }
+                        // A profile change is kept as it says the person is now, and the boot
+                        // answer kept for the sections carries it too.
+                        slakio_core::backend::Live::People { workspace, users } if *workspace == front.workspace => {
+                            let users: Vec<_> = users.iter().filter(|u| u.workspace == front.workspace).cloned().collect();
+                            for u in last.iter_mut().flat_map(|s| s.users.iter_mut()) {
+                                if let Some(new) = users.iter().find(|n| n.id == u.id) {
+                                    (u.avatar, u.avatar_guessed) = new.changed_over(u.avatar.as_ref().map(|a| (a, u.avatar_guessed)));
+                                }
+                            }
+                            cache.put_people(users);
+                        }
+                        _ => {}
+                    },
                     _ => {}
                 }
                 if end.tx.send(envelope).await.is_err() {

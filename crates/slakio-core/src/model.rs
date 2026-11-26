@@ -136,6 +136,13 @@ impl User {
             _ => own,
         }
     }
+
+    /// The photo a person has once this live profile change of them replaces one whose photo
+    /// was `old`: as [`User::photo_over`], but the photo it gives always wins, a guess too (the
+    /// one kept is older than the change).
+    pub fn changed_over(&self, old: Option<(&String, bool)>) -> (Option<String>, bool) {
+        self.photo_over(old.map(|(a, guessed)| (a, guessed || self.avatar.is_some())))
+    }
 }
 
 /// What a sidebar section holds, which decides where new conversations land and how the

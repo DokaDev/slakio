@@ -97,8 +97,9 @@ fn state(n: i64) -> rusqlite::Result<SavedState> {
 
 /// A person, as a page or the snapshot brings them; `ord` is their place in the snapshot. A photo
 /// kept before stays when `u` has none, unless `u` says it is gone ([`User::no_photo`]), and
-/// when `u`'s is only a guess and the one kept was given ([`User::photo_over`]).
-pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> rusqlite::Result<()> {
+/// when `u`'s is only a guess and the one kept was given ([`User::photo_over`]), unless `u` is
+/// `fresh` (a live profile change: the photo kept is older than it, so it never wins).
+pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>, fresh: bool) -> rusqlite::Result<()> {
     let org = match &u.org {
         Org::Own => None,
         Org::External(name) => Some(name.unsanitized()),
@@ -109,10 +110,10 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?11)
          ON CONFLICT (workspace, id) DO UPDATE SET ord = COALESCE(?3, ord), name = ?4, display_name = ?5,
              org = ?6, bot = ?7, presence = ?8,
-             avatar = CASE WHEN (?9 = '' OR (?11 AND NOT avatar_guessed AND avatar <> '')) AND NOT ?10
+             avatar = CASE WHEN (?9 = '' OR (?11 AND NOT ?12 AND NOT avatar_guessed AND avatar <> '')) AND NOT ?10
                  THEN avatar ELSE ?9 END,
-             avatar_guessed = CASE WHEN (?9 = '' OR (?11 AND NOT avatar_guessed AND avatar <> '')) AND NOT ?10
-                 THEN avatar_guessed ELSE ?11 END",
+             avatar_guessed = CASE WHEN (?9 = '' OR (?11 AND NOT ?12 AND NOT avatar_guessed AND avatar <> ''))
+                 AND NOT ?10 THEN avatar_guessed ELSE ?11 END",
         params![
             u.workspace.as_str(),
             u.id.as_str(),
@@ -124,7 +125,8 @@ pub(crate) fn put_user(tx: &Transaction<'_>, u: &User, ord: Option<usize>) -> ru
             presence_code(u.presence),
             u.avatar.as_deref().unwrap_or_default(),
             u.no_photo,
-            u.avatar_guessed
+            u.avatar_guessed,
+            fresh
         ],
     )?;
     Ok(())
@@ -269,7 +271,7 @@ fn write(tx: &Transaction<'_>, ord: usize, ws: &WorkspaceId, s: &Snapshot) -> ru
         )?;
     }
     for (i, u) in s.users.iter().enumerate() {
-        put_user(tx, u, Some(i))?;
+        put_user(tx, u, Some(i), false)?;
     }
     for (i, sec) in s.sections.iter().enumerate() {
         tx.execute(
@@ -363,6 +365,19 @@ impl Store {
         let tx = self.conn.transaction()?;
         for (ord, w) in snapshot.workspaces.iter().enumerate() {
             write(&tx, ord, &w.id, snapshot)?;
+        }
+        tx.commit()
+    }
+
+    /// Keep `users` as a live profile change says they are now: the photo each gives replaces the
+    /// one kept, given or guessed (the writer only).
+    pub fn put_people(&mut self, users: &[User]) -> rusqlite::Result<()> {
+        if self.read_only() {
+            return Ok(());
+        }
+        let tx = self.conn.transaction()?;
+        for u in users {
+            put_user(&tx, u, None, true)?;
         }
         tx.commit()
     }

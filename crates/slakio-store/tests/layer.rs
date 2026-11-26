@@ -624,3 +624,45 @@ async fn sections_a_boot_does_not_know_stay_and_slack_s_that_follow_are_kept() {
     r.settled().await;
     assert_eq!(r.cache.snapshot(vec![ws]).await.unwrap().sections, sections);
 }
+
+/// A live profile change is kept as it says the person is now: its photo, only a guess, replaces
+/// an older given one kept, and the next run still shows it (a sections update re-keeping the
+/// boot's answer meanwhile carries it too).
+#[tokio::test]
+async fn a_live_photo_change_outlasts_a_restart_over_an_older_given_photo() {
+    use slakio_core::backend::Live;
+    use slakio_core::model::User;
+    let (dir, w) = (scratch("live-photo"), world());
+    let mut s = snapshot(&w);
+    let i = s.users.iter().position(|u| u.avatar.is_some()).expect("the world has photos");
+    s.users[i].avatar_guessed = false;
+    let ws = s.workspaces[0].id.clone();
+    let given = s.users[i].avatar.clone().unwrap();
+    // A new photo, its 72-pixel copy only guessed from the upload.
+    let guess = given.replace("_72.png", "-new_72.png");
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, Command::Boot);
+    let req = r.backend_next().await;
+    r.answer(req.id, Event::Booted(Box::new(s.clone()))).await;
+    assert!(matches!(r.ui_next().await.event, Event::Booted(_)));
+    let changed = User { avatar: Some(guess.clone()), avatar_guessed: true, ..s.users[i].clone() };
+    let live = Live::People { workspace: ws.clone(), users: vec![changed] };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(live))).await;
+    r.ui_next().await;
+    let sections = Live::Sections {
+        workspace: ws.clone(),
+        sections: s.sections.clone(),
+        places: s.conversations.iter().map(|c| (c.id.clone(), c.section.clone())).collect(),
+    };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(sections))).await;
+    r.ui_next().await;
+    r.settled().await;
+    r.no_faults();
+    drop(r);
+    // The next run: the cache's boot.
+    let r = run(&dir, &ws, Caps::default(), false).await;
+    let back = r.cache.snapshot(vec![ws.clone()]).await.unwrap();
+    let u = back.users.iter().find(|u| u.id == s.users[i].id).unwrap();
+    assert_eq!((u.avatar.clone(), u.avatar_guessed), (Some(guess), true), "the change's photo, not the older one");
+    r.no_faults();
+}

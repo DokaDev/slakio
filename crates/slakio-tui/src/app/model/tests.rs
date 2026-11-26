@@ -438,6 +438,29 @@ fn a_guessed_photo_does_not_replace_a_given_one_but_a_given_one_replaces_a_guess
     assert!(!m.user(&a, &me).unwrap().avatar_guessed);
 }
 
+/// A live profile change's photo replaces the one known, a given one too, even when it is only
+/// a guess (the one known is older than the change); one that gives none keeps it.
+#[test]
+fn a_live_change_s_guessed_photo_replaces_a_given_one() {
+    let (a, part_a) = part(0);
+    let host = slakio_core::images::AVATAR_HOSTS[0];
+    let (given, guess) = (format!("https://{host}/me-real_72.png"), format!("https://{host}/2026-02-01/T1-U1_72.png"));
+    let me = part_a.workspaces[0].me.clone();
+    let mut s = part_a.clone();
+    for u in s.users.iter_mut().filter(|u| u.id == me) {
+        (u.avatar, u.avatar_guessed) = (Some(given.clone()), false);
+    }
+    let mut m = Model::default();
+    m.sign_ins(&signed(&model())[..1]);
+    m.merge(&a, &s, false);
+    let known = m.user(&a, &me).unwrap().clone();
+    m.change_users(&a, &[User { avatar: None, ..known.clone() }]);
+    assert_eq!(m.user(&a, &me).unwrap().avatar, Some(given), "a change without a photo keeps it");
+    m.change_users(&a, &[User { avatar: Some(guess.clone()), avatar_guessed: true, ..known }]);
+    let u = m.user(&a, &me).unwrap();
+    assert_eq!((u.avatar.clone(), u.avatar_guessed), (Some(guess), true), "the change's photo");
+}
+
 /// A record that says the person has no photo of their own drops the photo known, as a page
 /// brings it, as a workspace's boot does and as a whole new boot does.
 #[test]

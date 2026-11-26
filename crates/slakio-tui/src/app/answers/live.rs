@@ -86,7 +86,7 @@ impl App {
                     })
                     .collect();
                 self.model.rename_dms(&workspace, &known);
-                self.model.add_users(&workspace, &known);
+                self.model.change_users(&workspace, &known);
                 !known.is_empty()
             }
             Live::Connection { workspace, state } => self.on_connection(workspace, state, now),
