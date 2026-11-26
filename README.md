@@ -368,7 +368,9 @@ background and decoded off the screen's thread.
   `pictures.log.1`). It holds stages, counts, HTTP statuses and host names only: no address
   past its host, no token, cookie, name, id, emoji name or message text; a picture is told apart
   by a short hash that changes every run. With it on, slakio also reads the shape of your
-  sidebar's sections once per workspace (field names and counts only) and nothing else changes.
+  sidebar's sections once per workspace, of what the start tells of your team and of other
+  organizations' people, and of a page's reactions and emoji (field names and counts only),
+  and nothing else changes.
   Have a look at the file before you share it, and delete it when you are done.
 
 ## Keys

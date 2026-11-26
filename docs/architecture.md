@@ -255,14 +255,22 @@ every rail sits in the transport, below the backend, so no caller can go around 
    (counts, lookups) may use 90, so what the user waits for always has room; 1,500 an hour;
    and a safety ceiling of 10,000 for a run, after which all network stops until the program
    starts again. Over a cap a request fails with `CapReached` and is not sent.
-   Pictures (profile photos, a workspace's emoji and file thumbnails, `Governor::picture`) are
-   background requests with a share of their own inside the background shares: at most 30 a
+   A file's smaller copy (a preview, on the file host with the session's cookie) is a
+   background request with a share of its own inside the background shares: at most 30 a
    minute and 350 an hour of a workspace's 60 and 700, and 45 a minute and 500 an hour of the
-   process's 90 and 1,000 (`Limits::lane_picture_*`, `Limits::picture_*`). So however many
-   pictures a screen wants, the socket's opening, its catching up and the people lookups always
-   have the rest. A picture over its share fails with `CapReached` like any other, is asked
-   again a minute later (`images::RETRY_AFTER`) and shows as text or initials meanwhile; it
-   still counts on the minute, the hour and the run.
+   process's 90 and 1,000 (`Limits::lane_picture_*`, `Limits::picture_*`). Over it a preview
+   fails with `CapReached`, is asked again a minute later (`images::RETRY_AFTER`) and shows as
+   "not loaded" meanwhile; it counts on the minute, the hour and the run like any request.
+   Profile photos and a workspace's emoji (the avatar and emoji hosts, no session) keep to the
+   picture hosts' budget instead (`governor::cdn`, `CdnLimits`), which never touches the API's
+   shares nor its run total: 300 a minute and 3,000 an hour for the process, of which the
+   pictures asked for the list and ahead take at most two thirds, at most 12 at once, and an
+   alarm of its own at 20,000 a run, past which every later photo or emoji is refused for the
+   run (initials and `:name:` stay; one diagnostics line says so) while the API goes on. A
+   picture host that answers 429 is not asked again for its `Retry-After` (30 seconds when it
+   does not say, at most an hour); the others go on. Which budget a picture takes follows its
+   kind (`Source`), never its host. So however many pictures a screen wants, the socket's
+   opening, its catching up and the people lookups always have their room.
    When Slack asks to slow down (HTTP 429 or `ratelimited`), that method is paused for its
    `Retry-After` (30 seconds when Slack does not say); a paused method fails with
    `RateLimited` without being sent, and the other methods go on. A method Slack allows only a
@@ -306,9 +314,14 @@ at most 2 (`picture::AVATAR_REDIRECTS`), each only to an address `images::avatar
 (a Gravatar address only when it names Gravatar's own parameters alone, plainly and with no `;`,
 and each `d=`/`default=` fallback it names is a keyword or on Slack's avatar hosts), each hop
 counted. The user's own photo comes from the start bundle's `self`
-profile, else from the edge `users/info` lookup the boot already makes for the DMs' people. Each ask counts as a background request of the workspace's lane (`Governor::picture`);
-at most four at once a workspace, each within 25 s in all (`picture::DEADLINE`, however its
-bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
+profile, else from the edge `users/info` lookup the boot already makes for the DMs' people.
+A photo slakio makes from the uploaded original (`images::avatar_sized`, `User::avatar_guessed`)
+never replaces one Slack gave, in the model or the cache; refused (401, 403, 404, 410) before
+any redirect, it is asked at most `picture::AVATAR_FALLBACKS` (2) more times, at the same file's
+other names on the avatar host (`images::avatar_fallbacks`), each checked and counted. A
+preview's ask counts as a background request of the workspace's lane (`Governor::picture`), a
+photo's or an emoji's in the picture hosts' budget, holding one of its 12 places over all its
+hops; each within 25 s in all (`picture::DEADLINE`, however its bytes trickle). Only an answer whose type is `image/…` is read, at most `images::BYTES_MAX`
 bytes (said or counted). The UI decodes it on a blocking task, the size read
 from the header first and refused over `images::SIDE_MAX` a side or `images::PIXELS_MAX`
 pixels, makes it smaller and sends it to the terminal once as a kitty graphics virtual
@@ -329,7 +342,14 @@ refusal); a failure is never said. The backend reads it into what each name draw
 (`images::emoji::resolve`): its picture only when `images::emoji_address` keeps the address
 (the emoji host, `https`, no port, no user), aliases followed at most `ALIAS_DEPTH` (4) times
 with a guard against cycles, an alias of a name the workspace lacks kept as that standard
-emoji's name. An emoji's picture is `images::Source::Emoji`, asked for only when a frame draws
+emoji's name. A name written in conjoining Hangul jamo (as a Mac writes an uploaded file's
+name) is read as its syllables (`images::emoji::compose_hangul`), in the list and in text and
+reactions, the typed form winning where both are listed; only modern Hangul composes (other
+scripts' decomposed letters, archaic and leftover jamo stay refused). A reaction or a rich-text
+emoji that comes with its picture's address (another workspace's, in a shared channel) gives
+its message that address (`Message::emoji_pictures`, at most 16, on the emoji host only); it is
+drawn only once the workspace's own list is in and lacks the name, and is not kept in the
+cache. A link's label draws a standard emoji's shortcode as that emoji. An emoji's picture is `images::Source::Emoji`, asked for only when a frame draws
 it, fetched like a photo (no cookie, no token, no `Origin`, no `Referer`), following at most 2
 redirects (`picture::EMOJI_REDIRECTS`) each only to the emoji host and counted; decoded whole
 into two cells of a row (`Shape::Emoji`, first frame of a GIF) and drawn as two placeholder
@@ -343,8 +363,11 @@ neither is removed or fails). The least recently drawn goes first, never one the
 frame or the one before it looked at; when all are on screen a list photo makes room for a
 timeline picture, else the new picture is not sent and is parked until the screen changes (the
 set of pictures a shown frame looks at differs from the frame before's). After a frame the
-timeline's pictures are asked before the list's photos, at most `IN_FLIGHT_MAX` (4) at once and
-none while the pictures on screen and those on their way fill the room. A frame draws at most
+timeline's pictures are asked before the list's photos, at most `IN_FLIGHT_MAX` (4) previews and
+`CDN_IN_FLIGHT_MAX` (12) photos and emoji at once, and none while the pictures on screen and
+those on their way fill the room. A photo or an emoji that failed for a while is asked again
+after 2, 5, then 15 seconds (`images::backoff`; a 429's own wait when longer), a preview after
+a minute; a passing failure of one shape leaves the other free. A frame draws at most
 `EMOJI_PER_FRAME` (32) distinct emoji pictures, counted in the order it lays them out; a
 message only measured to place the view gives its part back (`Images::not_shown`) and is laid
 out again if it is shown after all, so only what is shown counts. The rest stay `:name:`.
@@ -400,8 +423,9 @@ truth for the span it covers, the whole timeline replaced when it does not reach
 loaded when it was asked (no gap is hidden), what came live meanwhile kept after it; one that
 fails is asked again by itself after a pause that doubles up to 15 minutes. Each workspace's
 socket is its own; one that fails holds none back, and the background share is split so it
-cannot spend another's either (`Limits::lane_background_*`); its pictures keep to their part of
-that share (`Limits::lane_picture_*`), so a reopening never waits for them.
+cannot spend another's either (`Limits::lane_background_*`); its previews keep to their part of
+that share (`Limits::lane_picture_*`) and its photos and emoji to the picture hosts' budget, so
+a reopening never waits for them.
 
 The backend (`slakio_slack::serve`) owns a `BackendEnd`: every request gets one answer, a change
 is refused before any request, and a newer page of the same conversation or thread supersedes
