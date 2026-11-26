@@ -157,19 +157,21 @@ fn a_conversation_goes_to_the_first_section_that_takes_it() {
     let s = Sidebar::new("T1", Some(list), &Diag::default());
     let all = Facts { dm: true, starred: true, external: true, app: true };
     assert_eq!(s.place("C1", all).as_str(), "T1:custom:LC", "a section of the user's own first");
-    assert_eq!(s.place("D1", all).as_str(), "T1:stars");
-    assert_eq!(s.place("D1", Facts { starred: false, ..all }).as_str(), "T1:external");
+    assert_eq!(s.place("D1", all).as_str(), "T1:apps", "an app DM goes to Apps, starred or not");
+    assert_eq!(s.place("D1", Facts { starred: false, ..all }).as_str(), "T1:apps", "Apps comes before External");
+    assert_eq!(s.place("D3", Facts { app: false, ..all }).as_str(), "T1:stars");
+    assert_eq!(s.place("D3", Facts { app: false, starred: false, ..all }).as_str(), "T1:external");
     assert_eq!(s.place("D1", Facts { dm: true, app: true, ..Facts::default() }).as_str(), "T1:apps");
     let channel = Facts { app: true, ..Facts::default() };
     assert_eq!(s.place("C2", channel).as_str(), "T1:channels", "only a DM is an app's");
     assert_eq!(s.place("D2", Facts { dm: true, ..Facts::default() }).as_str(), "T1:dms");
-    // Without Slack listing them, shared and app conversations stay where they were (a starred
-    // one goes to the default Starred).
+    // Without Slack listing them, shared and app conversations stay where they were; a starred
+    // app DM goes to Direct messages, never Starred.
     let plain = Sidebar::new("T1", None, &Diag::default());
     let unstarred = Facts { starred: false, ..all };
     assert_eq!(plain.place("D1", unstarred).as_str(), "T1:dms");
     assert_eq!(plain.place("C1", Facts { dm: false, ..unstarred }).as_str(), "T1:channels");
-    assert_eq!(plain.place("D1", all).as_str(), "T1:stars");
+    assert_eq!(plain.place("D1", all).as_str(), "T1:dms");
 }
 
 #[test]

@@ -428,7 +428,7 @@ fn a_closed_dm_or_group_dm_is_listed_closed_and_keeps_its_section() {
     let s = with_sidebar(b, None, Vec::new(), NOW, Sidebar::new("T1", Some(listed), &Diag::default()));
     let state = |id| (find(&s, id).closed, find(&s, id).section.as_str().to_string());
     assert_eq!(state("G1"), (false, "T1:dms".into()), "open");
-    assert_eq!(state("G2"), (true, "T1:stars".into()), "starred, not open: kept in Starred");
+    assert_eq!(state("G2"), (true, "T1:stars".into()), "starred, not open: in Starred, hidden while closed");
     assert_eq!(state("G3"), (true, "T1:custom:LC".into()), "in a section of the user's own, not open");
     assert_eq!(state("G4"), (true, "T1:dms".into()));
     assert_eq!(state("D1"), (false, "T1:dms".into()));
