@@ -143,12 +143,14 @@ async fn run(mut end: BackendEnd, mut inner: BackendHandle, front: Front) {
                             }
                         }
                         // A profile change is kept as it says the person is now, and the boot
-                        // answer kept for the sections carries it too.
+                        // answer kept for the sections carries it too (its names and photo).
                         slakio_core::backend::Live::People { workspace, users } if *workspace == front.workspace => {
                             let users: Vec<_> = users.iter().filter(|u| u.workspace == front.workspace).cloned().collect();
                             for u in last.iter_mut().flat_map(|s| s.users.iter_mut()) {
                                 if let Some(new) = users.iter().find(|n| n.id == u.id) {
                                     (u.avatar, u.avatar_guessed) = new.changed_over(u.avatar.as_ref().map(|a| (a, u.avatar_guessed)));
+                                    (u.name, u.display_name) = (new.name.clone(), new.display_name.clone());
+                                    u.no_photo = new.no_photo;
                                 }
                             }
                             cache.put_people(users);

@@ -719,3 +719,39 @@ async fn a_live_profile_change_keeps_what_it_does_not_tell_and_adds_no_one() {
     let n: i64 = db.query_row("SELECT count(*) FROM users WHERE id = 'UNOBODY'", [], |row| row.get(0)).unwrap();
     assert_eq!(n, 0, "a person not kept is not added");
 }
+
+/// A live rename outlasts a sections update that keeps the boot's answer again, and a restart.
+#[tokio::test]
+async fn a_live_rename_outlasts_a_sections_update_and_a_restart() {
+    use slakio_core::backend::Live;
+    use slakio_core::model::User;
+    use slakio_core::sanitize::Remote;
+    let (dir, w) = (scratch("live-rename"), world());
+    let s = snapshot(&w);
+    let ws = s.workspaces[0].id.clone();
+    let mut r = run(&dir, &ws, Caps::default(), false).await;
+    r.ask(1, Command::Boot);
+    let req = r.backend_next().await;
+    r.answer(req.id, Event::Booted(Box::new(s.clone()))).await;
+    assert!(matches!(r.ui_next().await.event, Event::Booted(_)));
+    let renamed =
+        User { name: Remote::new("renamed.handle"), display_name: Remote::new("Renamed Person"), ..s.users[0].clone() };
+    let live = Live::People { workspace: ws.clone(), users: vec![renamed.clone()] };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(live))).await;
+    r.ui_next().await;
+    let sections = Live::Sections {
+        workspace: ws.clone(),
+        sections: s.sections.clone(),
+        places: s.conversations.iter().map(|c| (c.id.clone(), c.section.clone())).collect(),
+    };
+    r.answer(Generation::PUSHED, Event::Live(Box::new(sections))).await;
+    r.ui_next().await;
+    r.settled().await;
+    r.no_faults();
+    drop(r);
+    let r = run(&dir, &ws, Caps::default(), false).await;
+    let back = r.cache.snapshot(vec![ws.clone()]).await.unwrap();
+    let u = back.users.iter().find(|u| u.id == renamed.id).unwrap();
+    assert_eq!((&u.name, &u.display_name), (&renamed.name, &renamed.display_name), "the live rename, not the boot's");
+    r.no_faults();
+}
