@@ -106,10 +106,15 @@ images, and settings. This README only lists what works; it will grow with each 
     for a thread on a narrow screen, the status line names the workspace and the view;
   - each DM shows whether its person is active (`●`), away (`○`) or in do not disturb (`◐`),
     in the list and in the conversation's title;
-  - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold
-    with mention counts; `Enter` or a click opens the conversation in the work area and moves
-    there, `l` opens it and stays in the list; Home ends with Saved, the messages kept without
-    a reminder;
+  - the list panel shows sections (fold with `Enter`), channels and DMs, unread ones in bold with
+    mention counts and read ones muted; Starred lists no DM closed in Slack's sidebar, and a DM
+    with an app goes to Apps (when Slack lists that section) rather than Starred or Direct
+    messages; a channel shared with another organization starts with `⌗` (the share glyph with
+    icons on) and has no link mark at the row's end; your own DM says `you` after its name (the
+    Korean word in Korean), and a DM shows its person's status emoji after the name; a group DM
+    starts with how many people are in it and is named by two of them and the rest (`Ann, Bob and
+    6 others`); `Enter` or a click opens the conversation in the work area and moves there, `l`
+    opens it and stays in the list; Home ends with Saved, the messages kept without a reminder;
   - To-dos (`Space o`, also `Space l` and `:later`, Later's names before Slack renamed it)
     lists a filter row, then In progress and Completed (each folds with `Enter`): each to-do
     shows its author's chip, its text and its reminder (`Overdue` in the warning colour, or `in
@@ -292,7 +297,8 @@ shows its first frame) has a preview under its card, at most 36 × 10 cells, and
 `avatars = "image"` (or `:avatars image`) the comfortable layout shows people's profile photos
 in place of their initials, and each DM in the list shows its peer's photo, small, in the two
 cells of their initials (group DMs keep how many people are in them; only the rows on screen
-fetch their photos, and a photo shown in both places is fetched for each). Elsewhere, and
+fetch their photos, and a photo shown in both places is fetched for each); an open DM's title
+starts with the same photo, with nothing more fetched. Elsewhere, and
 until a picture has come, the text card and the initials show as before; a picture that cannot
 be shown says why on its card (too large, no preview, not loaded). A workspace's own emoji show as small pictures, two cells wide, in a
 message's text and in its reaction chips (a line never breaks inside one); a GIF or animated PNG
