@@ -86,7 +86,10 @@ pub(super) fn people<'a>(diag: &Diag, entries: impl Iterator<Item = &'a Value>, 
         .take(super::ENTRIES_MAX)
         .filter(|p| p.get("team_id").and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != own))
         .collect();
-    diag.line(Kind::TeamShape, Stage::Counted, "external_users", &[("count", &others.len().to_string())]);
+    // None of another workspace is told once a run; some, each time.
+    if !others.is_empty() || diag.first(Kind::TeamShape, Stage::Counted, "external_users") {
+        diag.line(Kind::TeamShape, Stage::Counted, "external_users", &[("count", &others.len().to_string())]);
+    }
     let teamish = |k: &str, words: &[&str]| words.iter().any(|w| k.contains(w));
     names(diag, "external_user_key", others.iter().copied(), |k| teamish(k, &TEAMISH));
     names(diag, "external_profile_key", others.iter().filter_map(|p| p.get("profile")), |k| teamish(k, &["team"]));

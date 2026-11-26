@@ -390,3 +390,32 @@ fn the_team_and_reaction_probes_log_key_names_only() {
         assert!(text.lines().all(|l| !l.contains("Partner Co") && !l.contains("Partner Person")), "{text}");
     });
 }
+
+/// The page probes are told once per page kind, however many pages come; a lookup that finds
+/// none of another workspace says so once.
+#[test]
+fn two_history_pages_give_the_page_probes_once() {
+    rt().block_on(async {
+        let mut r = Run::new("probes-once", None).await;
+        assert!(matches!(r.ask(Command::Boot).await, Event::Booted(_)));
+        let team = World::demo().snapshot().workspaces[0].id.as_str().to_string();
+        let mine = json!({"id": "UMINE1", "team_id": team, "name": "mine", "profile": {"display_name": "Mine"}});
+        for k in 0..2 {
+            r.fake.fail_next("users/info", Fault::Answer(json!({"ok": true, "results": [mine.clone()]})));
+            let message = json!({"type": "message", "ts": format!("170000010{k}.000000"), "user": "UMINE1",
+                "text": "hi", "reactions": [{"name": "wave", "count": 1, "users": ["UMINE1"]}]});
+            r.fake.fail_next("conversations.history", Fault::Answer(json!({"ok": true, "messages": [message]})));
+            let before = Some(slakio_core::model::Ts(1_800_000_000_000_000 - k));
+            let page = r.ask(Command::History { target: general(), before, limit: 28 }).await;
+            assert!(matches!(page, Event::History(_)));
+        }
+        let text = r.text();
+        for line in [
+            "reaction-shape counted url_on_reaction count=0 page=history",
+            "reaction-shape field reaction_key name=name",
+        ] {
+            assert_eq!(text.matches(line).count(), 1, "`{line}` once in\n{text}");
+        }
+        assert!(text.matches("external_users count=0").count() <= 1, "none of another workspace told once:\n{text}");
+    });
+}
