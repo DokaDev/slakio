@@ -13,7 +13,7 @@
 //! ╰────────────────────────────────╯╰────────────────────────╯
 //! ```
 
-use super::{avatar_chip, frame, panel, presence_mark, timeline};
+use super::{avatar_chip, frame, list, panel, presence_mark, timeline};
 use crate::action::{Action, PaneAction};
 use crate::app::composer::View;
 use crate::app::pane::Pane;
@@ -133,12 +133,23 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
         .workspace(pane.target.workspace())
         .map(|w| Span::styled("▌", t.workspace(w.color)))
         .unwrap_or_default();
-    let text = if thread { format!("⤷ {} · {name} ", thread_name(app, pane)) } else { format!("{name} ") };
+    // A channel shared with another organization is titled `⌗partner-shared` (with icons, its
+    // glyph and the blank of its slot); the tabs and the status line keep `#`.
+    let shared = conversation.filter(|c| c.external && c.kind == ConversationKind::Channel { private: false });
+    let titled = match shared {
+        Some(c) if app.settings.icons => format!("{} {}", list::ICON_SHARED, c.name.line()),
+        Some(c) => format!("{}{}", list::SHARED_MARK, c.name.line()),
+        None => name.clone(),
+    };
+    let lead = if thread { format!("⤷ {} · ", thread_name(app, pane)) } else { String::new() };
+    let text = format!("{lead}{titled} ");
     let peer = match conversation.map(|c| &c.kind) {
         Some(ConversationKind::Dm { user }) if !thread => app.model.user(pane.target.workspace(), user),
         _ => None,
     };
     let mut spans = vec![Span::raw(" "), stripe];
+    let glyph_x = (shared.is_some() && app.settings.icons)
+        .then(|| area.x + 1 + spans.iter().map(|s| s.width() as u16).sum::<u16>() + width(&lead) as u16);
     // A DM's title starts with its peer's avatar chip: `MK @Minsu Kim`.
     if let Some(chip) = peer.and_then(|u| avatar_chip(app, &u.workspace, &u.id, u.display_name.line().as_str())) {
         spans.extend([chip, Span::raw(" ")]);
@@ -162,6 +173,10 @@ fn draw_pane(f: &mut Frame, app: &App, pane: &Pane, (layout, view): (&PaneLayout
     let title = Line::from(fit(spans, usize::from(area.width).saturating_sub(4)));
     let title_w = title.width() as u16;
     f.render_widget(panel(app, focused, title), area);
+    // The glyph in its two-cell slot, when the title holds it whole.
+    if let Some(x) = glyph_x.filter(|x| x + 2 <= area.x + 1 + title_w) {
+        super::glyph_cell(f.buffer_mut(), x, area.y, list::ICON_SHARED, t.title(focused));
+    }
     let insert = focused && pane.insert;
     let before = pane.links.borrow().clone();
     timeline::draw(f, app, pane, layout.parts.messages, focused);

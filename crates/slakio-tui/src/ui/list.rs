@@ -16,7 +16,7 @@
 //! │                           │
 //! │ ▸ Ops                 2   │   folded: how many of its conversations are unread
 //! │   ▪ secret-proj           │   ▪ = private
-//! │   # partner-shared    ext │   ext = shared with another organization
+//! │   ⌗ partner-shared        │   ⌗ = shared with another organization
 //! │   # feed-customer-1…  1   │   names end in … where they would touch the pill
 //! │   MK● Minsu Kim           │   a DM: its peer's avatar chip, and at its corner whether
 //! │   JL◐ Jiyoung Lee         │   they are active (●), away (○) or in do not disturb (◐)
@@ -49,10 +49,13 @@ use ratatui::widgets::Paragraph;
 use slakio_core::i18n::Label;
 use slakio_core::model::{ConversationKind, Presence};
 
-/// Nerd Font glyphs: `nf-md-lock` (a private channel) and `nf-md-link_variant` (a channel shared
-/// with another organization).
+/// Nerd Font glyphs: `nf-md-lock` (a private channel), `nf-md-link_variant` (a DM with another
+/// organization) and `nf-md-share_variant` (a channel shared with another organization).
 const ICON_PRIVATE: &str = "\u{F033E}";
 const ICON_EXTERNAL: &str = "\u{F0339}";
+pub(super) const ICON_SHARED: &str = "\u{F0497}";
+/// A channel shared with another organization with icons off: one cell wide on every terminal.
+pub(super) const SHARED_MARK: &str = "\u{2317}";
 
 pub(super) fn draw(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
@@ -230,7 +233,10 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
         Row::Conversation(i) => {
             let c = app.model.conversation(i);
             let icons = app.settings.icons;
+            // A private channel keeps its lock when shared too: access is the stronger fact.
             let prefix = match (&c.kind, icons) {
+                (ConversationKind::Channel { private: false }, false) if c.external => SHARED_MARK,
+                (ConversationKind::Channel { private: false }, true) if c.external => ICON_SHARED,
                 (ConversationKind::Channel { private: false }, _) => "#",
                 (ConversationKind::Channel { private: true }, false) => "▪",
                 (ConversationKind::Channel { private: true }, true) => ICON_PRIVATE,
@@ -302,7 +308,7 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                     (x + 2, x + 4)
                 }
                 None => {
-                    if prefix == ICON_PRIVATE {
+                    if prefix == ICON_PRIVATE || prefix == ICON_SHARED {
                         super::glyph_cell(f.buffer_mut(), area.x + x, area.y, prefix, prefix_style);
                     } else {
                         put(f, area, x, 1, vec![Span::styled(prefix, prefix_style)]);
@@ -310,7 +316,9 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                     (x, x + 2)
                 }
             };
-            let mut tag = match (c.external, icons) {
+            // Only a DM ends with its link; a shared channel says so by its prefix.
+            let external = c.external && c.is_dm();
+            let mut tag = match (external, icons) {
                 (false, _) => String::new(),
                 (true, false) => format!(" {}", app.i18n.label(Label::ListExternal)),
                 // The glyph and the blank of its slot.
@@ -336,10 +344,23 @@ fn draw_row(f: &mut Frame, app: &App, row: Row, area: Rect) -> Option<(u16, Pres
                 spans.push(Span::styled(tag, t.faint()));
             }
             put(f, area, name_x, name_w + tag_w, spans);
-            if icons && c.external {
+            if icons && external {
                 super::glyph_cell(f.buffer_mut(), area.x + name_x + name_w + 1, area.y, ICON_EXTERNAL, t.faint());
             }
             presence.filter(|_| !c.muted).map(|(_, p)| (area.x + mark_x, p))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SHARED_MARK;
+
+    /// The shared mark is one cell wide on every terminal, also where East Asian ambiguous width
+    /// is drawn wide (common with Korean), so a row's name never shifts.
+    #[test]
+    fn the_shared_mark_is_one_cell_wide_on_ambiguous_wide_terminals_too() {
+        use unicode_width::UnicodeWidthStr;
+        assert_eq!((SHARED_MARK.width(), SHARED_MARK.width_cjk()), (1, 1));
     }
 }

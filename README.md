@@ -16,8 +16,9 @@ shows only its mentions of you, a muted DM nothing); opening a conversation show
 messages, older ones as you scroll up, and a message's thread when you open it (a thread of
 more than 3,000 replies shows its first 3,000, and says so). Messages show Slack's formatting (bold, italic, strike, code and code
 blocks, quotes, links, people and channels by name, emoji); a bot's sections and attachments
-show as text, and a bot's or app's message is marked `app`. Channels shared with another
-organization and people and bots from it are marked `ext`,
+show as text, and a bot's or app's message is marked `app`. A channel shared with another
+organization starts with `⌗` (a share icon with icons on) in place of `#`, and people and bots
+from it are marked `ext`,
 and people in do not disturb `◐` (the status line shows it when it is you). It only
 reads: it sends no message, reacts to nothing and marks nothing as read. Messages posted,
 edited and deleted show as they happen in the conversations and threads open, and the unread
